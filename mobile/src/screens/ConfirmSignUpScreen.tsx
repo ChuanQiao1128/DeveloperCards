@@ -17,7 +17,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import type { RootStackParamList } from '../navigation/types';
 import { useAuthStore } from '../auth/authStore';
-import { friendlyAuthError } from '../auth/authErrors';
+import { friendlyAuthError, isAuthFlowError } from '../auth/authErrors';
 import { leaveAuthFlow, type LeaveAuthNavigation } from '../auth/leaveAuthFlow';
 import { recordFunnelEvent } from '../telemetry/funnel';
 
@@ -62,6 +62,16 @@ export default function ConfirmSignUpScreen({ navigation, route }: Props) {
         { text: 'Continue', onPress: () => navigation.popTo('SignIn', { email }) },
       ]);
     } catch (e: any) {
+      // 2026-11-01: confirming an already-verified account is not a failure —
+      // Cognito answers NotAuthorizedException("Current status is CONFIRMED")
+      // and authStore converts it to a typed AuthFlowError so we can point
+      // the user at sign-in instead of the generic "something went wrong".
+      if (isAuthFlowError(e, 'ALREADY_CONFIRMED')) {
+        Alert.alert('Already verified', e.message, [
+          { text: 'Sign in', onPress: () => navigation.popTo('SignIn', { email }) },
+        ]);
+        return;
+      }
       Alert.alert('Confirm failed', friendlyAuthError(e));
     }
   }

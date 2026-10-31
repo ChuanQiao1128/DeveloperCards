@@ -165,7 +165,10 @@ describe('auth recovery screens', () => {
     expect(navigation.navigate).toHaveBeenCalledWith('ConfirmSignUp', { email: 'user@example.com' });
   });
 
-  it('sign-up with an existing unconfirmed email resends the code and opens ConfirmSignUp', async () => {
+  it('sign-up with an existing email alerts and offers sign-in instead of sending a code', async () => {
+    // 2026-11-01: with PreventUserExistenceErrors ENABLED, ResendConfirmationCode
+    // always succeeds, so the old resend-as-probe never detects a confirmed
+    // account. The screen must say the account exists and offer sign-in.
     store.signUpWithEmail.mockRejectedValue(new AuthFlowError('USERNAME_EXISTS', 'already exists'));
     store.resendConfirmCode.mockResolvedValue(undefined);
 
@@ -188,8 +191,43 @@ describe('auth recovery screens', () => {
     });
     await flush();
 
-    expect(store.resendConfirmCode).toHaveBeenCalledWith('user@example.com');
-    expect(navigation.replace).toHaveBeenCalledWith('ConfirmSignUp', { email: 'user@example.com' });
+    expect(store.resendConfirmCode).not.toHaveBeenCalled();
+    expect(mockAlert).toHaveBeenCalledWith(
+      'Account already exists',
+      'This email already has an account. Sign in instead.',
+      expect.any(Array),
+    );
+  });
+
+  it('confirming an already-verified account offers sign-in instead of a generic error', async () => {
+    store.confirmSignUpCode.mockRejectedValue(
+      new AuthFlowError('ALREADY_CONFIRMED', 'This email is already verified. Please sign in.'),
+    );
+
+    const navigation = makeNav();
+    let tree!: renderer.ReactTestRenderer;
+    await act(async () => {
+      tree = renderer.create(
+        <ConfirmSignUpScreen
+          navigation={navigation as any}
+          route={{ key: 'confirm', name: 'ConfirmSignUp', params: { email: 'user@example.com' } } as any}
+        />,
+      );
+    });
+
+    await act(async () => {
+      byPlaceholder(tree, '123456').props.onChangeText('123456');
+    });
+    await act(async () => {
+      byPlaceholder(tree, '123456').props.onSubmitEditing();
+    });
+    await flush();
+
+    expect(mockAlert).toHaveBeenCalledWith(
+      'Already verified',
+      'This email is already verified. Please sign in.',
+      expect.any(Array),
+    );
   });
 
   it('forgot password sends a code, then sets the new password and returns to sign-in', async () => {

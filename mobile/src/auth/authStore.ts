@@ -403,6 +403,18 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       return 'needs_sign_in';
     } catch (err: any) {
       if (generation !== getAuthSessionGeneration()) return 'needs_sign_in';
+      // 2026-11-01: Cognito rejects ConfirmSignUp for an already-confirmed
+      // account with NotAuthorizedException("Current status is CONFIRMED").
+      // Keep the typed code so the confirm screen can route to sign-in
+      // instead of showing the generic fallback.
+      if (
+        err?.name === 'NotAuthorizedException' &&
+        /current status is confirmed/i.test(String(err?.message ?? ''))
+      ) {
+        const flowErr = new AuthFlowError('ALREADY_CONFIRMED', 'This email is already verified. Please sign in.');
+        set({ lastError: flowErr.message });
+        throw flowErr;
+      }
       const msg = friendlyAuthError(err);
       set({ lastError: msg });
       throw new Error(msg);
