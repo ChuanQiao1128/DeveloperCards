@@ -78,7 +78,10 @@ async function renderProfile(navigate = vi.fn()) {
   let tree!: renderer.ReactTestRenderer;
   await act(async () => {
     tree = renderer.create(
-      <ProfileScreen navigation={{ navigate } as any} route={{ key: 'profile', name: 'Profile' } as any} />,
+      <ProfileScreen
+        navigation={{ navigate, goBack: vi.fn() } as any}
+        route={{ key: 'profile', name: 'Profile' } as any}
+      />,
     );
   });
   await act(async () => {

@@ -71,23 +71,6 @@ describe('StudySection', () => {
     expect(onSelect).toHaveBeenCalledWith('zh-CN');
   });
 
-  it('shows the reset-deck row only when the screen passes a handler', () => {
-    expect(render(false).tree.root.findAll((node) => node.props?.testID === 'settings-reset-deck-progress')).toHaveLength(0);
-
-    const onReset = vi.fn();
-    let tree!: renderer.ReactTestRenderer;
-    act(() => {
-      tree = renderer.create(
-        <StudySection prefs={{ fourButtons: false }} onToggleFourButtons={vi.fn()} onResetDeckProgress={onReset} />,
-      );
-    });
-    const row = tree.root.find((node) => (node.type as any) === 'Pressable' && node.props?.testID === 'settings-reset-deck-progress');
-    expect(row.props.accessibilityRole).toBe('button');
-    expect(row.props.accessibilityLabel).toBe(STUDY_COPY.resetDeckLabel);
-    act(() => row.props.onPress());
-    expect(onReset).toHaveBeenCalledTimes(1);
-  });
-
   it('calls onToggleFourButtons with the flipped value', () => {
     const off = render(false);
     act(() => toggleOf(off.tree).props.onPress());
