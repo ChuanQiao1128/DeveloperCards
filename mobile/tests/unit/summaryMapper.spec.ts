@@ -133,9 +133,9 @@ describe('summaryMapper wallet scenarios', () => {
 
     expect(fullClear.vm.nextAction.title).toBe('Cleared today. What now?');
     expect(minimumGoal.vm.nextAction.title).toBe('Streak saved. Keep moving?');
-    expect(empty.vm.nextAction.title).toBe('No session logged yet');
-    expect(empty.vm.nextAction.body).toBe('Browse your library while we wait for tomorrow’s session.');
-    expect(partialReady.vm.nextAction.title).toBe('Progress saved. Keep going?');
+    expect(empty.vm.nextAction.title).toBe('Choose your next cards');
+    expect(empty.vm.nextAction.body).toBe('No cards were studied in this session. Go to Home to continue learning or unlock your next cards.');
+    expect(partialReady.vm.nextAction.title).toBe('Choose your next cards');
   });
 
   it('keeps all primary action labels short enough for 360pt buttons', () => {
@@ -174,14 +174,14 @@ describe('summaryMapper — a run with nothing rated', () => {
       reward: null,
     });
 
-    expect(summary.vm.title).toBe('No session logged yet');
+    expect(summary.vm.title).toBe('Ready to learn');
     expect(summary.vm.subtitle).toBe('Claude Developer Foundations (CCDV-F) · no cards reviewed');
     expect(summary.vm.progress.done).toBe(0);
     expect(summary.vm.progress.total).toBe(0);
     expect(summary.vm.progress.completionLabel).toBe('Nothing reviewed this time.');
     expect(summary.vm.progress.body).toBe("No cards to review yet · 0 due cards in today's queue");
     expect(summary.vm.completionLabel).toBe('No cards reviewed');
-    expect(summary.vm.nextAction.title).toBe('No session logged yet');
+    expect(summary.vm.nextAction.title).toBe('Choose your next cards');
     expect(summary.vm.reward.fullClear).toBe(false);
     expect(summary.vm.reward.minimumGoalMet).toBe(false);
 
@@ -201,7 +201,7 @@ describe('summaryMapper — a run with nothing rated', () => {
       dueCount: 0,
       wallet: { availablePulls: 0, reservePulls: 0 },
     });
-    expect(summary.vm.title).toBe('No session logged yet');
+    expect(summary.vm.title).toBe('Ready to learn');
     expect(summary.vm.progress.total).toBe(4);
     expect(summary.vm.progress.body).toBe("0 / 4 cards · not started · 0 due cards in today's queue");
     expect(summary.vm.progress.completionLabel).toBe('Nothing reviewed this time.');

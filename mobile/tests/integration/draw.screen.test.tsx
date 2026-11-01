@@ -75,6 +75,7 @@ vi.mock('react-native', () => {
   const React = require('react');
   return {
     View: ({ children, ...props }: any) => React.createElement('View', props, children),
+    ScrollView: ({ children, ...props }: any) => React.createElement('ScrollView', props, children),
     Text: ({ children, ...props }: any) => React.createElement('Text', props, children),
     ActivityIndicator: (props: any) => React.createElement('ActivityIndicator', props),
     Pressable: ({ children, onPress, ...props }: any) =>

@@ -485,7 +485,7 @@ describe('SessionCardScreen', () => {
     }));
   });
 
-  it('uses Continue in the route-complete state', async () => {
+  it('offers Continue learning when no card can be dealt', async () => {
     vi.mocked(pickNextCard).mockReturnValue(null);
     const navigation = { navigate: vi.fn(), goBack: vi.fn(), replace: vi.fn() } as any;
 
@@ -504,23 +504,13 @@ describe('SessionCardScreen', () => {
     });
     await flush();
 
-    expect(findTextByLabel(tree, 'Continue')).toHaveLength(1);
+    expect(findTextByLabel(tree, 'Continue learning')).toHaveLength(1);
+    expect(findTextByLabel(tree, 'Session complete')).toHaveLength(0);
     expect(findTextByLabel(tree, 'View summary')).toHaveLength(0);
   });
 
-  // Ported from tests/integration/review-summary.flow.test.tsx, deleted with
-  // ReviewScreen (issue #11). That file pressed the dead screen's done-state
-  // button and pinned the SessionSummary payload; the live screen only had a
-  // test that the button *renders*, so pressing it was genuinely unpinned.
-  it('routes to SessionSummary when Continue is pressed in the route-complete state', async () => {
+  it('returns an unstarted visit to Home without opening a summary', async () => {
     vi.mocked(pickNextCard).mockReturnValue(null);
-    // minimumGoal 2, not the default 1. The deleted ReviewScreen hard-coded
-    // `minimumGoal: 1` here, and with a fixture of 1 this assertion cannot
-    // tell the planner's answer from that hard-code -- mutation-checked:
-    // swapping doneMinimumGoal for a literal 1 left the 1-fixture version of
-    // this test green. The sibling test above only covers the post-rating
-    // branch, so the done-state branch was genuinely unpinned.
-    vi.mocked(planChallengeRoute).mockReturnValue(buildChallengeRoute({ minimumGoal: 2 }) as any);
     const navigation = { navigate: vi.fn(), goBack: vi.fn(), replace: vi.fn() } as any;
 
     let tree!: renderer.ReactTestRenderer;
@@ -538,24 +528,9 @@ describe('SessionCardScreen', () => {
     });
     await flush();
 
-    act(() => {
-      findPressableByLabel(tree, 'Continue').props.onPress();
-    });
-
-    // Exact object, not objectContaining: this branch deliberately differs
-    // from the post-rating one above -- it carries no sessionId, because a
-    // run that ended with nothing to review never started a rating. Pinning
-    // the whole shape is what makes a future change to either branch show up
-    // as a decision rather than as drift.
-    expect(navigation.replace).toHaveBeenCalledWith('SessionSummary', {
-      slug: 'csharp',
-      deckTitle: 'C# Interview',
-      sessionDone: 0,
-      sessionLimit: 1,
-      minimumGoal: 2,
-      dueCount: 0,
-      streakEarned: false,
-    });
+    act(() => { findPressableByLabel(tree, 'Continue learning').props.onPress(); });
+    expect(navigation.navigate).toHaveBeenCalledWith('Home', undefined, { pop: true });
+    expect(navigation.replace).not.toHaveBeenCalled();
   });
 
   it('shows passive trial preview progress without adding another action', async () => {
@@ -1325,13 +1300,16 @@ describe('SessionCardScreen', () => {
       expect(navigation.goBack).toHaveBeenCalled();
     });
 
-    it('still starts a one-node maintenance run for limit 1 with no card to pick (route-complete path is untouched)', async () => {
+    it('shows an actionable caught-up state without starting or completing an empty session', async () => {
       vi.mocked(planChallengeRoute).mockReturnValue(buildChallengeRoute({ limit: 1, dueCount: 0, newCount: 0 }) as any);
       vi.mocked(pickNextCard).mockReturnValue(null);
-      const { tree } = await mount();
+      const { tree, navigation } = await mount();
       expect(byTestID(tree, 'session-card-empty-deck')).toHaveLength(0);
-      expect(findTextByLabel(tree, 'Session complete')).toHaveLength(1);
-      expect(useSessionStore.getState().sessionId).toBeTruthy();
+      expect(byTestID(tree, 'session-card-caught-up')).toHaveLength(1);
+      expect(findTextByLabel(tree, 'Session complete')).toHaveLength(0);
+      expect(useSessionStore.getState().sessionId).toBeFalsy();
+      act(() => { byTestID(tree, 'session-card-caught-up-cta')[0].props.onPress(); });
+      expect(navigation.navigate).toHaveBeenCalledWith('Home', undefined, { pop: true });
     });
 
     it('switches the dock hint from the recall prompt to the rating question on reveal', async () => {

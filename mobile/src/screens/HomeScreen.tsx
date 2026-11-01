@@ -34,6 +34,7 @@ import {
 import HomeDeckRow from '../features/gacha/home/HomeDeckRow';
 import HomePackCarousel, { type HomePackPage } from '../features/gacha/home/HomePackCarousel';
 import { isLargeFontScale, useFontScale } from '../theme/dynamicType';
+import { isOrderedDeck } from '../features/gacha/draw/orderedDeckPolicy';
 import {
   buildReadyHomeVm,
   createCoalescedRunner,
@@ -720,7 +721,7 @@ export function HomeScreen({ navigation, route }: Props) {
     : selectedDueToday > 0
       ? `${cardsWaiting} today`
       : homeState.vm.draw.state === 'available' || homeState.vm.draw.state === 'reserve'
-        ? 'A reward pack is ready'
+        ? selectedDeckRow && isOrderedDeck(selectedDeckRow.deck.slug) ? 'Keep learning at your own pace' : 'A reward pack is ready'
         : !heroSaysClear
           ? null
           : selectedDeckRow?.deck.canStudy &&
@@ -822,9 +823,6 @@ export function HomeScreen({ navigation, route }: Props) {
                 <Text style={styles.settingsText}>⚙︎</Text>
               </Pressable>
             </View>
-            {compactHome && homeState.vm ? (
-              <TodayPressureCard counts={homeState.vm.counts} selectedDeckTitle={homeState.vm.selectedDeckTitle} compact />
-            ) : null}
             {/* ─── HERO BAND — the cover carousel ─────────────────────
                 2026-10-18 home carousel: the hero pack is a horizontal
                 swipe carousel, one page per pack in DECK_ORDER, with the
@@ -857,6 +855,8 @@ export function HomeScreen({ navigation, route }: Props) {
                   ? STARTER_COPY.headline
                   : isFeaturedMastered
                   ? 'Deck mastered 🎉'
+                  : isOrderedDeck(featuredDeck.slug)
+                    ? homeState.vm.hero.headline
                   : selectedDueToday > 0
                     ? cardsWaiting
                     : (homeState.vm.draw.state === 'available' || homeState.vm.draw.state === 'reserve')
@@ -970,7 +970,15 @@ export function HomeScreen({ navigation, route }: Props) {
                     </View>
                   </View>
 
-                  {/* ─── PRIMARY CTA — directly under the hero so it is on
+                  {featuredDeck.realRow?.actionHint !== 'none' ? <TodayPressureCard
+                    counts={homeState.vm.counts}
+                    selectedDeckTitle={homeState.vm.selectedDeckTitle}
+                    totalCards={featuredDeck.realRow?.deck.totalCards}
+                    masteredCount={featuredDeck.realRow?.deck.masteredCount}
+                    compact={compactHome}
+                  /> : null}
+
+                  {/* ─── PRIMARY CTA — directly under the progress so it is on
                       the first screen of a 6.1-inch phone (R22 §1.6). ──── */}
                   <View testID="screen-home-primary-cta">
                     <Pressable
@@ -1005,9 +1013,6 @@ export function HomeScreen({ navigation, route }: Props) {
 
                   {/* ─── TODAY GROUP — pressure card + update notice + goal ──── */}
                   <View style={styles.actionGroup}>
-                    {!compactHome ? (
-                      <TodayPressureCard counts={homeState.vm.counts} selectedDeckTitle={homeState.vm.selectedDeckTitle} />
-                    ) : null}
                     {/* A stable line at standard sizes, natural height at accessibility sizes:
                         the update notice while a newer build exists ("Updating …"
                         while the free-deck auto-installer runs, or the manual
@@ -1205,7 +1210,7 @@ const styles = StyleSheet.create({
   heroTitleCompact: { fontSize: 19, lineHeight: 24 },
   naturalLineHeight: { lineHeight: undefined },
   primaryCtaCompact: { marginTop: spacing.xs },
-  primaryCtaLargeText: { paddingVertical: spacing.sm },
+  primaryCtaLargeText: { paddingVertical: spacing.sm, borderRadius: spacing.buttonRadius },
   loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   loadingText: { marginTop: spacing.sm, color: colors.inkSecondary, fontSize: typography.body },
   pressed: { opacity: 0.9 },
@@ -1274,8 +1279,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
   },
   // ─── ACTION GROUP — pressure + CTA + draw status ────────────────────
-  // Wider top margin from heroBand → makes hero clearly the visual lead.
-  // Today card group, now under the CTA and draw status line.
+  // Supporting notices follow the progress and primary learning action.
   actionGroup: {
     marginTop: spacing.sm,
   },

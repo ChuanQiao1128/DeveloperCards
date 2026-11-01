@@ -953,7 +953,7 @@ describe('HomeScreen v9', () => {
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
   };
 
-  it('puts the primary CTA directly under the hero, above the Today card', async () => {
+  it('puts course progress between the hero and the primary learning action', async () => {
     const tree = await renderHome();
     const order = tree.root
       .findAll((node) => typeof node.props?.testID === 'string' && typeof node.type === 'string')
@@ -964,11 +964,12 @@ describe('HomeScreen v9', () => {
     const goal = order.indexOf('home-goal-line');
     expect(hero).toBeGreaterThan(-1);
     expect(cta).toBeGreaterThan(hero);
-    expect(today).toBeGreaterThan(cta);
+    expect(today).toBeGreaterThan(hero);
+    expect(cta).toBeGreaterThan(today);
     expect(goal).toBeGreaterThan(cta);
     // Nothing but the hero sits between the pack and the button.
     const between = order.slice(hero + 1, cta);
-    expect(between).toEqual([]);
+    expect(between).toContain('home-pack-unlocked');
   });
 
   it('lets the hero headline wrap to two lines and shrink instead of truncating', async () => {
@@ -1150,15 +1151,10 @@ describe('HomeScreen v9', () => {
     }
   });
 
-  it('labels the fourth Today tile Collected, not Owned', async () => {
+  it('shows collected over total separately from cards studied', async () => {
     const tree = await renderHome();
-    // Read the label off the real tile: the empty Today card also holds an invisible copy of the
-    // tiles (it keeps the card's height), so a text search alone would pass without the grid.
-    const tile = tree.root.findByProps({ testID: 'home-today-count-total' });
-    expect(tile.findAll((node) => (node.type as any) === 'Text').map((node) => String(node.props.children))).toContain(
-      'Collected',
-    );
-    expect(textBlob(tree)).not.toContain('Owned');
+    expect(tree.root.findByProps({ testID: 'home-pack-unlocked' }).props.children).toContain('cards unlocked');
+    expect(tree.root.findByProps({ testID: 'home-pack-studied' }).props.children).toContain('studied at least once');
     expect(textBlob(tree)).not.toContain('Keep streak');
   });
 });

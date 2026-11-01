@@ -4,6 +4,7 @@ import { a11y } from '../../../theme/a11y';
 import { colors } from '../../../theme/colors';
 import { spacing } from '../../../theme/spacing';
 import { typography } from '../../../theme/typography';
+import { isLargeFontScale, useFontScale } from '../../../theme/dynamicType';
 
 type RewardSummaryCardProps = {
   reward: {
@@ -23,8 +24,11 @@ type RewardSummaryCardProps = {
 };
 
 export function RewardSummaryCard(props: RewardSummaryCardProps) {
+  const largeText = isLargeFontScale(useFontScale());
   const { reward, ctaLabel = null, onPressUsePulls = null, testID } = props;
   const canUsePulls = !!onPressUsePulls && reward.walletAfter.available > 0;
+  const availableChanged = reward.walletBefore.available !== reward.walletAfter.available;
+  const reserveChanged = reward.walletBefore.reserve !== reward.walletAfter.reserve;
 
   return (
     <View testID={testID} style={styles.card}>
@@ -32,50 +36,50 @@ export function RewardSummaryCard(props: RewardSummaryCardProps) {
           third copy of the count the hero chip and the anchor circle below
           already carry; the anchor is this card's statement of it. */}
       <View style={styles.topRow}>
-        <Text numberOfLines={1} style={styles.sectionLabel}>
+        <Text numberOfLines={largeText ? undefined : 1} style={styles.sectionLabel}>
           Reward
         </Text>
       </View>
 
-      <View style={styles.anchorRow}>
-        <View style={styles.anchor}>
-          <Text numberOfLines={1} style={styles.anchorCount}>
+      <View style={[styles.anchorRow, largeText && styles.largeTextRow]}>
+        <View style={[styles.anchor, largeText && styles.anchorLarge]}>
+          <Text numberOfLines={largeText ? undefined : 1} style={styles.anchorCount}>
             +{reward.pulls}
           </Text>
-          <Text numberOfLines={1} style={styles.anchorLabel}>
+          <Text numberOfLines={largeText ? undefined : 1} style={styles.anchorLabel}>
             draws
           </Text>
         </View>
         <View style={styles.anchorContent}>
-          <Text numberOfLines={2} style={styles.title}>
+          <Text numberOfLines={largeText ? undefined : 2} style={styles.title}>
             {reward.title}
           </Text>
-          <Text numberOfLines={3} style={styles.body}>
+          <Text numberOfLines={largeText ? undefined : 3} style={styles.body}>
             {reward.body}
           </Text>
         </View>
       </View>
 
-      <View style={styles.walletRow}>
-        <Text numberOfLines={1} style={styles.walletCaption}>
+      {availableChanged || reserveChanged ? <View style={styles.walletRow}>
+        {availableChanged ? <><Text numberOfLines={largeText ? undefined : 1} style={styles.walletCaption}>
           Saved draws
         </Text>
-        <Text numberOfLines={1} style={styles.walletValue}>
+        <Text numberOfLines={largeText ? undefined : 1} style={styles.walletValue}>
           {reward.walletBefore.available}
         </Text>
-        <Text numberOfLines={1} style={styles.walletArrow}>
+        <Text numberOfLines={largeText ? undefined : 1} style={styles.walletArrow}>
           →
         </Text>
-        <Text numberOfLines={1} style={styles.walletValue}>
+        <Text numberOfLines={largeText ? undefined : 1} style={styles.walletValue}>
           {reward.walletAfter.available}
-        </Text>
-        <Text numberOfLines={1} style={styles.reserveLabel}>
+        </Text></> : null}
+        {reserveChanged ? <Text numberOfLines={largeText ? undefined : 1} style={styles.reserveLabel}>
           extra {reward.walletBefore.reserve} → {reward.walletAfter.reserve}
-        </Text>
-      </View>
+        </Text> : null}
+      </View> : null}
 
       {reward.usePullsLabel ? (
-        <Text numberOfLines={1} style={styles.pullHint}>
+        <Text numberOfLines={largeText ? undefined : 1} style={styles.pullHint}>
           {reward.usePullsLabel}
         </Text>
       ) : null}
@@ -87,7 +91,7 @@ export function RewardSummaryCard(props: RewardSummaryCardProps) {
           style={({ pressed }) => [styles.ctaButton, pressed && styles.ctaButtonPressed]}
           onPress={onPressUsePulls ?? undefined}
         >
-          <Text numberOfLines={1} style={styles.ctaText}>
+          <Text numberOfLines={largeText ? undefined : 1} style={styles.ctaText}>
             {ctaLabel ?? 'Open draw'}
           </Text>
         </Pressable>
@@ -122,6 +126,8 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.6,
   },
+  largeTextRow: { flexDirection: 'column', alignItems: 'stretch' },
+  anchorLarge: { width: undefined, height: undefined, minHeight: 84 },
   anchorRow: {
     marginTop: spacing.sm,
     flexDirection: 'row',

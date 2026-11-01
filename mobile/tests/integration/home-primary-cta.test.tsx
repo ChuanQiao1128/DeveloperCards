@@ -281,23 +281,12 @@ describe('home primary CTA uniqueness', () => {
       expect(textBlob).not.toContain('Start first draw');
       expect(textBlob).toContain('Due');
       expect(textBlob).toContain('New');
-      expect(textBlob).toContain('Learned');
-      // Fourth tile is the selected deck's owned cards, not the cross-deck due
-      // sum that read "0 Total" under a 441-card deck. R22 §5: it reads Collected.
-      expect(textBlob).toContain('Collected');
+      expect(textBlob).toContain('studied at least once');
+      expect(textBlob).toContain('cards unlocked');
       expect(textBlob).not.toContain('Owned');
-      expect(textBlob).not.toContain('Total');
+      const progress = tree.root.findByProps({ testID: 'home-pack-unlocked' });
+      expect(progress.props.children).toMatch(/\d+ \/ \d+ cards unlocked/);
 
-      const metricStyle = tree.root.findByProps({ testID: 'home-today-count-total' }).props.style;
-      expect(metricStyle).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ flex: 1, minWidth: 0 }),
-        ]),
-      );
-      const totalsHeading = tree.root.find((node) => (node.type as any) === 'Text' && node.props.children === 'Pack totals');
-      let metricGroup = totalsHeading.parent!;
-      while ((metricGroup.type as any) !== 'View') metricGroup = metricGroup.parent!;
-      expect(metricGroup.props.style).toMatchObject(width < 390 ? { width: '100%' } : { flex: 1 });
     },
   );
 

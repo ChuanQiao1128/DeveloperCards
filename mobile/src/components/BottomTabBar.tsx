@@ -97,16 +97,16 @@ const styles = StyleSheet.create({
   icon: {
     fontSize: 15,
     fontWeight: '800',
-    color: '#8C7A5B',
+    color: colors.inkMuted,
   },
   iconActive: {
     color: colors.gold,
   },
   label: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '800',
     letterSpacing: 0.3,
-    color: '#8C7A5B',
+    color: colors.inkMuted,
   },
   labelActive: {
     color: colors.ink,

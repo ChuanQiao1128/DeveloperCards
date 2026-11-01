@@ -30,6 +30,37 @@ function makeDeck(overrides: Partial<DeckSummary> = {}): DeckSummary {
   };
 }
 
+describe('AWS Basics learning actions', () => {
+  const course = (overrides: Partial<DeckSummary> = {}) => makeDeck({
+    slug: 'aws-saa-fundamentals', totalCards: 347, studyCards: 347, localCards: 347,
+    ownedCount: 18, masteredApprox: 18, dueToday: 0, newToday: 0, ...overrides,
+  });
+  it.each([
+    { held: 5, owned: 18, expected: 'Unlock next 5 cards' },
+    { held: 2, owned: 18, expected: 'Unlock next 2 cards' },
+    { held: 5, owned: 346, expected: 'Unlock next 1 card' },
+  ])('offers the actual next batch: $expected', ({ held, owned, expected }) => {
+    const vm = buildHomeVM({ deckSummaries: [course({ ownedCount: owned, masteredApprox: owned })], selectedSlug: 'aws-saa-fundamentals', hasSignedInUser: false,
+      wallet: { availablePulls: held, reservePulls: 0 }, runtimeStatus: { completedRouteToday: true } });
+    expect(vm.cta).toMatchObject({ label: expected, nav: 'draw', disabled: false });
+    expect(vm.draw.label).not.toContain('tomorrow');
+  });
+  it.each([
+    { newToday: 5, dueToday: 0, label: 'Continue learning' },
+    { newToday: 0, dueToday: 3, label: 'Review 3 cards' },
+  ])('keeps $label reachable after an earlier session finished', ({ newToday, dueToday, label }) => {
+    const vm = buildHomeVM({ deckSummaries: [course({ newToday, dueToday, ownedCount: 23 })], selectedSlug: 'aws-saa-fundamentals', hasSignedInUser: false,
+      wallet: { availablePulls: 5, reservePulls: 0 }, runtimeStatus: { completedRouteToday: true } });
+    expect(vm.cta).toMatchObject({ label, nav: 'challenge' });
+  });
+  it('does not offer another unlock when every card is collected', () => {
+    const vm = buildHomeVM({ deckSummaries: [course({ ownedCount: 347, masteredApprox: 347 })], selectedSlug: 'aws-saa-fundamentals', hasSignedInUser: false,
+      wallet: { availablePulls: 60, reservePulls: 5 } });
+    expect(vm.cta.nav).toBe('library');
+    expect(vm.hero.headline).toBe('All cards unlocked');
+  });
+});
+
 describe('hero headline fits in two lines (R22 §5)', () => {
   const LONG_TITLE = 'AWS Solutions Architect (SAA-C03)';
   const kinds: HomeCtaKind[] = [

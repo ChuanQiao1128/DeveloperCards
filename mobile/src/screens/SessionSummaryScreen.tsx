@@ -9,6 +9,7 @@ import { goHome } from '../navigation/tabNavigation';
 import { RewardSummaryCard } from '../features/gacha/components/RewardSummaryCard';
 import { SummaryProgressBlock } from '../features/gacha/components/SummaryProgressBlock';
 import { buildDrawState } from '../features/gacha/draw/drawState';
+import { isOrderedDeck } from '../features/gacha/draw/orderedDeckPolicy';
 import { resolveNewMilestones, type Milestone } from '../features/gacha/milestones/milestoneTracker';
 import type { RewardWalletState } from '../features/gacha/rewards/rewardWallet';
 import { loadDeckWallet } from '../features/gacha/rewards/deckWallet';
@@ -20,6 +21,7 @@ import { a11y } from '../theme/a11y';
 import { colors } from '../theme/colors';
 import { spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
+import { isLargeFontScale, useFontScale } from '../theme/dynamicType';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'SessionSummary'>;
 
@@ -46,7 +48,9 @@ function navigateFromActionKind(args: {
 }
 
 export function SessionSummaryScreen({ navigation, route }: Props) {
+  const largeText = isLargeFontScale(useFontScale());
   const { sessionId, deckTitle, slug, sessionDone, sessionLimit, minimumGoal, dueCount, streakEarned = false, reward, loadForecast, picks } = route.params;
+  const isCourse = isOrderedDeck(slug);
 
   const [walletBeforeReward, setWalletBeforeReward] = useState<RewardWalletState | null>(null);
   const [streakBeforeSnapshot, setStreakBeforeSnapshot] = useState<StreakSnapshot | null>(null);
@@ -63,10 +67,10 @@ export function SessionSummaryScreen({ navigation, route }: Props) {
 
     (async () => {
       try {
-        if (sessionId) {
+        if (sessionId && sessionDone > 0) {
           const [loadedWallet, streakResult] = await Promise.all([
             loadDeckWallet(slug),
-            applySessionStreak({ sessionId, earned: streakEarned }),
+            applySessionStreak({ sessionId, earned: streakEarned && sessionDone > 0 }),
           ]);
 
           if (!cancelled) {
@@ -144,37 +148,41 @@ export function SessionSummaryScreen({ navigation, route }: Props) {
   const streakBefore = streakBeforeSnapshot?.currentDailyStreak ?? streakAfterSnapshot?.currentDailyStreak ?? 0;
   const streakAfter = streakAfterSnapshot?.currentDailyStreak ?? streakBefore;
   const streakChanged = streakAfter > streakBefore || streakEarned;
-  const summaryHasActivity = sessionDone > 0 || dueCount > 0 || summary.resolvedReward.rewardPulls > 0 || streakAfter > 0;
+  const summaryHasActivity = sessionDone > 0;
   const isSummaryError = summaryResolveStatus === 'error';
   const isSummaryLoading = summaryResolveStatus === 'loading';
-  const isSummaryEmpty = summaryResolveStatus === 'ready' && !summaryHasActivity;
+  const isSummaryEmpty = !summaryHasActivity;
 
-  const actionTitle = isSummaryError ? 'Refresh summary' : summary.vm.nextAction.title;
+  const actionTitle = isSummaryError ? 'Refresh summary' : isCourse && summaryHasActivity ? 'Keep learning at your own pace' : summary.vm.nextAction.title;
 
   const actionBody =
     isSummaryError
       ? (summaryResolveError ?? 'Unable to refresh reward and streak details right now.')
       : isSummaryLoading
         ? 'Wrapping up reward and streak details...'
-        : summary.vm.nextAction.body;
+        : isCourse && summaryHasActivity
+          ? 'Your progress is saved. Continue to learn available cards or unlock the next batch.'
+          : summary.vm.nextAction.body;
 
   // ─── Instant-reward CTA gating ─────────────────────────────────────
   // When the user just earned pulls AND the wallet can accept them,
   // we surface a prominent gold "Use N pulls now" CTA at the top of
   // the page. This closes the study → reward → spend loop in one tap
   // (previously: SessionSummary → Home → pack → Draw = 3 taps).
-  // When this CTA is showing, the bottom actionCard primary demotes
+  // When this CTA is showing, the Home action demotes
   // to a quieter "Back to Home" button to avoid dual-CTA confusion.
   const earnedPulls = summary.resolvedReward.rewardPulls;
   const showRewardCallout =
-    summaryResolveStatus === 'ready' && earnedPulls > 0 && drawVm.canOpen;
+    !isCourse && summaryResolveStatus === 'ready' && summaryHasActivity && earnedPulls > 0 && drawVm.canOpen;
 
   const primaryActionLabel = isSummaryLoading
     ? 'Updating...'
     : isSummaryError
       ? 'Retry'
       : isSummaryEmpty
-        ? 'Open library'
+        ? 'Back to learning'
+        : isCourse
+          ? 'Continue learning'
         : showRewardCallout
           ? 'Back to Home'
           : summary.vm.nextAction.primary.label;
@@ -182,7 +190,7 @@ export function SessionSummaryScreen({ navigation, route }: Props) {
   // The demoted primary goes Home, so the link under it must not: the mapper
   // picked the secondary against the un-demoted primary and would otherwise
   // put "Back home" under "Back to Home".
-  const secondaryAction = showRewardCallout
+  const secondaryAction = showRewardCallout || isCourse
     ? resolveSecondaryAction({ primaryGoesHome: true })
     : summary.vm.nextAction.secondary;
 
@@ -198,21 +206,21 @@ export function SessionSummaryScreen({ navigation, route }: Props) {
           <View style={styles.heroCard}>
             {/* Gold uppercase celebration eyebrow — reinforces the achievement
                 feeling. Reward badge moves to a pokeBlue accent pill. */}
-            <Text numberOfLines={1} style={styles.heroEyebrow}>
-              SESSION COMPLETE
+            <Text numberOfLines={largeText ? undefined : 1} style={styles.heroEyebrow}>
+              {isSummaryError ? 'SUMMARY UNAVAILABLE' : isSummaryLoading ? 'LOADING SUMMARY' : isSummaryEmpty ? 'READY TO LEARN' : 'SESSION COMPLETE'}
             </Text>
-            <View style={styles.heroTopRow}>
-              <Text numberOfLines={1} style={styles.heroBadge}>
+            {!isSummaryEmpty && summaryResolveStatus === 'ready' ? <View style={[styles.heroTopRow, largeText && styles.largeTextRow]}>
+              <Text numberOfLines={largeText ? undefined : 1} style={styles.heroBadge}>
                 {summary.vm.reward.badge}
               </Text>
-              <Text numberOfLines={1} style={styles.heroCompletion}>
+              <Text numberOfLines={largeText ? undefined : 1} style={styles.heroCompletion}>
                 {summary.vm.progress.completionLabel}
               </Text>
-            </View>
-            <Text numberOfLines={2} style={styles.title}>
-              {summary.vm.title}
+            </View> : null}
+            <Text numberOfLines={largeText ? undefined : 2} style={styles.title}>
+              {isCourse && summaryHasActivity ? `You studied ${sessionDone} card${sessionDone === 1 ? '' : 's'}` : summary.vm.title}
             </Text>
-            <Text numberOfLines={1} style={styles.subtitle}>
+            <Text numberOfLines={largeText ? undefined : 1} style={styles.subtitle}>
               {summary.vm.subtitle}
             </Text>
           </View>
@@ -220,96 +228,11 @@ export function SessionSummaryScreen({ navigation, route }: Props) {
           {/* Instant-reward CTA — visible only when the user just earned
               pulls. Gold pill with the badge count + "Use now →". This
               closes the daily learn-to-spend loop in one tap. */}
-          {showRewardCallout ? (
-            <Pressable
-              // Reuses the same testID the RewardSummaryCard's internal
-              // CTA used to expose. The two CTAs are mutually exclusive
-              // (showRewardCallout gates which one renders), so the
-              // single-handle test contract remains intact.
-              testID="summary-reward-use-pulls-cta"
-              accessibilityRole="button"
-              accessibilityLabel={`Use ${earnedPulls} new ${earnedPulls === 1 ? 'draw' : 'draws'} now`}
-              style={({ pressed }) => [styles.usePullsButton, pressed && styles.buttonPressed]}
-              onPress={() =>
-                navigation.navigate('Draw', {
-                  slug,
-                  rewardPending: drawVm.state === 'reward-pending',
-                })
-              }
-            >
-              <View style={styles.usePullsBadge}>
-                <Text style={styles.usePullsBadgeText} numberOfLines={1}>
-                  {`+${earnedPulls}`}
-                </Text>
-              </View>
-              <Text style={styles.usePullsLabel} numberOfLines={1}>
-                {`Use ${earnedPulls} new ${earnedPulls === 1 ? 'draw' : 'draws'} now`}
-              </Text>
-              <Text style={styles.usePullsArrow} numberOfLines={1}>
-                →
-              </Text>
-            </Pressable>
-          ) : null}
-
-          <RewardSummaryCard
-            testID="summary-reward-block"
-            reward={summary.vm.reward}
-            ctaLabel={drawVm.canOpen && !showRewardCallout ? drawVm.ctaLabel : null}
-            onPressUsePulls={
-              drawVm.canOpen && !showRewardCallout
-                ? () => navigation.navigate('Draw', { slug, rewardPending: drawVm.state === 'reward-pending' })
-                : null
-            }
-          />
-
-          {loadForecast ? (
-            <Text testID="session-summary-load-forecast" numberOfLines={2} style={styles.forecastLine}>
-              {loadForecast}
-            </Text>
-          ) : null}
-
-          {picks ? (
-            <Text testID="session-summary-picks" numberOfLines={2} style={styles.forecastLine}>
-              {mcqPicksLine(picks)}
-            </Text>
-          ) : null}
-
-          <SummaryProgressBlock
-            testID="summary-progress-block"
-            done={summary.vm.progress.done}
-            total={summary.vm.progress.total}
-            completionLabel={summary.vm.progress.completionLabel}
-            body={summary.vm.progress.body}
-            streak={{ before: streakBefore, after: streakAfter, earned: streakChanged }}
-            transitions={summary.vm.progress.transitions}
-            streakNote={summary.vm.progress.streakNote}
-            transitionsNote={summary.vm.progress.transitionsNote}
-          />
-
-          {latestMilestone ? (
-            <View style={styles.milestoneCard}>
-              <Text numberOfLines={1} style={styles.cardEyebrow}>
-                Milestone
-              </Text>
-              <Text numberOfLines={2} style={styles.cardTitle}>
-                {latestMilestone.title}
-              </Text>
-              <Text numberOfLines={2} style={styles.cardBody}>
-                {latestMilestone.body}
-              </Text>
-              {extraMilestonesLabel ? (
-                <Text numberOfLines={1} style={styles.cardMeta}>
-                  {extraMilestonesLabel}
-                </Text>
-              ) : null}
-            </View>
-          ) : null}
-
           <View style={styles.actionCard}>
-            <Text numberOfLines={1} style={styles.actionTitle}>
+            <Text numberOfLines={largeText ? undefined : 1} style={styles.actionTitle}>
               {actionTitle}
             </Text>
-            <Text numberOfLines={2} style={styles.actionBody}>
+            <Text numberOfLines={largeText ? undefined : 2} style={styles.actionBody}>
               {actionBody}
             </Text>
 
@@ -334,7 +257,12 @@ export function SessionSummaryScreen({ navigation, route }: Props) {
                 }
 
                 if (isSummaryEmpty) {
-                  navigation.navigate('Library');
+                  goHome(navigation);
+                  return;
+                }
+
+                if (isCourse) {
+                  goHome(navigation);
                   return;
                 }
 
@@ -354,7 +282,7 @@ export function SessionSummaryScreen({ navigation, route }: Props) {
               }}
             >
               <Text
-                numberOfLines={1}
+                numberOfLines={largeText ? undefined : 1}
                 style={[
                   styles.primaryButtonText,
                   showRewardCallout && styles.primaryButtonTextDemoted,
@@ -378,12 +306,99 @@ export function SessionSummaryScreen({ navigation, route }: Props) {
                   })
                 }
               >
-                <Text numberOfLines={1} style={styles.secondaryButtonText}>
+                <Text numberOfLines={largeText ? undefined : 1} style={styles.secondaryButtonText}>
                   {secondaryAction.label}
                 </Text>
               </Pressable>
             ) : null}
           </View>
+
+          {showRewardCallout ? (
+            <Pressable
+              // Reuses the same testID the RewardSummaryCard's internal
+              // CTA used to expose. The two CTAs are mutually exclusive
+              // (showRewardCallout gates which one renders), so the
+              // single-handle test contract remains intact.
+              testID="summary-reward-use-pulls-cta"
+              accessibilityRole="button"
+              accessibilityLabel={`Use ${earnedPulls} new ${earnedPulls === 1 ? 'draw' : 'draws'} now`}
+              style={({ pressed }) => [styles.usePullsButton, pressed && styles.buttonPressed]}
+              onPress={() =>
+                navigation.navigate('Draw', {
+                  slug,
+                  rewardPending: drawVm.state === 'reward-pending',
+                })
+              }
+            >
+              <View style={styles.usePullsBadge}>
+                <Text style={styles.usePullsBadgeText} numberOfLines={largeText ? undefined : 1}>
+                  {`+${earnedPulls}`}
+                </Text>
+              </View>
+              <Text style={styles.usePullsLabel} numberOfLines={largeText ? undefined : 1}>
+                {`Use ${earnedPulls} new ${earnedPulls === 1 ? 'draw' : 'draws'} now`}
+              </Text>
+              <Text style={styles.usePullsArrow} numberOfLines={largeText ? undefined : 1}>
+                →
+              </Text>
+            </Pressable>
+          ) : null}
+
+          {summaryHasActivity && summaryResolveStatus === 'ready' && earnedPulls > 0 ? <RewardSummaryCard
+            testID="summary-reward-block"
+            reward={summary.vm.reward}
+            ctaLabel={!isCourse && drawVm.canOpen && !showRewardCallout ? drawVm.ctaLabel : null}
+            onPressUsePulls={
+              !isCourse && drawVm.canOpen && !showRewardCallout
+                ? () => navigation.navigate('Draw', { slug, rewardPending: drawVm.state === 'reward-pending' })
+                : null
+            }
+          /> : null}
+
+          {loadForecast ? (
+            <Text testID="session-summary-load-forecast" numberOfLines={largeText ? undefined : 2} style={styles.forecastLine}>
+              {loadForecast}
+            </Text>
+          ) : null}
+
+          {picks ? (
+            <Text testID="session-summary-picks" numberOfLines={largeText ? undefined : 2} style={styles.forecastLine}>
+              {mcqPicksLine(picks)}
+            </Text>
+          ) : null}
+
+          {summaryHasActivity && summaryResolveStatus === 'ready' ? <SummaryProgressBlock
+            testID="summary-progress-block"
+            done={summary.vm.progress.done}
+            total={summary.vm.progress.total}
+            completionLabel={summary.vm.progress.completionLabel}
+            body={summary.vm.progress.body}
+            streak={{ before: streakBefore, after: streakAfter, earned: streakChanged }}
+            transitions={summary.vm.progress.transitions}
+            streakNote={summary.vm.progress.streakNote}
+            transitionsNote={summary.vm.progress.transitionsNote}
+          /> : null}
+
+          {sessionDone > 0 && latestMilestone ? (
+            <View style={styles.milestoneCard}>
+              <Text numberOfLines={largeText ? undefined : 1} style={styles.cardEyebrow}>
+                Milestone
+              </Text>
+              <Text numberOfLines={largeText ? undefined : 2} style={styles.cardTitle}>
+                {latestMilestone.title}
+              </Text>
+              <Text numberOfLines={largeText ? undefined : 2} style={styles.cardBody}>
+                {latestMilestone.body}
+              </Text>
+              {extraMilestonesLabel ? (
+                <Text numberOfLines={largeText ? undefined : 1} style={styles.cardMeta}>
+                  {extraMilestonesLabel}
+                </Text>
+              ) : null}
+            </View>
+          ) : null}
+
+
         </ScrollView>
       </LinearGradient>
     </SafeAreaView>
@@ -414,13 +429,14 @@ const styles = StyleSheet.create({
   },
   // Gold uppercase eyebrow — celebration accent above hero copy
   heroEyebrow: {
-    color: colors.gold,
-    fontSize: typography.caption,
+    color: colors.inkSecondary,
+    fontSize: typography.bodySmall,
     fontWeight: '900',
     letterSpacing: 1.2,
     textTransform: 'uppercase',
     marginBottom: 4,
   },
+  largeTextRow: { flexDirection: 'column', alignItems: 'stretch' },
   heroTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   // Reward badge — gold accent pill instead of muted brown gravel
   heroBadge: {
@@ -545,19 +561,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   usePullsBadgeText: {
-    color: '#FFFFFF',
+    color: colors.ink,
     fontSize: 14,
     fontWeight: '900',
     letterSpacing: 0.4,
   },
   usePullsLabel: {
-    color: '#FFFFFF',
+    color: colors.ink,
     fontSize: 15,
     fontWeight: '900',
     letterSpacing: 0.3,
   },
   usePullsArrow: {
-    color: '#FFFFFF',
+    color: colors.ink,
     fontSize: 20,
     fontWeight: '900',
   },

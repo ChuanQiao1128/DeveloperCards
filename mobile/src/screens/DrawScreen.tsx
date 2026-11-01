@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import * as RN from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -31,7 +31,7 @@ import { spendablePullsNow } from '../features/gacha/rewards/spendablePulls';
 import { scheduleProgressSync } from '../sync/progressSync';
 import { a11y } from '../theme/a11y';
 import { colors } from '../theme/colors';
-import { CHROME_MAX_FONT_SCALE, packSizeForWindowHeight, useWindowHeight } from '../theme/dynamicType';
+import { CHROME_MAX_FONT_SCALE, isLargeFontScale, packSizeForWindowHeight, useFontScale, useWindowHeight } from '../theme/dynamicType';
 import { spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
 import { PAGE_GRADIENT_LIGHT, packImageForSlug, packPaletteFromSlug, type PackPalette } from '../theme/packArt';
@@ -66,6 +66,7 @@ type DrawReady = {
   // decides the open buttons (drawButtonPlan); the canPullSingle / canPullMulti pair it replaces
   // only knew 1 and 10.
   undrawnCount: number;
+  totalCards: number;
   deckOptions: DeckOption[];
   pityLabel: string;
   collectionComplete: boolean;
@@ -336,8 +337,10 @@ export function DrawScreen({ navigation, route }: Props) {
 
   // Shrink the pack on short windows (e.g. iPhone SE) so the pack + swipe
   // affordance + CTA all stay on screen. The swipe gesture must keep working,
-  // so the pack is resized — never wrapped in a ScrollView.
-  const packSize = packSizeForWindowHeight(useWindowHeight());
+  // with a smaller cover; scrolling also keeps enlarged labels reachable.
+  const largeText = isLargeFontScale(useFontScale());
+  const windowHeight = useWindowHeight();
+  const packSize = packSizeForWindowHeight(largeText ? 600 : windowHeight);
 
   useEffect(() => {
     if (routeSlug) {
@@ -541,6 +544,7 @@ export function DrawScreen({ navigation, route }: Props) {
               walletPulls: pulls,
               canEarnDraws,
               undrawnCount: status.undrawnCount,
+              totalCards: new Set(deck.Cards.map(card => card.StableUid)).size,
               deckOptions: mergedOptions,
               pityLabel: status.pityLabel,
               collectionComplete: status.collectionComplete,
@@ -740,7 +744,7 @@ export function DrawScreen({ navigation, route }: Props) {
               </Text>
               <Pressable
                 testID="screen-draw-primary-cta"
-                style={({ pressed }) => [styles.primaryCta, pressed && styles.pressed]}
+                style={({ pressed }) => [styles.primaryCta, largeText && styles.ctaLargeText, pressed && styles.pressed]}
                 onPress={() => {
                   // An open() failure leaves `ready` set, so the next load
                   // would keep the frozen error card up (readyRef is non-null).
@@ -749,12 +753,12 @@ export function DrawScreen({ navigation, route }: Props) {
                   setRetryToken((token) => token + 1);
                 }}
               >
-                <Text style={styles.primaryCtaText} numberOfLines={1} maxFontSizeMultiplier={CHROME_MAX_FONT_SCALE}>
+                <Text style={styles.primaryCtaText} numberOfLines={largeText ? undefined : 1} maxFontSizeMultiplier={largeText ? undefined : CHROME_MAX_FONT_SCALE}>
                   Retry
                 </Text>
               </Pressable>
-              <Pressable testID="screen-draw-secondary-cta" style={({ pressed }) => [styles.secondaryCta, pressed && styles.pressed]} onPress={() => goHome(navigation)}>
-                <Text style={styles.secondaryCtaText} numberOfLines={1} maxFontSizeMultiplier={CHROME_MAX_FONT_SCALE}>
+              <Pressable testID="screen-draw-secondary-cta" style={({ pressed }) => [styles.secondaryCta, largeText && styles.ctaLargeText, pressed && styles.pressed]} onPress={() => goHome(navigation)}>
+                <Text style={styles.secondaryCtaText} numberOfLines={largeText ? undefined : 1} maxFontSizeMultiplier={largeText ? undefined : CHROME_MAX_FONT_SCALE}>
                   Back to Home
                 </Text>
               </Pressable>
@@ -777,13 +781,13 @@ export function DrawScreen({ navigation, route }: Props) {
               <Text style={styles.stateBody} numberOfLines={2}>
                 Choose a pack from Library first, then come back.
               </Text>
-              <Pressable testID="screen-draw-primary-cta" style={({ pressed }) => [styles.primaryCta, pressed && styles.pressed]} onPress={() => navigation.navigate('Library')}>
-                <Text style={styles.primaryCtaText} numberOfLines={1} maxFontSizeMultiplier={CHROME_MAX_FONT_SCALE}>
+              <Pressable testID="screen-draw-primary-cta" style={({ pressed }) => [styles.primaryCta, largeText && styles.ctaLargeText, pressed && styles.pressed]} onPress={() => navigation.navigate('Library')}>
+                <Text style={styles.primaryCtaText} numberOfLines={largeText ? undefined : 1} maxFontSizeMultiplier={largeText ? undefined : CHROME_MAX_FONT_SCALE}>
                   View library
                 </Text>
               </Pressable>
-              <Pressable testID="screen-draw-secondary-cta" style={({ pressed }) => [styles.secondaryCta, pressed && styles.pressed]} onPress={() => goHome(navigation)}>
-                <Text style={styles.secondaryCtaText} numberOfLines={1} maxFontSizeMultiplier={CHROME_MAX_FONT_SCALE}>
+              <Pressable testID="screen-draw-secondary-cta" style={({ pressed }) => [styles.secondaryCta, largeText && styles.ctaLargeText, pressed && styles.pressed]} onPress={() => goHome(navigation)}>
+                <Text style={styles.secondaryCtaText} numberOfLines={largeText ? undefined : 1} maxFontSizeMultiplier={largeText ? undefined : CHROME_MAX_FONT_SCALE}>
                   Back to Home
                 </Text>
               </Pressable>
@@ -808,6 +812,8 @@ export function DrawScreen({ navigation, route }: Props) {
   // n = 0 shows the empty states below. Nothing greyed out says how many
   // draws a bigger batch needs: that would read as a reason to save up.
   const plan = drawButtonPlan({ held: ready.walletPulls, undrawn: ready.undrawnCount });
+  const isCourse = isOrderedDeck(ready.slug);
+  const unlockLabel = (count: number) => `Unlock next ${count} card${count === 1 ? '' : 's'}`;
   // One always-present status line under the footer. minHeight keeps the
   // footer from jumping as the copy appears and clears.
   const statusText = opening
@@ -818,21 +824,23 @@ export function DrawScreen({ navigation, route }: Props) {
         ? 'Loading pack…'
         : ready.walletPulls < 1 && !ready.collectionComplete && !ready.canEarnDraws
           ? 'No cards due · browse your collected cards'
-        : '';
+        : isCourse && plan.openable > 0
+          ? 'Unlock these cards, then start learning · no daily wait'
+          : '';
 
   return (
     <SafeAreaView style={styles.safeArea} testID="screen-draw-root">
       <LinearGradient colors={PAGE_GRADIENT_LIGHT} style={styles.gradient}>
-        <View style={styles.container}>
+        <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
           {/* Top header — deck title + pulls badge. Pokemon shows you which
               pack you're about to open up here; the previous design relied on
               tiny text inside the pack art, which got lost. */}
           <View style={styles.header} testID="draw-header">
             <View style={styles.deckTitleWrap}>
-              <Text style={styles.deckEyebrow} numberOfLines={1} maxFontSizeMultiplier={CHROME_MAX_FONT_SCALE}>
+              <Text style={styles.deckEyebrow} numberOfLines={largeText ? undefined : 1} maxFontSizeMultiplier={largeText ? undefined : CHROME_MAX_FONT_SCALE}>
                 {isOrderedDeck(ready.slug) ? 'COURSE PACK · UNLOCK IN ORDER' : 'REWARD PACK'}
               </Text>
-              <Text style={styles.deckTitle} numberOfLines={1} maxFontSizeMultiplier={CHROME_MAX_FONT_SCALE}>
+              <Text style={styles.deckTitle} numberOfLines={largeText ? undefined : 1} maxFontSizeMultiplier={largeText ? undefined : CHROME_MAX_FONT_SCALE}>
                 {ready.deckTitle}
               </Text>
             </View>
@@ -850,7 +858,7 @@ export function DrawScreen({ navigation, route }: Props) {
                 <View style={styles.pullsTokenGem} />
                 <View style={styles.pullsTokenFacet} />
               </View>
-              <Text style={styles.pullsBadgeText} numberOfLines={1} maxFontSizeMultiplier={CHROME_MAX_FONT_SCALE}>
+              <Text style={styles.pullsBadgeText} numberOfLines={largeText ? undefined : 1} maxFontSizeMultiplier={largeText ? undefined : CHROME_MAX_FONT_SCALE}>
                 × {ready.walletPulls}
               </Text>
             </View>
@@ -859,11 +867,16 @@ export function DrawScreen({ navigation, route }: Props) {
           {/* Guarantee countdown. Rendered next to the pulls badge because it
               answers the question a player asks right before spending one. */}
           {ready.pityLabel ? (
-            <Text style={styles.pityProgress} testID="draw-pity-progress" numberOfLines={1} maxFontSizeMultiplier={CHROME_MAX_FONT_SCALE}>
+            <Text style={styles.pityProgress} testID="draw-pity-progress" numberOfLines={largeText ? undefined : 1} maxFontSizeMultiplier={largeText ? undefined : CHROME_MAX_FONT_SCALE}>
               {ready.pityLabel}
             </Text>
           ) : null}
 
+          {isCourse ? (
+            <Text style={styles.courseProgress} testID="draw-course-progress">
+              {`${ready.totalCards - ready.undrawnCount} / ${ready.totalCards} cards unlocked`}
+            </Text>
+          ) : null}
           <View
             testID="draw-card-stack-stage"
             style={styles.hero}
@@ -967,12 +980,12 @@ export function DrawScreen({ navigation, route }: Props) {
                 accessibilityRole="button"
                 accessibilityLabel={`Collection complete for ${ready.deckTitle}`}
                 disabled={true}
-                style={[styles.primaryCta, styles.ctaDisabled]}
+                style={[styles.primaryCta, largeText && styles.ctaLargeText, styles.ctaDisabled]}
                 onPress={() => {
                   void open(MAX_BATCH_OPEN);
                 }}
               >
-                <Text style={styles.primaryCtaText} numberOfLines={1} maxFontSizeMultiplier={CHROME_MAX_FONT_SCALE}>
+                <Text style={styles.primaryCtaText} numberOfLines={largeText ? undefined : 1} maxFontSizeMultiplier={largeText ? undefined : CHROME_MAX_FONT_SCALE}>
                   Collection complete
                 </Text>
               </Pressable>
@@ -981,12 +994,12 @@ export function DrawScreen({ navigation, route }: Props) {
                 accessibilityRole="button"
                 accessibilityLabel={`See your ${ready.deckTitle} collection`}
                 disabled={false}
-                style={({ pressed }) => [styles.secondaryCta, pressed && styles.pressed]}
+                style={({ pressed }) => [styles.secondaryCta, largeText && styles.ctaLargeText, pressed && styles.pressed]}
                 onPress={() => {
                   navigation.navigate('Library', { focusSlug: ready.slug });
                 }}
               >
-                <Text style={styles.secondaryCtaText} numberOfLines={1} maxFontSizeMultiplier={CHROME_MAX_FONT_SCALE}>
+                <Text style={styles.secondaryCtaText} numberOfLines={largeText ? undefined : 1} maxFontSizeMultiplier={largeText ? undefined : CHROME_MAX_FONT_SCALE}>
                   See your collection
                 </Text>
               </Pressable>
@@ -996,15 +1009,15 @@ export function DrawScreen({ navigation, route }: Props) {
               <Pressable
                 testID={ready.canEarnDraws ? 'draw-earn-pulls-cta' : 'draw-caught-up-cta'}
                 accessibilityRole="button"
-                accessibilityLabel={ready.canEarnDraws ? "Start today's session to earn draws" : 'Open library'}
-                style={({ pressed }) => [styles.primaryCta, pressed && styles.pressed]}
+                accessibilityLabel={ready.canEarnDraws ? isCourse ? 'Continue learning' : "Start today's session to earn draws" : 'Open library'}
+                style={({ pressed }) => [styles.primaryCta, largeText && styles.ctaLargeText, pressed && styles.pressed]}
                 onPress={() => {
                   if (ready.canEarnDraws) navigation.navigate('SessionCard', { slug: ready.slug });
                   else navigation.navigate('Library', { focusSlug: ready.slug });
                 }}
               >
-                <Text style={styles.primaryCtaText} numberOfLines={1} maxFontSizeMultiplier={CHROME_MAX_FONT_SCALE}>
-                  {ready.canEarnDraws ? 'Earn draws by studying  →' : 'Open library'}
+                <Text style={styles.primaryCtaText} numberOfLines={largeText ? undefined : 1} maxFontSizeMultiplier={largeText ? undefined : CHROME_MAX_FONT_SCALE}>
+                  {ready.canEarnDraws ? isCourse ? 'Continue learning' : 'Earn draws by studying  →' : 'Open library'}
                 </Text>
               </Pressable>
               {/* Hidden test probes — preserve testID + disabled state
@@ -1036,15 +1049,15 @@ export function DrawScreen({ navigation, route }: Props) {
               <Pressable
                 testID="screen-draw-secondary-cta"
                 accessibilityRole="button"
-                accessibilityLabel={`Open 1 card from ${ready.deckTitle}`}
+                accessibilityLabel={isCourse ? unlockLabel(1) : `Open 1 card from ${ready.deckTitle}`}
                 disabled={openDisabled}
-                style={({ pressed }) => [styles.primaryCta, openDisabled && styles.ctaDisabled, pressed && styles.pressed]}
+                style={({ pressed }) => [styles.primaryCta, largeText && styles.ctaLargeText, openDisabled && styles.ctaDisabled, pressed && styles.pressed]}
                 onPress={() => {
                   void open(1);
                 }}
               >
-                <Text style={styles.primaryCtaText} numberOfLines={1} maxFontSizeMultiplier={CHROME_MAX_FONT_SCALE}>
-                  Open 1
+                <Text style={styles.primaryCtaText} numberOfLines={largeText ? undefined : 1} maxFontSizeMultiplier={largeText ? undefined : CHROME_MAX_FONT_SCALE}>
+                  {isCourse ? unlockLabel(1) : 'Open 1'}
                 </Text>
               </Pressable>
               {/* Hidden test probe — preserves testID + disabled state for
@@ -1065,37 +1078,37 @@ export function DrawScreen({ navigation, route }: Props) {
               <Pressable
                 testID="screen-draw-primary-cta"
                 accessibilityRole="button"
-                accessibilityLabel={`Open ${plan.batch} cards from ${ready.deckTitle}`}
+                accessibilityLabel={isCourse ? unlockLabel(plan.batch) : `Open ${plan.batch} cards from ${ready.deckTitle}`}
                 disabled={openDisabled}
-                style={({ pressed }) => [styles.primaryCta, openDisabled && styles.ctaDisabled, pressed && styles.pressed]}
+                style={({ pressed }) => [styles.primaryCta, largeText && styles.ctaLargeText, openDisabled && styles.ctaDisabled, pressed && styles.pressed]}
                 onPress={() => {
                   if (plan.batch !== null) void open(plan.batch);
                 }}
               >
-                <Text style={styles.primaryCtaText} numberOfLines={1} maxFontSizeMultiplier={CHROME_MAX_FONT_SCALE}>
-                  {`Open ${plan.batch}`}
+                <Text style={styles.primaryCtaText} numberOfLines={largeText ? undefined : 1} maxFontSizeMultiplier={largeText ? undefined : CHROME_MAX_FONT_SCALE}>
+                  {isCourse ? unlockLabel(plan.batch) : `Open ${plan.batch}`}
                 </Text>
               </Pressable>
               <Pressable
                 testID="screen-draw-secondary-cta"
                 accessibilityRole="button"
-                accessibilityLabel={`Open 1 card from ${ready.deckTitle}`}
+                accessibilityLabel={isCourse ? unlockLabel(1) : `Open 1 card from ${ready.deckTitle}`}
                 disabled={openDisabled}
-                style={({ pressed }) => [styles.secondaryCta, openDisabled && styles.ctaDisabled, pressed && styles.pressed]}
+                style={({ pressed }) => [styles.secondaryCta, largeText && styles.ctaLargeText, openDisabled && styles.ctaDisabled, pressed && styles.pressed]}
                 onPress={() => {
                   void open(1);
                 }}
               >
-                <Text style={styles.secondaryCtaText} numberOfLines={1} maxFontSizeMultiplier={CHROME_MAX_FONT_SCALE}>
-                  Open 1
+                <Text style={styles.secondaryCtaText} numberOfLines={largeText ? undefined : 1} maxFontSizeMultiplier={largeText ? undefined : CHROME_MAX_FONT_SCALE}>
+                  {isCourse ? 'Unlock 1 card' : 'Open 1'}
                 </Text>
               </Pressable>
             </View>
           )}
-          <Text testID="draw-open-status" style={styles.openStatus} numberOfLines={1} maxFontSizeMultiplier={CHROME_MAX_FONT_SCALE}>
+          <Text testID="draw-open-status" style={styles.openStatus}>
             {statusText}
           </Text>
-        </View>
+        </ScrollView>
       </LinearGradient>
     </SafeAreaView>
   );
@@ -1114,11 +1127,12 @@ const styles = StyleSheet.create({
   },
   stateTitle: { color: colors.inkSoft, fontSize: typography.title3, lineHeight: 24, fontWeight: '900', textAlign: 'center' },
   stateBody: { marginTop: spacing.xs, color: colors.inkMuted, fontSize: typography.bodySmall, lineHeight: 18, textAlign: 'center' },
-  container: { flex: 1, paddingHorizontal: spacing.screenPadding, paddingTop: spacing.sm, paddingBottom: spacing.xl },
+  container: { flexGrow: 1, paddingHorizontal: spacing.screenPadding, paddingTop: spacing.sm, paddingBottom: spacing.xl },
   // Header now has a deck-title block on the left + pulls badge on the right
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 4, paddingHorizontal: 4 },
   deckTitleWrap: { flex: 1, paddingRight: spacing.sm },
-  deckEyebrow: { fontSize: 10, fontWeight: '900', letterSpacing: 1.4, color: colors.inkMuted },
+  deckEyebrow: { fontSize: typography.caption, fontWeight: '800', letterSpacing: 1, color: colors.inkSecondary },
+  courseProgress: { marginTop: spacing.xs, color: colors.inkSecondary, fontSize: typography.bodySmall, fontWeight: '700' },
   deckTitle: { marginTop: 2, fontSize: typography.title3, fontWeight: '900', color: colors.inkSoft },
   pullsBadge: {
     flexDirection: 'row', alignItems: 'center', minHeight: 36, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4,
@@ -1207,7 +1221,7 @@ const styles = StyleSheet.create({
   neighborArrowChipLeft: { left: -2 },
   neighborArrowChipRight: { right: -2 },
   neighborArrowChipText: { fontSize: 14, fontWeight: '900', color: colors.inkSoft, marginTop: -2 },
-  neighborTitle: { marginTop: 6, color: colors.inkMuted, fontSize: 9, fontWeight: '800', textAlign: 'center', width: '100%' },
+  neighborTitle: { marginTop: 6, color: colors.inkMuted, fontSize: typography.caption, fontWeight: '800', textAlign: 'center', width: '100%' },
   packStage: { width: '100%', alignItems: 'center', justifyContent: 'center', marginTop: spacing.sm },
   // Stacking context for the 3D pack (see the JSX comment): above the hero halo, no layout.
   pack3dWrapper: { zIndex: 2 },
@@ -1274,7 +1288,7 @@ const styles = StyleSheet.create({
   },
   swipeThumbPrimed: { backgroundColor: colors.pokeBlueDeep },
   swipeThumbText: { color: colors.softCream, fontSize: 14, fontWeight: '900', marginTop: -2 },
-  swipeHint: { marginTop: 4, color: colors.inkMuted, fontSize: 10, fontWeight: '700', letterSpacing: 0.4 },
+  swipeHint: { marginTop: 4, color: colors.inkMuted, fontSize: typography.bodySmall, fontWeight: '700', letterSpacing: 0.4 },
   // Hidden swipe block — kept in tree for test contract (text must exist) but
   // 0×0 + opacity 0 so it has no visual footprint.
   swipeBlockHidden: { width: 0, height: 0, opacity: 0, overflow: 'hidden' },
@@ -1285,19 +1299,20 @@ const styles = StyleSheet.create({
   footerActions: { marginTop: spacing.md, gap: spacing.sm },
   // Always-present status line under the footer. The fixed minHeight reserves
   // the row so the footer does not jump when the copy appears and clears.
-  openStatus: { marginTop: spacing.xs, minHeight: 16, alignSelf: 'center', color: colors.inkMuted, fontSize: typography.caption, fontWeight: '700' },
+  openStatus: { marginTop: spacing.xs, minHeight: 20, alignSelf: 'center', textAlign: 'center', color: colors.inkSecondary, fontSize: typography.bodySmall, fontWeight: '600' },
   primaryCta: {
     minHeight: 56, borderRadius: 999, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.md,
     backgroundColor: colors.pokeBlue, shadowColor: 'rgba(44,156,192,0.5)', shadowOpacity: 1, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 6,
   },
-  primaryCtaText: { color: colors.ink, fontSize: typography.button, fontWeight: '900', letterSpacing: 0.4 },
+  ctaLargeText: { borderRadius: spacing.buttonRadius, paddingVertical: spacing.sm },
+  primaryCtaText: { textAlign: 'center', color: colors.ink, fontSize: typography.button, fontWeight: '900', letterSpacing: 0.4 },
   // Ghost button — no fill, hairline border. Reads as "alternative", makes
   // the solid pokeBlue batch button the obvious primary action.
   secondaryCta: {
     minHeight: 48, borderRadius: 999, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.md,
     backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.hairline,
   },
-  secondaryCtaText: { color: colors.inkMuted, fontSize: typography.bodySmall, fontWeight: '800', letterSpacing: 0.3 },
+  secondaryCtaText: { textAlign: 'center', color: colors.inkMuted, fontSize: typography.bodySmall, fontWeight: '800', letterSpacing: 0.3 },
   ctaDisabled: { opacity: 0.45 },
   pressed: { opacity: 0.9 },
 });

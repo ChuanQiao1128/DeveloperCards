@@ -164,7 +164,7 @@ describe('SessionSummaryScreen', () => {
     // economy-v2: the pull is paid at rating; the summary only renders the outcome.
     expect(texts).toContain('+1 draw · 1 new card learned');
     expect(texts).toContain('1 ready for this pack');
-    expect(texts).toContain('Daily streak');
+    expect(texts).toContain('Cards studied');
     expect(texts).toContain('First day complete');
 
     await act(async () => {
@@ -237,6 +237,22 @@ describe('SessionSummaryScreen', () => {
     return [...texts, ...labels].join('\n');
   }
 
+  it('does not turn a zero-card visit into progress or streak activity', async () => {
+    const before = [...store.entries()];
+    const tree = await renderSummary({ slug: 'aws-saa-fundamentals', deckTitle: 'AWS Architect Basics', sessionId: 'zero-visit', sessionDone: 0, sessionLimit: 1, minimumGoal: 1, dueCount: 3, streakEarned: true });
+    expect(visibleWords(tree)).not.toMatch(/SESSION COMPLETE|Progress saved|\+0|Daily streak/);
+    expect(tree.root.findAllByProps({ testID: 'summary-reward-block' })).toHaveLength(0);
+    expect(tree.root.findAllByProps({ testID: 'summary-progress-block' })).toHaveLength(0);
+    expect([...store.entries()]).toEqual(before);
+  });
+
+  it('keeps the ordered course summary focused on learning', async () => {
+    const tree = await renderSummary({ slug: 'aws-saa-fundamentals', deckTitle: 'AWS Architect Basics', sessionId: 'course-session', sessionDone: 5, sessionLimit: 5, minimumGoal: 1, dueCount: 0, reward: ONE_NEW_CARD_REWARD });
+    expect(visibleWords(tree)).toContain('You studied 5 cards');
+    expect(visibleWords(tree)).toContain('Continue learning');
+    expect(tree.root.findAllByProps({ testID: 'summary-reward-use-pulls-cta' })).toHaveLength(0);
+  });
+
   it('shows no old game word on the rendered summary, reward card and progress block included', async () => {
     const baseParams = {
       sessionId: 'sess-words',
@@ -257,8 +273,8 @@ describe('SessionSummaryScreen', () => {
     const cardTexts = card.findAll((node) => (node.type as any) === 'Text').map(textOf);
     expect(cardTexts).toContain('draws');
     expect(cardTexts).toContain('Saved draws');
-    expect(cardTexts).toContain('extra 0 → 0');
-    expect(earnedWords).toContain('Learning map updated for this session.');
+    expect(cardTexts).not.toContain('extra 0 → 0');
+    expect(earnedWords).not.toContain('Learning map updated for this session.');
     expect(earnedWords).not.toMatch(OLD_WORDS);
 
     // Overflow: the extra draws are waiting, so the reward card shows the extra line with a change.
@@ -504,7 +520,7 @@ describe('SessionSummaryScreen', () => {
     loadWalletSpy.mockRestore();
   });
 
-  it('uses neutral empty-state library copy without session setup language', async () => {
+  it('offers a return to learning without a false completion or zero rewards', async () => {
     const navigation = {
       navigate: vi.fn(),
     } as any;
@@ -536,14 +552,17 @@ describe('SessionSummaryScreen', () => {
     });
 
     const texts = tree.root.findAll((node) => (node.type as any) === 'Text').map(getTextContent).join('\n');
-    expect(texts).toContain('Browse your library while we wait for tomorrow’s session.');
+    expect(texts).toContain('No cards were studied in this session.');
+    expect(texts).not.toMatch(/SESSION COMPLETE|Progress saved|wait for tomorrow|\+0/);
+    expect(tree.root.findAllByProps({ testID: 'summary-reward-block' })).toHaveLength(0);
+    expect(tree.root.findAllByProps({ testID: 'summary-progress-block' })).toHaveLength(0);
     expect(texts.toLowerCase()).not.toContain('choose cards');
     expect(texts.toLowerCase()).not.toContain('session launch');
 
     act(() => {
       findPressableByTestID(tree, 'screen-session-summary-primary-cta').props.onPress();
     });
-    expect(navigation.navigate).toHaveBeenCalledWith('Library');
+    expect(navigation.navigate).toHaveBeenCalledWith('Home', undefined, { pop: true });
   });
 
   it('shows an extra milestone count when multiple milestones unlock', async () => {
