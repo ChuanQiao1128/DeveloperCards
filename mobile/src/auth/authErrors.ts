@@ -8,6 +8,7 @@
 export type AuthFlowCode =
   | 'NEEDS_CONFIRMATION'
   | 'USERNAME_EXISTS'
+  | 'ALREADY_CONFIRMED'
   | 'RESET_REQUIRED'
   | 'NEW_PASSWORD_REQUIRED'
   | 'FAILED';

@@ -52,6 +52,7 @@ import {
   type FeedbackPrefs,
 } from '../features/gacha/settings/feedbackPrefs';
 import { StudySection } from '../features/gacha/settings/study/StudySection';
+import { resetSingleDeckProgress } from '../features/gacha/deckReset';
 import { loadCardLangPref, setCardLangPref, useCardLangPref } from '../features/gacha/study/cardLangPrefs';
 import { getStudyGoal, type StudyGoal } from '../features/goal/studyGoal';
 import { loadActiveDeckSlug } from '../content/activeDeck';
@@ -338,6 +339,31 @@ export function SettingsScreen({ navigation }: Props) {
     if (debugTaps.current.tap()) navigation.navigate('DebugMenu');
   }, [navigation]);
 
+  const onResetDeckProgress = useCallback(() => {
+    if (!activeDeckSlug) return;
+    Alert.alert(
+      'Reset deck progress?',
+      'This clears study progress, owned cards and daily stats for the active deck on this device. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset',
+          style: 'destructive',
+          onPress: () => {
+            void (async () => {
+              try {
+                await resetSingleDeckProgress(activeDeckSlug);
+                Alert.alert('Progress reset', 'The active deck\u2019s progress on this device has been cleared.');
+              } catch (e: any) {
+                Alert.alert('Reset failed', e?.message ?? String(e));
+              }
+            })();
+          },
+        },
+      ],
+    );
+  }, [activeDeckSlug]);
+
   const onSignOut = useCallback(async () => {
     await signOutNow();
     await refresh();
@@ -474,6 +500,7 @@ export function SettingsScreen({ navigation }: Props) {
             onToggleFourButtons={onToggleFourButtons}
             goal={{ value: studyGoal, fallbackDeckSlug: activeDeckSlug, onSaved: setStudyGoalState }}
             cardLang={{ value: cardLang, onSelect: (next) => void setCardLangPref(next) }}
+            onResetDeckProgress={activeDeckSlug ? onResetDeckProgress : undefined}
           />
 
           <PrivacySection prefs={privacyPrefs} onToggleShare={onToggleShareUsageCounts} />

@@ -49,15 +49,6 @@
   ],
   "entries": [
     {
-      "id": "GHSA-vfj7-8cjw-p6xm",
-      "package": "braces",
-      "severity": "high",
-      "title": "braces vulnerable to stack-exhaustion denial of service through deeply nested patterns",
-      "inBundle": false,
-      "reason": "Not in the shipped app (inBundle false): absent from the iOS and Android Metro source maps, checked in every CI run by check-bundle-packages.py. Build-time only: expo > metro-file-map > micromatch glob matching in Metro, on repo-controlled patterns. No fixed release: the advisory covers <=3.0.3 and 3.0.3 is the newest braces; it leaves the tree only when Metro stops using micromatch (npm proposes react-native 0.87.1, a major).",
-      "expires": "2027-02-01"
-    },
-    {
       "id": "GHSA-8gc5-j5rx-235r",
       "package": "fast-xml-parser",
       "severity": "high",
@@ -127,6 +118,51 @@
       "title": "PostCSS: Path Traversal in Previous Source Map Auto-Loading (sourceMappingURL) leads to Arbitrary .map File Disclosure",
       "inBundle": false,
       "reason": "Not in the shipped app (inBundle false): absent from the iOS and Android Metro source maps, checked in every CI run by check-bundle-packages.py. Build-time only: @expo/metro-config's CSS transform; the app ships no CSS. No lockfile fix: every @expo/metro-config 54.0.x (pinned exactly by expo) requires postcss ~8.4.32, and 8.4.49, the newest 8.4.x, is affected; @expo/metro-config 57 moves to ^8.5.14. It leaves with an Expo SDK major.",
+      "expires": "2027-02-01"
+    },
+    {
+      "id": "GHSA-5x38-2vff-x55p",
+      "package": "node-forge",
+      "severity": "high",
+      "title": "Forge: X.509 basicConstraints bypass in verifyCertificateChain() via deprecated extension OIDs 2.5.29.10 and 2.5.29.13",
+      "inBundle": false,
+      "reason": "Not in the shipped app (inBundle false): absent from the iOS and Android Metro source maps, checked in every CI run by check-bundle-packages.py. Build-time only: @expo/cli dev-server certificates and @expo/code-signing-certificates; app.json sets no updates code signing. No fixed release: the advisory covers node-forge <=1.4.0 and 1.4.0 (2026-03-24) is the newest release; it leaves the tree when @expo/cli stops depending on node-forge (an Expo SDK major).",
+      "expires": "2027-02-01"
+    },
+    {
+      "id": "GHSA-7wch-p9px-956x",
+      "package": "node-forge",
+      "severity": "high",
+      "title": "Forge: Regular expression denial of service in PEM decoding (pem.decode)",
+      "inBundle": false,
+      "reason": "Not in the shipped app (inBundle false): absent from the iOS and Android Metro source maps, checked in every CI run by check-bundle-packages.py. Build-time only: @expo/cli dev-server certificates and @expo/code-signing-certificates; app.json sets no updates code signing. No fixed release: the advisory covers node-forge <=1.4.0 and 1.4.0 (2026-03-24) is the newest release; it leaves the tree when @expo/cli stops depending on node-forge (an Expo SDK major).",
+      "expires": "2027-02-01"
+    },
+    {
+      "id": "GHSA-8hrf-8g6f-7xwp",
+      "package": "node-forge",
+      "severity": "high",
+      "title": "Forge: Denial of service in TLS record processing via a record interleaved with a fragmented handshake message",
+      "inBundle": false,
+      "reason": "Not in the shipped app (inBundle false): absent from the iOS and Android Metro source maps, checked in every CI run by check-bundle-packages.py. Build-time only: @expo/cli dev-server certificates and @expo/code-signing-certificates; app.json sets no updates code signing. No fixed release: the advisory covers node-forge <=1.4.0 and 1.4.0 (2026-03-24) is the newest release; it leaves the tree when @expo/cli stops depending on node-forge (an Expo SDK major).",
+      "expires": "2027-02-01"
+    },
+    {
+      "id": "GHSA-hqq3-7jhf-c5jx",
+      "package": "node-forge",
+      "severity": "high",
+      "title": "Forge: Denial of service in TLS record processing via call stack exhaustion",
+      "inBundle": false,
+      "reason": "Not in the shipped app (inBundle false): absent from the iOS and Android Metro source maps, checked in every CI run by check-bundle-packages.py. Build-time only: @expo/cli dev-server certificates and @expo/code-signing-certificates; app.json sets no updates code signing. No fixed release: the advisory covers node-forge <=1.4.0 and 1.4.0 (2026-03-24) is the newest release; it leaves the tree when @expo/cli stops depending on node-forge (an Expo SDK major).",
+      "expires": "2027-02-01"
+    },
+    {
+      "id": "GHSA-jc66-7q78-782g",
+      "package": "node-forge",
+      "severity": "high",
+      "title": "Forge: PKCS#12 MAC forgery and constant-key PBE via zero iteration count",
+      "inBundle": false,
+      "reason": "Not in the shipped app (inBundle false): absent from the iOS and Android Metro source maps, checked in every CI run by check-bundle-packages.py. Build-time only: @expo/cli dev-server certificates and @expo/code-signing-certificates; app.json sets no updates code signing. No fixed release: the advisory covers node-forge <=1.4.0 and 1.4.0 (2026-03-24) is the newest release; it leaves the tree when @expo/cli stops depending on node-forge (an Expo SDK major).",
       "expires": "2027-02-01"
     }
   ]

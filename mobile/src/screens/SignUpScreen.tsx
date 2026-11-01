@@ -30,7 +30,6 @@ function normEmail(v: string) {
 export default function SignUpScreen({ navigation }: Props) {
   const loading = useAuthStore((s) => s.loading);
   const signUpWithEmail = useAuthStore((s) => s.signUpWithEmail);
-  const resendConfirmCode = useAuthStore((s) => s.resendConfirmCode);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -53,19 +52,17 @@ export default function SignUpScreen({ navigation }: Props) {
       navigation.replace('ConfirmSignUp', { email: e });
     } catch (err: any) {
       if (isAuthFlowError(err, 'USERNAME_EXISTS')) {
-        // The email is taken. If it's an unconfirmed account, resending the
-        // code succeeds and we route to ConfirmSignUp so the user can finish;
-        // if it throws, the account is confirmed — point them at sign in.
-        try {
-          await resendConfirmCode(e);
-          navigation.replace('ConfirmSignUp', { email: e });
-        } catch {
-          Alert.alert(
-            'Account already exists',
-            'This email already has an account. Sign in instead.',
-            [{ text: 'Sign in', onPress: () => navigation.replace('SignIn', { email: e }) }],
-          );
-        }
+        // 2026-11-01: the user pool runs with PreventUserExistenceErrors
+        // ENABLED, so ResendConfirmationCode always answers success and the
+        // old "resend to detect a confirmed account" probe never throws.
+        // Always say the account exists and offer sign-in. An *unconfirmed*
+        // account surfaces at sign-in as UserNotConfirmedException and the
+        // sign-in flow routes it to ConfirmSignUp with a fresh code.
+        Alert.alert(
+          'Account already exists',
+          'This email already has an account. Sign in instead.',
+          [{ text: 'Sign in', onPress: () => navigation.replace('SignIn', { email: e }) }],
+        );
         return;
       }
       Alert.alert('Sign up failed', friendlyAuthError(err));

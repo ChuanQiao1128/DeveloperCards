@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { colors } from '../../../../theme/colors';
 import { spacing } from '../../../../theme/spacing';
 import { typography } from '../../../../theme/typography';
@@ -14,6 +14,8 @@ export const STUDY_COPY = {
   title: 'Study',
   fourButtonsLabel: 'Show all four rating buttons',
   fourButtonsBody: 'Rate cards with Again, Hard, Good and Easy instead of Forgot and Remembered.',
+  resetDeckLabel: 'Reset deck progress',
+  resetDeckBody: "Clear this deck's study progress, owned cards and daily stats on this device. This cannot be undone.",
 } as const;
 
 export function StudySection(props: {
@@ -23,8 +25,10 @@ export function StudySection(props: {
   goal?: { value: StudyGoal | null; fallbackDeckSlug: string | null; onSaved: (goal: StudyGoal | null) => void };
   /** Card translations: the remembered card language. Omitted, the section shows no language row. */
   cardLang?: { value: CardDisplayLang; onSelect: (next: CardDisplayLang) => void };
+  /** Reset the active deck's local study progress. Omitted, the section shows no reset row. */
+  onResetDeckProgress?: () => void;
 }) {
-  const { prefs, onToggleFourButtons, goal, cardLang } = props;
+  const { prefs, onToggleFourButtons, goal, cardLang, onResetDeckProgress } = props;
   return (
     <View style={styles.sectionCard}>
       <Text style={styles.sectionTitle} numberOfLines={1}>
@@ -39,6 +43,18 @@ export function StudySection(props: {
         onPress={() => onToggleFourButtons(!prefs.fourButtons)}
       />
       {cardLang ? <CardLangRow value={cardLang.value} onSelect={cardLang.onSelect} /> : null}
+      {onResetDeckProgress ? (
+        <Pressable
+          testID="settings-reset-deck-progress"
+          accessibilityRole="button"
+          accessibilityLabel={STUDY_COPY.resetDeckLabel}
+          onPress={onResetDeckProgress}
+          style={({ pressed }) => [styles.resetRow, pressed && styles.pressed]}
+        >
+          <Text style={styles.resetLabel}>{STUDY_COPY.resetDeckLabel}</Text>
+          <Text style={styles.resetBody}>{STUDY_COPY.resetDeckBody}</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -58,5 +74,24 @@ const styles = StyleSheet.create({
     fontSize: typography.body,
     fontWeight: '800',
     color: colors.ink,
+  },
+  resetRow: {
+    marginTop: spacing.sm,
+    minHeight: 44,
+    justifyContent: 'center',
+  },
+  resetLabel: {
+    fontSize: typography.bodySmall,
+    fontWeight: '700',
+    color: colors.ink,
+  },
+  resetBody: {
+    marginTop: 2,
+    fontSize: typography.caption,
+    color: colors.inkSecondary,
+    lineHeight: 17,
+  },
+  pressed: {
+    opacity: 0.9,
   },
 });
