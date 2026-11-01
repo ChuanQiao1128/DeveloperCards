@@ -94,6 +94,13 @@ vi.mock('../../src/features/gacha/rewards/rewardWallet', () => ({
   saveRewardWalletState: vi.fn(async () => {}),
 }));
 
+// Draw uses the per-pack wallet; keep this visibility fixture funded explicitly.
+vi.mock('../../src/features/gacha/rewards/deckWallet', () => ({
+  loadDeckWallet: vi.fn(async () => walletFixture),
+  ensureDeckBootstrap: vi.fn(async () => ({ granted: 0, wallet: walletFixture })),
+  migrateLegacyWalletIfNeeded: vi.fn(async () => ({ kind: 'noop', moved: {} })),
+}));
+
 // DrawScreen schedules a sync after a committed draw (issue #12 item 6a).
 // Mocked here rather than mocked away: progressSync pulls in Platform,
 // expo-crypto and the API client, none of which this screen test is about.

@@ -622,9 +622,8 @@ describe('HomeScreen v9', () => {
     expect(navigateMock).not.toHaveBeenCalled();
   });
 
-  // 2026-10-18 home carousel: a coming deck has nothing to open, so it gets no
-  // carousel page and no dot (it used to be a disabled "Soon" tile).
-  it('gives a manifest coming deck no carousel page and no dot', async () => {
+  // Coming packs stay discoverable while their study actions remain disabled.
+  it('keeps a manifest coming deck visible in the carousel and dots', async () => {
     deckSummariesFixture.push({
       slug: 'aws-saa-c03',
       title: 'AWS SAA-C03',
@@ -659,11 +658,12 @@ describe('HomeScreen v9', () => {
     );
 
     expect(tiles.map((tile) => tile.props.accessibilityLabel)).toEqual([
+      'AWS SAA-C03 pack — Coming soon',
       'C# Interview pack — 1 due',
       'AWS Core pack — 2 due',
     ]);
-    expect(tiles.some((tile) => tile.props.accessibilityLabel.startsWith('AWS SAA-C03'))).toBe(false);
-    expect(tree.root.findAllByProps({ testID: 'home-pack-page-aws-saa-c03' })).toHaveLength(0);
+    expect(tiles.some((tile) => tile.props.accessibilityLabel.startsWith('AWS SAA-C03'))).toBe(true);
+    expect(tree.root.findAllByProps({ testID: 'home-pack-page-aws-saa-c03' }).length).toBeGreaterThan(0);
   });
 
   it('centers the draw status label under the CTA', async () => {

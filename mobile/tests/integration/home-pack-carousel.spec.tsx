@@ -315,6 +315,23 @@ describe('HomeScreen cover carousel', () => {
     vi.mocked(loadHomeDeckSummaries).mockClear();
   });
 
+  it('shows both upcoming packs without replacing the live active deck or starting study', async () => {
+    const upcoming = { availability: 'coming', canStudy: false, dueToday: 0, newToday: 0 };
+    deckSummariesFixture = [BASICS(), { ...SAA(), ...upcoming }, { ...CLAUDE(), ...upcoming }];
+    const tree = await renderHome();
+    expect(dots(tree)).toHaveLength(3);
+    for (const title of ['AWS SAA-C03', 'Claude CCDV-F']) {
+      await press(dot(tree, title));
+      expect(textOf(tree, 'home-pack-caption')).toBe(title);
+      expect(primaryCtaLabel(tree)).toBe('Coming soon');
+      expect(featured(tree).props.disabled).toBe(true);
+      await press(featured(tree));
+    }
+    expect(setActiveDeckSlugMock).not.toHaveBeenCalled();
+    expect(navigateMock).not.toHaveBeenCalled();
+    expect(executeDeckAction).not.toHaveBeenCalled();
+  });
+
   it('selects the pack a swipe lands on, makes it the active deck and rebuilds Home without reloading', async () => {
     const tree = await renderHome();
     scrollToMock.mockClear();

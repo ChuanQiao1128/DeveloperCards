@@ -250,6 +250,7 @@ function toWalletState(wallet?: RewardWalletState | null): RewardWalletState {
 }
 
 function buildDrawVM(wallet?: RewardWalletState | null, selectedDeck?: DeckSummary | null): HomeDrawVM {
+  if (selectedDeck?.availability === 'coming') return { state: 'locked', label: 'Coming soon' };
   const safeWallet = toWalletState(wallet);
 
   if (
@@ -538,6 +539,11 @@ function buildHeroCopy(params: {
     };
   }
 
+  if (selectedDeck?.availability === 'coming') {
+    return { eyebrow: 'Home', title: 'Coming soon', subtitle: 'This pack is being prepared.',
+      helper: selectedDeck.eta ?? '' };
+  }
+
   if (!selectedDeck) {
     return {
       eyebrow: 'Today',
@@ -761,8 +767,7 @@ function buildDeckRows(params: {
 /**
  * 2026-10-18 home carousel: the packs Home's cover carousel pages through, one page each, in
  * DECK_ORDER (content/hiddenDecks.ts). The summaries already arrive in that order; sorting again
- * keeps the carousel in it whatever reaches Home. A 'coming' deck has nothing to open and gets no
- * page.
+ * keeps the carousel in it whatever reaches Home. Coming packs stay visible with study disabled.
  *
  * While the starter lesson is open (`lockedSlug`) the carousel holds one page, the lesson's pack,
  * so the cover and the one instruction under it name the same pack. When the lesson's pack is not
@@ -775,8 +780,7 @@ export function homeCarouselRows(params: {
 }): HomeDeckVM[] {
   const { rows, selectedSlug, lockedSlug } = params;
   const pages = sortByDeckOrder(rows.map((row) => ({ slug: row.deck.slug, row })))
-    .map(({ row }) => row)
-    .filter((row) => row.actionHint !== 'none');
+    .map(({ row }) => row);
   if (!lockedSlug) return pages;
   const lessonRow =
     rows.find((row) => row.deck.slug === lockedSlug) ??
@@ -871,6 +875,9 @@ export function buildHomeVM(params: {
           testID: 'home-primary-cta',
           disabled: false,
         };
+  }
+  if (selectedDeck?.availability === 'coming' && statusKind !== 'error') {
+    cta = { kind: 'first_run', label: 'Coming soon', nav: 'none', testID: 'home-primary-cta', disabled: true };
   }
   const heroCopy = buildHeroCopy({
     statusKind,

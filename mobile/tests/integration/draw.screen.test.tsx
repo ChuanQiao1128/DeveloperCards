@@ -30,6 +30,12 @@ let manifestFixture: any[] = [{ slug: 'csharp', availability: 'live', title: 'C#
 let resolveDeckFixture: any = csharpDeck();
 let installDeckOkFixture = false;
 let updatesFixture: Record<string, any> = {};
+let studyWorkFixture = true;
+
+vi.mock('../../src/features/gacha/draw/drawPool', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../../src/features/gacha/draw/drawPool')>(),
+  hasDrawStudyWork: vi.fn(async () => studyWorkFixture),
+}));
 
 const consumeDeckPullsMock = vi.fn(async (_slug: string, count: number) => {
   const spent = Math.min(count, walletFixture.availablePulls);
@@ -246,6 +252,7 @@ describe('DrawScreen v9', () => {
     resolveDeckFixture = csharpDeck();
     installDeckOkFixture = false;
     updatesFixture = {};
+    studyWorkFixture = true;
     manifestCalls.length = 0;
     remoteManifestLoader = null;
     consumeDeckPullsMock.mockClear();
@@ -529,6 +536,24 @@ describe('DrawScreen v9', () => {
     expect(consumeDeckPullsMock).toHaveBeenCalledWith('csharp', 1);
   });
 
+  it('rechecks study work when draws disappear after the pack was loaded', async () => {
+    studyWorkFixture = false;
+    const navigate = vi.fn();
+    const tree = await renderDraw(navigate);
+    armPackSwipe(tree);
+    walletFixture = { availablePulls: 0, reservePulls: 0 };
+    await act(async () => {
+      tree.root.findByProps({ testID: 'screen-draw-primary-cta' }).props.onPress();
+      await Promise.resolve();
+    });
+    expect(collectText(tree)).not.toContain('Earn draws by studying');
+    expect(commitDrawMock).not.toHaveBeenCalled();
+    const library = tree.root.findByProps({ testID: 'draw-caught-up-cta' });
+    act(() => { library.props.onPress(); });
+    expect(navigate).toHaveBeenCalledWith('Library', { focusSlug: 'csharp' });
+    expect(navigate).not.toHaveBeenCalledWith('SessionCard', expect.anything());
+  });
+
   it('offers a single Open 1 when one card is missing, however many draws are held', async () => {
     resolveDeckFixture = csharpDeck(1);
     const tree = await renderDraw();
@@ -539,7 +564,7 @@ describe('DrawScreen v9', () => {
     expect(tree.root.findByProps({ testID: 'screen-draw-secondary-cta' }).props.disabled).toBe(false);
   });
 
-  it('shows the earn-pulls escape CTA when no pulls remain', async () => {
+  it('shows the earn-pulls escape CTA when no pulls remain and study work exists', async () => {
     // When wallet is empty, the dead-end "two greyed-out Open buttons"
     // pattern is replaced with a prominent pokeBlue "Earn pulls by
     // studying" CTA that drops the user straight into a SessionCard run.
@@ -579,6 +604,19 @@ describe('DrawScreen v9', () => {
       earnCta.props.onPress();
     });
     expect(navigate).toHaveBeenCalledWith('SessionCard', { slug: 'csharp' });
+  });
+
+  it('does not send a caught-up learner with no draws into an empty session', async () => {
+    walletFixture = { availablePulls: 0, reservePulls: 0 };
+    studyWorkFixture = false;
+    const navigate = vi.fn();
+    const tree = await renderDraw(navigate);
+    expect(collectText(tree)).not.toContain('Earn draws by studying');
+    expect(collectText(tree)).toContain('No cards due');
+    const library = tree.root.findByProps({ testID: 'draw-caught-up-cta' });
+    act(() => { library.props.onPress(); });
+    expect(navigate).toHaveBeenCalledWith('Library', { focusSlug: 'csharp' });
+    expect(navigate).not.toHaveBeenCalledWith('SessionCard', expect.anything());
   });
 
   it('supports neighbor hint selection and resets swipe arm state on switch', async () => {

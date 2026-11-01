@@ -111,7 +111,7 @@ function toPackPage(row: HomeDeckVM): HomePackPage {
   // dropped back into review.
   const isFullyMastered = totalCards > 0 && masteredCount >= totalCards && dueCount === 0;
   let status = 'Ready';
-  if (row.actionHint === 'none') status = 'Soon';
+  if (row.actionHint === 'none') status = 'Coming soon';
   else if (row.actionHint === 'paywall') status = 'Locked';
   else if (row.actionHint === 'install' || row.actionHint === 'trial-start') status = 'Install';
   else if (row.update?.state === 'updating') status = 'Updating';
@@ -833,7 +833,7 @@ export function HomeScreen({ navigation, route }: Props) {
                 when motion is enabled. Hero copy is action-driven, not a
                 duplicate of the pack name. */}
             {(() => {
-              // One page per pack row ('coming' decks get none); while the
+              // One page per pack row, including upcoming packs; while the
               // starter lesson is open, the lesson's pack alone.
               const carouselRows = homeCarouselRows({
                 rows: homeState.vm.decks.rows,
@@ -887,6 +887,7 @@ export function HomeScreen({ navigation, route }: Props) {
                     ? `${featuredDeck.status} ${featuredDeck.title}`
                     : homeState.vm.cta.label;
               const handleFeaturedPackPress = () => {
+                if (featuredHint === 'none') return;
                 if (starterSlug) {
                   openStarterLesson(starterSlug);
                   return;
