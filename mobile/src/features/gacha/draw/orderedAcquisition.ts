@@ -5,8 +5,7 @@ import { getUserScopedKey } from '../../../review/storage';
 import { isLearnedProgress } from '../selectors/progressSelectors';
 import { STARTER_LESSON_KEY } from '../starter/starterGate';
 
-export const ORDERED_DECK_SLUG = 'aws-saa-fundamentals';
-export const isOrderedDeck = (slug: string): boolean => slug === ORDERED_DECK_SLUG;
+export { ORDERED_DECK_SLUG, isOrderedDeck } from './orderedDeckPolicy';
 
 export function orderedCards(cards: readonly CardExport[]): CardExport[] {
   const seen = new Set<string>();

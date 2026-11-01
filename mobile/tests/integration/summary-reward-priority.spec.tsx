@@ -51,7 +51,7 @@ describe('summary reward priority', () => {
     (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
   });
 
-  it('renders reward block above progress block', async () => {
+  it('keeps next steps above earned rewards and progress', async () => {
     let tree!: renderer.ReactTestRenderer;
     await act(async () => {
       tree = renderer.create(
@@ -69,6 +69,7 @@ describe('summary reward priority', () => {
               minimumGoal: 1,
               dueCount: 2,
               streakEarned: true,
+              reward: { newCardPulls: 1, newCardUids: ['u1'], dueClearPulls: 0, rewardPulls: 1, applied: 1, dropped: 0, walletBefore: { availablePulls: 0, reservePulls: 0 }, walletAfter: { availablePulls: 1, reservePulls: 0 } },
             },
           } as any}
         />,
@@ -87,5 +88,8 @@ describe('summary reward priority', () => {
     expect(rewardIndex).toBeGreaterThanOrEqual(0);
     expect(progressIndex).toBeGreaterThanOrEqual(0);
     expect(rewardIndex).toBeLessThan(progressIndex);
+    const actionIndex = all.findIndex(node => node.props?.testID === 'screen-session-summary-primary-cta');
+    expect(actionIndex).toBeGreaterThanOrEqual(0);
+    expect(actionIndex).toBeLessThan(rewardIndex);
   });
 });

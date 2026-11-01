@@ -97,6 +97,7 @@ vi.mock('react-native', () => {
   const React = require('react');
   return {
     View: ({ children, ...props }: any) => React.createElement('View', props, children),
+    ScrollView: ({ children, ...props }: any) => React.createElement('ScrollView', props, children),
     Text: ({ children, ...props }: any) => React.createElement('Text', props, children),
     ActivityIndicator: (props: any) => React.createElement('ActivityIndicator', props),
     Pressable: ({ children, onPress, ...props }: any) =>
@@ -222,7 +223,7 @@ function readWallet(): { availablePulls: number; reservePulls: number } {
 }
 
 describe('AWS Basics continuous course entrance', () => {
-  it('shows Open 5 for a caught-up 18/347 learner and delivers the next five cards', async () => {
+  it('offers the next 5 cards for a caught-up 18/347 learner and delivers the next five cards', async () => {
     await flushDrawHistory(); store.clear(); invalidateDrawStateCache(); invalidateDeckCache();
     failSetItemFor = null; afterSetItem = null; setItemCalls.length = 0;
     const slug = 'aws-saa-fundamentals';
@@ -245,7 +246,8 @@ describe('AWS Basics continuous course entrance', () => {
         route={{ key: 'draw', name: 'Draw', params: { slug } } as any} />);
     });
     await flush();
-    expect(collectText(tree)).toContain('Open 5');
+    expect(collectText(tree)).toContain('Unlock next 5 cards');
+    expect(tree.root.findByProps({ testID: 'screen-draw-primary-cta' }).props.accessibilityLabel).toBe('Unlock next 5 cards');
     armPackSwipe(tree);
     await act(async () => {
       tree.root.findByProps({ testID: 'screen-draw-primary-cta' }).props.onPress();

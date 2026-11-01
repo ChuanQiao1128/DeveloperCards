@@ -656,7 +656,7 @@ describe('HomeScreen cover carousel', () => {
     const tree = await renderHome();
     const coverFrames = featured(tree).findAll((node) => {
       const styles = Array.isArray(node.props.style) ? node.props.style : [node.props.style];
-      return styles.some((style: any) => style?.width === 126 && style?.height === 180);
+      return styles.some((style: any) => style?.width === 98 && style?.height === 140);
     });
     expect(coverFrames.length).toBeGreaterThan(0);
     expect(primaryCtaLabel(tree)).toBeTruthy();
@@ -737,7 +737,7 @@ describe('HomeScreen cover carousel', () => {
   it('counts the selected pack once in the hero and avoids a repeated due-count header', async () => {
     const tree = await renderHome();
     // AWS Architect Basics has 1 due; SAA-C03 has 4; the three packs together have 5.
-    expect(textOf(tree, 'home-hero-title')).toBe('1 card waiting');
+    expect(textOf(tree, 'home-hero-title')).toBe('Your next lesson is ready');
     expect(textOf(tree, 'home-header-subtitle')).toBeNull();
 
     await swipeEnd(tree, HOME_PACK_PAGE_WIDTH);

@@ -13,10 +13,8 @@ export const COPY = {
   title: {
     fullClear: 'Session complete 🎉',
     progress: 'Good progress today',
-    // sessionDone 0: nothing was rated, so neither "progress" nor "complete"
-    // is true. Same words as nextAction.emptyTitle so the hero and the
-    // action card stop contradicting each other on a session that never dealt.
-    none: 'No session logged yet',
+    // A visit with no cards studied has no completion or progress to claim.
+    none: 'Ready to learn',
   },
   completion: {
     fullClear: 'Cleared today’s session.',
@@ -50,12 +48,12 @@ export const COPY = {
     fullClearTitle: 'Cleared today. What now?',
     streakSavedTitle: 'Streak saved. Keep moving?',
     progressTitle: 'Progress saved. Keep going?',
-    emptyTitle: 'No session logged yet',
+    emptyTitle: 'Choose your next cards',
     libraryTitle: 'Library is ready',
     drawBody: 'Continue your day, then open Draw when you want to use your draws.',
     homeBody: 'Continue to Home for the next session.',
     libraryBody: "Browse your library to review today's updates.",
-    emptyBody: 'Browse your library while we wait for tomorrow’s session.',
+    emptyBody: 'No cards were studied in this session. Go to Home to continue learning or unlock your next cards.',
     continue: 'Continue',
     openLibrary: 'Open library',
     backHome: 'Back home',
@@ -282,7 +280,7 @@ export function buildSessionSummaryVM(params: {
   });
   const nextActionCopy = resolveNextActionCopy({
     resolvedReward,
-    hasActivity: sessionDone > 0 || dueCount > 0 || resolvedReward.rewardPulls > 0 || (streakAfter ?? 0) > 0,
+    hasActivity: sessionDone > 0,
     primaryKind: primaryAction.kind,
   });
 

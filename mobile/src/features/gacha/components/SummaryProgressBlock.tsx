@@ -3,6 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { colors } from '../../../theme/colors';
 import { spacing } from '../../../theme/spacing';
 import { typography } from '../../../theme/typography';
+import { isLargeFontScale, useFontScale } from '../../../theme/dynamicType';
 
 type SummaryProgressBlockProps = {
   done: number;
@@ -17,44 +18,45 @@ type SummaryProgressBlockProps = {
 };
 
 export function SummaryProgressBlock(props: SummaryProgressBlockProps) {
+  const largeText = isLargeFontScale(useFontScale());
   const { done, total, completionLabel, body, streak, transitions, streakNote = null, transitionsNote = null, testID } = props;
 
   const fallbackStreak = streak.earned ? `🔥 ${streak.before} → ${streak.after}` : `🔥 ${streak.after}`;
   const fallbackTransitions =
     transitions.newToLearning > 0 || transitions.learningToMastered > 0
       ? `${transitions.newToLearning} cards entered Learning · ${transitions.learningToMastered} cards mastered`
-      : 'Learning map updated for this session.';
+      : null;
 
   return (
     <View testID={testID} style={styles.card}>
-      <Text numberOfLines={1} style={styles.eyebrow}>
+      <Text numberOfLines={largeText ? undefined : 1} style={styles.eyebrow}>
         Progress
       </Text>
-      <Text numberOfLines={2} style={styles.title}>
-        Daily streak
+      <Text numberOfLines={largeText ? undefined : 2} style={styles.title}>
+        Cards studied
       </Text>
 
       <View style={styles.metricRow}>
-        <Text numberOfLines={1} style={styles.metricValue}>
+        <Text numberOfLines={largeText ? undefined : 1} style={styles.metricValue}>
           {done} / {total}
         </Text>
-        <Text numberOfLines={1} style={styles.metricLabel}>
+        <Text numberOfLines={largeText ? undefined : 1} style={styles.metricLabel}>
           cards
         </Text>
       </View>
 
-      <Text numberOfLines={2} style={styles.completionLabel}>
+      <Text numberOfLines={largeText ? undefined : 2} style={styles.completionLabel}>
         {completionLabel}
       </Text>
-      <Text numberOfLines={3} style={styles.body}>
+      <Text numberOfLines={largeText ? undefined : 3} style={styles.body}>
         {body}
       </Text>
-      <Text numberOfLines={1} style={styles.note}>
+      <Text numberOfLines={largeText ? undefined : 1} style={styles.note}>
         {streakNote ?? fallbackStreak}
       </Text>
-      <Text numberOfLines={2} style={styles.note}>
+      {transitionsNote || fallbackTransitions ? <Text numberOfLines={largeText ? undefined : 2} style={styles.note}>
         {transitionsNote ?? fallbackTransitions}
-      </Text>
+      </Text> : null}
     </View>
   );
 }
@@ -85,6 +87,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   metricRow: {
+    flexWrap: 'wrap',
     marginTop: spacing.sm,
     flexDirection: 'row',
     alignItems: 'flex-end',

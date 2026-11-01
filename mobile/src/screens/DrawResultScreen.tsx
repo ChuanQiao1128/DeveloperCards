@@ -33,6 +33,8 @@ import { RevealCardFace } from '../components/ceremony/RevealCardFace';
 import { DrawSummaryGrid } from '../components/ceremony/DrawSummaryGrid';
 import { resultFeaturedCardWidth } from '../features/gacha/draw/spotlightPlan';
 import { spacing } from '../theme/spacing';
+import { typography } from '../theme/typography';
+import { isLargeFontScale } from '../theme/dynamicType';
 // The featured face and its frame layout now live in RevealCardFace so DrawResult and the
 // single-pull RevealSpotlight render the same card; the old names stay exported here.
 export { REVEAL_FRAME_LAYOUT as FEATURED_FRAME_LAYOUT, REVEAL_STEM_LINES as FEATURED_STEM_LINES } from '../components/ceremony/RevealCardFace';
@@ -41,6 +43,7 @@ import { COLLECTION_COPY } from '../features/gacha/copy/collectionCopy';
 import { formatRank } from '../features/gacha/library/cardRank';
 import { drawResultStyles as styles } from '../features/gacha/components/drawResultStyles';
 import { SHARE_DRAW_TESTID, shareDrawImage, type ShareDrawResult } from '../features/gacha/share/shareDraw';
+import { isOrderedDeck } from '../features/gacha/draw/orderedDeckPolicy';
 import { RATING_PROMPT_DELAY_MS, maybeRequestRating, resolveRatingTrigger } from '../features/gacha/milestones/ratingPrompt';
 import { loadStreakSnapshot } from '../features/gacha/streaks/streakTracker';
 import { MCQ_COPY } from '../features/gacha/mcq/mcqConstants';
@@ -110,9 +113,11 @@ const localStyles = StyleSheet.create({
 
 export function DrawResultScreen({ navigation, route }: Props) {
   const params = route.params as DrawResultRouteParams;
+  const isCourse = isOrderedDeck(params.slug);
   // Sized from the window (was a fixed 260 pt): wider featured card on bigger phones. Called
   // before any early return so the hook order never depends on the loading/error branches.
-  const { width: windowWidth } = useWindowDimensions();
+  const { width: windowWidth, fontScale = 1 } = useWindowDimensions();
+  const largeText = isLargeFontScale(fontScale);
   const featuredWidth = resultFeaturedCardWidth(windowWidth);
   const drawResult = params.drawResult ?? null;
   const [remainingPulls, setRemainingPulls] = useState<number | null>(null);
@@ -226,9 +231,8 @@ export function DrawResultScreen({ navigation, route }: Props) {
   // Draw screen that can only say "Collection complete".
   const packComplete = params.packComplete === true;
   const canContinueDrawing = !isWalletLoading && remainingPulls > 0 && !packComplete;
-  // Labels start with "Continue drawing" / "Go to Library" (test contract);
-  // we just append context so the user knows what'll happen.
-  const primaryLabel = isWalletLoading
+  // Random packs offer another draw or the Library; courses continue into study.
+  const primaryLabel = isCourse ? 'Continue learning' : isWalletLoading
     ? 'Checking draws...'
     : canContinueDrawing
       ? `Continue drawing  ·  ${remainingPulls} draw${remainingPulls === 1 ? '' : 's'} left`
@@ -237,6 +241,10 @@ export function DrawResultScreen({ navigation, route }: Props) {
         : 'Go to Library  ·  earn draws in study';
 
   const handlePrimary = () => {
+    if (isCourse) {
+      navigation.navigate('SessionCard', { slug: params.slug });
+      return;
+    }
     if (isWalletLoading) {
       return;
     }
@@ -367,6 +375,34 @@ export function DrawResultScreen({ navigation, route }: Props) {
       ? featuredEntryRef.current.interpolate({ inputRange: [0, 1], outputRange: [0, 1] })
       : 1;
 
+
+  const primaryAction = (
+            <Pressable
+              testID="screen-draw-result-primary-cta"
+              accessibilityRole="button"
+              accessibilityLabel={
+                isCourse ? 'Continue learning' : isWalletLoading
+                  ? 'Checking remaining draws'
+                  : canContinueDrawing
+                  ? `Continue drawing from ${deckLabel(params)}`
+                  : 'Go to library, scroll to new cards'
+              }
+              accessibilityState={{ disabled: isWalletLoading && !isCourse }}
+              disabled={isWalletLoading && !isCourse}
+              style={({ pressed }) => [
+                styles.primaryCta,
+                largeText ? { borderRadius: spacing.buttonRadius, paddingVertical: spacing.sm } : null,
+                isWalletLoading && !isCourse ? { opacity: 0.72 } : null,
+                pressed && styles.pressed,
+              ]}
+              onPress={handlePrimary}
+            >
+              <Text style={styles.primaryCtaText} numberOfLines={largeText ? undefined : 1}>
+                {primaryLabel}
+              </Text>
+            </Pressable>
+  );
+
   return (
     <SafeAreaView style={styles.safeArea} testID="screen-draw-result-root">
       <LinearGradient colors={PAGE_GRADIENT_LIGHT} style={styles.gradient}>
@@ -393,6 +429,14 @@ export function DrawResultScreen({ navigation, route }: Props) {
           contentContainerStyle={styles.container}
           showsVerticalScrollIndicator={false}
         >
+          {isCourse ? (
+            <View style={{ gap: spacing.xs, marginBottom: spacing.md }}>
+              <Text style={{ color: colors.ink, fontSize: typography.title3, fontWeight: '800' }}>
+                {`${cards.length} new card${cards.length === 1 ? '' : 's'} ready to learn`}
+              </Text>
+              {primaryAction}
+            </View>
+          ) : null}
           <View
             ref={shareTargetRef}
             collapsable={false}
@@ -594,29 +638,7 @@ export function DrawResultScreen({ navigation, route }: Props) {
 
           {/* Footer */}
           <View style={styles.footer}>
-            <Pressable
-              testID="screen-draw-result-primary-cta"
-              accessibilityRole="button"
-              accessibilityLabel={
-                isWalletLoading
-                  ? 'Checking remaining draws'
-                  : canContinueDrawing
-                  ? `Continue drawing from ${deckLabel(params)}`
-                  : 'Go to library, scroll to new cards'
-              }
-              accessibilityState={{ disabled: isWalletLoading }}
-              disabled={isWalletLoading}
-              style={({ pressed }) => [
-                styles.primaryCta,
-                isWalletLoading ? { opacity: 0.72 } : null,
-                pressed && styles.pressed,
-              ]}
-              onPress={handlePrimary}
-            >
-              <Text style={styles.primaryCtaText} numberOfLines={1}>
-                {primaryLabel}
-              </Text>
-            </Pressable>
+            {!isCourse ? primaryAction : null}
             <Pressable
               testID={SHARE_DRAW_TESTID}
               accessibilityRole="button"

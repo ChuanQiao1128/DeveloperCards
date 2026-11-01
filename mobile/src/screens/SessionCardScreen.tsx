@@ -17,6 +17,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
+import { goHome } from '../navigation/tabNavigation';
 import type { CardExport, DeckExport } from '../types/deckExport';
 import { errorToMessage } from '../api/errorKind';
 import { checkManifestForUpdates } from '../content/deckRepository';
@@ -754,6 +755,16 @@ export function SessionCardScreen({ navigation, route }: Props) {
                 ownedSet: nextOwned,
                 kindHint: buildKindHint(mcqRunRef.current, getFeatureFlags()),
               });
+          const remainingDueCount = countDueToday(nextProgress, now, nextOwned);
+          void syncDailyReminders({ remainingDueCount, now });
+          if (!nextCurrent) {
+            setProgress(nextProgress);
+            setOwnedSet(nextOwned);
+            setDailyStats(stats);
+            setCurrent(null);
+            setLoading(false);
+            return;
+          }
           const nextSessionId = `${deckForStudy.Slug}-${now.getTime()}`;
           startSession({
             sessionId: nextSessionId,
@@ -767,8 +778,6 @@ export function SessionCardScreen({ navigation, route }: Props) {
           setDailyStats(stats);
           applyCurrent(nextCurrent, nextSessionId);
           setLoading(false);
-          const remainingDueCount = countDueToday(nextProgress, now, nextOwned);
-          void syncDailyReminders({ remainingDueCount, now });
         } catch (e: any) {
           if (cancelled) return;
           // The starter lesson's own deck only. A deck that cannot be studied ends the lesson (the
@@ -1240,7 +1249,8 @@ export function SessionCardScreen({ navigation, route }: Props) {
       </SafeAreaView>
     );
   }
-  if (emptyDeck) {
+  const caughtUp = !emptyDeck && !current && sessionDone === 0;
+  if (emptyDeck || caughtUp) {
     return (
       <SafeAreaView style={styles.safeArea} testID="screen-session-card-root">
         <LinearGradient
@@ -1249,7 +1259,7 @@ export function SessionCardScreen({ navigation, route }: Props) {
           end={{ x: 1, y: 1 }}
           style={styles.gradient}
         >
-          <View style={styles.container}>
+          <ScrollView contentContainerStyle={[styles.container, { flex: undefined, flexGrow: 1 }]}>
             <View style={styles.headerRow}>
               <Pressable
                 style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
@@ -1257,39 +1267,40 @@ export function SessionCardScreen({ navigation, route }: Props) {
                 onPress={() => navigation.goBack()}
                 testID="session-card-empty-deck-back"
               >
-                <Text style={styles.backText} numberOfLines={1} maxFontSizeMultiplier={CHROME_MAX_FONT_SCALE}>
+                <Text style={styles.backText}>
                   ← Back
                 </Text>
               </Pressable>
               <View style={styles.headerTextWrap}>
-                <Text style={styles.title} numberOfLines={2} maxFontSizeMultiplier={CHROME_MAX_FONT_SCALE}>
+                <Text style={styles.title}>
                   {deck.Title}
                 </Text>
-                <Text style={styles.subtitle} numberOfLines={1} maxFontSizeMultiplier={CHROME_MAX_FONT_SCALE}>
-                  No cards yet
+                <Text style={styles.subtitle}>
+                  {emptyDeck ? 'No cards yet' : 'No reviews due right now'}
                 </Text>
               </View>
             </View>
-            <View style={styles.doneCard} testID="session-card-empty-deck">
-              <Text style={styles.doneTitle} numberOfLines={1}>
-                No cards yet
+            <View style={styles.doneCard} testID={emptyDeck ? 'session-card-empty-deck' : 'session-card-caught-up'}>
+              <Text style={styles.doneTitle}>
+                {emptyDeck ? 'No cards yet' : 'Your unlocked cards are up to date'}
               </Text>
-              <Text style={styles.doneBody} numberOfLines={3}>
-                You don’t hold any card of this deck yet. Open a pack to get your first cards — every
-                card you draw joins today’s session.
+              <Text style={styles.doneBody}>
+                {emptyDeck
+                  ? 'You don’t hold any card of this deck yet. Open a pack to get your first cards — every card you draw joins today’s session.'
+                  : 'No cards are due for review right now. Go to Home to unlock more cards or browse your collection.'}
               </Text>
               <Pressable
-                testID="session-card-empty-deck-cta"
+                testID={emptyDeck ? 'session-card-empty-deck-cta' : 'session-card-caught-up-cta'}
                 accessibilityRole="button"
                 style={({ pressed }) => [styles.doneButton, pressed && styles.pressed]}
-                onPress={() => navigation.navigate('Draw', { slug: deck.Slug, rewardPending: true })}
+                onPress={() => emptyDeck ? navigation.navigate('Draw', { slug: deck.Slug, rewardPending: true }) : goHome(navigation)}
               >
-                <Text style={styles.doneButtonText} numberOfLines={1}>
-                  Open a pack to get your first cards
+                <Text style={styles.doneButtonText}>
+                  {emptyDeck ? 'Open a pack to get your first cards' : 'Continue learning'}
                 </Text>
               </Pressable>
             </View>
-          </View>
+          </ScrollView>
         </LinearGradient>
       </SafeAreaView>
     );

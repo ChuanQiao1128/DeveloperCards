@@ -151,6 +151,23 @@ describe('DrawResultScreen v9', () => {
     maybeRequestRatingMock.mockClear();
   });
 
+  it.each([0, 8])('continues the ordered course directly into learning with %i draws left', async availablePulls => {
+    walletFixture = { availablePulls, reservePulls: 0 };
+    const navigation = { navigate: vi.fn() } as any;
+    let tree!: renderer.ReactTestRenderer;
+    await act(async () => {
+      tree = renderer.create(<DrawResultScreen navigation={navigation} route={{ key: 'result', name: 'DrawResult', params: makeParams({ slug: 'aws-saa-fundamentals', deckTitle: 'AWS Architect Basics' }) } as any} />);
+    });
+    await flush();
+    const button = tree.root.findByProps({ testID: 'screen-draw-result-primary-cta' });
+    expect(button.props.accessibilityLabel).toBe('Continue learning');
+    const order = tree.root.findAll(node => typeof node.type === 'string').map(node => node.props.testID);
+    expect(order.indexOf('screen-draw-result-primary-cta')).toBeLessThan(order.indexOf('screen-draw-result-featured-card'));
+    expect(collectText(tree)).toContain('Continue learning');
+    act(() => button.props.onPress());
+    expect(navigation.navigate).toHaveBeenCalledWith('SessionCard', { slug: 'aws-saa-fundamentals' });
+  });
+
   it('renders collection bar, featured card, single primary CTA and done link', async () => {
     let tree!: renderer.ReactTestRenderer;
     await act(async () => {

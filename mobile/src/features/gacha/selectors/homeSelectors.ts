@@ -16,6 +16,8 @@ import { deckShortTitle } from '../../../content/deckShortTitle';
 import { sortByDeckOrder } from '../../../content/hiddenDecks';
 import { buildChallengeRoute } from '../planner/sessionBuilder';
 import type { RewardWalletState } from '../rewards/rewardWallet';
+import { isOrderedDeck } from '../draw/orderedDeckPolicy';
+import { drawButtonPlan } from '../draw/drawBatch';
 
 export type HomeCtaKind =
   | 'first_run'
@@ -252,6 +254,22 @@ function toWalletState(wallet?: RewardWalletState | null): RewardWalletState {
 function buildDrawVM(wallet?: RewardWalletState | null, selectedDeck?: DeckSummary | null): HomeDrawVM {
   if (selectedDeck?.availability === 'coming') return { state: 'locked', label: 'Coming soon' };
   const safeWallet = toWalletState(wallet);
+  if (selectedDeck?.canStudy && isOrderedDeck(selectedDeck.slug)) {
+    const undrawn = Math.max(0, selectedDeck.studyCards - ownedCountOf(selectedDeck));
+    const plan = drawButtonPlan({ held: safeWallet.availablePulls, undrawn });
+    return {
+      state: safeWallet.availablePulls > 0 ? 'available' : 'locked',
+      label: undrawn === 0
+        ? 'All cards unlocked · reviews keep your knowledge fresh'
+        : plan.openable > 0
+          ? `${plan.batch ?? 1} new card${(plan.batch ?? 1) === 1 ? '' : 's'} ready to unlock · keep learning today`
+          : selectedDeck.newToday > 0
+            ? 'Learn your unlocked cards, then continue with the next batch'
+            : selectedDeck.dueToday > 0
+              ? 'Reviews are ready · you can continue this course today'
+              : 'Open this course to load your next cards',
+    };
+  }
 
   if (
     safeWallet.availablePulls >= FREE_PULL_CAP &&
@@ -886,6 +904,25 @@ export function buildHomeVM(params: {
     hasSignedInUser,
     draw,
   });
+  if (selectedDeck?.canStudy && selectedDeck.availability !== 'coming'
+    && isOrderedDeck(selectedDeck.slug) && statusKind !== 'error') {
+    const undrawn = Math.max(0, selectedDeck.studyCards - ownedCountOf(selectedDeck));
+    const plan = drawButtonPlan({ held: toWalletState(wallet).availablePulls, undrawn });
+    if (selectedDeck.newToday > 0 || selectedDeck.dueToday > 0) {
+      cta = { ...cta, nav: 'challenge', disabled: false, label: selectedDeck.newToday > 0
+        ? 'Continue learning'
+        : `Review ${selectedDeck.dueToday} card${selectedDeck.dueToday === 1 ? '' : 's'}` };
+      heroCopy.title = selectedDeck.newToday > 0 ? 'Your next lesson is ready' : dueTodayHeadline(selectedDeck.dueToday);
+    } else if (undrawn > 0) {
+      cta = { ...cta, nav: 'draw', disabled: false, label: plan.openable > 0
+        ? `Unlock next ${plan.batch ?? 1} card${(plan.batch ?? 1) === 1 ? '' : 's'}` : 'Continue course' };
+      heroCopy.title = 'Ready for your next cards';
+    } else {
+      cta = { ...cta, nav: 'library', disabled: false, label: 'Explore your cards' };
+      heroCopy.title = 'All cards unlocked';
+    }
+    heroCopy.subtitle = draw.label;
+  }
 
   const decks = buildDeckRows({
     deckSummaries,

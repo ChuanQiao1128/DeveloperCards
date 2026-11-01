@@ -30,7 +30,7 @@ function snapshot(overrides: Partial<StreakSnapshot>): StreakSnapshot {
 describe('session summary copy', () => {
   it('uses session and draw words in the summary copy table', () => {
     expect(COPY.title.fullClear).toBe('Session complete 🎉');
-    expect(COPY.title.none).toBe('No session logged yet');
+    expect(COPY.title.none).toBe('Ready to learn');
     expect(COPY.completion.fullClear).toBe('Cleared today’s session.');
     expect(COPY.reward.sectionFullClear).toBe('Session reward');
     expect(COPY.reward.badge(1)).toBe('+1 draw');
@@ -41,10 +41,10 @@ describe('session summary copy', () => {
     expect(COPY.reward.useDraws(1)).toBe('Use 1 draw');
     expect(COPY.progress.fullClearLabel(5, 5)).toBe('5 / 5 cards · all due cards done');
     expect(COPY.progress.partialLabel(1, 5)).toBe('1 / 5 cards · session started');
-    expect(COPY.nextAction.emptyTitle).toBe('No session logged yet');
+    expect(COPY.nextAction.emptyTitle).toBe('Choose your next cards');
     expect(COPY.nextAction.drawBody).toBe('Continue your day, then open Draw when you want to use your draws.');
     expect(COPY.nextAction.homeBody).toBe('Continue to Home for the next session.');
-    expect(COPY.nextAction.emptyBody).toBe('Browse your library while we wait for tomorrow’s session.');
+    expect(COPY.nextAction.emptyBody).toBe('No cards were studied in this session. Go to Home to continue learning or unlock your next cards.');
   });
 
   it('leaves no game word in any learner string of the copy table', () => {

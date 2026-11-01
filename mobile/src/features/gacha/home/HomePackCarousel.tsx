@@ -45,8 +45,8 @@ const AnimatedView: any = A.View ?? View;
 const hasAnimated = typeof A.Value === 'function';
 
 /** Compact artwork keeps the study action and Today summary within reach. */
-const PACK_WIDTH = 126;
-const PACK_HEIGHT = 180;
+const PACK_WIDTH = 98;
+const PACK_HEIGHT = 140;
 /** One page: the cover plus the gap that leaves its neighbours peeking in. Also the snap interval. */
 export const HOME_PACK_PAGE_WIDTH = 208;
 const PAGE_PADDING_TOP = 6;
@@ -422,9 +422,9 @@ const styles = StyleSheet.create({
   halo: {
     position: 'absolute',
     top: 0,
-    width: 240,
-    height: 240,
-    borderRadius: 240,
+    width: 180,
+    height: 180,
+    borderRadius: 180,
     backgroundColor: 'rgba(232,184,90,0.18)', // colors.glowGold @ 18%
   },
   // Full window width (the page has 18pt side padding), so the neighbours peek in from the edges.
