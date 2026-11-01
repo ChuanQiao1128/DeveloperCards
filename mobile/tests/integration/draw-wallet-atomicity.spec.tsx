@@ -3,6 +3,7 @@ import renderer, { act } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { invalidateDeckCache } from '../../src/content/deckCache';
+import { listManifestDecks, resolveDeckBySlug } from '../../src/content/deckRepository';
 
 // deckCache memoizes deck reads at module scope; clear it between tests so a
 // changed resolveDeckBySlug mock is not shadowed by a prior test's entry (G30).
@@ -219,6 +220,42 @@ function readWallet(): { availablePulls: number; reservePulls: number } {
   if (!raw) return { availablePulls: 0, reservePulls: 0 };
   return JSON.parse(raw).decks?.[SLUG] ?? { availablePulls: 0, reservePulls: 0 };
 }
+
+describe('AWS Basics continuous course entrance', () => {
+  it('shows Open 5 for a caught-up 18/347 learner and delivers the next five cards', async () => {
+    await flushDrawHistory(); store.clear(); invalidateDrawStateCache(); invalidateDeckCache();
+    failSetItemFor = null; afterSetItem = null; setItemCalls.length = 0;
+    const slug = 'aws-saa-fundamentals';
+    const course = { ...deck, Slug: slug, Title: 'AWS Architect Basics', TotalCards: 347, FreeCardCount: 347,
+      Cards: Array.from({ length: 347 }, (_, i) => ({ StableUid: `c${i + 1}`, OrderInDeck: i + 1, Difficulty: 1, Question: `Q${i + 1}`, Revision: 1 })) };
+    const progress = course.Cards.slice(0, 18).map(c => ({ stableUid: c.StableUid, stage: 1,
+      lastReviewedAt: Date.now() - 1000, nextReviewAt: Date.now() + 86400000, lastSeenRevision: 1 }));
+    const progressKey = `${SCOPE}deck-progress:${slug}`;
+    store.set(progressKey, JSON.stringify(progress));
+    store.set(`${SCOPE}devcards:draw-state:${slug}`, JSON.stringify({ owned: progress.map(p => p.stableUid), pity: null }));
+    store.set(WALLET_KEY, JSON.stringify({ migratedAtMs: 1, decks: {}, bootstrappedAtMs: { [slug]: 1 } }));
+    store.set('recallsmith:onboarding:stage:v1', 'done');
+    store.set('devcards:content:manifest:v2', JSON.stringify({ decks: [{ slug, availability: 'live' }] }));
+    store.set(`devcards:content:deckmeta:v2:anon:${slug}`, JSON.stringify({ buildId: '1', fileUri: 'file:///aws.json' }));
+    vi.mocked(resolveDeckBySlug).mockResolvedValueOnce(course);
+    vi.mocked(listManifestDecks).mockResolvedValueOnce([{ slug, availability: 'live', title: course.Title } as any]);
+    const navigate = vi.fn(); let tree!: renderer.ReactTestRenderer;
+    await act(async () => {
+      tree = renderer.create(<DrawScreen navigation={{ goBack: vi.fn(), navigate } as any}
+        route={{ key: 'draw', name: 'Draw', params: { slug } } as any} />);
+    });
+    await flush();
+    expect(collectText(tree)).toContain('Open 5');
+    armPackSwipe(tree);
+    await act(async () => {
+      tree.root.findByProps({ testID: 'screen-draw-primary-cta' }).props.onPress();
+      await Promise.resolve();
+    });
+    expect(navigate.mock.calls[0][1].drawResult.cards.map((c: any) => c.stableUid)).toEqual(['c19', 'c20', 'c21', 'c22', 'c23']);
+    expect(store.get(progressKey)).toBe(JSON.stringify(progress));
+    expect(JSON.parse(store.get(WALLET_KEY)!).decks[slug].availablePulls).toBe(0);
+  });
+});
 
 describe('draw screen · exhausted pool', () => {
   beforeEach(async () => {
