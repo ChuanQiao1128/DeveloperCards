@@ -99,6 +99,109 @@ describe('ordered-v1 selection and accounting', () => {
     expect((await loadDrawState(slug)).owned).toContain('retired');
   });
 });
+
+describe('continuous AWS Basics course', () => {
+  const now = new Date('2026-11-01T04:00:00Z');
+  function completed(count: number) {
+    return Array.from({ length: count }, (_, i) => ({ ...learned(`c${i + 1}`),
+      lastSeenRevision: 1, lastReviewedAt: now.getTime() - 1_000, nextReviewAt: now.getTime() + 86_400_000 }));
+  }
+  beforeEach(() => {
+    deck = { ...deck, TotalCards: 347, FreeCardCount: 347,
+      Cards: Array.from({ length: 347 }, (_, i) => ({ StableUid: `c${i + 1}`, OrderInDeck: i + 1, Question: `Q${i + 1}`, Difficulty: 1, Revision: 1 })).reverse() };
+    seed(completed(18).map(p => p.stableUid), 0);
+    store.set(progressKey, JSON.stringify(completed(18)));
+    store.set(`${scope}recallsmith:economy-floor:v1:${slug}`, '2026-11-01');
+    writes.length = 0;
+  });
+
+  it('restores five unlocks for the caught-up 18/347 learner, once across repeated refreshes', async () => {
+    const progressBefore = store.get(progressKey);
+    const results = await Promise.all([ensureDeckBootstrap(slug), ensureDeckBootstrap(slug), ensureDeckBootstrap(slug)]);
+    expect(results.map(r => r.granted)).toEqual([5, 0, 0]);
+    expect(await loadDeckWallet(slug)).toEqual({ availablePulls: 5, reservePulls: 0 });
+    expect(writes).toEqual([walletKey]);
+    expect(store.get(progressKey)).toBe(progressBefore);
+    expect(JSON.parse(store.get(walletKey)!).bootstrappedAtMs[slug]).toBe(1);
+  });
+
+  it('opens cards 19–23, studies them, and opens cards 24–28 on the same day', async () => {
+    expect((await ensureDeckBootstrap(slug)).granted).toBe(5);
+    expect(uids(await acquireDraw(slug, 5, { deck }))).toEqual(['c19', 'c20', 'c21', 'c22', 'c23']);
+    expect((await ensureDeckBootstrap(slug)).granted).toBe(0);
+    let progress = await loadDeckProgress(deck);
+    const ownedSet = new Set((await loadDrawState(slug)).owned);
+    for (let i = 0; i < 5; i++) {
+      const current = pickNextCard({ deck, progress, now, mode: 'learn-new', ownedSet })!;
+      expect(current.card.StableUid).toBe(`c${19 + i}`);
+      progress = buildRatedSessionState({ current, progress, rating: 'hard', mode: 'learn-new',
+        sessionDone: i, sessionLimit: 5, now, cardIndex: null, ownedSet, learningCheck: true }).updatedProgress;
+      store.set(progressKey, JSON.stringify(progress));
+    }
+    expect((await ensureDeckBootstrap(slug)).granted).toBe(5);
+    expect(uids(await acquireDraw(slug, 5, { deck }))).toEqual(['c24', 'c25', 'c26', 'c27', 'c28']);
+    expect((await ensureDeckBootstrap(slug)).granted).toBe(0);
+  });
+
+  it('caps the last batch at two and grants nothing once all cards are collected', async () => {
+    seed(completed(345).map(p => p.stableUid), 0); store.set(progressKey, JSON.stringify(completed(345)));
+    expect((await ensureDeckBootstrap(slug)).granted).toBe(2);
+    expect(uids(await acquireDraw(slug, 5, { deck }))).toEqual(['c346', 'c347']);
+    store.set(progressKey, JSON.stringify(completed(347)));
+    expect((await ensureDeckBootstrap(slug)).granted).toBe(0);
+    expect((await loadDeckWallet(slug)).availablePulls).toBe(0);
+  });
+
+  it('waits until every collected card is studied and preserves a funded wallet', async () => {
+    store.set(progressKey, JSON.stringify(completed(17)));
+    expect((await ensureDeckBootstrap(slug)).granted).toBe(0);
+    expect(writes).toEqual([]);
+    seed(completed(18).map(p => p.stableUid), 2); store.set(progressKey, JSON.stringify(completed(18)));
+    expect((await ensureDeckBootstrap(slug)).wallet.availablePulls).toBe(2);
+    expect(writes).toEqual([]);
+  });
+
+  it.each(['coming', 'retired', 'missing-manifest', 'changed-build', 'corrupt-progress', 'starter-open'])('refuses continuation for %s', async mode => {
+    if (mode === 'coming' || mode === 'retired') store.set('devcards:content:manifest:v2', JSON.stringify({ decks: [{ slug, availability: mode }] }));
+    if (mode === 'missing-manifest') store.delete('devcards:content:manifest:v2');
+    if (mode === 'changed-build') store.set(`devcards:content:deckmeta:v2:user-a:${slug}`, JSON.stringify({ buildId: 'other', fileUri: 'file:///other.json' }));
+    if (mode === 'corrupt-progress') store.set(progressKey, '{');
+    if (mode === 'starter-open') store.set('recallsmith:onboarding:stage:v1', 'starter');
+    expect((await ensureDeckBootstrap(slug)).granted).toBe(0);
+    expect(writes).toEqual([]);
+  });
+
+  it('retries a failed wallet write without consuming a separate continuation marker', async () => {
+    onWrite = async key => { if (key === walletKey) throw new Error('IO'); };
+    expect((await ensureDeckBootstrap(slug)).granted).toBe(0);
+    onWrite = null;
+    expect((await ensureDeckBootstrap(slug)).granted).toBe(5);
+    expect((await ensureDeckBootstrap(slug)).granted).toBe(0);
+  });
+
+  it('does not grant to a switched account or after reset during qualification', async () => {
+    const g = barrier(); let once = true;
+    onRead = async key => { if (key === progressKey && once) { once = false; await g.block(); } };
+    const pending = ensureDeckBootstrap(slug); await g.reached;
+    setActiveUserSubForStorage('user-b'); invalidateDrawStateOperations(); g.release();
+    expect((await pending).granted).toBe(0);
+    expect(writes).toEqual([]);
+  });
+
+  it.each(['account switch', 'reset'])('rechecks the fence after the final installed-build read during %s', async mode => {
+    const g = barrier(); let metaReads = 0;
+    onRead = async key => {
+      if (key === `devcards:content:deckmeta:v2:user-a:${slug}` && ++metaReads === 2) await g.block();
+    };
+    const pending = ensureDeckBootstrap(slug); await g.reached;
+    if (mode === 'account switch') setActiveUserSubForStorage('user-b');
+    else invalidateDrawStateOperations();
+    g.release();
+    expect((await pending).granted).toBe(0);
+    expect(writes).toEqual([]);
+    expect(JSON.parse(store.get(walletKey)!).decks[slug].availablePulls).toBe(0);
+  });
+});
 describe('deterministic serialization', () => {
   it('two entrances serialize qualification through debit', async () => {
     seed([], 1); const g = barrier(); let once = true; onWrite = async (k, after) => { if (k === stateKey && !after && once) { once = false; await g.block(); } };

@@ -1,9 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { getUserScopedKey, loadAllProgress } from '../../../review/storage';
+import { captureProgressUserSub, getUserScopedKey, loadAllProgress, readStoredDeckProgress } from '../../../review/storage';
 import { loadActiveDeckSlug } from '../../../content/activeDeck';
+import { isInstalledDrawDeckEligibleUnderLock } from '../../../content/deckEligibility';
 import { ANON_USER_SCOPE_PREFIX, loadDrawStateUnderLock } from '../draw/drawStateStore';
-import { withDrawStateLock } from '../draw/drawStateLock';
+import { drawStateGeneration, withDrawStateLock } from '../draw/drawStateLock';
+import { isOrderedDeck, orderedEffectiveOwned } from '../draw/orderedAcquisition';
 import {
   applyRewardToWallet,
   consumePullsFromWallet,
@@ -362,14 +364,14 @@ export async function refundDeckPulls(slug: string, count: number): Promise<Rewa
  * like deckCache's own scope read, so suites that never touch decks do not load the deck stack).
  * Null when the deck is not installed or cannot be read.
  */
-async function liveDeckUids(slug: string): Promise<Set<string> | null> {
+async function liveDeckSnapshot(slug: string): Promise<{ uids: Set<string>; version: string } | null> {
   try {
     const { getCachedDeck } = await import('../../../content/deckCache');
     const deck = await getCachedDeck(slug);
     const uids = (deck?.Cards ?? [])
       .map((card) => card?.StableUid)
       .filter((uid): uid is string => typeof uid === 'string' && uid.length > 0);
-    return uids.length > 0 ? new Set(uids) : null;
+    return uids.length > 0 && deck ? { uids: new Set(uids), version: deck.Version } : null;
   } catch {
     return null;
   }
@@ -422,16 +424,23 @@ async function ownsOnlyRetiredCards(slug: string, owned: readonly string[], live
  * left the deck, the pack is granted DECK_BOOTSTRAP_GRANT once more, marked in
  * rebootstrappedAtMs so it never repeats. A pack where even one held card is still
  * in the deck never qualifies.
+ *
+ * AWS Basics is a continuous course: after every collected card has been studied, an empty
+ * wallet gets up to five unlocks for the next missing cards. Draw + wallet locks serialize
+ * this with acquisition; a refresh sees the funded wallet, and a spent batch has unstudied
+ * owned cards until the learner finishes it. No daily marker or progress write is needed.
  */
 export async function ensureDeckBootstrap(slug: string): Promise<{ granted: number; wallet: RewardWalletState }> {
   // Repository reads can purge retired decks; resolve outside the draw lock.
   const prefix = await getUserScopedKey('');
   const userSub = prefix.slice('devcards:u:'.length, -1);
-  const live = await liveDeckUids(slug);
-  return withDrawStateLock(() => ensureDeckBootstrapUnderDrawLock(slug, live, userSub));
+  const generation = drawStateGeneration();
+  const snapshot = await liveDeckSnapshot(slug);
+  return withDrawStateLock(() => ensureDeckBootstrapUnderDrawLock(slug, snapshot, userSub, generation));
 }
 
-async function ensureDeckBootstrapUnderDrawLock(slug: string, live: Set<string> | null, userSub: string): Promise<{ granted: number; wallet: RewardWalletState }> {
+async function ensureDeckBootstrapUnderDrawLock(slug: string, snapshot: { uids: Set<string>; version: string } | null, userSub: string, generation: number): Promise<{ granted: number; wallet: RewardWalletState }> {
+  const live = snapshot?.uids ?? null;
   try {
     if (await isStarterLessonOpen()) {
       return { granted: 0, wallet: await loadDeckWallet(slug) };
@@ -448,6 +457,26 @@ async function ensureDeckBootstrapUnderDrawLock(slug: string, live: Set<string> 
       }
       const rebootstrapped = Object.prototype.hasOwnProperty.call(record.rebootstrappedAtMs ?? {}, slug);
       const drawState = await loadDrawStateUnderLock(slug, userSub, true);
+      if (isOrderedDeck(slug) && snapshot && await isInstalledDrawDeckEligibleUnderLock(slug, userSub, snapshot.version)) {
+        const progress = (await readStoredDeckProgress(slug, userSub)) ?? [];
+        const learned = new Set(progress.filter(isLearnedProgress).map(entry => entry.stableUid));
+        const owned = await orderedEffectiveOwned(slug, drawState.owned, userSub);
+        const held = [...snapshot.uids].filter(uid => owned.has(uid));
+        const remaining = snapshot.uids.size - held.length;
+        if (held.length > 0 && remaining > 0 && held.every(uid => learned.has(uid))
+          && await isInstalledDrawDeckEligibleUnderLock(slug, userSub, snapshot.version)
+          && await captureProgressUserSub(true) === userSub
+          && generation === drawStateGeneration()) {
+          const granted = Math.min(DECK_BOOTSTRAP_GRANT, remaining);
+          const applied = applyRewardToWallet(current, granted);
+          const wallet = { availablePulls: applied.availablePulls, reservePulls: applied.reservePulls };
+          await AsyncStorage.setItem(key, JSON.stringify({ ...record,
+            decks: { ...record.decks, [slug]: wallet },
+            bootstrappedAtMs: { ...record.bootstrappedAtMs, [slug]: record.bootstrappedAtMs[slug] ?? Date.now() },
+          }));
+          return { granted, wallet, rebootstrapCandidate: false, owned: [] };
+        }
+      }
       if (alreadyMarked || drawState.owned.length !== 0 || drawState.pity != null) {
         // Not a first visit. An empty pack that was never re-bootstrapped may still qualify below.
         return { granted: 0, wallet: current, rebootstrapCandidate: !rebootstrapped, owned: [...drawState.owned] };
