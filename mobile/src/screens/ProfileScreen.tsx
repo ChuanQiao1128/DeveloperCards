@@ -47,6 +47,7 @@ export function ProfileScreen({ navigation }: Props) {
   return (
     <AppInfoScreen
       eyebrow="Profile"
+      headerAction={{ label: 'Back', onPress: () => navigation.goBack() }}
       title="Your study profile"
       body="Your streak, your week and the preferences that shape what you study."
       chips={['Streak', 'Progress']}

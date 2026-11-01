@@ -63,6 +63,7 @@ import {
   type StudyPrefs,
 } from '../features/gacha/study/studyPrefs';
 import { PrivacySection } from '../features/gacha/settings/privacy/PrivacySection';
+import { DataResetsSection } from '../features/gacha/settings/data/DataResetsSection';
 import {
   getPrivacyPrefsSync,
   loadPrivacyPrefs,
@@ -444,10 +445,6 @@ export function SettingsScreen({ navigation }: Props) {
             </Pressable>
           </View>
 
-          <Text style={styles.title} numberOfLines={2}>
-            Account, content, reminders, and app basics.
-          </Text>
-
           <View style={styles.sectionCard}>
             <Text style={styles.sectionTitle} numberOfLines={1}>
               Progress
@@ -466,10 +463,8 @@ export function SettingsScreen({ navigation }: Props) {
           <AccountSection
             signedIn={signedIn}
             email={email}
-            resetting={resetting}
             onSignIn={onSignIn}
             onSignOut={() => void onSignOut()}
-            onResetReviewSchedule={onResetReviewSchedule}
             primaryCtaTestID="screen-settings-primary-cta"
           />
 
@@ -477,6 +472,13 @@ export function SettingsScreen({ navigation }: Props) {
             audience={audience}
             saving={audienceSaving}
             onSelect={(next) => void onSelectAudience(next)}
+          />
+
+          <StudySection
+            prefs={studyPrefs}
+            onToggleFourButtons={onToggleFourButtons}
+            goal={{ value: studyGoal, fallbackDeckSlug: activeDeckSlug, onSaved: setStudyGoalState }}
+            cardLang={{ value: cardLang, onSelect: (next) => void setCardLangPref(next) }}
           />
 
           <RemindersSection
@@ -495,11 +497,10 @@ export function SettingsScreen({ navigation }: Props) {
 
           <FeedbackSection prefs={feedbackPrefs} onToggle={onToggleFeedback} />
 
-          <StudySection
-            prefs={studyPrefs}
-            onToggleFourButtons={onToggleFourButtons}
-            goal={{ value: studyGoal, fallbackDeckSlug: activeDeckSlug, onSaved: setStudyGoalState }}
-            cardLang={{ value: cardLang, onSelect: (next) => void setCardLangPref(next) }}
+          <DataResetsSection
+            resettingSchedule={resetting}
+            onResetReviewSchedule={onResetReviewSchedule}
+            hasActiveDeck={activeDeckSlug !== null}
             onResetDeckProgress={activeDeckSlug ? onResetDeckProgress : undefined}
           />
 

@@ -245,10 +245,8 @@ describe('account deletion', () => {
         <AccountSection
           signedIn
           email="a@b.c"
-          resetting={false}
           onSignIn={vi.fn()}
           onSignOut={vi.fn()}
-          onResetReviewSchedule={vi.fn()}
           primaryCtaTestID="screen-settings-primary-cta"
         />,
       );
@@ -283,10 +281,8 @@ describe('account deletion', () => {
         <AccountSection
           signedIn
           email="a@b.c"
-          resetting={false}
           onSignIn={vi.fn()}
           onSignOut={vi.fn()}
-          onResetReviewSchedule={vi.fn()}
           primaryCtaTestID="screen-settings-primary-cta"
         />,
       );
@@ -325,10 +321,8 @@ describe('account deletion', () => {
         <AccountSection
           signedIn={false}
           email={null}
-          resetting={false}
           onSignIn={vi.fn()}
           onSignOut={vi.fn()}
-          onResetReviewSchedule={vi.fn()}
           primaryCtaTestID="screen-settings-primary-cta"
         />,
       );
@@ -345,10 +339,8 @@ describe('account deletion', () => {
         <AccountSection
           signedIn
           email="a@b.c"
-          resetting={false}
           onSignIn={vi.fn()}
           onSignOut={vi.fn()}
-          onResetReviewSchedule={vi.fn()}
           primaryCtaTestID="screen-settings-primary-cta"
         />,
       );

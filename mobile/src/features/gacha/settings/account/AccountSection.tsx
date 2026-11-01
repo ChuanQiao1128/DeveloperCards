@@ -12,9 +12,8 @@ export const ACCOUNT_COPY = {
   signedInState: (email: string) => `Signed in as ${email}`,
   signIn: 'Sign in',
   signOut: 'Sign out',
-  freshStartTitle: 'Review everything again',
-  freshStartBody: 'Makes every card you have studied, in every deck, due now. Your owned cards stay.',
-  resetSchedule: 'Make all learned cards due today',
+  // 2026-11-01 settings redesign: the "review everything again" reset moved to
+  // DataResetsSection (settings/data), which groups both start-over actions.
   deleteTitle: 'Delete account',
   deleteBody:
     'Permanently deletes your account and the progress, cards and saved draws stored for it on our servers and on this device. This cannot be undone.',
@@ -35,19 +34,15 @@ export const DELETE_CONFIRM_TOKEN = 'DELETE';
 export function AccountSection(props: {
   signedIn: boolean;
   email: string | null;
-  resetting: boolean;
   onSignIn: () => void;
   onSignOut: () => void;
-  onResetReviewSchedule: () => void;
   primaryCtaTestID?: string;
 }) {
   const {
     signedIn,
     email,
-    resetting,
     onSignIn,
     onSignOut,
-    onResetReviewSchedule,
     primaryCtaTestID,
   } = props;
 
@@ -99,26 +94,6 @@ export function AccountSection(props: {
       >
         <Text style={styles.primaryButtonText} numberOfLines={1}>
           {signedIn ? ACCOUNT_COPY.signOut : ACCOUNT_COPY.signIn}
-        </Text>
-      </Pressable>
-
-      <View style={styles.rule} />
-
-      <Text style={styles.sectionTitle} numberOfLines={1}>
-        {ACCOUNT_COPY.freshStartTitle}
-      </Text>
-      <Text style={styles.sectionBody}>
-        {ACCOUNT_COPY.freshStartBody}
-      </Text>
-
-      <Pressable
-        style={({ pressed }) => [styles.secondaryButton, (pressed || resetting) && styles.pressed]}
-        accessibilityRole="button"
-        onPress={onResetReviewSchedule}
-        disabled={resetting}
-      >
-        <Text style={styles.secondaryButtonText} numberOfLines={1}>
-          {resetting ? 'Resetting...' : ACCOUNT_COPY.resetSchedule}
         </Text>
       </Pressable>
 

@@ -32,6 +32,12 @@ export function AppInfoScreen(props: {
   onTertiary?: () => void;
   cosmic?: boolean;
   footer?: React.ReactNode;
+  /**
+   * 2026-11-01 settings redesign: an optional top-of-screen affordance
+   * (e.g. Back / Close) so stack-pushed info pages that use this shell
+   * always show a way out, not just the swipe gesture.
+   */
+  headerAction?: { label: string; onPress: () => void };
 }) {
   const cosmic = props.cosmic ?? false;
   const gradient: [string, string, ...string[]] = cosmic
@@ -49,6 +55,20 @@ export function AppInfoScreen(props: {
     <SafeAreaView style={[styles.safeArea, { backgroundColor: cosmic ? colors.cosmicBgDeep : colors.parchmentBg }]}> 
       <LinearGradient colors={gradient} style={styles.gradient}>
         <ScrollView contentContainerStyle={styles.container}>
+          {props.headerAction ? (
+            <View style={styles.headerRow}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={props.headerAction.label}
+                onPress={props.headerAction.onPress}
+                style={({ pressed }) => [styles.headerButton, { backgroundColor: cosmic ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.85)' }, pressed && styles.headerButtonPressed]}
+              >
+                <Text style={[styles.headerButtonText, { color: cosmic ? colors.cosmicInk : colors.ink }]} numberOfLines={1}>
+                  {props.headerAction.label}
+                </Text>
+              </Pressable>
+            </View>
+          ) : null}
           <View style={[styles.heroCard, { backgroundColor: cosmic ? 'rgba(255,255,255,0.06)' : 'rgba(255,250,240,0.9)', borderColor: cardBorder }]}> 
             <Text style={[styles.eyebrow, { color: cosmic ? colors.glowGold : colors.gold }]}>{props.eyebrow}</Text>
             <Text style={[styles.title, { color: titleColor }]}>{props.title}</Text>
@@ -116,6 +136,16 @@ export function AppInfoScreen(props: {
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
   gradient: { flex: 1 },
+  headerRow: { flexDirection: 'row', justifyContent: 'flex-end', marginBottom: spacing.xs },
+  headerButton: {
+    minHeight: 40,
+    paddingHorizontal: 16,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerButtonPressed: { opacity: 0.85 },
+  headerButtonText: { fontSize: typography.bodySmall, fontWeight: '800' },
   container: { paddingHorizontal: spacing.screenPadding, paddingTop: spacing.screenPadding, paddingBottom: spacing.xl + 84 },
   heroCard: {
     borderRadius: 28,

@@ -14,6 +14,7 @@ export function HelpFAQScreen({ navigation }: Props) {
   return (
     <AppInfoScreen
       eyebrow="FAQ"
+      headerAction={{ label: 'Back', onPress: () => navigation.goBack() }}
       title="Help and answers"
       body="Short answers to what people ask most: draws, rare cards, what you study, offline use and how cards are made. Missing something? Open Support from the Me tab."
       cosmic
