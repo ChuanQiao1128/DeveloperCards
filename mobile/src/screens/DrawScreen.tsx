@@ -19,7 +19,7 @@ import { deckShortTitle } from '../content/deckShortTitle';
 import { acquireDraw } from '../features/gacha/draw/acquireDraw';
 import { isOrderedDeck } from '../features/gacha/draw/orderedAcquisition';
 import { clampOpenCount, drawButtonPlan, MAX_BATCH_OPEN } from '../features/gacha/draw/drawBatch';
-import { loadDrawStatus } from '../features/gacha/draw/drawPool';
+import { hasDrawStudyWork, loadDrawStatus } from '../features/gacha/draw/drawPool';
 import { drawCommittedSyncDelayMs } from '../features/gacha/draw/ceremonyTimings';
 import {
   ensureDeckBootstrap,
@@ -61,6 +61,7 @@ type DrawReady = {
   slug: string;
   deckTitle: string;
   walletPulls: number;
+  canEarnDraws: boolean;
   // 2026-10-17 batch open: this pack's cards not yet owned (loadDrawStatus). With walletPulls it
   // decides the open buttons (drawButtonPlan); the canPullSingle / canPullMulti pair it replaces
   // only knew 1 and 10.
@@ -503,6 +504,7 @@ export function DrawScreen({ navigation, route }: Props) {
             loadDrawStatus(slug, (deck as any)?.Cards ?? []),
           ]);
           const pulls = spendablePullsNow(deckWallet);
+          const canEarnDraws = pulls > 0 || await hasDrawStudyWork(deck);
           const deckTitle = normalizeTitle(deck, slug);
           const mergedOptions = mergeSelectedDeck(deckOptions, slug, deckTitle);
 
@@ -537,6 +539,7 @@ export function DrawScreen({ navigation, route }: Props) {
               slug,
               deckTitle,
               walletPulls: pulls,
+              canEarnDraws,
               undrawnCount: status.undrawnCount,
               deckOptions: mergedOptions,
               pityLabel: status.pityLabel,
@@ -605,7 +608,10 @@ export function DrawScreen({ navigation, route }: Props) {
         const heldNow = spendablePullsNow(await loadDeckWallet(ready.slug));
         const drawCount = clampOpenCount({ requested, held: heldNow, undrawn: ready.undrawnCount });
         if (drawCount < 1) {
-          setReady((prev) => (prev && prev.slug === ready.slug ? { ...prev, walletPulls: heldNow } : prev));
+          const deck = loadedDeckRef.current?.slug === ready.slug ? loadedDeckRef.current.deck : null;
+          const canEarnDraws = deck !== null && await hasDrawStudyWork(deck);
+          setReady((prev) => (prev && prev.slug === ready.slug
+            ? { ...prev, walletPulls: heldNow, canEarnDraws } : prev));
           return;
         }
         setSwipePrimed(false);
@@ -810,6 +816,8 @@ export function DrawScreen({ navigation, route }: Props) {
       ? 'Downloading pack…'
       : switchingDeck
         ? 'Loading pack…'
+        : ready.walletPulls < 1 && !ready.collectionComplete && !ready.canEarnDraws
+          ? 'No cards due · browse your collected cards'
         : '';
 
   return (
@@ -928,7 +936,7 @@ export function DrawScreen({ navigation, route }: Props) {
                 CTA is shown — it says the same thing more actionably.
                 Keep the text node in the tree (collectText test contract)
                 via a hidden probe when the empty-pulls CTA takes over. */}
-            {ready.walletPulls < 1 ? (
+            {ready.walletPulls < 1 && ready.canEarnDraws ? (
               <Text style={styles.swipeHintHidden} numberOfLines={1}>
                 No draws for this pack yet. Learn its cards to earn more.
               </Text>
@@ -946,8 +954,8 @@ export function DrawScreen({ navigation, route }: Props) {
               (c) Wallet empty → hide the disabled pair as 0×0 probes
                   (test contract preserves the testIDs + disabled props)
                   and show a prominent pokeBlue "Earn draws by studying"
-                  CTA that navigates straight to SessionCard. Restores
-                  actionability instead of the dead-end grey buttons. */}
+                  CTA only when the owned cards have work to study; otherwise
+                  offer the library instead of an empty session. */}
           {ready.collectionComplete ? (
             /* Nothing left to draw. The pack used to stay openable here and
                charge a pull for an empty reveal; the button now says why it
@@ -986,16 +994,17 @@ export function DrawScreen({ navigation, route }: Props) {
           ) : plan.openable < 1 ? (
             <View style={styles.footerActions}>
               <Pressable
-                testID="draw-earn-pulls-cta"
+                testID={ready.canEarnDraws ? 'draw-earn-pulls-cta' : 'draw-caught-up-cta'}
                 accessibilityRole="button"
-                accessibilityLabel="Start today's session to earn draws"
+                accessibilityLabel={ready.canEarnDraws ? "Start today's session to earn draws" : 'Open library'}
                 style={({ pressed }) => [styles.primaryCta, pressed && styles.pressed]}
                 onPress={() => {
-                  navigation.navigate('SessionCard', { slug: ready.slug });
+                  if (ready.canEarnDraws) navigation.navigate('SessionCard', { slug: ready.slug });
+                  else navigation.navigate('Library', { focusSlug: ready.slug });
                 }}
               >
                 <Text style={styles.primaryCtaText} numberOfLines={1} maxFontSizeMultiplier={CHROME_MAX_FONT_SCALE}>
-                  Earn draws by studying  →
+                  {ready.canEarnDraws ? 'Earn draws by studying  →' : 'Open library'}
                 </Text>
               </Pressable>
               {/* Hidden test probes — preserve testID + disabled state

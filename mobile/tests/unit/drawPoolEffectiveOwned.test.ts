@@ -35,7 +35,7 @@ import { loadDeckProgress, saveDeckProgress, setActiveUserSubForStorage } from '
 import { commitDraw, flushDrawHistory, replayDraw } from '../../src/features/gacha/draw/drawCommit';
 import { loadDrawHistory, loadDrawState, saveDrawState } from '../../src/features/gacha/draw/drawStateStore';
 import { invalidateDrawStateCache } from '../../src/features/gacha/draw/drawStateCache';
-import { loadDrawPoolOwned, loadDrawStatus } from '../../src/features/gacha/draw/drawPool';
+import { hasDrawStudyWork, loadDrawPoolOwned, loadDrawStatus } from '../../src/features/gacha/draw/drawPool';
 import { ensureStarterLesson } from '../../src/features/gacha/starter/starterGate';
 
 const SLUG = 'csharp';
@@ -79,6 +79,47 @@ describe('draw pool uses the effective owned set', () => {
     failEveryRead = false;
     invalidateDrawStateCache();
     setActiveUserSubForStorage(null);
+  });
+
+  it('distinguishes 18 caught-up cards from the 329 cards still waiting to be collected', async () => {
+    const now = new Date(2026, 10, 1, 16, 22);
+    const deck = deckOf(Array.from({ length: 347 }, (_, i) => card(`c${i + 1}`, i + 1)));
+    const progress = deck.Cards.map((c: Card, i: number) => i < 18
+      ? { ...learned(c.StableUid), lastReviewedAt: now.getTime() - 1_000, nextReviewAt: now.getTime() + 86_400_000 }
+      : untouched(c.StableUid));
+    await saveDeckProgress(deck, progress);
+    await saveDrawState(SLUG, { owned: deck.Cards.slice(0, 18).map((c: Card) => c.StableUid), pity: null });
+    expect(await hasDrawStudyWork(deck, now)).toBe(false);
+
+    // A due review reopens study, without unlocking an uncollected card.
+    await saveDeckProgress(deck, progress.map((p: CardProgress, i: number) => i === 0
+      ? { ...p, nextReviewAt: now.getTime() - 1_000 } : p));
+    expect(await hasDrawStudyWork(deck, now)).toBe(true);
+
+    // Collecting a new card also reopens study even when no reviews are due.
+    await saveDeckProgress(deck, progress);
+    await saveDrawState(SLUG, { owned: deck.Cards.slice(0, 19).map((c: Card) => c.StableUid), pity: null });
+    expect(await hasDrawStudyWork(deck, now)).toBe(true);
+  });
+
+  it('checks a revised card without demoting progress, rescheduling it or writing metadata', async () => {
+    const now = new Date(2026, 10, 1, 16, 22);
+    const deck = deckOf([{ ...card('c1', 1), Revision: 2 } as Card]);
+    const progress = [{ ...learned('c1'), lastSeenRevision: 1,
+      lastReviewedAt: now.getTime() - 1_000, nextReviewAt: now.getTime() + 86_400_000 }];
+    store.set(PROGRESS_KEY, JSON.stringify(progress));
+    await saveDrawState(SLUG, { owned: ['c1'], pity: null });
+    const before = new Map(store);
+    expect(await hasDrawStudyWork(deck, now)).toBe(false);
+    expect(store).toEqual(before);
+  });
+
+  it('recognizes an owned new card without creating progress or metadata', async () => {
+    const deck = deckOf([card('c1', 1)]);
+    await saveDrawState(SLUG, { owned: ['c1'], pity: null });
+    const before = new Map(store);
+    expect(await hasDrawStudyWork(deck)).toBe(true);
+    expect(store).toEqual(before);
   });
 
   it('never draws a card of the open starter lesson', async () => {

@@ -1,5 +1,7 @@
 import type { CardProgress } from '../../../review/model';
 import { readStoredDeckProgress } from '../../../review/storage';
+import type { DeckExport } from '../../../types/deckExport';
+import { countDueToday, countNewAvailable } from '../planner/sessionPlanner';
 import { isOrderedDeck } from './orderedAcquisition';
 import { rarityOfCard } from './cardRarity';
 import { resolveEffectiveOwned } from './effectiveOwned';
@@ -32,6 +34,17 @@ export async function loadDrawPoolOwned(slug: string, storedOwned?: readonly str
     progress = [];
   }
   return resolveEffectiveOwned(slug, progress, storedOwned);
+}
+
+/** Use the session's owned gate and planner counts before offering a study reward. */
+export async function hasDrawStudyWork(deck: DeckExport, now = new Date()): Promise<boolean> {
+  const stored = await readStoredDeckProgress(deck.Slug);
+  const byUid = new Map((stored ?? []).map((entry) => [entry.stableUid, entry]));
+  const progress = deck.Cards.map((card) => byUid.get(card.StableUid) ?? {
+    stableUid: card.StableUid, stage: 0, nextReviewAt: 0,
+  });
+  const owned = await resolveEffectiveOwned(deck.Slug, progress);
+  return countNewAvailable(progress, owned) > 0 || countDueToday(progress, now, owned) > 0;
 }
 
 export type DrawStatus = {

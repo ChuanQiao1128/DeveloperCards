@@ -331,6 +331,8 @@ export default function HomePackCarousel({
                     testID="home-featured-pack"
                     accessibilityRole="button"
                     accessibilityLabel={featuredLabel}
+                    disabled={page.realRow?.actionHint === 'none'}
+                    accessibilityState={{ disabled: page.realRow?.actionHint === 'none' }}
                     accessibilityValue={coverValue}
                     accessibilityActions={coverActions}
                     onAccessibilityAction={(event: any) => {
@@ -356,7 +358,13 @@ export default function HomePackCarousel({
                 )}
                 {/* Update chip over the cover's foot, outside the cover's Pressable: a stale deck
                     says what it is missing, or that it is on its way. */}
-                {page.realRow?.update ? (
+                {page.realRow?.actionHint === 'none' ? (
+                  <View testID={`home-pack-coming-${page.slug}`} pointerEvents="none" style={[styles.updateChip, largeText && styles.updateChipLargeText]}>
+                    <Text style={[styles.updateChipText, largeText && styles.naturalLineHeight]}>
+                      Coming soon
+                    </Text>
+                  </View>
+                ) : page.realRow?.update ? (
                   <View
                     testID={`home-pack-update-chip-${page.slug}`}
                     pointerEvents="none"

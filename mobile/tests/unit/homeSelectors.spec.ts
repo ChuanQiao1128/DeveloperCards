@@ -726,7 +726,7 @@ describe('homeCarouselRows', () => {
     ]);
   });
 
-  it('gives a coming deck no page', () => {
+  it('keeps coming decks on the shelf beside the live pack', () => {
     const rows = rowsFor([
       makeDeck({ slug: 'aws-saa-fundamentals' }),
       makeDeck({ slug: 'aws-saa-c03', availability: 'coming', canStudy: false }),
@@ -734,8 +734,30 @@ describe('homeCarouselRows', () => {
     ]);
     expect(slugs(homeCarouselRows({ rows, selectedSlug: null, lockedSlug: null }))).toEqual([
       'aws-saa-fundamentals',
+      'aws-saa-c03',
       'claude-ccdv-f',
     ]);
+  });
+
+  it('shows a coming pack without offering study or spending its saved draws', () => {
+    const vm = buildHomeVM({
+      deckSummaries: [makeDeck({ slug: 'aws-saa-c03', availability: 'coming', canStudy: false,
+        dueToday: 0, newToday: 0, eta: 'To be announced' })],
+      selectedSlug: 'aws-saa-c03',
+      hasSignedInUser: false,
+      wallet: { availablePulls: 5, reservePulls: 0 },
+    });
+    expect(vm.hero.headline).toBe('Coming soon');
+    expect(vm.cta).toMatchObject({ label: 'Coming soon', nav: 'none', disabled: true });
+    expect(vm.draw).toEqual({ state: 'locked', label: 'Coming soon' });
+  });
+
+  it('keeps refresh errors retryable while an upcoming pack is selected', () => {
+    const vm = buildHomeVM({
+      deckSummaries: [makeDeck({ availability: 'coming', canStudy: false })],
+      selectedSlug: 'csharp', hasSignedInUser: false, errorMessage: 'Network unavailable',
+    });
+    expect(vm.cta).toMatchObject({ nav: 'retry', disabled: false });
   });
 
   it('holds the starter lesson pack alone while the lesson is open, whatever is selected', () => {
