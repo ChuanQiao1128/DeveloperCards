@@ -151,6 +151,7 @@ vi.mock('../../src/review/storage', () => ({
   captureProgressUserSub: vi.fn(async () => 'anon'),
   getUserScopedKey: vi.fn(async (baseKey: string) => `${SCOPE}${baseKey}`),
   loadDeckProgress: vi.fn(async () => []),
+  readStoredDeckProgress: vi.fn(async (slug: string) => JSON.parse(store.get(`${SCOPE}deck-progress:${slug}`) ?? 'null')),
 }));
 
 const recordFunnelEventMock = vi.fn();
@@ -510,7 +511,9 @@ describe('draw screen · wallet/draw-state ordering', () => {
     expect(JSON.parse(store.get(STATE_KEY)!).owned).toEqual([]);
     expect(navigate).not.toHaveBeenCalled();
     expect(scheduleProgressSyncMock).not.toHaveBeenCalled();
-    expect(tree.root.findByProps({ testID: 'draw-earn-pulls-cta' })).toBeTruthy();
+    // With neither a collected card nor a draw left, no study session can start.
+    expect(tree.root.findByProps({ testID: 'draw-caught-up-cta' })).toBeTruthy();
+    expect(tree.root.findAllByProps({ testID: 'draw-earn-pulls-cta' })).toHaveLength(0);
   });
 
   it('refunds incrementally, keeping pulls granted while the draw was in flight', async () => {
