@@ -13,7 +13,7 @@ name: CD
 #   deploy  environment `production`: waits for the owner's approval, refuses a stale plan (a re-run of an old run's
 #           failed job after a newer deployment), verifies the artifact, then assumes
 #           arn:aws:iam::622994489535:role/developercards-gha-prod through GitHub OIDC (the role trusts only
-#           repo:ChuanQiao1128/recallsmith:environment:production). Smokes production as a baseline, records a restore
+#           repo:ChuanQiao1128/DeveloperCards:environment:production). Smokes production as a baseline, records a restore
 #           point, deploys each target with the existing scripts in PREBUILT mode, smokes production again, and on any
 #           new failure restores everything that moved. Smoke and rollback are steps of this job on purpose: a second
 #           job naming `production` would wait for a second approval.

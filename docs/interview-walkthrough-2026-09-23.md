@@ -1,7 +1,7 @@
 # DeveloperCards — 面试讲解手册（2026-09-23）
 
 用途：把这个项目讲给中级/高级工程师岗位的面试官。每条事实都可被追问、可被验证（代码、AWS 控制台、App Store 都在）。
-配套：`docs/backend-architecture-review-2026-09-22.md`（生产就绪评审）、`docs/recallsmith-resume-bullets.md`（简历口径纪律）。
+配套：`docs/backend-architecture-review-2026-09-22.md`（生产就绪评审）、`docs/developercards-resume-bullets.md`（简历口径纪律）。
 
 **主张纪律**：只有已上线且有证据的行为才用过去式。没做的事在 §7 明写，面试时主动说——主动暴露边界比被问出来强得多。
 

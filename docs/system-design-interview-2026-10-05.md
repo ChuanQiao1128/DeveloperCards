@@ -344,7 +344,7 @@ flowchart LR
 | 一条语句：`on conflict (event_id) do nothing` + LWW upsert；被拒事件按 duplicate 回执 | `src_C/Vpc/Runtime/ProgressEvents.cs:277-293,423-589,614`；`ProgressEventsSingleStatementTests.cs`；`ProgressEventsIntegrationTests.cs` |
 | 时钟夹紧 +5 分钟，到期时间 ≤90 天，每次 1–200 条 | `src_C/Vpc/Runtime/ProgressEvents.cs:63,115,179-180,202-205` |
 | 拉取用键集分页，每页 5000 行，最多 20 页 | `src_C/Vpc/Runtime/ProgressGet.cs:25,99`；`mobile/src/sync/progressSync.ts:1299` |
-| 4 → 1 次往返（VPC 内）；p50 37.1 → 18.8 ms 及其口径 | `docs/low-latency-plan.md`（§B 表格、"下限在哪"一节、"2026-08-19 · PR #10"一节）；`docs/recallsmith-resume-bullets.md` 证据表；`infra/README.md:186`（128 → 512 MB） |
+| 4 → 1 次往返（VPC 内）；p50 37.1 → 18.8 ms 及其口径 | `docs/low-latency-plan.md`（§B 表格、"下限在哪"一节、"2026-08-19 · PR #10"一节）；`docs/developercards-resume-bullets.md` 证据表；`infra/README.md:186`（128 → 512 MB） |
 | 队列上限 3000 条，满了丢最旧的 | `mobile/src/sync/progressSync.ts:395,580-581,413` |
 | 抽卡状态是快照同步：收藏取并集，钱包和保底按时间后写者赢 | `src_C/Vpc/Runtime/DrawStateSync.cs:10-27` |
 | FSRS-5 参数；可退回固定阶梯；调度器标签；状态从间隔重算 | `mobile/src/review/fsrs.ts:1-7,29-34`；`mobile/src/review/fsrsScheduler.ts:50-80,102`；`mobile/src/review/model.ts:53`；`mobile/src/sync/progressSync.ts:136-143` |
@@ -676,7 +676,7 @@ flowchart LR
 | 首屏预算 377,000 B、登录页预算 487,000 B、553,688 → 308,582 B；highlight.js 不在首屏和预取里（axios 只检查在构建中）；2026-10-05 重测 370,892 B / 484,690 B（用这个测试的方法在本地构建测得） | `frontend/tests/bundleFirstLoad.test.ts` |
 | CSP 与安全 header 只有一份定义；Playwright 在生产 header 下检查违规 | `infra/modules/edge/security_headers.json`、`infra/modules/edge/security_headers.tf`、`frontend/tests/e2e/cspGuard.ts`、`frontend/scripts/serve-with-headers.mjs`、`frontend/playwright.config.ts`、`infra/scripts/tests/test_r29_harden.py`、`infra/RUNBOOK.md` §16 |
 | 控制台部署：资源缓存一年、不删旧分块、读回 SHA-256 | `frontend/deploy.sh` |
-| 测试数（Vitest 1,511、Playwright 16、后端 2,928）及其边界 | `docs/recallsmith-resume-bullets.md`（证据表，CI run 37191434061） |
+| 测试数（Vitest 1,511、Playwright 16、后端 2,928）及其边界 | `docs/developercards-resume-bullets.md`（证据表，CI run 37191434061） |
 | core-vpc：dotnet10、arm64、512 MB、90 秒、保留并发 40、X-Ray、prod 别名；请求体 1 MiB 上限 | `infra/modules/api/core_vpc.tf`、`infra/envs/prod/main.tf`、`src_C/Vpc/VpcFunction.cs` |
 | RDS PostgreSQL 17.9、db.t4g.micro、单 AZ、不公网可达、加密 | `infra/modules/data/rds.tf` |
 | 每容器 1 条连接、SslMode.Require；数据库角色 50 条连接上限；INIT 预热 | `src_C/Shared/RecallSmith.Lambda.Db/Pg.cs`、`src_C/env/prod.env.json`、`src_C/Vpc/Db/AppRole.cs`、`src_C/Vpc/Warmup.cs` |
@@ -691,7 +691,7 @@ flowchart LR
 | webhook 签名与轮换、SSRF 检查、5 次投递 30/120/480/900 秒 | `services/webhook-dispatcher/src/webhook_dispatcher/signing.py`、`delivery.py`、`urlguard.py` |
 | 995/995 投递、367/367 探测（启用期间）；20 条消息、发布 13 条（30 天窗口）；DLQ 为 0 | `docs/ops/2026-10-03-reliability.md` |
 | 三次告警误报（09-27 两次、09-29 一次；创建时动作未开，ALARM 未发通知）及 RUNBOOK 上线顺序 | `docs/ops/2026-10-03-pm-tick.md`、`docs/ops/2026-10-03-pm-sourcewatch.md`（改进项）、`docs/ops/2026-10-03-pm-synthetic.md`（改进项 4） |
-| source watcher 约 165 次、0 错误；webhook dispatcher 和 ai-qa 0 次调用 | 线上 CloudWatch AWS/Lambda（devcards-ro，2026-10-05 新西兰时间读取）；`docs/recallsmith-resume-bullets.md`（证据表，2026-10-04 读取为 164 次） |
+| source watcher 约 165 次、0 错误；webhook dispatcher 和 ai-qa 0 次调用 | 线上 CloudWatch AWS/Lambda（devcards-ro，2026-10-05 新西兰时间读取）；`docs/developercards-resume-bullets.md`（证据表，2026-10-04 读取为 164 次） |
 
 ## 企业级横切设计
 
@@ -920,19 +920,19 @@ flowchart LR
 | CloudTrail 按 session 名识别操作者 | `infra/RUNBOOK.md` §10、§12、§15；线上：`DeleteFunctionUrlConfig` 事件的操作者为 `assumed-role/devcards-admin-mfa/owner-admin`；trail `developercards-management` 记录全部管理事件、无数据事件 |
 | key 轮换 | `infra/scripts/rotate-operator-key.sh`、`infra/RUNBOOK.md` §10；线上：新 key 2026-10-04 Active，旧 key Inactive |
 | 同一 OS 用户、未绑定 `job_workflow_ref`、需要 permissions boundary 等边界 | `infra/RUNBOOK.md` §10 "What this does not stop"、§15 "What it does not stop"；线上 OIDC sub customization `use_default: true` |
-| ruleset：PR + 9 个 checks，无 bypass，0 个人工审批 | `.github/workflows/ci.yml`（job `name:` 即 required check 名）、`docs/recallsmith-resume-bullets.md` 证据表；线上 ruleset 24412075 |
+| ruleset：PR + 9 个 checks，无 bypass，0 个人工审批 | `.github/workflows/ci.yml`（job `name:` 即 required check 名）、`docs/developercards-resume-bullets.md` 证据表；线上 ruleset 24412075 |
 | CD 流程：workflow_run、改动检测、无凭证 build、清单哈希经 job outputs 传递再逐文件校验、审批、baseline smoke、restore point、部署失败或新失败或取消即自动回滚 | `.github/workflows/cd.yml`（`manifest_sha256` output、verify 步骤）、`scripts/cd/plan.sh`、`scripts/cd/artifact.sh`（`cmd_verify`）、`scripts/cd/restore-point.sh`、`scripts/smoke.sh`、`scripts/rollback.sh`、`scripts/deploy-preflight.sh`、`infra/RUNBOOK.md` §12 |
-| 回滚只在桩测试里验证过；6 次生产部署成功；PR #741 的 18/18 | `scripts/tests/cd-scripts.test.sh`、`docs/recallsmith-resume-bullets.md`；线上 GitHub Deployments（environment `production`） |
+| 回滚只在桩测试里验证过；6 次生产部署成功；PR #741 的 18/18 | `scripts/tests/cd-scripts.test.sh`、`docs/developercards-resume-bullets.md`；线上 GitHub Deployments（environment `production`） |
 | Terraform：allow-list、preflight、select、guard、check-plan、apply 保存的 plan、二次 plan 为空 | `.github/workflows/terraform.yml`、`infra/scripts/tf-pipeline.py`、`infra/scripts/check-plan.py`、`infra/scripts/tests/test_tf_pipeline.py`、`infra/RUNBOOK.md` §2–§5、§15 |
 | pipeline 角色 = Admin 减 9 条 deny；`module.operators` 只能 break-glass；state bucket 只禁改设置和删版本 | `infra/modules/operators/main.tf`（`gha_infra`、`gha_infra_deny`，含 `KeepStateHistory`、`KeepStateVersions`）、`infra/RUNBOOK.md` §15 "Break-glass" |
-| 3 次生产 apply；imports 文件里 75 个 import 块；PR #747 的 12/15 | 线上 terraform.yml runs 37185288412、37185788377、37190473658（plan-only 37168515931）；`infra/envs/prod/imports.tf`（73）、`imports_r18a.tf`（2）（`main.tf` 另有 3 个）；`docs/recallsmith-resume-bullets.md` |
+| 3 次生产 apply；imports 文件里 75 个 import 块；PR #747 的 12/15 | 线上 terraform.yml runs 37185288412、37185788377、37190473658（plan-only 37168515931）；`infra/envs/prod/imports.tf`（73）、`imports_r18a.tf`（2）（`main.tf` 另有 3 个）；`docs/developercards-resume-bullets.md` |
 | SLO 多窗口 burn rate（发布快烧只看 1 小时）、最小事件数 guard、休眠说明 | `infra/modules/observability/slo_r18h.tf`、`infra/RUNBOOK.md` §8 |
 | 心跳、DLQ、4xx-rate、429、auth-reject 告警 | `infra/modules/observability/alarms_r18a.tf`、`alarms_r18.tf`、`alarms_r28.tf`、`infra/RUNBOOK.md` §7 "User-facing refusals" |
 | 9 项无账号合成探测，每 15 分钟一次；数据库宕机约 22 分钟告警 | `services/synthetic-check/src/synthetic_check/checks.py`、`infra/modules/worker/synthetic.tf`、`services/synthetic-check/README.md`、`infra/RUNBOOK.md` §8 |
 | 告警数量；只有一个 email 订阅；备份单区域 | `infra/modules/observability/alerts.tf`；线上 `describe-alarms`：55 个 metric + 5 个 composite，0 个处于 ALARM；线上 RDS 无自动备份复制、AWS Backup 0 个 plan |
 | 三次误报复盘（09-27 tick、source-watch；09-29 synthetic）；5 天可靠性统计（探测 3.8 天） | `docs/ops/2026-10-03-pm-tick.md`、`-pm-sourcewatch.md`、`-pm-synthetic.md`、`-pm-p95.md`、`docs/ops/2026-10-03-reliability.md` |
 | PITR 演练：26 分 10 秒 / 26 分 25 秒 / RPO 8 分 3 秒 | `infra/scripts/dr-restore-drill.sh`、`docs/ops/dr-restore-drill-2026-10-04.md`、`infra/RUNBOOK.md` §13 |
-| runtime 弃用守卫（与 .NET 10 同一次改动加入）；.NET 8 → 10；PR #737 时 2,887 个测试 | `infra/scripts/check-lambda-runtimes.py`（commit 61fe5e9）、`.github/workflows/ci.yml`（job `infra`）、`src_C/global.json`、`infra/RUNBOOK.md` §11、`docs/recallsmith-resume-bullets.md`（PR #737）；线上 INIT_START `dotnet:10.mainline.v74` |
+| runtime 弃用守卫（与 .NET 10 同一次改动加入）；.NET 8 → 10；PR #737 时 2,887 个测试 | `infra/scripts/check-lambda-runtimes.py`（commit 61fe5e9）、`.github/workflows/ci.yml`（job `infra`）、`src_C/global.json`、`infra/RUNBOOK.md` §11、`docs/developercards-resume-bullets.md`（PR #737）；线上 INIT_START `dotnet:10.mainline.v74` |
 | Actions 固定 SHA（40/40）、Dependabot、只读 token | `.github/workflows/*.yml`、`.github/dependabot.yml`、三个 workflow 的 `permissions: contents: read` |
 | CodeQL、secret scanning、push protection | 不在仓库里，是 GitHub 设置；线上 `code-scanning/default-setup`、`security_and_analysis` |
 | npm（`--omit=dev`）、pip、NuGet 审计门禁 | `.github/workflows/ci.yml`（frontend、mcp-server、author-runner 的 `npm audit --omit=dev --audit-level=high`；mobile 的 `check-npm-audit.py`；python job 的 `pip-audit`）、`src_C/Directory.Build.props` |
@@ -1107,7 +1107,7 @@ flowchart LR
 | GPT-5.5 的 IAM 授权已配置并生效 | `infra/modules/identity/roles_r18.tf`（`BedrockMantleOpenAiInference`）、`infra/envs/prod/main.tf`；线上 `developercards-ai-qa-role` 策略（devcards-ro，2026-10-05） |
 | 盲审和影子一致率 | `docs/system-design-zh-console.md` §4、`frontend/src/lib/automationVerdictSeen.ts` |
 | ai-qa 30 天 0 次调用；source-watcher 启用以来约 165 次运行、0 错误；启用时间 09-27 14:28Z | 线上 CloudWatch AWS/Lambda，2026-10-05（devcards-ro 只读）；`docs/ops/2026-10-03-reliability.md` §2 |
-| Bedrock 访问被拒；owner 未批 API 费用；没有 GPT-5.5 运行记录 | 仓库外 owner 报告 `user-perspective-review-2026-10-04.md` §2.4；`services/ai-qa/README.md`（Rollout、allowlisting）；`docs/recallsmith-resume-bullets.md` 证据表 |
+| Bedrock 访问被拒；owner 未批 API 费用；没有 GPT-5.5 运行记录 | 仓库外 owner 报告 `user-perspective-review-2026-10-04.md` §2.4；`services/ai-qa/README.md`（Rollout、allowlisting）；`docs/developercards-resume-bullets.md` 证据表 |
 | eval 设计：7 类缺陷、镜像对照（未注入缺陷的真实卡）、调用生产代码、表面特征平衡 | `evals/README.md`、`evals/tests/test_seed_v3.py`、`evals/src/dc_evals/score.py` |
 | 96% / 7.6% / 452 次 / ~$19；proxy 判 FAIL；10% 缺陷比例下 precision ≈0.58 | `evals/reports/2026-09-27-claude-cli-claude-opus-5-qa-v3-seeded-v3.md` |
 | dev/holdout 拆分；污染说明；seeded-v3 是没见过的数据 | `evals/reports/tuning-2026-09-27/README.md` |
@@ -1118,7 +1118,7 @@ flowchart LR
 | 凭证防护 | `tools/mcp-server/src/credentialGuard.ts`、`.claude/settings.json` |
 | worktree 隔离；合并权限只在 driver 手里 | `docs/delivery-wave-1.6-plan-2026-09-19.md` |
 | 独立审查和 mutation checks（25→18、15→12；20 / 16 处故意改坏） | PR #741（8c74419）、PR #747（3b1c829）、`scripts/tests/cd-scripts.test.sh`、`docs/delivery/r29-issues/HARDEN-route-guard-test.sh` |
-| main：PR + 9 个检查、无人可绕过、0 个人工 approval | GitHub ruleset 24412075（线上，2026-10-05 复读）、`docs/recallsmith-resume-bullets.md` |
+| main：PR + 9 个检查、无人可绕过、0 个人工 approval | GitHub ruleset 24412075（线上，2026-10-05 复读）、`docs/developercards-resume-bullets.md` |
 | 常规生产部署和 Terraform 由 owner 批准；生产内容写操作由 owner 或经批准的 supervisor 执行 | `.github/workflows/cd.yml`、`.github/workflows/terraform.yml`、GitHub environments `production` / `infra-prod`（线上）、`infra/RUNBOOK.md` §12、§15、`docs/delivery/r29-content/REPORT.md` §6 |
 | 87% 提交带 AI trailer | `git log --no-merges` on main 3c8d84e（1,225/1,406） |
 

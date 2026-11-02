@@ -1,4 +1,4 @@
-# RecallSmith admin console
+# DeveloperCards admin console
 
 The React admin console: authoring decks and cards, publishing them, and
 administering users. It talks to the .NET Lambda backend in `src_C/` through

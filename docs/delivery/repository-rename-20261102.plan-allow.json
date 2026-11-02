@@ -1,0 +1,19 @@
+{
+  "changes": {
+    "module.operators.aws_iam_role.gha_prod": {
+      "action": "update",
+      "keys": [
+        "assume_role_policy",
+        "description"
+      ]
+    },
+    "module.operators.aws_iam_role.gha_infra": {
+      "action": "update",
+      "keys": [
+        "assume_role_policy",
+        "description"
+      ]
+    }
+  },
+  "_note": "Repository rename to ChuanQiao1128/DeveloperCards only. These operator-role trust/description changes are break-glass: routine Terraform CI must refuse this allow-list. Use the existing local MFA admin path, preserve the provider/audience/environment/main protections and all permission policies; no resources are recreated. See infra/RUNBOOK.md, Repository rename."
+}

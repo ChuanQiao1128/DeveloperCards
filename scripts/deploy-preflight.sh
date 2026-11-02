@@ -22,7 +22,7 @@
 set -euo pipefail
 set +x
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-REPO="${DEPLOY_REPO:-ChuanQiao1128/recallsmith}"
+REPO="${DEPLOY_REPO:-ChuanQiao1128/DeveloperCards}"
 BRANCH="${DEPLOY_BRANCH:-main}"
 
 # The nine checks the main ruleset requires, by exact name. scripts/tests/cd-scripts.test.sh fails when this list and

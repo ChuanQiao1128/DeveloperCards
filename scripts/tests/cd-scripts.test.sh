@@ -636,6 +636,33 @@ check "still-current: the plan saw none, one exists now -> refused" [ "$RC" = 1 
 run GITHUB_REPOSITORY=o/r "$P/scripts/cd/plan.sh" still-current '4; true'
 check "still-current: a malformed id refuses" [ "$RC" = 1 ]
 
+# GitHub keeps old deployment-status URLs after a rename. Accept that exact old name
+# only for the same repository ID, and still read the job/run through the current API.
+cp "$GHD/statuses-2.json" "$T/before-rename-2.json"
+cp "$GHD/statuses-4.json" "$T/before-rename-4.json"
+GH_REPO_URL="https://github.com/ChuanQiao1128/recallsmith"
+echo '{"id":1076433600}' > "$GHD/repo.json"
+echo "[$(st success "$GH_REPO_URL/commit/$C1#cd-full" 20 21), $(started 20 21)]" > "$GHD/statuses-2.json"
+echo "[$(st success "$GH_REPO_URL/actions/runs/40#cd-rollback" 40 41), $(started 40 41)]" > "$GHD/statuses-4.json"
+: > "$LOG"
+run GITHUB_REPOSITORY=ChuanQiao1128/DeveloperCards "$P/scripts/cd/plan.sh" last-deployed
+if [ "$RC" = 0 ] && [ "$(cat "$T/out")" = "$C1" ] && has "$LOG" 'repos/ChuanQiao1128/DeveloperCards/actions/jobs/21'; then ok "rename: old full deployment stays the base, verified through the current repository API"; else bad "rename: old full deployment stays the base, verified through the current repository API"; fi
+run GITHUB_REPOSITORY=ChuanQiao1128/DeveloperCards "$P/scripts/cd/plan.sh" still-current 4
+check "rename: old rollback record still protects against stale plans" [ "$RC" = 0 ]
+cd_job 20 21 "deploy (production)" success .github/workflows/evil.yml
+run GITHUB_REPOSITORY=ChuanQiao1128/DeveloperCards "$P/scripts/cd/plan.sh" last-deployed
+if [ "$RC" = 0 ] && [ "$(cat "$T/out")" = "" ]; then ok "rename: an old URL does not bypass job/workflow verification"; else bad "rename: an old URL does not bypass job/workflow verification"; fi
+cd_job 20 21 "deploy (production)" success
+echo '{"id":999}' > "$GHD/repo.json"
+run GITHUB_REPOSITORY=ChuanQiao1128/DeveloperCards "$P/scripts/cd/plan.sh" last-deployed
+check "rename: a different repository ID refuses instead of planning every target" [ "$RC" = 1 ]
+rm "$GHD/repo.json"
+run GITHUB_REPOSITORY=ChuanQiao1128/DeveloperCards "$P/scripts/cd/plan.sh" last-deployed
+check "rename: cannot verify repository identity -> refuses" [ "$RC" = 1 ]
+cp "$T/before-rename-2.json" "$GHD/statuses-2.json"
+cp "$T/before-rename-4.json" "$GHD/statuses-4.json"
+GH_REPO_URL="https://github.com/o/r"
+
 run EVENT=workflow_run RUN_SHA="$C3" GITHUB_REPOSITORY=o/r DEPLOY_REPO=o/r GITHUB_STEP_SUMMARY="$T/summary.md" "$P/scripts/cd/plan.sh" decide
 if [ "$RC" = 0 ] && has "$T/out" "targets=backend console" && has "$T/out" "base=$C1" && has "$T/out" "last_success=4"; then ok "decide (push): targets since the last full deployment, and the newest deployment it saw"; else bad "decide (push): targets since the last full deployment, and the newest deployment it saw"; fi
 if has "$T/out" "deploy=true" && has "$T/out" "scope=full" && has "$T/out" "has_backend=true" && has "$T/out" "has_site=false" && has "$T/out" "python="; then ok "decide (push): deploy=true, scope=full, flags"; else bad "decide (push): deploy=true, scope=full, flags"; fi

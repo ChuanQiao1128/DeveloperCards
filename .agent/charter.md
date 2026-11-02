@@ -39,7 +39,7 @@ between those sessions so that nothing important waits unnoticed.
 
 ## In scope
 
-- GitHub activity on ChuanQiao1128/recallsmith: issues, comments, PRs, CI runs on `main`.
+- GitHub activity on ChuanQiao1128/DeveloperCards: issues, comments, PRs, CI runs on `main`.
 
 ## Out of scope
 

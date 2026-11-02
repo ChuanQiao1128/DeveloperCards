@@ -1,4 +1,4 @@
-# RecallSmith
+# DeveloperCards
 
 A spaced-repetition flashcard product for developers: an Expo/React Native app
 where people review cards, a React admin console for authoring and publishing
@@ -21,6 +21,11 @@ documents explain it; every number in them cites a committed file:
   trade-offs, and what is still owner-gated.
 - [Demo video script](docs/showcase/demo-video-script.md) (`docs/showcase/demo-video-script.md`):
   a shot list under three minutes.
+
+## AWS card rebuild
+
+The [current rebuild plan](docs/content/aws-rebuild/README.md) covers a new bilingual AWS card pack.
+Content execution remains paused; no replacement pack or OTA has been released.
 
 ## 1. What is in this repository
 
@@ -328,7 +333,7 @@ themselves; prose gets the claim that does not expire.)
   tests mount a page with no application shell above it, and it is asserted in
   `frontend/tests/confirmDialogA11y.test.tsx` rather than left implicit.
 - **The end-to-end suite does not reach the API.** `npx playwright test` drives
-  a real browser against the real built bundle, but the RecallSmith API and the
+  a real browser against the real built bundle, but the DeveloperCards API and the
   Cognito hosted UI are stubbed with `page.route()`, so nothing checks that the
   console and the backend still agree on a payload. The gap is deliberate and
   its reasoning is in §4; it is why those two tests are called smoke tests

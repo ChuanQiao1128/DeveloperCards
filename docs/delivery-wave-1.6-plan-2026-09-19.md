@@ -160,7 +160,7 @@
 # ~/.rimv-delivery/r16-a-home/wave.conf（每波一份，BASE/BRANCH_PREFIX/CONTROL_DIR 各自不同）
 WAVE=r16-a-home
 REPO=/Users/qc/Desktop/2026年9月/DeveloperCards/recallsmith
-GHREPO=ChuanQiao1128/recallsmith
+GHREPO=ChuanQiao1128/DeveloperCards
 BASE=delivery/r16-a-home              # 永远不是 main；B 波从 A 的 BASE 切，以此类推
 BRANCH_PREFIX=delivery/r16a
 CONTROL_DIR="$HOME/.rimv-delivery/r16-a-home"

@@ -51,6 +51,8 @@ elif re.search(r"/deployments\?environment=", path):
     name = "deployments.json"
 elif re.search(r"/deployments/(\d+)/statuses", path):
     name = "statuses-" + re.search(r"/deployments/(\d+)/statuses", path).group(1) + ".json"
+elif path == "repos/ChuanQiao1128/DeveloperCards":
+    name = "repo.json"
 else:
     sys.exit(f"stub gh: no fixture for {path}")
 fixture = os.path.join(d, name)
