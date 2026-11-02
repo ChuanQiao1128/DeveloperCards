@@ -47,7 +47,7 @@ variable "rds_instance_id" {
 
 variable "github_repository" {
   type    = string
-  default = "ChuanQiao1128/recallsmith"
+  default = "ChuanQiao1128/DeveloperCards"
 }
 
 variable "github_environment" {

@@ -19,7 +19,7 @@ name: Terraform
 #   apply   environment `infra-prod`: waits for the owner's approval, the one human step. Then, before any
 #           credential, the on-main, stale and preflight checks again (re-running this job alone reuses select's
 #           outputs). Assumes developercards-gha-infra through GitHub OIDC (its trust accepts only
-#           repo:ChuanQiao1128/recallsmith:environment:infra-prod). init with the real backend, plan to a saved
+#           repo:ChuanQiao1128/DeveloperCards:environment:infra-prod). init with the real backend, plan to a saved
 #           file, `tf-pipeline.py guard` (refuses module.operators and the other break-glass changes), check-plan.py
 #           against the allow-list, apply of that SAVED plan, then a second plan that must be PLAN EMPTY. When
 #           Terraform could not save the state after an apply (errored.tfstate), it is pushed, or kept in the state

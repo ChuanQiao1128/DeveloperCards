@@ -1,6 +1,6 @@
-RecallSmith asset licence — 2026-09-20
+DeveloperCards asset licence — 2026-09-20
 
-The MIT licence in `LICENSE` covers the RecallSmith source code and documentation
+The MIT licence in `LICENSE` covers the DeveloperCards source code and documentation
 ONLY. It does NOT grant any rights to the visual or audio assets shipped with the
 app. Everything under `mobile/assets/` — the app icon and splash, pack covers,
 card backs, rarity frames, the foil LUT, the particle sheet, the glow sprite, and
@@ -31,7 +31,7 @@ project-generated or commissioned.
 
 Some deck titles name a vendor exam or a programming language (for example
 AWS SAA-C03, C#). Those names are used descriptively to identify the study
-material. RecallSmith is not affiliated with, sponsored by, or endorsed by any of
+material. DeveloperCards is not affiliated with, sponsored by, or endorsed by any of
 those vendors, and it is not an official exam simulator.
 
 ## How to add an asset

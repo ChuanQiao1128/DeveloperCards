@@ -144,10 +144,22 @@ cmd_select() {
   in_deploy_order "$spec"
 }
 
-# cd_job_ok <repo> <log url> → 0 when the URL names a job of <repo> that is cd.yml's deploy or rollback job, in a run
+# Old status URLs survive a rename; the caller verifies the repository ID before enabling this exact alias.
+canonical_repo_url() {
+  local repo="$1" url="$2" previous="${3:-}" prefix
+  prefix="https://github.com/$previous/"
+  if [ -n "$previous" ] && [[ "$url" = "$prefix"* ]]; then
+    echo "https://github.com/$repo/${url#"$prefix"}"
+  else
+    echo "$url"
+  fi
+}
+
+# cd_job_ok <repo> <log url> [verified previous name] → 0 when the URL names a job of <repo> that is cd.yml's deploy or rollback job, in a run
 # on main, and that job concluded success (read back through the Actions API, which no token can write).
 cd_job_ok() {
   local repo="$1" log="$2" run job got
+  log="$(canonical_repo_url "$repo" "$log" "${3:-}")"
   [[ "$log" =~ ^https://github\.com/([^/]+/[^/]+)/actions/runs/([0-9]+)/job/([0-9]+)$ ]] || return 1
   [ "${BASH_REMATCH[1]}" = "$repo" ] || return 1
   run="${BASH_REMATCH[2]}"
@@ -165,7 +177,12 @@ cd_job_ok() {
 # status a successful cd.yml deploy or rollback job on main set: "full" prints the commit of the newest #cd-full one,
 # "any" the id of the newest one of any kind. Prints nothing when there is none in the newest CD_SCAN_LIMIT (40).
 scan_deployments() {
-  local want="$1" repo="${GITHUB_REPOSITORY:?GITHUB_REPOSITORY is required}" ids id line url log ran rest prefix runs_prefix scanned=0
+  local want="$1" repo="${GITHUB_REPOSITORY:?GITHUB_REPOSITORY is required}" ids id line url log ran rest prefix runs_prefix scanned=0 previous="" repo_id
+  if [ "$repo" = ChuanQiao1128/DeveloperCards ]; then
+    repo_id="$(gh api "repos/$repo" --jq '.id')" || die "cannot verify repository identity after rename"
+    [ "$repo_id" = 1076433600 ] || die "unexpected repository identity after rename"
+    previous="ChuanQiao1128/recallsmith"
+  fi
   prefix="https://github.com/$repo/commit/"
   runs_prefix="https://github.com/$repo/actions/runs/"
   ids="$(gh api "repos/$repo/deployments?environment=production&per_page=100" \
@@ -183,7 +200,7 @@ scan_deployments() {
         | if $s == null then "" else [($s.environment_url // ""), ($s.log_url // $s.target_url // ""), ($p.log_url // $p.target_url // "")] | @tsv end')" \
       || die "cannot read the statuses of deployment $id"
     [ -n "$line" ] || continue
-    url="${line%%"$TAB"*}"
+    url="$(canonical_repo_url "$repo" "${line%%"$TAB"*}" "$previous")"
     log="${line#*"$TAB"}"
     ran="${log#*"$TAB"}"
     log="${log%%"$TAB"*}"
@@ -193,7 +210,7 @@ scan_deployments() {
     else
       [[ ( "$url" = "$prefix"* && "$rest" =~ ^[0-9a-f]{40}#cd-(full|partial)$ ) || ( "$url" = "$runs_prefix"* && "$url" =~ \#cd-rollback$ ) ]] || continue
     fi
-    if [ -z "$log" ] || [ "$log" != "$ran" ] || ! cd_job_ok "$repo" "$log"; then
+    if [ -z "$log" ] || [ "$log" != "$ran" ] || ! cd_job_ok "$repo" "$log" "$previous"; then
       echo "plan: warning: deployment $id carries a success status that the job which ran it (a successful cd.yml deploy or rollback job on $MAIN_BRANCH) did not set: ignored" >&2
       continue
     fi

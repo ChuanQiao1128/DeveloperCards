@@ -1,4 +1,4 @@
-# RecallSmith / DeveloperCards · Resume Project Bullets
+# DeveloperCards · Resume Project Bullets
 
 | Item | Value |
 | --- | --- |
@@ -9,7 +9,7 @@
 
 ## Current resume version (2026-10-04, five bullets)
 
-**RecallSmith / DeveloperCards** · Independent product · React Native/TypeScript, React 19, C#/.NET 10, Python, PostgreSQL, AWS, Terraform, GitHub Actions · iOS App Store
+**DeveloperCards** · Independent product · React Native/TypeScript, React 19, C#/.NET 10, Python, PostgreSQL, AWS, Terraform, GitHub Actions · iOS App Store
 
 1. Designed offline-first sync from React Native to C#/PostgreSQL: a device outbox replays events to an idempotent endpoint that merges last-writer-wins in one atomic SQL statement; DB round trips 4 → 1, ingest-handler p50 −49% (37.1 → 18.8 ms).
 2. Moved routine deploys of a Terraform-managed AWS stack (Lambda, API Gateway, RDS, SQS, CloudFront) from a laptop to GitHub Actions via OIDC, with no stored CI credentials: owner approval, hash-verified artifacts, smoke tests, automatic rollback.
@@ -25,7 +25,7 @@ Use one variant per application and do not mix bullets across variants. Each bul
 
 ### Full-stack engineer (F1–F5)
 
-**RecallSmith / DeveloperCards** · Independent product · TypeScript, React 19, React Native, C#/.NET 10, PostgreSQL, AWS, Terraform, GitHub Actions · iOS App Store
+**DeveloperCards** · Independent product · TypeScript, React 19, React Native, C#/.NET 10, PostgreSQL, AWS, Terraform, GitHub Actions · iOS App Store
 
 1. Designed offline-first sync from React Native to C#/PostgreSQL: a device outbox replays events to an idempotent endpoint that merges last-writer-wins in one atomic SQL statement; DB round trips 4 → 1, ingest-handler p50 −49% (37.1 → 18.8 ms).
 2. Built a React 19/TypeScript admin console (React Query, Cognito PKCE, 18 pages): route splitting cut first-load JS+CSS 44% (554 → 309 kB), now capped by a CI byte budget; strict CSP tested in Playwright under production headers; 1,500+ Vitest tests.
@@ -35,7 +35,7 @@ Use one variant per application and do not mix bullets across variants. Each bul
 
 ### Full-stack + AI agent engineer (A1–A5)
 
-**RecallSmith / DeveloperCards** · Independent product · TypeScript (MCP), Python (evals, Lambdas), headless Claude Code, C#/.NET 10, PostgreSQL, AWS, Terraform
+**DeveloperCards** · Independent product · TypeScript (MCP), Python (evals, Lambdas), headless Claude Code, C#/.NET 10, PostgreSQL, AWS, Terraform
 
 1. Built a drafting agent on headless Claude Code with a 4-tool TypeScript MCP server (ingest, trigram dedupe, lint, submit) that can draft but never publish: verbatim-quote grounding, fetch host allow-list, credential guard, 6-route token scope.
 2. Built a Python seeded-defect eval harness (7 defect classes, mirrored controls, card-clustered 95% CIs); an offline Claude Opus 5 run on an unseen set caught 96% of seeded defects with 7.6% false flags on clean controls (452 reviews, ~$19).
@@ -45,7 +45,7 @@ Use one variant per application and do not mix bullets across variants. Each bul
 
 ### AI automation engineer (U1–U5)
 
-**RecallSmith / DeveloperCards** · Independent product · Python 3.12, AWS (EventBridge Scheduler, Lambda, SQS), C#/.NET 10, PostgreSQL, MCP, Terraform, GitHub Actions
+**DeveloperCards** · Independent product · Python 3.12, AWS (EventBridge Scheduler, Lambda, SQS), C#/.NET 10, PostgreSQL, MCP, Terraform, GitHub Actions
 
 1. Built event-driven automation on AWS: EventBridge Scheduler jobs (hourly source watch, 15-min tick, weekly digest) on Python 3.12 Lambdas, SQS consumers with DLQs, HMAC-signed outbound webhooks with key rotation, SSRF guard, 5-attempt backoff.
 2. Automated content verification: an hourly source watcher re-checks each cited page weekly for its verbatim quote; AI-assisted backfill lifted citation coverage AWS 5% → 98.7%, CCDV-F 25% → 98.4%; dual AI fact-checks of 61 cards led to 9 fixes.
@@ -67,7 +67,7 @@ Bullet IDs: M = current version, F = full-stack, A = AI agent, U = AI automation
 | Deploys only changed targets (U4) | `scripts/cd/plan.sh` (GitHub Deployments API), RUNBOOK §12 "What deploys when"; CD run 37190637998 planned `backend console` | Changes are measured from the last successful *full* deployment. A merge that touches only docs, infra or mobile deploys nothing and asks for no approval. |
 | Terraform: saved plan → privilege guard → allow-list → apply → empty re-plan (U4) | `.github/workflows/terraform.yml`, `infra/scripts/tf-pipeline.py` (guard), `infra/scripts/check-plan.py` (allow-list), RUNBOOK §15. 3 production applies on 2026-10-04 (runs 37185288412, 37185788377, 37190473658). Review: PR #747 (15 findings, 12 confirmed and fixed; 3b1c829) | The guard runs before the allow-list check. The pipeline role is AdministratorAccess minus a 9-statement explicit deny. The guard refuses operator-role changes, IAM writes, PassRole/AssumeRole on `*`, admin attachments, provisioners and imports. It does not catch service roles that run code, or resource policies (RUNBOOK §15). The owner approves the allow-list, not the plan text. Break-glass stays local with MFA. |
 | Shared full-admin key cut to assume-role only; job-scoped roles (M3, F4, A5) | `infra/modules/operators/main.tf`, RUNBOOK §10, `infra/scripts/operator-cutover.sh`; independent review of #736 fixed in PR #739 (5d69915); deployer MFA in #740 | The key was restricted, not removed: it is still Active and can only assume roles (plus see its own user and change its password). Without MFA it reaches only `devcards-agent-readonly`: ReadOnlyAccess plus 8 explicit deny statements (KMS/SSM/Secrets Manager, Lambda configuration, S3 objects, Cognito user records, code and credential downloads, API access logs, owner contact, latent PII reads). `devcards-deployer` (scoped) and `devcards-admin-mfa` (AdministratorAccess) need MFA and have 1-hour sessions. The admin role is not least-privilege, so say "job-scoped". Agents run as the same macOS user, so they could use a cached owner session for that hour. No IAM Identity Center. Do not quote a count of review findings for this PR: none is recorded. |
-| main requires a PR and 9 CI checks (M3, F4) | GitHub ruleset 24412075 (`gh api repos/ChuanQiao1128/recallsmith/rulesets/24412075`) | Required checks: mobile, frontend vitest, frontend Playwright, backend, python, infra, mcp-server, n8n, author-runner. Force push and deletion are blocked; no bypass actors. 0 required approvals: review is by AI agents, not a human. CodeQL is not one of the 9. |
+| main requires a PR and 9 CI checks (M3, F4) | GitHub ruleset 24412075 (`gh api repos/ChuanQiao1128/DeveloperCards/rulesets/24412075`) | Required checks: mobile, frontend vitest, frontend Playwright, backend, python, infra, mcp-server, n8n, author-runner. Force push and deletion are blocked; no bypass actors. 0 required approvals: review is by AI agents, not a human. CodeQL is not one of the 9. |
 | npm/pip/NuGet audit gates (F4) | `ci.yml`: `check-npm-audit.py` with `mobile/npm-audit-allowlist.json` in the mobile job; `npm audit --omit=dev --audit-level=high` in frontend, mcp-server and author-runner; `pip-audit --strict` in python. `src_C/Directory.Build.props` (NU1903/NU1904 as errors) in backend; commit 5996b0f | The gates run inside required checks. Commit 5996b0f fixed 62 of 71 high/critical mobile npm advisories by changing only the lockfile (no native module moved; 3 shipped package versions changed). Whether that lockfile has reached users by OTA was not checked. 9 accepted advisories stay on an allow-list that expires 2027-02-01 (the next Expo SDK upgrade), when CI goes red unless they are re-reviewed; each is marked not in the shipped app, and `check-bundle-packages.py` checks that against the iOS and Android source maps in every mobile CI run. |
 | SHA-pinned Actions, CodeQL, secret scanning (M3, F4) | `.github/workflows/*.yml` (commit 801af4a: all 41 `uses:` lines pinned to 40-hex SHAs), `.github/dependabot.yml`. Live: CodeQL default setup for Actions, C#, JS/TS and Python, 0 open alerts; secret scanning with push protection | These settings live in GitHub, not in the repo. Non-provider secret patterns and validity checks are off. Dependabot version updates cover Actions only. 50 Dependabot alerts remain open: 33 console dev-only (14 high), 17 mobile runtime (the 9 allow-listed high/critical plus 8 medium/low). |
 | Strict CSP tested in Playwright under production headers (F2) | `infra/modules/edge/security_headers.{json,tf}`, `frontend/tests/e2e/cspGuard.ts`, `infra/scripts/tests/test_r29_harden.py`, RUNBOOK §16. Live `curl -sI` on the console and landing site; CI "frontend (playwright smoke)" 16 passed on f7b163e | Enforced through CloudFront on the console and landing site, not the API: no `unsafe-inline` or `unsafe-eval`, plus HSTS, XFO DENY and nosniff. Playwright runs against a local server sending the production headers (`serve-with-headers.mjs`). No CSP report endpoint. |

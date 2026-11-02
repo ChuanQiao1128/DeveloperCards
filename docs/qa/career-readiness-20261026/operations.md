@@ -7,7 +7,7 @@ A read-only CloudWatch observation found 228 sync handler samples and 16 publish
 - Collection: 2026-10-26 10:43:30 UTC, `ap-southeast-2`, existing `devcards-agent-readonly` role.
 - Requested window: 2026-09-28 10:43:30 to 2026-10-26 10:43:30 UTC. CloudWatch rounded the bucket origin to 10:40 UTC; queries use 3,600-second buckets. Sample counts refer to the returned buckets.
 - Alias snapshots: `core-vpc:prod` points to version **85**; `worker-lambda:prod` points to **37**, with no weighted routing in either response.
-- The [latest successful CD run](https://github.com/ChuanQiao1128/recallsmith/actions/runs/39899509568), created 2026-10-23 04:17:10 UTC, has source `298b15421441787536ea729ee23f06aff2391eba`. This run is supporting release history. The full observation window spans multiple releases, and alias snapshots alone do not prove which source version served every sample.
+- The [latest successful CD run](https://github.com/ChuanQiao1128/DeveloperCards/actions/runs/39899509568), created 2026-10-23 04:17:10 UTC, has source `298b15421441787536ea729ee23f06aff2391eba`. This run is supporting release history. The full observation window spans multiple releases, and alias snapshots alone do not prove which source version served every sample.
 - Reading qualified Lambda configuration was explicitly denied. No stronger role was used; deployed runtime/code-hash attribution remains **UNKNOWN**.
 
 [Source responses and query arguments](operations-source.json) retain the metric dimensions, returned datapoints and SHA-256 of each original response. Logs are restricted to timing/memory fields from REPORT records; no credentials, request payloads or user identifiers are included.

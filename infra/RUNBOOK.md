@@ -1,4 +1,39 @@
-# RUNBOOK — RecallSmith / DeveloperCards infra
+# RUNBOOK — DeveloperCards infra
+
+## Repository rename
+
+The canonical repository is `ChuanQiao1128/DeveloperCards`. GitHub redirects the
+former repository URL, but an Actions OIDC token uses the **current** repository
+name. A redirect does not update AWS role trust.
+
+Only `developercards-gha-prod` (`production`) and `developercards-gha-infra`
+(`infra-prod`) need a trust-subject change. Keep the existing GitHub OIDC provider,
+`sts.amazonaws.com` audience, `StringEquals`, environment protections, role names,
+permissions and main-branch restrictions. The final subjects are respectively
+`repo:ChuanQiao1128/DeveloperCards:environment:production` and
+`repo:ChuanQiao1128/DeveloperCards:environment:infra-prod`.
+
+Use the existing `devcards-admin` MFA path for this break-glass change; the routine
+Terraform role cannot update its own trust. The scoped plan allowance is
+`docs/delivery/repository-rename-20261102.plan-allow.json`. Before renaming, save both
+current trust documents privately and add the new exact subject alongside the old
+subject. Rename the same GitHub repository (preserving its ID), update the Git
+remote and verify both protected environments. Then remove the old subject and
+update the two role descriptions to the new repository name. Read back both policies
+and descriptions; a later Terraform refresh must agree with the committed defaults.
+Do not create a replacement repository or widen trust with a wildcard.
+
+Historical deployment statuses also retain their old GitHub URLs. `scripts/cd/plan.sh`
+accepts that exact former URL prefix only after reading repository ID `1076433600`
+from the current repository API, and still verifies the original deployment job and
+run. This preserves the last full deployment and rollback/stale-plan baselines;
+failure to verify the identity stops planning.
+
+If the rename fails, restore the saved trust documents. If the administrative MFA
+session is unavailable, complete the code/review work and leave the external rename
+pending. Existing app IDs, URL schemes, EAS project, cache keys, .NET assembly names,
+S3/state/queue names and the separate `recallsmith-mobile-config` repository retain
+their deployed identities. Dated delivery records keep their historical names.
 
 ## 1. Adopt (E01, once)
 
@@ -850,7 +885,7 @@ push to `main` in this repository, CD starts (`workflow_run`; a pull request, a 
    against the manifest sha256 the build job passed (not read from the artifact store): every file matches, the files
    are **exactly** the ones the targets need, the console tarball holds only files and directories under `dist/`
    (it is unpacked into a fresh directory first) → assume `arn:aws:iam::622994489535:role/developercards-gha-prod`
-   (its trust accepts only `repo:ChuanQiao1128/recallsmith:environment:production`; session
+   (its trust accepts only `repo:ChuanQiao1128/DeveloperCards:environment:production`; session
    `gha-cd-<run id>-<attempt>`, which is how CloudTrail names it) → preflight (identity; the console bundle carries
    the DSN SSM holds) → **baseline smoke** (`scripts/smoke.sh` before any change; never fails the job) →
    **restore point** (`scripts/cd/restore-point.sh record`: every prod alias about to move, the console's
@@ -887,7 +922,7 @@ environment must not have "Prevent self-review" on: the owner both merges and ap
 
 "Since the last full deployment", not "in this push": a run that was rejected, rolled back, or cancelled while
 queued leaves its changes in the next run's plan. A full deployment is marked by the environment URL the deploy job
-sets on success, `https://github.com/ChuanQiao1128/recallsmith/commit/<sha>#cd-full`; a run with an explicit target
+sets on success, `https://github.com/ChuanQiao1128/DeveloperCards/commit/<sha>#cd-full`; a run with an explicit target
 list sets `#cd-partial` and a manual rollback `#cd-rollback`, and neither becomes the next base. A record counts only
 when GitHub Actions made the deployment and its first success status came from a successful `deploy (production)` or
 `rollback (production)` job of `cd.yml` on `main` (checked through the Actions API), so a status posted with a token
@@ -1021,11 +1056,11 @@ ruleset 24415242, variable `CONSOLE_SENTRY_DSN` (read from the live console bund
    named `main` (or restrict tag creation to the owner).
 5. Repository variable (not a secret: the DSN is public in the bundle) `CONSOLE_SENTRY_DSN` = the SSM String
    `/developercards/prod/console-sentry-dsn`:
-   `gh variable set CONSOLE_SENTRY_DSN --repo ChuanQiao1128/recallsmith --body "$(aws ssm get-parameter --profile devcards-admin --name /developercards/prod/console-sentry-dsn --query Parameter.Value --output text)"`.
+   `gh variable set CONSOLE_SENTRY_DSN --repo ChuanQiao1128/DeveloperCards --body "$(aws ssm get-parameter --profile devcards-admin --name /developercards/prod/console-sentry-dsn --query Parameter.Value --output text)"`.
    Change both together: the deploy stops before any change when the bundle lacks the DSN SSM holds.
 6. After the first deploy, check its record carries the marker:
-   `gh api "repos/ChuanQiao1128/recallsmith/deployments?environment=production" --jq '.[0].id'`, then
-   `gh api repos/ChuanQiao1128/recallsmith/deployments/<id>/statuses --jq '.[].environment_url'` must show
+   `gh api "repos/ChuanQiao1128/DeveloperCards/deployments?environment=production" --jq '.[0].id'`, then
+   `gh api repos/ChuanQiao1128/DeveloperCards/deployments/<id>/statuses --jq '.[].environment_url'` must show
    `…/commit/<sha>#cd-full`. Without it every run deploys every target (safe, but noisy).
 
 ### Not covered
@@ -1281,7 +1316,7 @@ PR (change + its allow-list) -> CI, no AWS -> auto-merge -> push to main -> sele
    next run's plan shows it without its allow file and refuses (revert it, or re-run this run later).
 6. **apply (infra-prod).** Before any credential: the on-main, stale and preflight checks again, and the
    environment secret `TF_VAR_ALERT_EMAIL` is present. Then it assumes
-   `arn:aws:iam::622994489535:role/developercards-gha-infra` through GitHub OIDC (the role trusts only `repo:ChuanQiao1128/recallsmith:environment:infra-prod`; session
+   `arn:aws:iam::622994489535:role/developercards-gha-infra` through GitHub OIDC (the role trusts only `repo:ChuanQiao1128/DeveloperCards:environment:infra-prod`; session
    `gha-tf-<run id>-<attempt>`, which is how CloudTrail names it), runs `terraform init` with the real backend,
    `plan -lock-timeout=10m -out=<file>`, `show -json`, then
    - `tf-pipeline.py guard`: refuses any effective change in `module.operators` and any move into or out of it
@@ -1363,11 +1398,11 @@ rule, so `infra-prod` must exist before `terraform.yml` reaches `main`.
 
 1. Supervisor (done 2026-10-04: `infra-prod` exists with the same rules as `production`): environment `infra-prod`,
    required reviewer ChuanQiao1128, deployment branches `main` only, "Prevent self-review" off, administrators cannot
-   bypass. Check: `gh api repos/ChuanQiao1128/recallsmith/environments/infra-prod --jq
+   bypass. Check: `gh api repos/ChuanQiao1128/DeveloperCards/environments/infra-prod --jq
    '{can_admins_bypass, protection_rules}'`.
 2. Supervisor: environment secret `TF_VAR_ALERT_EMAIL` on `infra-prod` = the root variable `alert_email` (the alerts
    topic's e-mail, the value in the gitignored `prod.auto.tfvars`):
-   `gh secret set TF_VAR_ALERT_EMAIL --repo ChuanQiao1128/recallsmith --env infra-prod` (it prompts for the value).
+   `gh secret set TF_VAR_ALERT_EMAIL --repo ChuanQiao1128/DeveloperCards --env infra-prod` (it prompts for the value).
 3. Merge the change that adds the pipeline. Its push starts `terraform.yml`, whose **select** job stops on
    `docs/delivery/r27-issues/TFCI.plan-allow.json` (it lists `module.operators`): a red run, no approval request,
    nothing applied. Expected.
@@ -1442,10 +1477,10 @@ on the bucket's objects). Restoring an older state version is break-glass, with 
   approve. So before approving, check that the run is **Terraform** (`.github/workflows/terraform.yml`) and, when the
   push touched the gate files, read their diff. Two hardenings, both break-glass and left to the owner:
   1. Pin both GitHub roles to their workflow file: set the repository's OIDC subject template to include
-     `job_workflow_ref` (`gh api -X PUT repos/ChuanQiao1128/recallsmith/actions/oidc/customization/sub -f
+     `job_workflow_ref` (`gh api -X PUT repos/ChuanQiao1128/DeveloperCards/actions/oidc/customization/sub -f
      'include_claim_keys[]=repo' -f 'include_claim_keys[]=context' -f 'include_claim_keys[]=job_workflow_ref'`) and,
      in the same window, change the `sub` conditions of `developercards-gha-infra` and `developercards-gha-prod` to
-     `repo:ChuanQiao1128/recallsmith:environment:<env>:job_workflow_ref:ChuanQiao1128/recallsmith/.github/workflows/<terraform|cd>.yml@refs/heads/main`
+     `repo:ChuanQiao1128/DeveloperCards:environment:<env>:job_workflow_ref:ChuanQiao1128/DeveloperCards/.github/workflows/<terraform|cd>.yml@refs/heads/main`
      (a `module.operators` change, local with MFA). The template changes every token of the repository at once, so
      CD and this pipeline fail between the two steps.
   2. Require code-owner review for `.github/workflows/**`, `infra/scripts/check-plan.py`,
