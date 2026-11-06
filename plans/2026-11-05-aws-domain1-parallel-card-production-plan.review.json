@@ -1,0 +1,63 @@
+{
+  "schema": "aws-domain1-production-plan-independent-review-v1",
+  "reviewedUtc": "2026-11-05T03:17:46.219491+00:00",
+  "overall": "FAIL",
+  "scope": "只审执行计划及其事实来源；未制卡、未改代码、未启动生产或读取作者聊天历史。",
+  "inputs": {
+    "/Users/qc/Desktop/DeveloperCards/plans/2026-11-05-aws-domain1-parallel-card-production-plan.md": "92edb97cedeed9c1e68182c6b0f81fb1ff67707d534c4d77c2dd1944d8ac6573",
+    "/Users/qc/Desktop/DeveloperCards/plans/2026-11-05-aws-domain1-parallel-card-production-baseline.json": "ecb734d22a434bf88d412656997baf2f3f837c7e862edc013a76571f9cb52908"
+  },
+  "checks": [
+    {
+      "id": "R1",
+      "status": "PASS",
+      "note": "按当前domain-views及双向索引重算371题=310主归+61仅交叉；Q868排除；622唯一判断、559关联候选目标。12学习块及状态分区均无重复且集合等于371题。"
+    },
+    {
+      "id": "R2",
+      "status": "PASS",
+      "note": "当前run及接受库存均62卡；题卡账本17充分/25部分/14待重核，315题为集合差；354仅表示尚无当前充分支撑，不等同缺354张卡。五项来源及三项工具哈希匹配基线。"
+    },
+    {
+      "id": "R3",
+      "status": "PASS",
+      "note": "明确复用原需求/目标、不重新提取或先行全量归并；559目标不当作卡数；知识卡验收、完整原题支撑及学习者效果分别记账，源题异常不自动排除或强升PASS。"
+    },
+    {
+      "id": "R4",
+      "status": "PASS",
+      "note": "最多四槽含主控；作者与Reviewer固定分离、fork_turns:none，独立目录及冻结交接；不跨可变兄弟包读取。每题唯一最终审查责任。"
+    },
+    {
+      "id": "R5",
+      "status": "PASS",
+      "note": "正确识别当前prepare_selected单批、advance共享state/timings/cache、closeout.finish串行锁与SHA冲突拒绝的边界；提出波次冻结/单提交及接受卡完整上下文两项未实现适配，未声称现在能安全直接并跑。"
+    },
+    {
+      "id": "R6",
+      "status": "FAIL",
+      "note": "§4.B未明确隔离有效旧审查凭证与Reviewer输入，详见F1。"
+    },
+    {
+      "id": "R7",
+      "status": "PASS",
+      "note": "第6–9批首次交付924.658344/695.696122/787.484527/710.228815秒与实际task-clock一致；第8批919.631637秒完整回读另列。40–60卡/小时及100/150/200卡均明确为情景假设，native token未知且无伪实测节省。"
+    },
+    {
+      "id": "R8",
+      "status": "PASS",
+      "note": "本文与基线标记仅规划；本次核对当前run哈希仍等于基线；审查仅新写本review文件，未启动制作、发布或自动化。"
+    }
+  ],
+  "findings": [
+    {
+      "id": "F1",
+      "priority": "P1",
+      "blocking": true,
+      "location": "执行计划 §4.B 接受卡作为真正的题目上下文",
+      "description": "“加载…有效审查凭证…和本批待审卡共同进入题目支撑核查”没有区分本地凭证验证与独立Reviewer输入。AGENTS.md §5明确要求旧审查结论不进入Reviewer输入；当前pipeline.review_job也只用valid选择target/context，不把旧结论放进input.json。新适配若把旧PASS/结论随接受卡递交，会破坏独立题目核查。",
+      "requiredChange": "明确有效凭证仅供本地验证器/主控检查版本兼容、指纹与失效；独立Reviewer冻结包只含相关接受卡当前完整正文、官方摘录、递归先修、完整原题/需求与规则，不含旧PASS、旧审查结论、作者历史。凭证缺失/失效时先定向卡片复核，新的题目结论仍由当前正文独立作出。"
+    }
+  ],
+  "productionReadiness": "需先修正文F1；即使计划通过，仍须实现并独立核验计划列出的两项适配，才可按波次并行生产。"
+}

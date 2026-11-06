@@ -1,0 +1,16 @@
+import {readFileSync,writeFileSync} from 'node:fs';
+import {createRequire} from 'node:module';
+import {join} from 'node:path';
+const [repo,folder]=process.argv.slice(2);
+const {build}=createRequire(repo+'/package.json')('esbuild');
+const code=await build({stdin:{contents:`export {parseDeckMarkdown,serializeDeckMarkdown} from ${JSON.stringify(repo+'/src/lib/deckImport.ts')};`,resolveDir:repo,loader:'ts'},bundle:true,write:false,platform:'node',format:'esm',target:'node22',logLevel:'silent'});
+const lib=await import('data:text/javascript;base64,'+Buffer.from(code.outputFiles[0].text).toString('base64'));
+const project=c=>({uid:c.stableUid,difficulty:c.difficulty,topic:c.topic,question:c.question,explanation:c.explanation,zh:c.translations?.['zh-CN'],source:c.source});
+const expected=JSON.parse(readFileSync(join(folder,'cards.json'),'utf8'));
+const parsed=lib.parseDeckMarkdown(readFileSync(join(folder,'cards.deck.md'),'utf8'));
+const versioned=expected.map(c=>({...c,translations:{'zh-CN':{v:1,...c.translations['zh-CN']}}}));
+if(parsed.errors.length||JSON.stringify(versioned.map(project))!==JSON.stringify(parsed.cards.map(project)))throw Error('parser changed content');
+const round=lib.parseDeckMarkdown(lib.serializeDeckMarkdown('aws-saa-c03-rebuild-v2',parsed.cards));
+if(round.errors.length||JSON.stringify(round.cards.map(project))!==JSON.stringify(parsed.cards.map(project)))throw Error('roundtrip changed content');
+writeFileSync(join(folder,'cards.import.json'),JSON.stringify(versioned,null,2)+'\n');
+process.stdout.write(JSON.stringify({status:'PASS_CURRENT_PARSER_ROUNDTRIP',cards:expected.length})+'\n');

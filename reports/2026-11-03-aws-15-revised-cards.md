@@ -1,0 +1,321 @@
+# 15张AWS双语卡片 · 按当前设计标准重写
+
+每张保留一个有用判断：根据条件作答，解释机制，区分真正容易混淆的方案。背面采用“答／考点／易错提醒”。
+
+这15张修订自同一批卡片，身份不增加。跨账户EFS教学场景限定为有官方依据的EC2访问；原Lambda题的集成问题仍待核验。卡片验收与整题覆盖、真实记忆效果分别记录。
+
+## 1．Volume Gateway · Rare
+
+**问：** 一个本地应用要求完整主数据始终留在本地，日常读取不依赖从S3取回数据。假设容量符合配额，应选stored还是cached volumes，为什么？
+
+**答：** 选择stored volumes。它将完整主数据保留在本地存储上，应用读取使用这些本地数据。
+
+**考点：** stored volumes将本地主存储与异步备份到AWS分开。cached volumes则以S3作为主存储，读取时先检查本地缓存，再从S3取数据。
+
+**易错提醒：** cached volumes在缓存命中时也能提供低延迟，但其缓存机制不保证完整数据集始终留在本地。
+
+**Question:** An on-premises application requires its entire primary dataset to remain local, with normal reads independent of fetching data from S3. Assuming capacity fits the quotas, should it use stored or cached volumes, and why?
+
+**Answer:** Choose stored volumes. They keep the entire primary dataset on local storage, and application reads use that local data.
+
+**Key point:** Stored volumes separate local primary storage from asynchronous backup to AWS. Cached volumes instead use S3 as primary storage and check the local cache before fetching data from S3.
+
+**Watch out:** Cached volumes can provide low latency on cache hits, but their caching mechanism does not guarantee that the entire dataset always remains local.
+
+依据：[AWS 1](https://docs.aws.amazon.com/storagegateway/latest/vgw/StorageGatewayConcepts.html)
+
+## 2．Volume Gateway capacity · Rare
+
+**问：** 一个设计要求用单个stored volume保存数百TB数据。工程师认为网关的512 TiB汇总配额能证明它可行。这个判断成立吗？拆成多卷是否仍是原设计？
+
+**答：** 不成立。单个stored volume上限为16 TiB。512 TiB适用于一个网关上最多32个stored volumes的容量合计。拆分数据会改变单卷设计。
+
+**考点：** 这些限制作用于不同层级：每个卷必须符合单卷配额，所有卷的容量合计还必须符合网关配额。汇总检查通过不能抵消单卷检查失败。
+
+**易错提醒：** 修改后的多卷布局仍须同时满足两层限制；它不能使原来的数百TB单卷变为可行。
+
+**Question:** A design requires one stored volume containing several hundred TB. An engineer argues that the gateway's 512 TiB aggregate quota makes this feasible. Is that reasoning valid, and would splitting the data preserve the original design?
+
+**Answer:** No. A stored volume is limited to 16 TiB. The 512 TiB quota applies to the combined capacity of up to 32 stored volumes on one gateway. Splitting the data changes the single-volume design.
+
+**Key point:** The limits apply at different levels: every volume must fit its own quota, and their combined capacity must fit the gateway quota. Passing the aggregate check cannot override a failed single-volume check.
+
+**Watch out:** A revised multi-volume layout must satisfy both limits; it does not make the original several-hundred-TB single volume valid.
+
+依据：[AWS 1](https://docs.aws.amazon.com/storagegateway/latest/vgw/StorageGatewayConcepts.html) · [AWS 2](https://docs.aws.amazon.com/storagegateway/latest/vgw/resource-gateway-limits.html)
+
+## 3．Storage Gateway device semantics · Rare
+
+**问：** 一台本地文件服务器使用iSCSI块卷承载在线文件系统。Volume Gateway和Tape Gateway都提供iSCSI设备。哪一个符合这个存储用途，另一个为什么不能直接替代它？
+
+**答：** Volume Gateway符合在线块卷的用途。Tape Gateway向磁带备份应用提供虚拟磁带驱动器和介质转换器，因此不能直接替代该数据卷。
+
+**考点：** iSCSI说明访问协议，而暴露的设备决定软件如何使用它。存储卷与虚拟磁带库支持不同的操作和工作流程。
+
+**易错提醒：** 因块接口而选择Volume Gateway，并不能确定主数据是否留在本地；这还取决于选择stored还是cached volumes。
+
+**Question:** An on-premises file server uses an iSCSI block volume for its live filesystem. Volume Gateway and Tape Gateway both expose iSCSI devices. Which matches this storage role, and why can't the other directly replace it?
+
+**Answer:** Volume Gateway matches the live block-volume role. Tape Gateway exposes virtual tape drives and a media changer to tape-based backup applications, so it is not a direct replacement for that data volume.
+
+**Key point:** iSCSI identifies the access protocol, while the exposed device determines how software uses it. A storage volume and a virtual tape library support different operations and workflows.
+
+**Watch out:** Choosing Volume Gateway for its block interface does not settle whether primary data stays local; that depends on choosing stored or cached volumes.
+
+依据：[AWS 1](https://docs.aws.amazon.com/storagegateway/latest/vgw/StorageGatewayConcepts.html) · [AWS 2](https://docs.aws.amazon.com/storagegateway/latest/tgw/StorageGatewayConcepts.html)
+
+## 4．EBS snapshot recovery · Easy
+
+**问：** 你有一个包含已有文件系统的EBS快照，需要在EC2实例上访问其中的文件。应怎样恢复访问？哪一步初始化操作可能毁掉恢复的数据？
+
+**答：** 在实例所在可用区从快照创建EBS卷并附加。检查已有文件系统，然后挂载。不要在已有文件系统上创建新文件系统，否则会覆盖数据。
+
+**考点：** 快照重建的是卷在特定时间点保存的状态。附加块设备使实例能够使用该设备；挂载其文件系统才让文件可访问。
+
+**易错提醒：** 全新空白卷需要先创建文件系统才能使用。不要把这套初始化流程照搬到已有文件系统的恢复卷。
+
+**Question:** You have an EBS snapshot containing an existing filesystem and need its files on an EC2 instance. How should you restore access, and what initialization step could destroy the recovered data?
+
+**Answer:** Create an EBS volume from the snapshot in the instance's Availability Zone and attach it. Inspect the existing filesystem, then mount it. Do not create a new filesystem over the existing one; that overwrites the data.
+
+**Key point:** The snapshot recreates the volume's saved state at a particular point in time. Attaching the block device makes it available to the instance; mounting its filesystem makes the files accessible.
+
+**Watch out:** A new blank volume needs a filesystem before use. Do not apply that initialization procedure to a restored volume that already has one.
+
+依据：[AWS 1](https://docs.aws.amazon.com/ebs/latest/userguide/ebs-restoring-volume.html) · [AWS 2](https://docs.aws.amazon.com/ebs/latest/userguide/ebs-using-volumes.html)
+
+## 5．Local storage disaster recovery · Legend
+
+**问：** 一个新设计有单个12 TiB本地文件卷，使用iSCSI。正常运行时完整主数据必须留在本地，应保留块接口，并能在站点丢失后于EC2恢复文件。允许迁移，也接受非零RPO/RTO。请提出网关方案和恢复顺序，并解释竞争方案的差异。
+
+**答：** 使用stored volume：12 TiB符合16 TiB单卷上限，主数据保留本地，并提供iSCSI卷。利用其异步AWS备份并创建快照。站点丢失后，从已完成快照在恢复EC2实例所在可用区创建EBS卷，附加后检查已有文件系统并挂载，不重新格式化。
+
+**考点：** stored volumes同时满足完整本地主数据和块卷用途，快照则提供恢复到EBS的路径。cached volumes不保证完整数据集始终本地；Tape Gateway提供备份工作流程，不能替代在线卷。
+
+**易错提醒：** 恢复使用已完成快照捕获的数据。异步备份与时间点恢复不保证零RPO，创建、附加和挂载恢复卷的流程也不承诺零RTO。
+
+**Question:** A new design has one 12 TiB on-premises file volume using iSCSI. Its entire primary dataset must remain local during normal operation, the block interface should be retained, and files must be recoverable on EC2 after site loss. Migration and nonzero RPO/RTO are acceptable. Propose a gateway approach and recovery sequence, explaining why the alternatives differ.
+
+**Answer:** Use a stored volume: 12 TiB fits its 16 TiB per-volume limit, it keeps primary data local, and it exposes an iSCSI volume. Use its asynchronous AWS backup and take snapshots. After site loss, create an EBS volume from a completed snapshot in the recovery EC2 instance's Availability Zone, attach it, inspect the existing filesystem, and mount it without reformatting.
+
+**Key point:** Stored volumes satisfy both the full-local-data requirement and the block-volume role, while snapshots provide a path to EBS recovery. Cached volumes do not guarantee the entire dataset always stays local; Tape Gateway provides a backup workflow rather than a replacement live volume.
+
+**Watch out:** Recovery uses the data captured by a completed snapshot. Asynchronous backup and point-in-time recovery do not guarantee zero RPO, and creating, attaching, and mounting the recovery volume does not promise zero RTO.
+
+依据：[AWS 1](https://docs.aws.amazon.com/storagegateway/latest/vgw/StorageGatewayConcepts.html) · [AWS 2](https://docs.aws.amazon.com/ebs/latest/userguide/ebs-restoring-volume.html) · [AWS 3](https://docs.aws.amazon.com/ebs/latest/userguide/ebs-using-volumes.html) · [AWS 4](https://docs.aws.amazon.com/storagegateway/latest/tgw/StorageGatewayConcepts.html)
+
+## 6．Cross-account EFS authorization · Rare
+
+**问：** 另一个AWS账户中的EC2客户端已获得正确的EFS挂载目标IP，并能连接TCP 2049。它必须使用IAM按角色控制的只读访问。网络测试通过是否证明已获授权？还需要什么授权机制？
+
+**答：** 不能。使用EFS mount helper启用IAM授权，核对客户端角色的相关权限，并在文件系统资源策略中授权该跨账户角色或账户。ClientMount提供只读访问；ClientWrite授予写权限。
+
+**考点：** 网络连通使客户端能够到达NFS端点；EFS会另外结合文件系统策略与身份策略评估IAM访问。跨账户客户端须手动解析挂载目标，因此到达正确目标与满足授权是两个独立条件。
+
+**易错提醒：** 没有用户配置的文件系统策略时，默认策略不使用IAM认证，并向能通过挂载目标连接的匿名客户端授予完全访问。这不同于按角色控制的只读访问；不能把跨账户IAM配置泛化为每次EFS挂载都必须显式配置双边策略。
+
+**Question:** An EC2 client in another AWS account has the correct EFS mount target IP and can reach TCP 2049. It must use IAM-controlled, role-based read-only access. Does the network test prove access is authorized, and what authorization mechanism is needed?
+
+**Answer:** No. Use the EFS mount helper for IAM authorization, check the client role's relevant permissions, and authorize the cross-account role or account in the filesystem resource policy. ClientMount provides read-only access; ClientWrite grants write permission.
+
+**Key point:** Network connectivity reaches the NFS endpoint; EFS separately evaluates the filesystem policy and identity policies for IAM access. Cross-account clients must resolve the mount target manually, so reaching the correct target and satisfying authorization are separate conditions.
+
+**Watch out:** Without a user-configured filesystem policy, the default policy does not authenticate with IAM and grants full access to anonymous clients that can connect through a mount target. That differs from role-controlled read-only access; do not generalize the cross-account IAM setup into a rule that every EFS mount always needs explicit policies on both sides.
+
+依据：[AWS 1](https://docs.aws.amazon.com/efs/latest/ug/iam-access-control-nfs-efs.html) · [AWS 2](https://docs.aws.amazon.com/efs/latest/ug/security_iam_service-with-iam.html) · [AWS 3](https://docs.aws.amazon.com/efs/latest/ug/network-access.html) · [AWS 4](https://docs.aws.amazon.com/efs/latest/ug/manage-fs-access-vpc-peering.html)
+
+## 7．Lambda layers · Rare
+
+**问：** 多个Lambda函数需要读取持续增长的共享数据集，并在不更新部署的情况下看到新增文件。工程师建议用Lambda层分发这些文件。这个方案符合要求吗？容量限制如何影响判断？
+
+**答：** 不符合。层是包含代码或数据的版本化部署归档。文件变化需要新层版本，并更新函数以使用该版本。函数与其全部层的解压总大小必须符合250 MB限制。
+
+**考点：** 函数使用选定的层版本，因此内容取决于部署时的版本选择。这种机制适合打包依赖或数据，但不会持续呈现共享文件系统的变化。
+
+**易错提醒：** 250 MB不是每个层各自拥有的额度；把数据从函数包移到层中，也不会让它退出合计限制。
+
+**Question:** Several Lambda functions must read a growing shared dataset and see new files without a deployment update. An engineer proposes distributing the files through a Lambda layer. Does that fit, and how does the size limit affect the decision?
+
+**Answer:** No. A layer is a versioned deployment archive containing code or data. File changes require a new layer version and updating functions to use it. The function and all its layers together must fit the 250 MB unzipped limit.
+
+**Key point:** A function uses a selected layer version, so the content is tied to a deployment choice. That mechanism suits packaged dependencies or data, but it does not continuously expose changes in a shared filesystem.
+
+**Watch out:** The 250 MB allowance is not separate for each layer, and moving data out of the function package into a layer does not remove it from the combined limit.
+
+依据：[AWS 1](https://docs.aws.amazon.com/lambda/latest/dg/chapter-layers.html) · [AWS 2](https://docs.aws.amazon.com/lambda/latest/dg/adding-layers.html) · [AWS 3](https://docs.aws.amazon.com/lambda/latest/dg/permissions-layer-cross-account.html)
+
+## 8．Shared EFS versus scheduled copies · Rare
+
+**问：** 读取方既可以挂载源EFS，也可以读取由定时DataSync任务更新的EFS副本。两条路径均可部署，且不需要独立副本。新增源文件必须无需等待传输任务即可供读取。应选择哪条路径，它避免了什么额外资源？
+
+**答：** 直接读取源EFS。读取方共享同一源数据，无需等待文件到达副本。在这些前提下，这避免了额外副本的存储与DataSync传输。
+
+**考点：** EFS允许多个客户端访问共同的数据源。定时DataSync副本通过任务执行接收变化，因此副本中尚不存在的文件，须成功传输后才能在那里读取。
+
+**易错提醒：** 避免副本不等于总成本一定最低。仍需考虑EFS使用费用，以及适用的跨可用区VPC对等连接传输费用。
+
+**Question:** A reader can either mount the source EFS or read an EFS copy updated by scheduled DataSync tasks. Both paths are deployable, and no independent copy is needed. New source files must be available without waiting for a transfer task. Which path fits, and what extra resources does it avoid?
+
+**Answer:** Read the source EFS directly. Readers share the same source rather than waiting for files to reach a copy. Under these assumptions, this avoids the additional copy's storage and DataSync transfers.
+
+**Key point:** EFS lets multiple clients access a common data source. A scheduled DataSync copy receives changes through task executions, so a file absent from the copy remains unavailable there until it is successfully transferred.
+
+**Watch out:** Avoiding a copy does not prove the lowest total cost. EFS usage charges and applicable cross-Availability-Zone VPC peering transfer charges still matter.
+
+依据：[AWS 1](https://docs.aws.amazon.com/efs/latest/ug/how-it-works.html) · [AWS 2](https://docs.aws.amazon.com/datasync/latest/userguide/how-datasync-transfer-works.html) · [AWS 3](https://aws.amazon.com/datasync/pricing/) · [AWS 4](https://aws.amazon.com/efs/pricing/) · [AWS 5](https://aws.amazon.com/vpc/pricing/)
+
+## 9．Cross-account shared EFS design · Legend
+
+**问：** 一个账户中的EC2读取方需要按角色控制的只读访问，读取另一账户中持续增长的EFS数据集。它不能等待定时复制，也不需要独立副本。跨VPC连通可以实现。请提出访问路径、必要的连接与授权步骤，并给出有前提的成本理由。
+
+**答：** 直接挂载现有EFS。手动解析正确挂载目标，并确保TCP 2049连通。使用EFS mount helper启用IAM授权；核对客户端角色权限，并在文件系统资源策略中为跨账户主体授权ClientMount。这避免了额外副本及其同步工作，但仍须计入实际EFS使用费用和适用的传输费用。
+
+**考点：** 共享源数据消除了等待副本更新的环节。到达其NFS端点与获得读取授权是两个独立要求，因此仅有网络连通不能完成该设计。
+
+**易错提醒：** 默认匿名访问文件系统策略不能证明已实现按角色控制的只读访问。资源节省也依赖本场景不需要独立副本这一前提，不能据此宣称普遍最低成本。
+
+**Question:** An EC2 reader in one account needs role-controlled read-only access to a growing EFS dataset in another account. It cannot wait for scheduled copies and needs no independent copy. Cross-VPC connectivity is feasible. Propose the access path, the necessary connection and authorization steps, and a bounded cost rationale.
+
+**Answer:** Directly mount the existing EFS. Manually resolve the correct mount target and ensure TCP 2049 connectivity. Use the EFS mount helper with IAM authorization; check the client role's permissions and authorize the cross-account principal in the filesystem resource policy for ClientMount. This avoids an additional copy and its synchronization work, while actual EFS usage and applicable transfer charges still need to be counted.
+
+**Key point:** Sharing the source removes the copy-update wait. Reaching its NFS endpoint and being authorized to read it are separate requirements, so connectivity alone cannot complete the design.
+
+**Watch out:** The default anonymous-access filesystem policy is not proof of role-controlled read-only access. The resource savings also depend on this scenario's lack of a need for an independent copy; they do not establish universally lowest cost.
+
+依据：[AWS 1](https://docs.aws.amazon.com/efs/latest/ug/manage-fs-access-vpc-peering.html) · [AWS 2](https://docs.aws.amazon.com/efs/latest/ug/iam-access-control-nfs-efs.html) · [AWS 3](https://docs.aws.amazon.com/efs/latest/ug/security_iam_service-with-iam.html) · [AWS 4](https://docs.aws.amazon.com/efs/latest/ug/network-access.html) · [AWS 5](https://docs.aws.amazon.com/efs/latest/ug/how-it-works.html) · [AWS 6](https://docs.aws.amazon.com/datasync/latest/userguide/how-datasync-transfer-works.html) · [AWS 7](https://aws.amazon.com/datasync/pricing/) · [AWS 8](https://aws.amazon.com/efs/pricing/) · [AWS 9](https://aws.amazon.com/vpc/pricing/)
+
+## 10．EC2 recovery scope · Rare
+
+**问：** 某EC2应用依靠启动时的user data完成配置。团队已有AWS Backup EC2恢复点，认为恢复实例就能完整恢复应用环境。这个判断成立吗，还需要单独处理什么？
+
+**答：** 不成立。AWS Backup会恢复EC2实例、EBS根卷，以及受保护实例原有的EBS数据卷，但不会备份或恢复启动时的user data。应用所需的脚本或配置必须另行保留和恢复。
+
+**考点：** 实例和磁盘可以已经存在，但依赖启动脚本的配置仍然缺失。恢复工作负载还需要在恢复Region中重建必要的基础设施、配置和应用代码。
+
+**易错提醒：** AMI提供启动所需的软件和块设备映射；拥有AMI本身不能证明每项应用配置都有恢复路径。
+
+**Question:** An EC2 application depends on launch user data for its configuration. The team has an AWS Backup EC2 recovery point and assumes restoring the instance will restore the complete application environment. Is that justified, and what must be handled separately?
+
+**Answer:** No. AWS Backup restores an EC2 instance, its EBS root volume, and EBS data volumes if the protected instance had them, but it does not back up or restore launch user data. Preserve and restore the required script or configuration separately.
+
+**Key point:** The instance and disks can exist while startup-dependent configuration is missing. Recovering a workload also requires the necessary infrastructure, configuration, and application code in the recovery Region.
+
+**Watch out:** An AMI supplies boot software and block device mappings; possessing one does not by itself establish that every application setting has a recovery path.
+
+依据：[AWS 1](https://docs.aws.amazon.com/aws-backup/latest/devguide/restoring-ec2.html) · [AWS 2](https://docs.aws.amazon.com/whitepapers/latest/disaster-recovery-workloads-on-aws/disaster-recovery-options-in-the-cloud.html) · [AWS 3](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/AMIs.html)
+
+## 11．Regional recovery readiness · Rare
+
+**问：** 另一个Region中已有完成的AMI副本或AWS Backup EC2备份副本。这是否证明备用实例已经运行、能够立即接管？还差哪一类准备？
+
+**答：** 不能。这些是恢复资产，仍需在该Region启动或恢复实例，并重新部署所需的基础设施、配置和应用代码。如果要求实例在故障前就已运行，仅保留副本并不满足条件。
+
+**考点：** 复制保留可供恢复的内容；启动或恢复才会创建运行工作负载的计算资源。因此，副本存在不能证明能够立即接管，也不能确定恢复耗时。
+
+**易错提醒：** 源Region已有AMI仍不足以在恢复Region启动实例：AMI必须位于实例启动的Region。
+
+**Question:** Another Region already contains a completed AMI copy or an AWS Backup EC2 backup copy. Does that establish that a standby instance is running and can immediately take over? Explain the remaining distinction.
+
+**Answer:** No. These are recovery assets. You must still launch or restore an instance in that Region and redeploy the required infrastructure, configuration, and application code. If the requirement is for an instance to be running before the failure, a copy alone does not satisfy it.
+
+**Key point:** Copying preserves material for recovery; launching or restoring creates the compute resources that will run the workload. The existence of a copy therefore does not establish immediate takeover or a particular recovery duration.
+
+**Watch out:** A source-Region AMI is not sufficient for launching in the recovery Region: the AMI must be located in the Region where the instance is launched.
+
+依据：[AWS 1](https://docs.aws.amazon.com/aws-backup/latest/devguide/restoring-ec2.html) · [AWS 2](https://docs.aws.amazon.com/aws-backup/latest/devguide/cross-region-backup.html) · [AWS 3](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/CopyingAMIs.html) · [AWS 4](https://docs.aws.amazon.com/whitepapers/latest/disaster-recovery-workloads-on-aws/disaster-recovery-options-in-the-cloud.html)
+
+## 12．Recovery point data age · Rare
+
+**问：** 源端计划每天备份两次。灾难发生于今日18:00，目标Region最新可用恢复点记录昨日16:00的数据，复制于今日17:00完成。所有时间均为UTC。假设该数据时刻准确代表可恢复的工作负载数据，这个恢复点是否满足24小时数据丢失上限？
+
+**答：** 不满足。数据年龄为26小时，即今日18:00减去昨日16:00。不能按复制完成后经过的1小时计算；源端每天两次的计划也不能改变这个结果。
+
+**考点：** 这是依据数据丢失上限作出的条件推论：复制完成使记录的恢复点可用，并不会把它代表的数据推进到复制完成时刻。应检查目标端最新已完成且可用的恢复点，不能只看源端计划。
+
+**易错提醒：** 配置计划并不保证目标副本会准时就绪。即使数据年龄不超过24小时，也不能证明恢复会多快完成；恢复环境仍需重建。
+
+**Question:** Source backups are scheduled twice daily. At a disaster today at 18:00, the latest usable recovery point in the destination Region contains yesterday's 16:00 data; its copy completed today at 17:00. All times are UTC. Assuming that data timestamp accurately represents the recoverable workload data, does this point meet a 24-hour data-loss limit?
+
+**Answer:** No. Its data age is 26 hours: today at 18:00 minus yesterday at 16:00. The relevant age is not the one hour since copying completed, and the twice-daily source schedule does not change that result.
+
+**Key point:** This is a conditional inference from the data-loss limit: completing a copy makes that recorded recovery point available; it does not advance the data it represents to the copy-completion time. Check the latest completed, usable destination point rather than the source schedule alone.
+
+**Watch out:** A schedule is not a guarantee that the destination copy will be ready on time. Even data age within 24 hours does not establish how quickly recovery will finish; the recovery environment still has to be restored.
+
+依据：[AWS 1](https://docs.aws.amazon.com/aws-backup/latest/devguide/cross-region-backup.html) · [AWS 2](https://docs.aws.amazon.com/aws-backup/latest/devguide/creating-a-backup-plan.html) · [AWS 3](https://docs.aws.amazon.com/ebs/latest/userguide/ami-policy.html) · [AWS 4](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/CopyingAMIs.html) · [AWS 5](https://docs.aws.amazon.com/whitepapers/latest/disaster-recovery-workloads-on-aws/disaster-recovery-options-in-the-cloud.html)
+
+## 13．Native scheduled backup copying · Rare
+
+**问：** DLM或AWS Backup已按计划为符合支持条件的EC2工作负载创建备份，但每次跨Region复制仍由运维手动触发。要减少重复工作，应改变哪一部分，为什么不必另写定时Lambda？
+
+**答：** 在现有流程中加入原生计划复制：为DLM的EBS-backed AMI计划启用跨Region复制规则，或在AWS Backup计划中配置Copy to destination。当这些能力满足要求时，就能替代单独的手动复制触发步骤或自写定时Lambda复制流程。
+
+**考点：** 托管流程将受保护资源、备份计划和目标复制关联起来，减少需要单独维护的代码与调度。AWS Backup还集中管理备份策略并监控备份活动。
+
+**易错提醒：** 自动创建源备份不等于已经自动配置跨Region复制。复制目标必须纳入流程。
+
+**Question:** DLM or AWS Backup already creates scheduled backups for an eligible EC2 workload, but operators manually trigger each cross-Region copy. What should change to reduce repeated work, and why is a separate scheduled Lambda unnecessary?
+
+**Answer:** Add native scheduled copying to the existing workflow: enable a cross-Region copy rule on the DLM EBS-backed AMI schedule, or configure Copy to destination in the AWS Backup plan. When that capability meets the requirements, it replaces the separate manual copy trigger or custom scheduled Lambda copy workflow.
+
+**Key point:** The managed workflow connects protected resources, backup schedules, and destination copying, reducing separate code and scheduling to maintain. AWS Backup also centralizes backup policies and backup activity monitoring.
+
+**Watch out:** Automatically creating a source backup does not automatically configure its cross-Region copy. The copy destination must be part of the workflow.
+
+依据：[AWS 1](https://docs.aws.amazon.com/aws-backup/latest/devguide/cross-region-backup.html) · [AWS 2](https://docs.aws.amazon.com/ebs/latest/userguide/ami-policy.html) · [AWS 3](https://docs.aws.amazon.com/aws-backup/latest/devguide/creating-a-backup-plan.html) · [AWS 4](https://docs.aws.amazon.com/aws-backup/latest/devguide/whatisbackup.html) · [AWS 5](https://docs.aws.amazon.com/aws-backup/latest/devguide/assigning-resources.html)
+
+## 14．Backup-and-restore architecture · Legend
+
+**问：** 某符合支持条件的EC2工作负载允许灾后创建恢复实例，基础设施、配置和应用代码均可重新部署。团队需要集中管理备份策略与监控活动，且无需持续运行备用EC2实例。应采用什么备份恢复流程，它作出了什么资源取舍？
+
+**答：**
+
+1. 将EC2工作负载纳入AWS Backup计划，配置原生计划复制到恢复Region。
+2. 灾后使用目标端可用恢复点恢复EC2，并重新部署所需环境，包括通常由user data提供的配置。
+3. 在题设条件下，可以不持续保留运行中的备用EC2容量。这项资源取舍本身不能证明总成本最低。
+
+**考点：** 集中备份管理与异地副本负责保留恢复资产；之后的恢复操作才创建实例。正因为允许灾后创建实例，不持续保留运行中的备用容量才符合要求。
+
+**易错提醒：** 集中管理备份策略和监控活动，不能证明具备全面的EC2运行管理能力。如果条件改为故障前实例必须已经运行，这种资源安排就不再满足要求。
+
+**Question:** An eligible EC2 workload may create its recovery instance after a disaster. Its infrastructure, configuration, and application code can be redeployed. The team wants centralized backup policies and monitoring and requires no continuously running standby EC2 instance. What backup-and-recovery workflow fits, and what resource tradeoff does it make?
+
+**Answer:**
+
+1. Include the EC2 workload in an AWS Backup plan with native scheduled copying to the recovery Region.
+2. After a disaster, restore EC2 from a usable destination recovery point and redeploy the required environment, including configuration normally supplied by user data.
+3. Under the stated requirement, continuously running standby EC2 capacity can be omitted. This resource choice alone does not establish the lowest total cost.
+
+**Key point:** Centralized backup management and regional copies preserve recovery assets; the restore operation creates the instance later. Allowing post-disaster creation is what makes omitting continuously running standby capacity compatible with the requirement.
+
+**Watch out:** Centralized backup policies and monitoring do not establish comprehensive EC2 operational management. If the requirement changes to an instance already running before failure, this resource arrangement no longer satisfies it.
+
+依据：[AWS 1](https://docs.aws.amazon.com/aws-backup/latest/devguide/restoring-ec2.html) · [AWS 2](https://docs.aws.amazon.com/aws-backup/latest/devguide/cross-region-backup.html) · [AWS 3](https://docs.aws.amazon.com/aws-backup/latest/devguide/assigning-resources.html) · [AWS 4](https://docs.aws.amazon.com/aws-backup/latest/devguide/creating-a-backup-plan.html) · [AWS 5](https://docs.aws.amazon.com/aws-backup/latest/devguide/whatisbackup.html) · [AWS 6](https://docs.aws.amazon.com/whitepapers/latest/disaster-recovery-workloads-on-aws/disaster-recovery-options-in-the-cloud.html)
+
+## 15．Windows EC2 regional recovery · Legend
+
+**问：** us-west-1中符合支持条件的Windows Server EC2工作负载需每天备份两次，并能在us-west-2恢复，数据丢失不超过24小时。允许故障后创建恢复实例，环境已有重新部署方案。使用AWS Backup设计减少日常维护的自动化流程，并说明如何选取恢复点及执行恢复。
+
+**答：**
+
+1. 使用包含该EC2工作负载的AWS Backup计划，安排每天备份两次，并原生复制到us-west-2的目标备份库。
+2. 故障时检查目标端最新已完成且可用的恢复点。假设其数据时刻准确代表可恢复的工作负载数据，用故障时刻减去该数据时刻，年龄必须不超过24小时；更旧的恢复点不满足上限。
+3. 从选定恢复点恢复EC2，并重新部署所需基础设施、配置和应用代码，包括因user data未被恢复而遗漏的配置。
+
+**考点：** 原生计划复制省去单独的复制流程，目标数据年龄则用于检查数据丢失条件。两者解决不同问题：计划已自动化，并不能证明目标端最新恢复点足够新。
+
+**易错提醒：** 应使用恢复点代表的数据时刻，而非复制完成时间。源端每天两次的计划不保证24小时RPO；恢复点足够新，也不保证恢复耗时短。
+
+**Question:** An eligible Windows Server EC2 workload in us-west-1 must be backed up twice daily and recoverable in us-west-2 with no more than 24 hours of data loss. Creating the recovery instance after failure is acceptable, and the environment has a redeployment plan. Use AWS Backup to design an automated workflow that reduces routine maintenance, then explain how to select a recovery point and restore.
+
+**Answer:**
+
+1. Use an AWS Backup plan that includes the EC2 workload, schedules backups twice daily, and natively copies them to a destination vault in us-west-2.
+2. At failure, check the latest completed, usable destination recovery point. Assuming its data timestamp accurately represents recoverable workload data, subtract that timestamp from the failure time; the age must be no more than 24 hours. A point older than that does not meet the limit.
+3. Restore EC2 from the selected point and redeploy the required infrastructure, configuration, and application code, including configuration omitted because user data is not restored.
+
+**Key point:** Native scheduled copying removes the separate copy workflow, while destination data age tests the data-loss condition. These solve different problems: automating the plan does not demonstrate that its latest destination recovery point is sufficiently fresh.
+
+**Watch out:** Use the represented data time, not copy-completion time. Twice-daily source scheduling does not guarantee a 24-hour RPO, and a sufficiently fresh point does not guarantee a short recovery time.
+
+依据：[AWS 1](https://docs.aws.amazon.com/aws-backup/latest/devguide/restoring-ec2.html) · [AWS 2](https://docs.aws.amazon.com/aws-backup/latest/devguide/cross-region-backup.html) · [AWS 3](https://docs.aws.amazon.com/aws-backup/latest/devguide/assigning-resources.html) · [AWS 4](https://docs.aws.amazon.com/aws-backup/latest/devguide/creating-a-backup-plan.html) · [AWS 5](https://docs.aws.amazon.com/whitepapers/latest/disaster-recovery-workloads-on-aws/disaster-recovery-options-in-the-cloud.html) · [AWS 6](https://docs.aws.amazon.com/aws-backup/latest/devguide/whatisbackup.html)

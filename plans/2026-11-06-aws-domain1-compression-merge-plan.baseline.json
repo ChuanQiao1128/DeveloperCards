@@ -1,0 +1,357 @@
+{
+  "status": "planning_only",
+  "sourceBaselineCards": 197,
+  "sourceQuestionCount": 371,
+  "sourceVerdicts": {
+    "SUPPORTED": 280,
+    "CONDITIONAL": 57,
+    "SOURCE_ISSUE": 34
+  },
+  "baselinePathsAndHashes": {
+    "/Users/qc/.local/share/codex-workflows/recallsmith/aws-basics-bilingual-rag-release-20261028/runtime/full-card-rebuild-v2-20261102/domain1-final-card-catalog-20261105/current-artifacts.json": "3d71a6ca79316d7e8cffe809c7a035810c8a3f534cd2e7c4382f86cab552fcd1",
+    "/Users/qc/.local/share/codex-workflows/recallsmith/aws-basics-bilingual-rag-release-20261028/runtime/full-card-rebuild-v2-20261102/domain1-final-card-catalog-20261105/acceptance.json": "1c87e299339a1f203d9e9b694a8aa07af8d51524699ca42d171e7aaecc8a12ce",
+    "/Users/qc/.local/share/codex-workflows/recallsmith/aws-basics-bilingual-rag-release-20261028/runtime/full-card-rebuild-v2-20261102/domain1-final-card-catalog-20261105/deliverables/catalogue.final.json": "9000a20db3a759006d5854d6f1574dd895c25a1a1b9d54b8cb676f85a6895b34",
+    "/Users/qc/.local/share/codex-workflows/recallsmith/aws-basics-bilingual-rag-release-20261028/runtime/full-card-rebuild-v2-20261102/domain1-final-card-catalog-20261105/deliverables/question-support.final.json": "1a408ed9eee2e58541c5d10a4dddd11064587cab08798fdf8e102d5e5f239b43",
+    "/Users/qc/.local/share/codex-workflows/recallsmith/aws-basics-bilingual-rag-release-20261028/runtime/full-card-rebuild-v2-20261102/domain1-final-card-catalog-20261105/deliverables/bidirectional-index.final.json": "3acd6d5ea5153cae8c1c373392a83bc911c7568630a120fe68afa9152fb7e31d",
+    "/Users/qc/.local/share/codex-workflows/recallsmith/aws-basics-bilingual-rag-release-20261028/runtime/full-card-rebuild-v2-20261102/domain1-final-card-catalog-20261105/deliverables/card-review-bindings.final.json": "e1399d4e318f4c0917c3da18a1442a61916bdfc8ebf9f98dfd79c407cdd56a56"
+  },
+  "firstPriorityGroups": [
+    {
+      "groupId": "M01",
+      "title": "低频存储：立即读取还是允许恢复",
+      "memberIds": [
+        "NC08",
+        "NC09"
+      ],
+      "status": "proposed_not_merged_or_accepted",
+      "proposedOutputCards": 1,
+      "arithmeticReductionIfAccepted": 1,
+      "directQids": [
+        53,
+        199,
+        250
+      ],
+      "affectedQidsIncludingDependencies": [
+        53,
+        199,
+        250
+      ],
+      "members": [
+        {
+          "id": "NC08",
+          "frontZH": "S3文件已变成低频访问，但仍须立即读取并保留多AZ韧性。只为省存储费，应转One Zone-IA或需恢复的归档层吗？",
+          "answerZH": "不应；可用S3 Standard-IA这类符合即时读取与韧性要求的低频层，并按阶段用Lifecycle转换。",
+          "keyPointZH": "低频层降低存储费用而保留即时访问；单AZ层改变故障韧性，需恢复的归档层改变取回等待时间，都可能违反硬条件。"
+        },
+        {
+          "id": "NC09",
+          "frontZH": "文件结束热访问阶段后要保存多年，允许先恢复再读取。为什么可以从即时读取层转入Glacier归档层？",
+          "answerZH": "可以用Lifecycle转入满足取回时限的归档层；先根据允许等待时间选择，不能只看最低存储单价。",
+          "keyPointZH": "归档用更长的恢复等待换低存储成本。仍要求即时读取时不能提前进入需恢复的层；6小时和12小时取回要求也可能导向不同归档选项。Glacier归档类与S3 Standard具有相同的耐久性和韧性，数据仍以多AZ冗余保存。"
+        }
+      ]
+    },
+    {
+      "groupId": "M02",
+      "title": "访问者位置决定S3端点类型",
+      "memberIds": [
+        "CB07",
+        "CB08"
+      ],
+      "status": "proposed_not_merged_or_accepted",
+      "proposedOutputCards": 1,
+      "arithmeticReductionIfAccepted": 1,
+      "directQids": [
+        4,
+        91,
+        92,
+        115,
+        176,
+        208,
+        223,
+        294,
+        471,
+        480,
+        562,
+        610,
+        612,
+        667,
+        710,
+        839,
+        860,
+        866,
+        875,
+        980,
+        998,
+        1011,
+        1016
+      ],
+      "affectedQidsIncludingDependencies": [
+        4,
+        91,
+        92,
+        115,
+        176,
+        208,
+        223,
+        294,
+        471,
+        480,
+        562,
+        610,
+        612,
+        667,
+        710,
+        839,
+        860,
+        866,
+        875,
+        980,
+        998,
+        1011,
+        1016
+      ],
+      "members": [
+        {
+          "id": "CB07",
+          "frontZH": "本VPC访问同Region的S3或DynamoDB，要求绕过Internet Gateway与NAT。应创建哪类端点、关联在哪里？",
+          "answerZH": "创建相应服务的gateway endpoint，关联实际调用子网使用的路由表。",
+          "keyPointZH": "网关端点按路由接走服务流量，仍使用服务公有地址；它不是带安全组的端点网卡。实例自身安全组与子网NACL仍需允许服务流量。",
+          "mustAnswer": [
+            "对应服务gateway endpoint",
+            "关联调用子网的实际路由表"
+          ],
+          "prerequisiteIds": []
+        },
+        {
+          "id": "CB08",
+          "frontZH": "本VPC访问同Region S3，希望省去额外端点费；若访问者改成本地机房、经Direct Connect连入VPC，还能用同一类端点吗？",
+          "answerZH": "本VPC可优先用无额外端点费的gateway endpoint；本地机房访问应使用可达的S3 interface endpoint。",
+          "keyPointZH": "gateway通过本VPC路由提供S3路径，不能把它延伸给专线另一侧的客户端。interface提供可经已有私网到达的私有网卡入口，但有额外费用。"
+        }
+      ]
+    },
+    {
+      "groupId": "M03",
+      "title": "存量对象按清单实际执行改造",
+      "memberIds": [
+        "NC14",
+        "aws-rb2-domain1-normal-batch07-20261105-s3-default-versus-existing-copy"
+      ],
+      "status": "proposed_not_merged_or_accepted",
+      "proposedOutputCards": 1,
+      "arithmeticReductionIfAccepted": 1,
+      "directQids": [
+        216,
+        321,
+        446,
+        740
+      ],
+      "affectedQidsIncludingDependencies": [
+        216,
+        321,
+        446,
+        740
+      ],
+      "members": [
+        {
+          "id": "NC14",
+          "frontZH": "数百万已有S3对象需要统一改动，桶的新默认设置不会回写它们。怎样避免逐对象手工处理？",
+          "answerZH": "用Inventory或适当清单定位对象，必要时包含version ID，再用S3 Batch Operations执行所需的受支持操作。",
+          "keyPointZH": "默认值作用于后续对象；批任务才对清单中的既有对象实际执行动作。加密Copy与设置retention不是同一动作，须按本次目标选择。"
+        },
+        {
+          "id": "aws-rb2-domain1-normal-batch07-20261105-s3-default-versus-existing-copy",
+          "frontZH": "桶中有数百万个已确认未加密的历史对象，每个不超过5GB。只开启桶默认加密能补齐它们吗？怎样在S3内批量处理？",
+          "answerZH": "不能。例如用S3 Inventory列出未加密对象，再用S3 Batch Operations的Copy指定SSE-S3加密，写回原桶。",
+          "keyPointZH": "默认加密只影响后续写入；Inventory提供对象及加密状态清单，批量Copy按清单重新写入，因此能处理存量。",
+          "watchOutZH": "这条批量Copy路径不支持SSE-C，不能直接套用于客户逐请求供钥的要求。"
+        }
+      ]
+    },
+    {
+      "groupId": "M04",
+      "title": "PrivateLink供应商与消费者两侧衔接",
+      "memberIds": [
+        "CB09",
+        "XB015"
+      ],
+      "status": "proposed_not_merged_or_accepted",
+      "proposedOutputCards": 1,
+      "arithmeticReductionIfAccepted": 1,
+      "directQids": [
+        135,
+        208,
+        360,
+        555,
+        667,
+        810,
+        949,
+        998
+      ],
+      "affectedQidsIncludingDependencies": [
+        135,
+        208,
+        360,
+        468,
+        514,
+        555,
+        663,
+        667,
+        775,
+        810,
+        811,
+        949,
+        998,
+        1019
+      ],
+      "members": [
+        {
+          "id": "CB09",
+          "frontZH": "VPC应用，或经已有专线连入VPC的本地客户端，要私下调用SQS、API Gateway private REST API等支持PrivateLink的服务，怎样接入？",
+          "answerZH": "创建目标服务的interface VPC endpoint，并允许客户端连接端点；供应商服务须先有endpoint service。",
+          "keyPointZH": "端点提供被调用服务的私有网卡地址，端点安全组须允许客户端连接。对支持端点策略的AWS服务，端点策略管授权，不能代替网络放行。"
+        },
+        {
+          "id": "XB015",
+          "frontZH": "客户VPC要私下连接供应商账户的TCP服务，双方不想开放互联网。消费端interface endpoint之前，供应商还应准备什么？",
+          "answerZH": "供应商在服务前配置NLB并创建对应endpoint service；客户再创建连接该服务的interface endpoint。",
+          "keyPointZH": "NLB接收经PrivateLink到达的连接并转给后端；endpoint service是供应商发布入口，普通消费端点不会自动把任意后端发布出去。",
+          "watchOutZH": "RDS故障切换可能改变数据库IP，NLB按IP注册的目标须随之更新，不能只注册一次后永久不管。",
+          "mustAnswer": [
+            "供应商NLB与endpoint service",
+            "客户interface endpoint连该服务"
+          ],
+          "prerequisiteIds": [
+            "CB09"
+          ]
+        }
+      ]
+    },
+    {
+      "groupId": "M05",
+      "title": "SCP限制能力与目标账户范围",
+      "memberIds": [
+        "CA04",
+        "CA05"
+      ],
+      "status": "proposed_not_merged_or_accepted",
+      "proposedOutputCards": 1,
+      "arithmeticReductionIfAccepted": 1,
+      "directQids": [
+        151,
+        168,
+        419,
+        433,
+        455,
+        488,
+        492,
+        548,
+        619,
+        709,
+        872
+      ],
+      "affectedQidsIncludingDependencies": [
+        80,
+        151,
+        168,
+        419,
+        433,
+        455,
+        488,
+        492,
+        548,
+        586,
+        619,
+        668,
+        709,
+        777,
+        872,
+        883,
+        988
+      ],
+      "members": [
+        {
+          "id": "CA04",
+          "frontZH": "多个成员账户都必须禁止某些AWS操作，账户管理员甚至成员root也不能绕过。该把限制放在哪里？",
+          "answerZH": "用Organizations的SCP对相关成员账户施加明确拒绝。",
+          "keyPointZH": "SCP设置成员账户可用权限的上限，账户内的管理员授权不能越过它；事后告警或提供合规模板不能同样阻止其他入口执行。"
+        },
+        {
+          "id": "CA05",
+          "frontZH": "组织中只有开发账户要受某条SCP限制，生产账户不受影响。该如何选择挂载范围？",
+          "answerZH": "挂到这些开发成员账户，或把它们放入独立OU后挂到该OU。",
+          "keyPointZH": "OU是账户分组，其下账户继承SCP；挂到共同组织根会把生产账户也纳入限制。"
+        }
+      ]
+    }
+  ],
+  "firstPriorityUniqueAffectedQids": [
+    4,
+    53,
+    80,
+    91,
+    92,
+    115,
+    135,
+    151,
+    168,
+    176,
+    199,
+    208,
+    216,
+    223,
+    250,
+    294,
+    321,
+    360,
+    419,
+    433,
+    446,
+    455,
+    468,
+    471,
+    480,
+    488,
+    492,
+    514,
+    548,
+    555,
+    562,
+    586,
+    610,
+    612,
+    619,
+    663,
+    667,
+    668,
+    709,
+    710,
+    740,
+    775,
+    777,
+    810,
+    811,
+    839,
+    860,
+    866,
+    872,
+    875,
+    883,
+    949,
+    980,
+    988,
+    998,
+    1011,
+    1016,
+    1019
+  ],
+  "firstPriorityAffectedQuestionCount": 58,
+  "firstPriorityArithmeticOnly": {
+    "candidateGroups": 5,
+    "ifAllFiveBecomeOneCardEach": 192,
+    "notValidatedNewCardCount": true
+  },
+  "all197DispositionScanStillRequired": true,
+  "productionOrCurrentCatalogueChanged": false
+}

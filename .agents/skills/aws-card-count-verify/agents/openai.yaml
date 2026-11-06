@@ -1,0 +1,4 @@
+interface:
+  display_name: "AWS卡数闭环验证"
+  short_description: "持续核查实际短卡与逐题解题支撑，确定全库卡数和四领域归属"
+  default_prompt: "使用 $aws-card-count-verify 接续已有验证，直到能依据实际卡面和逐题证据确定全库去重卡数及四领域主归与共享引用数；复用有效结果，只处理缺口。"

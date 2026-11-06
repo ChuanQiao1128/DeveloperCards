@@ -1,0 +1,145 @@
+# deck: aws-saa-c03-rebuild-v2
+
+## aws-rb2-20261103-b01-local-data-timing | d1
+TOPIC: Local data and backup timing / 本地数据与备份时点
+Q:
+How do full local storage, a local cache, and periodic backups affect everyday file access and disaster recovery differently?
+Q_ZH:
+完整本地存储、本地缓存和定期备份，分别怎样影响日常文件访问与灾难恢复？
+A:
+Answer: Stored volumes keep the primary dataset on premises. Cached volumes keep primary data in S3 and cache accessed data locally. S3 File Gateway exposes S3 objects through file protocols with local caching. Tape Gateway holds backups written by backup software; those backups represent captured data rather than a live replacement for the file volume.
+Key point: A cached-volume read checks local cache before S3. Stored volumes provide local access to the entire dataset while backing it up asynchronously. Local data placement and backup freshness answer different questions.
+Watch out: A cache smaller than the dataset cannot establish that every file is local. Low latency does not mean zero latency, and asynchronous backups or point-in-time snapshots do not establish zero recovery-point or recovery-time objectives (RPO/RTO).
+A_ZH:
+答：stored volumes将主数据集保留在本地。cached volumes以S3保存主数据，并在本地缓存访问过的数据。S3 File Gateway通过文件协议提供S3对象访问，并使用本地缓存。Tape Gateway保存备份软件写入的备份；这些备份代表已捕获的数据，而不是文件卷的实时替代品。
+考点：cached volume读取数据时先检查本地缓存，再访问S3。stored volumes在本地提供整个数据集的访问，同时异步备份。本地数据位置和备份新鲜度回答的是不同问题。
+易错提醒：小于数据集的缓存不能证明所有文件都在本地。低延迟不等于零延迟；异步备份或时间点快照也不能证明恢复点目标或恢复时间目标（RPO/RTO）为零。
+SOURCE: https://docs.aws.amazon.com/storagegateway/latest/vgw/StorageGatewayConcepts.html
+
+## aws-rb2-20261103-b01-volume-capacity-boundaries | d2
+TOPIC: Volume capacity boundaries / 卷容量边界
+Q:
+A design proposes one stored volume holding several hundred terabytes. Does the gateway's aggregate capacity make that single-volume design valid? Compare the relevant volume limits.
+Q_ZH:
+某设计计划用一个stored volume保存数百TB数据。网关的汇总容量能否证明这个单卷设计可行？请比较相关卷容量限制。
+A:
+Answer: No. A stored volume supports at most 16 TiB; one gateway supports up to 32 stored volumes totaling 512 TiB. Cached volumes support up to 32 TiB each, with up to 32 volumes totaling 1,024 TiB per gateway. Neither aggregate limit is a single-volume limit.
+Key point: Validate both the individual volume and the gateway total. Spreading data across multiple volumes changes the proposed storage layout and requires an explicit design decision.
+Watch out: Converting decimal TB to binary TiB does not make a single volume of several hundred TB fit either per-volume limit.
+A_ZH:
+答：不能。stored volume单卷最大16 TiB；一个网关最多支持32个stored volumes，总计512 TiB。cached volume单卷最大32 TiB；一个网关最多支持32卷，总计1,024 TiB。两种汇总上限都不是单卷上限。
+考点：必须同时核对单卷容量和网关总容量。将数据分布到多个卷会改变原有存储布局，需要明确作出设计决定。
+易错提醒：即使将十进制TB换算成二进制TiB，单个数百TB的卷仍然超过这两种单卷上限。
+SOURCE: https://docs.aws.amazon.com/storagegateway/latest/vgw/resource-gateway-limits.html
+
+## aws-rb2-20261103-b01-gateway-interface-change | d2
+TOPIC: Gateway integration changes / 网关接入改动
+Q:
+An on-premises file server currently uses an iSCSI block device. How would integrating Volume Gateway, S3 File Gateway, or Tape Gateway change its storage interface and workflow?
+Q_ZH:
+一台本地文件服务器目前使用iSCSI块设备。接入Volume Gateway、S3 File Gateway或Tape Gateway，会怎样改变存储接口与工作流程？
+A:
+Answer: Volume Gateway presents volumes over iSCSI, preserving the block-access protocol while still requiring gateway deployment and storage setup or migration. S3 File Gateway exposes NFS/SMB shares, so the affected access path must use a file interface. Tape Gateway exposes virtual tape drives and a media changer over iSCSI to backup software.
+Key point: Match the device semantics as well as the protocol: an iSCSI volume and an iSCSI tape device serve different workflows. Interface continuity alone says nothing about whether all primary data is local or how recovery will run.
+Watch out: Do not rank infrastructure change from protocol names alone. Check deployment, data movement, application access changes, and backup-software integration for the actual environment.
+A_ZH:
+答：Volume Gateway通过iSCSI提供卷，可以保留块访问协议，但仍需部署网关并完成存储配置或迁移。S3 File Gateway提供NFS/SMB共享，因此相关访问路径必须使用文件接口。Tape Gateway通过iSCSI向备份软件提供虚拟磁带驱动器和介质转换器。
+考点：既要匹配协议，也要匹配设备语义：iSCSI卷与iSCSI磁带设备服务于不同流程。仅仅保留接口，不能说明全部主数据是否在本地，也不能说明灾后如何恢复。
+易错提醒：不要仅凭协议名称判断基础设施改动大小。应结合实际环境核对部署、数据迁移、应用访问调整和备份软件集成。
+SOURCE: https://docs.aws.amazon.com/storagegateway/latest/vgw/StorageGatewayConcepts.html
+
+## aws-rb2-20261103-b01-recover-file-access | d2
+TOPIC: Recovering usable files / 恢复可用文件访问
+Q:
+After losing an on-premises server, how do you rebuild file access from a gateway volume snapshot, S3 objects, or a tape backup? What checks prevent an incomplete recovery plan?
+Q_ZH:
+本地服务器丢失后，怎样分别从网关卷快照、S3对象或磁带备份重建文件访问？哪些检查可以避免恢复方案不完整？
+A:
+Answer: For a supported volume snapshot, create an EBS volume in the EC2 instance's Availability Zone, attach it, inspect its existing filesystem, and mount it appropriately. For S3 objects, use a suitable object or file interface, such as S3 File Gateway's NFS/SMB shares. For tape, plan a backup-software restore and retrieve archived tapes before reading them; validate the software and format for the intended EC2 destination.
+Key point: A snapshot recreates a captured point in time. Attaching recovered storage and making its files usable are separate steps; recreating a filesystem over an existing one overwrites data.
+Watch out: A bucket is not an attachable EBS block volume, although suitable tools can provide file access to S3. Under the supplied gateway quota documentation, a cached-volume snapshot larger than 16 TiB can restore to Storage Gateway but not EBS. None of these paths establishes zero RPO/RTO.
+A_ZH:
+答：对于受支持的卷快照，在EC2实例所在可用区创建EBS卷，附加后检查已有文件系统，再适当挂载。对于S3对象，使用合适的对象或文件接口，例如S3 File Gateway的NFS/SMB共享。对于磁带，规划备份软件恢复流程，并在读取归档磁带前先取回；还需验证软件及格式是否支持目标EC2环境。
+考点：快照重建的是已捕获的时间点。附加恢复后的存储与让其中的文件可用是不同步骤；在已有文件系统上重新创建文件系统会覆盖数据。
+易错提醒：桶不是可直接附加的EBS块卷，但适当工具可以提供S3文件访问。按所给网关配额文档，大于16 TiB的cached volume快照可恢复到Storage Gateway，却不能恢复为EBS。这些路径都不能证明RPO/RTO为零。
+SOURCE: https://docs.aws.amazon.com/storagegateway/latest/vgw/StorageGatewayConcepts.html
+
+## aws-rb2-20261103-b01-local-storage-dr-design | d3
+TOPIC: Local storage disaster recovery / 本地存储灾难恢复
+Q:
+A new design has one 12 TiB file volume on an on-premises server using iSCSI. It must keep the whole dataset local during normal operation, minimize storage-interface changes, and recover files on EC2 after a site loss. Migration is allowed, and nonzero RPO/RTO are acceptable. Propose a gateway design and recovery sequence, and explain the main tradeoffs.
+Q_ZH:
+一个新设计包含本地服务器上的单个12 TiB文件卷，使用iSCSI。正常运行时必须将整个数据集保留在本地，尽量减少存储接口改动，并能在站点丢失后于EC2恢复文件。允许迁移，也接受非零RPO/RTO。请提出网关设计、恢复顺序并解释主要取舍。
+A:
+Answer: Use a stored volume: 12 TiB fits its 16 TiB per-volume limit. Deploy the gateway, provision local storage, and migrate or configure the data for iSCSI access. Keep the full dataset local while backing it up asynchronously and scheduling snapshots. After a site loss, create an EBS volume from a completed snapshot in the recovery instance's Availability Zone, attach it, inspect the filesystem, and mount it.
+Key point: This recommendation combines full local data residency, compatible block access, a valid single-volume size, and a documented snapshot-to-EBS path. Cached designs cannot guarantee that every file is local when the cache holds only part of the dataset; tape requires a backup restore workflow.
+Watch out: The accepted recovery point depends on the completed snapshot. Deployment, data recovery, and mounting take steps; this design does not promise uninterrupted access, zero latency, or zero RPO/RTO.
+A_ZH:
+答：使用stored volume：12 TiB符合其16 TiB单卷上限。部署网关、配置本地存储，并迁移或配置数据以供iSCSI访问。完整数据集保留在本地，同时异步备份并安排快照。站点丢失后，使用已完成的快照，在恢复实例所在可用区创建EBS卷，附加后检查文件系统并挂载。
+考点：这个建议同时满足完整本地数据驻留、兼容的块访问、有效的单卷容量，以及有文档支持的快照转EBS路径。当缓存只容纳部分数据集时，缓存方案无法保证每个文件都在本地；磁带则需要备份恢复流程。
+易错提醒：可接受的恢复点取决于已完成的快照。部署、数据恢复和挂载都需要步骤；此设计不承诺访问永不中断、零延迟或零RPO/RTO。
+SOURCE: https://docs.aws.amazon.com/storagegateway/latest/vgw/StorageGatewayConcepts.html
+
+## aws-rb2-20261103-b01-cross-account-efs-checks | d2
+TOPIC: Cross-account EFS access / 跨账户EFS访问
+Q:
+A Lambda function in one account must read an EFS filesystem owned by another account. What should you check separately before treating a VPC peering connection as a working solution?
+Q_ZH:
+一个账户中的Lambda函数需要读取另一个账户拥有的EFS文件系统。在把VPC对等连接视为可用方案之前，应分别检查哪些事项？
+A:
+Answer: Check peering feasibility, non-overlapping address ranges, routes, and mount-target resolution. Verify mount targets for the function's Availability Zones, the EFS access point, and allowed TCP 2049 traffic from the function to the targets. Then inspect EFS authorization: without a user-configured filesystem policy, the default permits clients that can connect through a mount target. For IAM-controlled cross-account access, check the execution role's permissions and a filesystem resource policy admitting the consuming role or account. Read-only access needs ClientMount; add ClientWrite when writes are required.
+Key point: Reachability, mount configuration, and authorization are separate checks. The function's execution role also needs VPC connection permissions; the person configuring the function needs DescribeMountTargets to verify mount targets.
+Watch out: Peering alone grants no file authorization. Do not turn the default-policy case into a rule requiring explicit policies on both sides in every deployment, or assume an identity-policy allow alone establishes IAM-controlled cross-account access. Verify the exact cross-account Lambda configuration before deployment.
+A_ZH:
+答：检查对等连接是否可行、地址范围是否重叠、路由及挂载目标解析。核对函数所用可用区的挂载目标、EFS访问点，以及从函数到目标的TCP 2049流量是否获准。随后检查EFS授权：没有用户配置的文件系统策略时，默认策略允许能够经挂载目标连接的客户端访问。对于IAM受控的跨账户访问，应检查执行角色权限，以及允许消费方角色或账户的文件系统资源策略。只读访问需要ClientMount；需要写入时再增加ClientWrite。
+考点：网络可达性、挂载配置和授权是三项独立检查。函数执行角色还需要VPC连接权限；配置函数的人需要DescribeMountTargets权限来验证挂载目标。
+易错提醒：对等连接本身不授予文件访问权限。不要把默认策略场景写成每次部署都必须显式创建双边策略，也不要认为仅有身份策略允许就证明IAM受控的跨账户访问成立。部署前还须验证准确的跨账户Lambda配置方式。
+SOURCE: https://docs.aws.amazon.com/lambda/latest/dg/configuration-filesystem-efs.html
+
+## aws-rb2-20261103-b01-layers-are-deployment-assets | d2
+TOPIC: Layers and shared files / 层与共享文件
+Q:
+Can a Lambda layer replace a shared filesystem whose files keep growing? Explain the size, update, and cross-account permission boundaries.
+Q_ZH:
+Lambda层能否替代文件持续增长的共享文件系统？请说明容量、更新与跨账户授权边界。
+A:
+Answer: A layer packages supplementary code or data as a deployment archive. Functions use a selected layer version rather than continuously reading a shared filesystem. The function and all its layers together must stay within the 250 MB unzipped quota. To share a version across accounts, grant GetLayerVersion access to the account whose function will actually consume it.
+Key point: Treat a content update as a versioned deployment change: publish a new layer version and configure consumers to use it. Cross-account permission applies to an individual version and must be set again for a new version.
+Watch out: The 250 MB limit is shared by the function and every attached layer. Granting access to the data owner's account does not authorize a consuming function in a different account.
+A_ZH:
+答：层把附加代码或数据打包为部署归档。函数使用选定的层版本，而不是持续读取一个共享文件系统。函数与其全部层解压后的总大小必须符合250 MB配额。跨账户共享某个版本时，应向实际使用该版本的函数所在账户授予GetLayerVersion访问权限。
+考点：应把内容更新当作版本化部署变更：发布新的层版本，并配置消费函数使用它。跨账户权限只针对单个版本，新版本需要重新设置授权。
+易错提醒：250 MB限制由函数和所有附加层共同占用。向数据拥有方账户授权，并不能授权另一个账户中的消费函数。
+SOURCE: https://docs.aws.amazon.com/lambda/latest/dg/chapter-layers.html
+
+## aws-rb2-20261103-b01-efs-path-cost-comparison | d2
+TOPIC: File visibility and cost drivers / 文件可见性与成本因素
+Q:
+Assume direct EFS access, a DataSync-maintained EFS replica, and a Lambda file-service proxy can all be deployed. How should you compare new-file visibility, growth, and cost?
+Q_ZH:
+假设直接访问EFS、由DataSync维护EFS副本，以及Lambda文件服务代理这三种方案都可部署。应怎样比较新增文件可见性、增长与成本？
+A:
+Answer: Direct access reads the same shared EFS without a separate copy cycle. A replica receives changes through transfer tasks, so visibility depends on their execution and completion. A proxy can read the source on demand if designed that way, but the caller receives its service results rather than an EFS mount. EFS provides elastic shared storage; a replica also needs continued transfers as source files grow.
+Key point: Count EFS storage and applicable throughput or access charges. Direct peered access can incur inter-VPC transfer charges. A replica adds destination storage and DataSync transfer charges. A second Lambda adds requests and memory-weighted runtime; count other applicable transfer charges too.
+Watch out: A scheduled replica is not a continuously shared view. A proxy's freshness depends on its implementation. Compare measured traffic, storage, synchronization, and runtime; these cost dimensions do not establish one universally cheapest path.
+A_ZH:
+答：直接访问读取同一个共享EFS，无需额外复制周期。副本通过传输任务接收变更，因此可见性取决于任务的执行和完成。代理若按此设计，可以按需读取源文件，但调用方获得的是服务结果，而不是EFS挂载。EFS提供弹性共享存储；源文件增长时，副本还需要持续传输更新。
+考点：应核算EFS存储及适用的吞吐或访问费用。通过对等连接直接访问可能产生跨VPC传输费用。副本增加目标存储与DataSync传输费用。第二个Lambda增加请求数和按内存计量的运行时长费用，也应计入其他适用的传输费用。
+易错提醒：定时更新的副本不是持续共享的同一视图。代理的数据新鲜度取决于实现。应比较实际流量、存储、同步和运行时长；这些计费维度不能证明某条路径永远最便宜。
+SOURCE: https://docs.aws.amazon.com/efs/latest/ug/how-it-works.html
+
+## aws-rb2-20261103-b01-shared-efs-access-design | d3
+TOPIC: Choosing a shared-file access path / 选择共享文件访问路径
+Q:
+A Lambda reader must use another account's growing EFS dataset without waiting for scheduled copies. Peering and appropriate authorization are feasible, and no independent replica or extra file processing is needed. Which access path should you assess first, what must be checked, and how would you justify the cost decision?
+Q_ZH:
+一个Lambda读取函数需要使用另一账户中持续增长的EFS数据集，不能等待定时复制。对等连接与适当授权均可实现，也不需要独立副本或额外文件处理。应优先评估哪条访问路径、检查什么，并怎样论证成本选择？
+A:
+Answer: Assess direct access to the existing EFS first. Verify routes and target resolution, TCP 2049, mount targets for the function's Availability Zones, the access point, and the applicable read-only authorization mode. This reads the shared source without a replica synchronization cycle. Compared with a replica it avoids duplicate storage and synchronization work; compared with a proxy it avoids an additional function service. Validate that advantage against actual EFS and inter-VPC transfer charges.
+Key point: The recommendation follows from this workload's need for a shared source and its lack of a replica or processing requirement. EFS supplies elastic shared storage; neither copying files nor adding a proxy is required merely to expose that source to another authorized reader.
+Watch out: Peering is only part of the solution. If connectivity or authorization is infeasible, or a replica or processing service is actually required, reassess the design. Direct access is not guaranteed to have the lowest total cost for every workload.
+A_ZH:
+答：优先评估直接访问现有EFS。核对路由与目标解析、TCP 2049、函数所用可用区的挂载目标、访问点，以及适用的只读授权模式。此路径读取共享源文件，无需等待副本同步周期。相较副本，它避免重复存储与同步工作；相较代理，它避免增加一个函数服务。仍需结合实际EFS和跨VPC传输费用验证这种优势。
+考点：该建议来自本场景对共享源数据的需求，以及不需要副本或额外处理这一前提。EFS提供弹性共享存储；仅仅为了让另一个已获授权的读取方访问源数据，并不必然需要复制文件或增加代理。
+易错提醒：对等连接只是方案的一部分。如果连通性或授权无法实现，或者实际需要副本或处理服务，就应重新评估设计。直接访问并不保证对每一种工作负载的总成本都最低。
+SOURCE: https://docs.aws.amazon.com/lambda/latest/dg/configuration-filesystem-efs.html

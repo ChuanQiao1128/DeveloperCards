@@ -1,0 +1,227 @@
+{
+  "status": "REVISE",
+  "reviewedAtUtc": "2026-11-05T20:19:01.597084+00:00",
+  "inputHashes": {
+    "/Users/qc/Desktop/DeveloperCards/plans/2026-11-06-aws-domain1-compression-merge-plan.md": "bf05fef339bc57d2a3e71d3a3d88dda887f256053228cb62ceb41198e033a9f5",
+    "/Users/qc/Desktop/DeveloperCards/plans/2026-11-06-aws-domain1-compression-merge-plan.baseline.json": "50bd4563ed8ab077f4eb4f3bf51abcc34037adf7d3f1bcbb1d1a9eaf3b3a1e1e",
+    "/Users/qc/.local/share/codex-workflows/recallsmith/aws-basics-bilingual-rag-release-20261028/runtime/full-card-rebuild-v2-20261102/domain1-final-card-catalog-20261105/current-artifacts.json": "3d71a6ca79316d7e8cffe809c7a035810c8a3f534cd2e7c4382f86cab552fcd1",
+    "/Users/qc/.local/share/codex-workflows/recallsmith/aws-basics-bilingual-rag-release-20261028/runtime/full-card-rebuild-v2-20261102/domain1-final-card-catalog-20261105/acceptance.json": "1c87e299339a1f203d9e9b694a8aa07af8d51524699ca42d171e7aaecc8a12ce",
+    "/Users/qc/.local/share/codex-workflows/recallsmith/aws-basics-bilingual-rag-release-20261028/runtime/full-card-rebuild-v2-20261102/domain1-final-card-catalog-20261105/deliverables/catalogue.final.json": "9000a20db3a759006d5854d6f1574dd895c25a1a1b9d54b8cb676f85a6895b34",
+    "/Users/qc/.local/share/codex-workflows/recallsmith/aws-basics-bilingual-rag-release-20261028/runtime/full-card-rebuild-v2-20261102/domain1-final-card-catalog-20261105/deliverables/question-support.final.json": "1a408ed9eee2e58541c5d10a4dddd11064587cab08798fdf8e102d5e5f239b43",
+    "/Users/qc/.local/share/codex-workflows/recallsmith/aws-basics-bilingual-rag-release-20261028/runtime/full-card-rebuild-v2-20261102/domain1-final-card-catalog-20261105/deliverables/bidirectional-index.final.json": "3acd6d5ea5153cae8c1c373392a83bc911c7568630a120fe68afa9152fb7e31d",
+    "/Users/qc/.local/share/codex-workflows/recallsmith/aws-basics-bilingual-rag-release-20261028/runtime/full-card-rebuild-v2-20261102/domain1-final-card-catalog-20261105/deliverables/card-review-bindings.final.json": "e1399d4e318f4c0917c3da18a1442a61916bdfc8ebf9f98dfd79c407cdd56a56",
+    "/Users/qc/.local/share/codex-workflows/recallsmith/aws-basics-bilingual-rag-release-20261028/runtime/full-card-rebuild-v2-20261102/domain1-final-card-catalog-20261105/assemble.py": "fba697979e2c4343dea46359b475960b46d28430243fb6e6586bad9210b92fb2",
+    "/Users/qc/.local/share/codex-workflows/recallsmith/aws-basics-bilingual-rag-release-20261028/runtime/full-card-rebuild-v2-20261102/domain1-final-card-catalog-20261105/finalize.py": "3dd3ed3e15ffe6e46ce029cb7b0663c44fbd417209ff2b8854ea4f6d7e755bf7"
+  },
+  "summary": "执行顺序、有限修复、差异回测与回滚门禁可用；首批数字和依赖闭包一致。需3处小修：M02的DynamoDB去向与输出数量、全库约300张且四域共享的产品目标、旧脚本在新压缩目录的最小输出适配边界。无需制卡或扩大研究。",
+  "issues": [
+    {
+      "id": "CPR-001",
+      "priority": "P2",
+      "location": "计划第3节首批M02；baseline.firstPriorityGroups[M02].proposedOutputCards",
+      "problem": "M02声明CB07与CB08合为1张S3访问位置辨析卡，同时要求“DynamoDB适用范围单独保留”，但没有说明保留在同一新正文还是另一个可见条目。197版中，CB07是唯一在可见正文中教授DynamoDB端点适用范围的卡；Q176、Q223、Q562的现行条件支撑依赖其同Region gateway endpoint及路由表判断。现阶段没有发生删卡回归，但执行时两种解释会产生不同的净减数或知识去向。",
+      "minimalCorrection": "在M02一行明确二选一：若维持1张输出，将DynamoDB同Region gateway endpoint及调用子网路由表的必要分支纳入同一主要判断，并明确S3机房interface结论不推广到DynamoDB；若需要单独保留可见卡，则把该卡计入M02输出，M02暂不净减1，192只保留为所有组确实各输出1张时的纯算术情景。无需新增台账或补做事实研究。",
+      "validationAfterCorrection": "核对M02完整旧判断去向及实际输出数；执行阶段按计划用最终可见卡组回测Q176/Q223/Q562及其余既定受影响题。"
+    },
+    {
+      "id": "CPR-002",
+      "priority": "P2",
+      "location": "计划开头目标段及第6节数量说明",
+      "problem": "计划未重申全库约300张仍是产品目标以及四领域共享同一正文。当前不承诺100/150等压缩数字本身合理，但不应让“最终数量由通过的合并决定”取代既有全库总复习负担目标或形成领域1独立卡数目标。",
+      "minimalCorrection": "开头补一句：全库约300张核心短卡仍是产品目标，四领域共享卡；本次压缩领域1目录不设领域1硬配额，最终全库数量及覆盖能力仍待验证。",
+      "validationAfterCorrection": "只核计划目标口径；不据此改变197基线、62正式库存或强制合并。"
+    },
+    {
+      "id": "CPR-003",
+      "priority": "P2",
+      "location": "计划第5节沿用现有校验/导出能力；旧assemble.py与finalize.py",
+      "problem": "只读核对确认旧assemble.py以脚本目录为S并写catalogue.current.json等当前输出；finalize.py固定assert数量197、绑定旧backtest-input/catalogue.v4.json并写旧deliverables与197报告路径。计划虽要求另存候选和保护基线，但“只做必要的旧→新映射适配”没有明确这些旧入口不能原样重跑，否则会重建旧作者集合、拒绝新数量或覆盖已验收输出。",
+      "minimalCorrection": "在第5节明确：旧阶段assemble.py/finalize.py不可在原197目录原样重跑；执行时仅在新的压缩目录，以已验收197最终目录为只读基线，对实际计数、旧→新映射/冻结输入绑定和输出路径做必要最小参数适配，报告同样写新路径。当前仅记录该执行前置，不改工具、不增框架。",
+      "validationAfterCorrection": "执行前核输出均指向新压缩目录、计数来自实际存活正文、旧基线哈希保持；本轮仅审计划，不运行旧脚本。",
+      "evidenceLocations": {
+        "assemble.py": [
+          5,
+          16,
+          112,
+          113,
+          117
+        ],
+        "finalize.py": [
+          8,
+          10,
+          11,
+          47,
+          49,
+          50,
+          51,
+          183,
+          184,
+          185,
+          189
+        ]
+      }
+    }
+  ],
+  "checks": {
+    "compressionMeansFewerRecallTasksRatherThanLongerCards": {
+      "status": "PASS",
+      "basis": "第2、4节约束一个主要判断及原因，禁止独立配置堆叠与未教知识转题解；候选失败保留原卡。此结论仅为计划门禁成立，未验收任何合并正文。"
+    },
+    "all197DispositionBeforeBatchExecution": {
+      "status": "PASS",
+      "basis": "第3节先一次扫描197旧ID并给全目录去向，再实施首批；首5组不是全量终点。"
+    },
+    "longTailAndCoreCountTransparent": {
+      "status": "PASS",
+      "basis": "低频不直接删除，附录去向与不再声称的覆盖必须明记，禁止隐藏补充卡降低数量。"
+    },
+    "crossGroupNoDoubleReduction": {
+      "status": "PASS",
+      "firstGroupMemberCount": 10,
+      "duplicateFirstGroupMembers": [],
+      "basis": "当前5组成员互不重叠；计划要求后续交叉成员归一化，最终按实际存活正文计数。"
+    },
+    "baselineScopeAndBoundaries": {
+      "status": "PASS",
+      "cards": 197,
+      "questions": 371,
+      "verdicts": {
+        "SUPPORTED": 280,
+        "CONDITIONAL": 57,
+        "SOURCE_ISSUE": 34
+      },
+      "formalInventory": 62,
+      "basis": "6份基线文件实算哈希均与快照相符；337直接/条件和34题源疑点分别保留，不把模型回测当学习者效果。"
+    },
+    "cc12Q679RegressionProtection": {
+      "status": "PASS",
+      "basis": "计划显式要求保留Lock保留与Lifecycle期后清理分工，并仅在Q679通过后替换CC12；现行Q679确实使用CC11/CC12/CC13并记录恢复CC12的定向回测。"
+    },
+    "affectedOnlySemanticRetestAndUnchangedEvidenceReuse": {
+      "status": "PASS",
+      "basis": "按改删卡及递归先修后继取题、等跨组依赖齐备后去重回测；只重审新正文与失效依据，完整371条最终机械回读。"
+    },
+    "boundedRepairAndRollback": {
+      "status": "PASS",
+      "basis": "单组最多一次定向修复，仍失败保留原卡；允许已通过组继续收尾，禁止无限研究。"
+    },
+    "timeAndQuantityAreEstimates": {
+      "status": "PASS",
+      "basis": "192明确为五组均2变1时的算术情景；60–90分钟为待实测修正的暂排程，无已证提速或最终数量声明。"
+    },
+    "planningOnlyNoBaselineOrFormalInventoryMutation": {
+      "status": "PASS",
+      "basis": "计划明示保留197版、正式62库存与源输入；本审查仅新写review.json。"
+    },
+    "globalProductTargetAndSharedFourDomainCount": {
+      "status": "REVISE",
+      "issueId": "CPR-002"
+    },
+    "existingToolReuseSafeOutputBoundary": {
+      "status": "REVISE",
+      "issueId": "CPR-003",
+      "scriptsExecuted": false
+    }
+  },
+  "firstPriorityGroupChecks": [
+    {
+      "groupId": "M01",
+      "memberIds": [
+        "NC08",
+        "NC09"
+      ],
+      "memberSnapshotMatchesCurrentCatalogue": true,
+      "directQuestionCount": 3,
+      "affectedQuestionCountIncludingRecursivePrerequisites": 3,
+      "dependencyCardIds": [],
+      "questionListsMatchBaselineSnapshot": true
+    },
+    {
+      "groupId": "M02",
+      "memberIds": [
+        "CB07",
+        "CB08"
+      ],
+      "memberSnapshotMatchesCurrentCatalogue": true,
+      "directQuestionCount": 23,
+      "affectedQuestionCountIncludingRecursivePrerequisites": 23,
+      "dependencyCardIds": [],
+      "questionListsMatchBaselineSnapshot": true
+    },
+    {
+      "groupId": "M03",
+      "memberIds": [
+        "NC14",
+        "aws-rb2-domain1-normal-batch07-20261105-s3-default-versus-existing-copy"
+      ],
+      "memberSnapshotMatchesCurrentCatalogue": true,
+      "directQuestionCount": 4,
+      "affectedQuestionCountIncludingRecursivePrerequisites": 4,
+      "dependencyCardIds": [],
+      "questionListsMatchBaselineSnapshot": true
+    },
+    {
+      "groupId": "M04",
+      "memberIds": [
+        "CB09",
+        "XB015"
+      ],
+      "memberSnapshotMatchesCurrentCatalogue": true,
+      "directQuestionCount": 8,
+      "affectedQuestionCountIncludingRecursivePrerequisites": 14,
+      "dependencyCardIds": [
+        "XA053",
+        "XB020",
+        "XB025",
+        "XB038",
+        "XR104"
+      ],
+      "questionListsMatchBaselineSnapshot": true
+    },
+    {
+      "groupId": "M05",
+      "memberIds": [
+        "CA04",
+        "CA05"
+      ],
+      "memberSnapshotMatchesCurrentCatalogue": true,
+      "directQuestionCount": 11,
+      "affectedQuestionCountIncludingRecursivePrerequisites": 17,
+      "dependencyCardIds": [
+        "XA019",
+        "XA025",
+        "XA032",
+        "XA037"
+      ],
+      "questionListsMatchBaselineSnapshot": true
+    }
+  ],
+  "firstPriorityTotals": {
+    "uniqueOldMembers": 10,
+    "groups": 5,
+    "sumOfPerGroupAffectedCounts": 61,
+    "uniqueAffectedQuestions": 58,
+    "overlap": {
+      "M02_M04": [
+        208,
+        667,
+        998
+      ]
+    },
+    "arithmeticReductionIfExactlyOneOutputPerGroup": 5,
+    "arithmeticCountIfExactlyOneOutputPerGroup": 192,
+    "acceptedMergedCardCount": 0
+  },
+  "actualScope": {
+    "read": "两份计划输入及其列明的6份基线产物；仅对首5组、可见DynamoDB端点教学、CC12/Q679做定向内容核对。 按补充审查要求，只读assemble.py/finalize.py的输入、计数与输出路径相关代码。",
+    "mechanicalChecks": "6份基线哈希、197/371及三类状态、73/30/83/11用途统计、首批成员快照、递归先修闭包、重叠与58题并集。",
+    "notChecked": "未重新审核197张全部AWS事实或全部教学质量，未重做371题语义判题，未读取全部官方来源，未构造合并正文，未测学习者记忆或正确率，未证明最终卡数或工期。 未执行或改造旧assemble.py/finalize.py。",
+    "mutations": [
+      "本review.json"
+    ],
+    "modelCliApiCalls": 0,
+    "agentsSpawned": 0,
+    "published": false,
+    "catalogueOrFormalInventoryChanged": false
+  }
+}

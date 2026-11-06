@@ -1,0 +1,181 @@
+# 10张AWS双语卡片
+
+## 1．Security group connection state · Easy
+
+**问：** EC2实例的安全组允许客户端的入站HTTPS请求，但没有出站规则。该请求的响应能否通过安全组返回？适用边界是什么？
+
+**答：** 可以。已获准入站请求的响应可以离开实例，不受出站安全组规则限制。这项许可覆盖的是响应；实例另行发起的新连接仍需要出站许可。
+
+**考点：** 安全组会保存连接状态，因此已获准入站请求的返回流量不需要对应的出站允许规则。
+
+**易错提醒：** 响应与新的出站请求是两种情况。允许响应返回，并不代表实例可以任意发起出站访问。
+
+**Question：** An EC2 instance's security group allows a client's inbound HTTPS request but has no outbound rules. Can the response to that request pass the security group? Explain the boundary.
+
+**Answer：** Yes. The response to the allowed inbound request can leave the instance regardless of outbound security group rules. This permission covers the response; a separate connection initiated by the instance still needs outbound permission.
+
+**Key point：** Security groups retain connection state, so return traffic for an allowed inbound request does not need a matching outbound allow rule.
+
+**Watch out：** A response and a new outbound request are different cases. Allowing the former does not give the instance unrestricted outbound access.
+
+## 2．Combined security group permissions · Rare
+
+**问：** EC2实例关联两个安全组：一个仅允许ALB安全组来源访问Web端口，另一个仍允许任意IPv4来源访问同一端口。这样是否实现了只允许ALB？如果没有，必须改变什么？
+
+**答：** 没有。宽泛的允许规则仍会放行其他IPv4来源。应删除或收紧该许可，或解除提供该许可的安全组关联，同时在实际关联实例的安全组中保留所需的ALB来源许可。
+
+**考点：** 所有关联安全组的规则会合并成一套许可。安全组只有允许规则，没有拒绝规则，因此较窄的规则不能抵消另一个安全组的宽泛许可。
+
+**易错提醒：** 新建限制性安全组后，必须关联实例才会对该实例生效；关联后也不会覆盖已有许可。
+
+**Question：** An EC2 instance has two associated security groups. One allows its web port only from the ALB's security group; the other allows the same port from any IPv4 source. Does this restrict access to the ALB? If not, what must change?
+
+**Answer：** No. The broad allow rule still permits other IPv4 sources. Remove or narrow that permission, or disassociate the group that supplies it, while retaining the intended ALB-source permission on a security group associated with the instance.
+
+**Key point：** Rules from all associated security groups are aggregated into one set of permissions. Security groups have allow rules rather than deny rules, so a narrower rule cannot cancel another group's broader allowance.
+
+**Watch out：** Creating a restrictive security group has no effect on this instance until it is associated with the instance. Associating it also does not override existing permissions.
+
+## 3．ALB target source restriction · Rare
+
+**问：** ALB跨公有子网部署，向同一VPC私有子网中的EC2实例转发Web流量。实例的该Web入站流量只能来自ALB，须排除实例子网内外的其他来源。应在哪里实施来源限制？为什么改路由或放宽ALB入站规则不能提供这项限制？
+
+**答：** 在实际关联目标EC2实例的安全组中，为所需Web协议和端口设置入站允许规则，来源填写ALB的安全组。该来源安全组应专用于此ALB，并移除其他允许额外来源访问同一端口的许可。路由、公有寻址以及允许访问ALB的规则，都不能代替目标侧的来源规则。
+
+**考点：** 目标安全组决定哪些来源可以访问目标。引用负载均衡器安全组才能表达所需的来源限制；仅处于私有子网，并没有表达这条规则。
+
+**易错提醒：** 安全组引用按被引用组的关联资源生效。如果把ALB的来源安全组共享给其他发送资源，就会扩大获准来源集合；该引用并不是ALB身份的排他性证明。
+
+**Question：** An ALB spans public subnets and forwards web traffic to EC2 instances in a private subnet of the same VPC. The instances must accept that web traffic only from the ALB, excluding other sources both inside and outside their subnet. Where should the source restriction be enforced, and why would changing routes or loosening the ALB's inbound rules not supply it?
+
+**Answer：** In the security groups associated with the target EC2 instances, allow the required web protocol and port with the ALB's security group as the source. Use a source group dedicated to that ALB, and remove other permissions that admit additional sources to the same port. Routes, public addressing, and permissions to reach the ALB do not replace this target-side source rule.
+
+**Key point：** The target's security group decides which sources may reach the target. Referencing the load balancer's group expresses the intended source restriction; membership of the private subnet alone does not express that rule.
+
+**Watch out：** A security group reference applies to resources associated with the referenced group. Sharing the ALB's source group with other sending resources broadens the permitted source set; the reference is not exclusive proof of ALB identity.
+
+## 4．Network ACL response ports · Rare
+
+**问：** 互联网客户端使用临时端口52000连接EC2 Web服务器的TCP 443端口。请求已到达服务器，但子网网络ACL的出站规则只允许目的端口443，其余拒绝。响应为什么可能失败？应增加什么出站许可来支持这条连接？
+
+**答：** 响应的目的端口是客户端的52000，因此出站目的端口443规则无法放行它。应在会匹配的拒绝规则之前，允许出站目的端口52000，或包含该端口且适合实际客户端的端口范围。
+
+**考点：** 网络ACL无状态：允许请求不会自动允许响应。临时端口由客户端选择，因此返回规则必须覆盖该目的端口。ACL遇到第一条匹配规则后就停止继续评估。
+
+**易错提醒：** 示例范围32768–65535并不通用。不同客户端操作系统使用的范围不同，允许范围必须适合实际服务的客户端。
+
+**Question：** An internet client uses ephemeral port 52000 to connect to an EC2 web server on TCP port 443. The request reaches the server, but the subnet's network ACL permits outbound traffic only to destination port 443 and denies the rest. Why can the response fail, and what outbound permission would address this connection?
+
+**Answer：** The response is destined for the client's port 52000, so an outbound destination-port-443 rule does not permit it. Allow outbound traffic to destination port 52000, or a suitable client port range containing it, before a matching deny rule.
+
+**Key point：** Network ACLs are stateless: allowing a request does not automatically allow its response. The client chooses its ephemeral port, so the return rule must cover that destination port. ACL evaluation stops at the first matching rule.
+
+**Watch out：** The example range 32768–65535 is not universal. Client operating systems use different ranges; the allowed range must fit the clients being served.
+
+## 5．HTTPS request and response path · Legend
+
+**问：** EC2 Web服务器位于公有子网，已有Elastic IP、有效互联网路由，并监听TCP 443。实例当前关联默认安全组，子网默认网络ACL已被改为拒绝全部流量。本场景所有客户端均使用1024–65535临时端口。如何通过安全组和网络ACL允许任意IPv4来源的HTTPS访问及其响应？
+
+**答：** 在实际关联实例的安全组中，允许任意IPv4来源入站TCP 443；可以修改当前组，也可以创建并关联另一个组。在子网ACL中，允许任意IPv4来源入站TCP 443，并允许向任意IPv4目的地址出站至目的端口1024–65535，且这些规则应先于会匹配的拒绝规则生效。安全组会自动允许已获准入站请求的响应。
+
+**考点：** 关联的安全组在实例侧允许请求，并跟踪其响应。子网ACL不保存连接状态，会分别评估两个方向的流量，因此必须分别允许服务器监听端口和客户端返回端口。
+
+**易错提醒：** 只创建安全组而不关联实例，不会改变该实例的许可。ACL仅允许出站目的端口443，也不能覆盖发往客户端临时端口的响应。
+
+**Question：** An EC2 web server is in a public subnet with an Elastic IP address, a working internet route, and a listener on TCP 443. It currently uses the default security group, and the subnet's default network ACL has been changed to deny all traffic. All clients in scope use ephemeral ports 1024–65535. Using security groups and the network ACL, how would you permit HTTPS access from any IPv4 source and its responses?
+
+**Answer：** Allow inbound TCP 443 from any IPv4 source in a security group actually associated with the instance. You may update the current group or create and associate another group. In the subnet ACL, allow inbound TCP 443 from any IPv4 source and outbound traffic to destination ports 1024–65535 for any IPv4 destination, with these rules preceding matching denies. The security group automatically permits responses to the allowed inbound requests.
+
+**Key point：** The associated security group admits the request at the instance and tracks its response. The subnet ACL evaluates traffic in both directions without connection state, so it needs separate permissions for the server's listening port and the clients' return ports.
+
+**Watch out：** Creating a security group without associating it does not change this instance's permissions. Allowing outbound port 443 in the ACL also does not cover responses destined for client ephemeral ports.
+
+## 6．DynamoDB gateway endpoint routing · Easy
+
+**问：** VPC中的EC2实例需要调用DynamoDB，调用流量不得经过互联网。采用DynamoDB网关端点时，端点与实例所在子网的路由表应如何配合？
+
+**答：** 创建DynamoDB网关端点，并选择实例所在子网实际使用的路由表。每张所选路由表都会自动增加一条路由：目的地为AWS拥有的DynamoDB服务前缀列表，目标为网关端点。该访问路径不需要互联网网关或NAT设备。
+
+**考点：** 服务前缀列表标识目的服务流量，路由则把该流量送往网关端点。选择实例子网的路由表，才能让端点参与这些实例实际使用的路由判断。
+
+**易错提醒：** 使用服务的公共端点，本身并不代表流量经过互联网：网关端点访问仍使用该公共端点，但不需要互联网网关或NAT。DynamoDB也支持接口端点。
+
+**Question：** EC2 instances in a VPC must call DynamoDB without sending the calls across the internet. Using a DynamoDB gateway endpoint, how should the endpoint and the instances' subnet route tables work together?
+
+**Answer：** Create the DynamoDB gateway endpoint and select the route tables used by the instances' subnets. Each selected table automatically receives a route whose destination is the AWS-owned DynamoDB prefix list and whose target is the gateway endpoint. This provides access without an internet gateway or NAT device.
+
+**Key point：** The service prefix list identifies the destination traffic, and the route sends it to the gateway endpoint. Selecting the subnet's route table connects the endpoint to the routing decision used by those instances.
+
+**Watch out：** Using the service's public endpoint does not by itself mean the traffic traverses the internet: gateway endpoint access uses that public endpoint while avoiding an internet gateway or NAT. DynamoDB also supports interface endpoints.
+
+## 7．Endpoint mechanism and service target · Rare
+
+**问：** 你正在为EC2不经过互联网的DynamoDB调用部署DynamoDB网关端点。同事建议在每个子网手工创建端点ENI和安全组，或改用Amazon EC2接口端点。这两种提议能否代替网关端点的路由表机制？区别在哪里？
+
+**答：** 不能。对于已选定的网关端点，应选择实例子网使用的路由表，由系统自动加入DynamoDB路由。接口端点采用另一种机制：AWS在每个所选子网创建受管理的ENI并分配私有IP，端点安全组允许预期流量；每个AZ最多选择一个子网。Amazon EC2接口端点服务于EC2 API操作，不能代替DynamoDB调用的端点。
+
+**考点：** 网关端点通过路由表条目引导发往目标服务的流量；接口端点通过所选服务的子网ENI建立连接。端点的服务目标取决于被调用服务，调用者运行在EC2上并不意味着应该使用EC2 API端点。
+
+**易错提醒：** DynamoDB同时支持网关端点和接口端点。DynamoDB接口端点是另一种受支持的设计，EC2接口端点不能替代它。
+
+**Question：** You are implementing a DynamoDB gateway endpoint for EC2 calls that must avoid the internet. A colleague proposes manually creating an endpoint ENI and security group in every subnet, or using an Amazon EC2 interface endpoint instead. Can either proposal replace the gateway endpoint's route-table mechanism? Explain the distinction.
+
+**Answer：** No. For the chosen gateway endpoint, select the instances' subnet route tables so the DynamoDB route is added automatically. Interface endpoints use a different mechanism: AWS creates a managed ENI with a private IP in each selected subnet, and an endpoint security group allows the expected traffic. Select at most one subnet per AZ. An Amazon EC2 interface endpoint serves EC2 API actions, not DynamoDB calls.
+
+**Key point：** A gateway endpoint steers service-destination traffic through a route-table entry. An interface endpoint connects through subnet ENIs for the selected service. The service being called determines the endpoint's service target; the fact that the caller runs on EC2 does not make the EC2 API endpoint suitable.
+
+**Watch out：** DynamoDB supports both gateway and interface endpoints. A DynamoDB interface endpoint is a different supported design; an EC2 interface endpoint is not a substitute for it.
+
+## 8．SQS interface endpoint private DNS · Easy
+
+**问：** 私有子网中的EC2实例通过标准区域SQS域名调用HTTPS API，要求不经过互联网或NAT。VPC已启用DNS主机名和DNS解析。采用SQS接口VPC端点时，如何让该域名把调用导向私有地址？
+
+**答：** 在SQS接口端点上启用私有DNS，并继续使用受支持的标准区域SQS HTTPS域名。私有DNS使该服务域名解析到VPC端点。AWS会在所选子网创建端点ENI，并分配这些子网中的私有IP地址。
+
+**考点：** 应用可以继续使用区域服务域名，因为DNS会把它导向端点的私有地址。VPC的DNS主机名和DNS解析功能，是这种私有DNS行为的前提。
+
+**易错提醒：** 私有DNS不支持queue.amazonaws.com等旧版SQS域名。另外，端点ENI获得的是所选子网中的私有IP；把接口端点放在公有子网，本身不会使这些ENI地址变成公有IP。
+
+**Question：** EC2 instances in private subnets call the SQS HTTPS API through a standard regional SQS hostname and must avoid the internet and NAT. VPC DNS hostnames and DNS resolution are already enabled. With an SQS interface VPC endpoint, how does that hostname direct calls to private addresses?
+
+**Answer：** Enable private DNS on the SQS interface endpoint and keep using a supported standard regional SQS HTTPS hostname. Private DNS makes that service hostname resolve to the VPC endpoint. AWS creates endpoint ENIs with private IP addresses from the selected subnets.
+
+**Key point：** The application can retain the regional service hostname because DNS directs it to the endpoint's private addresses. VPC DNS hostnames and resolution are prerequisites for this private DNS behavior.
+
+**Watch out：** Private DNS does not support legacy SQS names such as queue.amazonaws.com. Also, endpoint ENIs receive private IPs from their selected subnets; placing an interface endpoint in a public subnet does not by itself make those ENI addresses public.
+
+## 9．Endpoint policy authorization boundary · Rare
+
+**问：** EC2应用已能通过HTTPS到达SQS接口端点。端点策略允许调用者使用该端点，但身份策略和资源策略都没有授予所需的队列操作权限。仅放宽端点策略，能否补足这项授权？
+
+**答：** 不能。端点策略控制哪些主体可以经端点访问服务，但不会覆盖或替代身份策略及资源策略。所需操作仍须通过这些策略获得授权。
+
+**考点：** 使用网络访问路径的许可与执行服务操作的许可是不同边界。端点策略可以限制端点使用，但不能因此替代服务操作授权。
+
+**易错提醒：** 端点安全组允许HTTPS，只是在网络层放行到端点ENI的流量，并不会补上本场景缺少的队列操作权限。
+
+**Question：** An EC2 application can already reach its SQS interface endpoint over HTTPS. The endpoint policy permits the caller to use the endpoint, but neither an identity-based policy nor a resource-based policy grants the required queue operation. Can broadening the endpoint policy supply that missing authorization?
+
+**Answer：** No. An endpoint policy controls which principals can use the endpoint to access the service; it does not override or replace identity-based or resource-based policies. The required operation still needs authorization through those policies.
+
+**Key point：** Permission to use a network access path and permission to perform a service operation are separate boundaries. An endpoint policy can restrict endpoint use without becoming a substitute source of service authorization.
+
+**Watch out：** An endpoint security group allowing HTTPS only admits network traffic to the endpoint ENI. It does not supply the queue-operation permission missing from this scenario.
+
+## 10．SQS private endpoint path across AZs · Legend
+
+**问：** VPC在两个AZ均有公有和私有子网。私有子网中的EC2应用需要通过私网HTTPS访问SQS，不使用NAT，并要求两个AZ都有端点ENI。应用已有所需队列操作权限；实例出站规则和网络ACL已允许所需流量及响应。VPC已启用DNS主机名和DNS解析，应用使用标准区域SQS域名。采用SQS接口VPC端点时，如何组合子网选择、DNS与端点访问控制？
+
+**答：** 一种有效设计是在每个AZ各选择一个私有子网用于SQS接口端点，由AWS分别创建具有私有IP的端点ENI。启用私有DNS。为端点关联安全组，允许应用EC2的HTTPS入站流量，例如引用应用EC2的安全组作为来源。确保端点策略允许调用者所需的访问，同时保留已有操作权限。若提供相同的私有端点路径和访问控制，选择公有子网也可以。
+
+**考点：** 在每个AZ选择一个子网，才能让两个AZ分别具有端点ENI。私有DNS把区域SQS域名导向端点，端点安全组允许应用流量进入，端点策略则增加访问边界，而不替代已有操作授权。
+
+**易错提醒：** 选择私有子网是示例，并非唯一正确落点：接口端点ENI即使位于公有子网，也使用私有IP。反过来，端点策略允许调用者，也不能弥补安全组阻断所需HTTPS流量的问题。
+
+**Question：** A VPC has public and private subnets in two AZs. EC2 applications in private subnets need private HTTPS access to SQS without NAT, with endpoint ENIs in both AZs. They already have the required queue-operation permissions; instance outbound rules and network ACLs permit the required traffic and responses. VPC DNS hostnames and resolution are enabled, and the applications use the standard regional SQS hostname. Using an SQS interface VPC endpoint, how would you combine subnet selection, DNS, and endpoint access controls?
+
+**Answer：** One valid design is to select one private subnet in each AZ for the SQS interface endpoint; AWS creates a private-IP endpoint ENI in each. Enable private DNS. Associate an endpoint security group that allows inbound HTTPS from the application EC2 instances, for example by referencing their security group. Ensure the endpoint policy permits the caller's required access while retaining the existing operation permissions. Public-subnet placement is also acceptable if it provides the same private endpoint path and access controls.
+
+**Key point：** Selecting a subnet in each AZ places endpoint ENIs in both AZs. Private DNS directs the regional SQS hostname to the endpoint, the endpoint security group admits application traffic, and the endpoint policy adds an access boundary without replacing existing operation authorization.
+
+**Watch out：** Choosing a private subnet is an example, not the only correct placement: interface endpoint ENIs use private IPs even in public subnets. Conversely, an endpoint policy that permits the caller cannot compensate for a security group that blocks the required HTTPS traffic.

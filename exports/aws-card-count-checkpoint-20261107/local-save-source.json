@@ -1,0 +1,6 @@
+{
+  "sourceLocalCommit": "c9cd0b5b4c9306b3369deb564e4cd5146427cee8",
+  "remoteBase": "a4c3dcc17451cf6250bf0b14d6ec310fc0e74576",
+  "method": "Apply AWS progress paths to existing remote main without modifying unrelated app files; local history preserved",
+  "checkpointAlsoSavedLocally": true
+}
