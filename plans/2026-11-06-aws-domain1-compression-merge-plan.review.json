@@ -1,0 +1,217 @@
+{
+  "status": "PASS",
+  "reviewedAtUtc": "2026-11-05T20:20:45.789519+00:00",
+  "reviewRound": 2,
+  "scope": "定向复审修订计划，关闭CPR-001/002/003；不是压缩执行或合并正文验收。",
+  "inputHashes": {
+    "/Users/qc/Desktop/DeveloperCards/plans/2026-11-06-aws-domain1-compression-merge-plan.md": "69b2a2c1729a3ed577bf05c54ad3026442b5b26213f032b7235b983cc7aed292",
+    "/Users/qc/Desktop/DeveloperCards/plans/2026-11-06-aws-domain1-compression-merge-plan.baseline.json": "50bd4563ed8ab077f4eb4f3bf51abcc34037adf7d3f1bcbb1d1a9eaf3b3a1e1e",
+    "/Users/qc/Desktop/DeveloperCards/plans/2026-11-06-aws-domain1-compression-merge-plan.review-r1.json": "71ce1f1f4ed2e60b4a2e2bbe9bc8dff01bee71f936a25595b94a890fe920b0b6"
+  },
+  "previousReview": {
+    "path": "/Users/qc/Desktop/DeveloperCards/plans/2026-11-06-aws-domain1-compression-merge-plan.review-r1.json",
+    "sha256": "71ce1f1f4ed2e60b4a2e2bbe9bc8dff01bee71f936a25595b94a890fe920b0b6",
+    "status": "REVISE",
+    "preservedUnchanged": true
+  },
+  "summary": "三项实质问题均已闭合。M02知识去向与计数分支、全库目标以及新目录工具适配边界已清楚；M04职责范围补充合理。计划审查通过，197基线、62正式库存及最终压缩数量未改变。",
+  "issues": [],
+  "closedIssues": [
+    {
+      "id": "CPR-001",
+      "status": "CLOSED",
+      "resolution": "M02同卡保留原DynamoDB gateway分支，禁止推广S3机房interface结论；不能2→1时按净减0重算。"
+    },
+    {
+      "id": "CPR-002",
+      "status": "CLOSED",
+      "resolution": "开头重申全库约300张、四领域共享且领域1无硬配额。"
+    },
+    {
+      "id": "CPR-003",
+      "status": "CLOSED",
+      "resolution": "禁止原目录原样重跑旧assemble/finalize；新压缩目录进行必要最小计数、映射和输出路径适配，先核哈希与写入位置。"
+    }
+  ],
+  "checks": {
+    "compressionMeansFewerRecallTasksRatherThanLongerCards": {
+      "status": "PASS",
+      "basis": "第2、4节约束一个主要判断及原因，禁止独立配置堆叠与未教知识转题解；候选失败保留原卡。此结论仅为计划门禁成立，未验收任何合并正文。"
+    },
+    "all197DispositionBeforeBatchExecution": {
+      "status": "PASS",
+      "basis": "第3节先一次扫描197旧ID并给全目录去向，再实施首批；首5组不是全量终点。"
+    },
+    "longTailAndCoreCountTransparent": {
+      "status": "PASS",
+      "basis": "低频不直接删除，附录去向与不再声称的覆盖必须明记，禁止隐藏补充卡降低数量。"
+    },
+    "crossGroupNoDoubleReduction": {
+      "status": "PASS",
+      "firstGroupMemberCount": 10,
+      "duplicateFirstGroupMembers": [],
+      "basis": "当前5组成员互不重叠；计划要求后续交叉成员归一化，最终按实际存活正文计数。"
+    },
+    "baselineScopeAndBoundaries": {
+      "status": "PASS",
+      "cards": 197,
+      "questions": 371,
+      "verdicts": {
+        "SUPPORTED": 280,
+        "CONDITIONAL": 57,
+        "SOURCE_ISSUE": 34
+      },
+      "formalInventory": 62,
+      "basis": "6份基线文件实算哈希均与快照相符；337直接/条件和34题源疑点分别保留，不把模型回测当学习者效果。"
+    },
+    "cc12Q679RegressionProtection": {
+      "status": "PASS",
+      "basis": "计划显式要求保留Lock保留与Lifecycle期后清理分工，并仅在Q679通过后替换CC12；现行Q679确实使用CC11/CC12/CC13并记录恢复CC12的定向回测。"
+    },
+    "affectedOnlySemanticRetestAndUnchangedEvidenceReuse": {
+      "status": "PASS",
+      "basis": "按改删卡及递归先修后继取题、等跨组依赖齐备后去重回测；只重审新正文与失效依据，完整371条最终机械回读。"
+    },
+    "boundedRepairAndRollback": {
+      "status": "PASS",
+      "basis": "单组最多一次定向修复，仍失败保留原卡；允许已通过组继续收尾，禁止无限研究。"
+    },
+    "timeAndQuantityAreEstimates": {
+      "status": "PASS",
+      "basis": "192明确为五组均2变1时的算术情景；60–90分钟为待实测修正的暂排程，无已证提速或最终数量声明。"
+    },
+    "planningOnlyNoBaselineOrFormalInventoryMutation": {
+      "status": "PASS",
+      "basis": "计划明示保留197版、正式62库存与源输入；本审查仅新写review.json。"
+    },
+    "globalProductTargetAndSharedFourDomainCount": {
+      "status": "PASS",
+      "basis": "开头明确全库约300张仍为产品设计目标、四领域共用同一知识卡，领域1不另设硬配额，补充卡/附录也须明示。",
+      "closedIssueId": "CPR-002"
+    },
+    "existingToolReuseSafeOutputBoundary": {
+      "status": "PASS",
+      "basis": "第5节明确旧assemble.py/finalize.py不得原样重跑覆写已验收目录，仅在新压缩目录做必要计数、旧→新映射和路径适配，先核基线哈希与写入位置。",
+      "closedIssueId": "CPR-003",
+      "scriptsExecuted": false
+    },
+    "m02DynamoDbDestinationAndOutputCount": {
+      "status": "PASS",
+      "basis": "M02明确同卡保留同Region S3/DynamoDB gateway endpoint及实际调用子网路由表；机房interface分支只对S3说明。若仍须两张，则未合并、净减0并重算。",
+      "closedIssueId": "CPR-001"
+    },
+    "m04ProviderConsumerScopeClarification": {
+      "status": "PASS",
+      "basis": "修订明确调用受支持AWS托管服务不要求客户自行部署供应商NLB；自建/供应商TCP服务才按对应发布流程处理。本次仅核计划范围澄清，不验收新合并正文。"
+    }
+  },
+  "firstPriorityGroupChecks": [
+    {
+      "groupId": "M01",
+      "memberIds": [
+        "NC08",
+        "NC09"
+      ],
+      "memberSnapshotMatchesCurrentCatalogue": true,
+      "directQuestionCount": 3,
+      "affectedQuestionCountIncludingRecursivePrerequisites": 3,
+      "dependencyCardIds": [],
+      "questionListsMatchBaselineSnapshot": true
+    },
+    {
+      "groupId": "M02",
+      "memberIds": [
+        "CB07",
+        "CB08"
+      ],
+      "memberSnapshotMatchesCurrentCatalogue": true,
+      "directQuestionCount": 23,
+      "affectedQuestionCountIncludingRecursivePrerequisites": 23,
+      "dependencyCardIds": [],
+      "questionListsMatchBaselineSnapshot": true
+    },
+    {
+      "groupId": "M03",
+      "memberIds": [
+        "NC14",
+        "aws-rb2-domain1-normal-batch07-20261105-s3-default-versus-existing-copy"
+      ],
+      "memberSnapshotMatchesCurrentCatalogue": true,
+      "directQuestionCount": 4,
+      "affectedQuestionCountIncludingRecursivePrerequisites": 4,
+      "dependencyCardIds": [],
+      "questionListsMatchBaselineSnapshot": true
+    },
+    {
+      "groupId": "M04",
+      "memberIds": [
+        "CB09",
+        "XB015"
+      ],
+      "memberSnapshotMatchesCurrentCatalogue": true,
+      "directQuestionCount": 8,
+      "affectedQuestionCountIncludingRecursivePrerequisites": 14,
+      "dependencyCardIds": [
+        "XA053",
+        "XB020",
+        "XB025",
+        "XB038",
+        "XR104"
+      ],
+      "questionListsMatchBaselineSnapshot": true
+    },
+    {
+      "groupId": "M05",
+      "memberIds": [
+        "CA04",
+        "CA05"
+      ],
+      "memberSnapshotMatchesCurrentCatalogue": true,
+      "directQuestionCount": 11,
+      "affectedQuestionCountIncludingRecursivePrerequisites": 17,
+      "dependencyCardIds": [
+        "XA019",
+        "XA025",
+        "XA032",
+        "XA037"
+      ],
+      "questionListsMatchBaselineSnapshot": true
+    }
+  ],
+  "firstPriorityTotals": {
+    "uniqueOldMembers": 10,
+    "groups": 5,
+    "sumOfPerGroupAffectedCounts": 61,
+    "uniqueAffectedQuestions": 58,
+    "overlap": {
+      "M02_M04": [
+        208,
+        667,
+        998
+      ]
+    },
+    "arithmeticReductionIfExactlyOneOutputPerGroup": 5,
+    "arithmeticCountIfExactlyOneOutputPerGroup": 192,
+    "acceptedMergedCardCount": 0
+  },
+  "priorMechanicalEvidenceReuse": {
+    "source": "/Users/qc/Desktop/DeveloperCards/plans/2026-11-06-aws-domain1-compression-merge-plan.review-r1.json",
+    "baselineHashUnchanged": true,
+    "recomputedGroupOrQuestionStatistics": false,
+    "basis": "首5组成员及58题依赖闭包的上一轮已通过机械证据复用；本轮未重算或重审。"
+  },
+  "actualScope": {
+    "read": "完整修订MD与上一轮REVISE审查；仅核baseline文件哈希未变。",
+    "semanticReadback": "CPR-001/002/003修正及M04职责范围澄清。",
+    "notChecked": "未重新统计58题、穿透旧脚本、重审197卡AWS事实或371题语义；未写合并正文、测学习者表现、证明工期或最终卡数。",
+    "mutations": [
+      "本review.json"
+    ],
+    "modelCliApiCalls": 0,
+    "agentsSpawned": 0,
+    "scriptsExecuted": false,
+    "published": false,
+    "catalogueOrFormalInventoryChanged": false,
+    "planChangedByReviewer": false
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "stage": "/Users/qc/.local/share/codex-workflows/recallsmith/aws-basics-bilingual-rag-release-20261028/runtime/full-card-rebuild-v2-20261102/card-generation-optimized-20261103",
+  "runRoot": "/Users/qc/.local/share/codex-workflows/recallsmith/aws-basics-bilingual-rag-release-20261028/runtime/full-card-rebuild-v2-20261102",
+  "generationLedger": "/Users/qc/.local/share/codex-workflows/recallsmith/aws-basics-bilingual-rag-release-20261028/runtime/full-card-rebuild-v2-20261102/card-rewrite15-20261103",
+  "sourceDir": "/Users/qc/.local/share/codex-workflows/recallsmith/aws-basics-bilingual-rag-release-20261028/runtime/full-card-rebuild-v2-20261102/card-pilot50-20261103/official-sources",
+  "agents": "/Users/qc/Desktop/DeveloperCards/AGENTS.md",
+  "archivedDeck": "/Users/qc/.local/share/codex-workflows/recallsmith/aws-basics-bilingual-rag-release-20261028/runtime/full-card-rebuild-v2-20261102/production-readonly/baseline-deck.json",
+  "frontend": "/Users/qc/src/recallsmith-career-readiness-20261026/frontend",
+  "node": "/opt/homebrew/bin/node",
+  "importReviews": [
+    "/Users/qc/.local/share/codex-workflows/recallsmith/aws-basics-bilingual-rag-release-20261028/runtime/full-card-rebuild-v2-20261102/card-rewrite15-20261103/batch-01/review-01/request.json",
+    "/Users/qc/.local/share/codex-workflows/recallsmith/aws-basics-bilingual-rag-release-20261028/runtime/full-card-rebuild-v2-20261102/card-rewrite15-20261103/batch-02/review-02/request.json"
+  ],
+  "batches": [
+    {
+      "id": "batch-01",
+      "packet": "/Users/qc/.local/share/codex-workflows/recallsmith/aws-basics-bilingual-rag-release-20261028/runtime/full-card-rebuild-v2-20261102/card-rewrite15-20261103/batch-01/author-input.json",
+      "candidate": "/Users/qc/.local/share/codex-workflows/recallsmith/aws-basics-bilingual-rag-release-20261028/runtime/full-card-rebuild-v2-20261102/card-rewrite15-20261103/batch-01/author/output.raw.json"
+    },
+    {
+      "id": "batch-02",
+      "packet": "/Users/qc/.local/share/codex-workflows/recallsmith/aws-basics-bilingual-rag-release-20261028/runtime/full-card-rebuild-v2-20261102/card-rewrite15-20261103/batch-02/author-input.json",
+      "candidate": "/Users/qc/.local/share/codex-workflows/recallsmith/aws-basics-bilingual-rag-release-20261028/runtime/full-card-rebuild-v2-20261102/card-rewrite15-20261103/batch-02/repair-01/output.json"
+    }
+  ],
+  "repairHistoryPaths": [
+    "/Users/qc/.local/share/codex-workflows/recallsmith/aws-basics-bilingual-rag-release-20261028/runtime/full-card-rebuild-v2-20261102/card-rewrite15-20261103/progress.json"
+  ]
+}

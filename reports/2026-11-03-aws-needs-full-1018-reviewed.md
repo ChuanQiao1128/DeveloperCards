@@ -1,0 +1,17926 @@
+# AWS全库1,018题制卡需求清单 · Review修订版
+
+版本：2026-11-03（Pacific/Auckland）；原需求生成于2026-11-02。本版修正Q841一处无来源等待顺序，15条候选新增需求语义复核证据。
+
+| 项目 | 当前结果 |
+| --- | --- |
+| 原题／选项／需求 | 1,018／4,209／1,018；Q868排除 |
+| 需求语义复核通过／未审候选 | 753／265 |
+| 当前未闭合实质问题 | 0 |
+| 正式新卡／最终卡数 | 0／未冻结 |
+
+这是制卡需求草案。程序检查与需求复核不等于AWS技术事实、正确答案或最终卡片覆盖通过。原1,018条生成版和全部历史证据保留；本版只有Q841正文一个字段发生变化，其他正文保持。
+
+## 修订与备注
+
+- Q841：原O1并列规定日备保留1个月及月备复制，没有要求等待1个月才复制；已移除新增顺序并复审通过。
+- Q763：within the next month应按“未来一个月内”理解，原草稿“下个月内”保留措辞备注，后续目标措辞须明确。
+- Q377：原题要求实例启动和终止时向审计系统报告；草稿“启停”是措辞备注，后续目标应明确“启动和终止”，避免误解为Start/Stop。
+
+复核包含10条固定随机未审候选及4条对照，再扩查55条时序风险，合计68道不同题目；抽查和风险路由不证明所有题语义无误。265条未审候选仍显式保留。
+
+## 逐题需求
+
+### Q1
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：跨洲城市站点采集温度、湿度和气压，每站平均500 GB/天，均有高速Internet；尽快汇聚至单个Amazon S3 bucket，并最小化运维复杂度。
+
+**必要判断**
+
+- j1（显式）：比较S3 Transfer Acceleration配合multipart upload直传、就近Region上传后Cross-Region Replication并删除源数据、每日Snowball Edge转运后复制的汇聚时效与运维。〔S, O1, O2, O3〕
+- j2（显式）：判断就近EC2/EBS落盘、定期snapshot跨Region复制并恢复的链路，是否完成向目标S3 bucket汇聚及其时效目标。〔S, O4〕
+
+**待官方核验**
+
+- 待查各上传、离线转运、跨Region复制及EBS snapshot恢复路径的适用范围、端到端步骤和时间开销。
+
+### Q2
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：专有应用日志已以JSON存于Amazon S3；执行简单、按需查询，尽量少改现有架构并最小化运维。
+
+**必要判断**
+
+- j1（显式）：比较Athena直接查询S3、Redshift集中加载、迁入CloudWatch Logs后查询，以及Glue catalog配合临时EMR Apache Spark SQL的架构变更和运维。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：判断各查询链路对JSON、SQL、数据搬迁、catalog及计算集群准备的要求。〔O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各服务对S3 JSON按需查询的支持、CloudWatch查询接口及所需加载、元数据和计算资源。
+
+### Q3
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：AWS Organizations集中管理部门多账号；management account中的S3项目报告仅允许组织内账号用户访问，并最小化运维。
+
+**必要判断**
+
+- j1（显式）：比较bucket policy按organization ID、部门OU路径或用户tag限定访问时的组织边界与维护负担。〔S, O1, O2, O4〕
+- j2（显式）：比较CloudTrail监控CreateAccount、InviteAccountToOrganization、LeaveOrganization、RemoveAccountFromOrganization后更新policy，与条件键方案在成员变动时的维护差异。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查aws PrincipalOrgID、aws:PrincipalOrgPaths、aws:PrincipalTag的准确标识、匹配范围及账号进出组织时的策略维护要求。
+
+**源异常／歧义**
+
+- O1条件键写为aws PrincipalOrgID，技术标识格式需确认。
+
+### Q4
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：VPC内EC2应用处理S3日志；EC2须在无Internet连接时获得到S3的私有网络连接。
+
+**必要判断**
+
+- j1（显式）：比较S3 gateway VPC endpoint、CloudWatch Logs转存、EC2 instance profile及API Gateway配合private link，能否建立所需EC2到S3私有访问路径。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：区分网络连通、访问授权与日志搬运各自解决的需求，并判断API Gateway方案所需的实际服务衔接。〔O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查S3私有连接方式、instance profile权限作用，以及API Gateway/private link访问S3的支持与网络前提。
+
+### Q5
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：原单EC2/EBS文档应用为扩展性和可用性复制到另一AZ，两实例位于ALB后；刷新仅见不同文档子集，需同时看见全部文档。
+
+**必要判断**
+
+- j1（显式）：比较复制两份EBS数据与迁移两卷数据至EFS并将新文档写入EFS，能否持续提供跨实例完整文档视图。〔S, O1, O3〕
+- j2（显式）：判断ALB按文档位置选择服务器或向两服务器同时发请求并合并返回，能否解决文档分散问题及需要哪些应用配合。〔S, O2, O4〕
+
+**待官方核验**
+
+- 待查跨AZ文件共享、EBS数据复制与后续写入一致性，以及ALB路由、请求分发和响应合并能力边界。
+
+### Q6
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：本地NAS通过NFS存放视频，单文件1 MB–500 GB，总量70 TB且不再增长；尽快迁往S3，同时尽可能少占网络带宽。
+
+**必要判断**
+
+- j1（显式）：比较IAM role授权AWS CLI复制、Snowball Edge本地装载并寄回导入，以及S3 File Gateway通过NFS搬迁的总时效与网络占用。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：判断File Gateway公共service endpoint与新建Direct Connect/public VIF两种链路的连接前提、部署时间和数据搬运路径。〔O3, O4〕
+
+**待官方核验**
+
+- 待查各路径对NFS、70 TB及最大500 GB文件的支持，Snowball Edge导入流程，以及File Gateway与Direct Connect/public VIF衔接条件。
+
+### Q7
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：消息由数十个应用和微服务快速消费；流量剧烈变化，突增至100,000条/秒，需解耦并增强扩展性。
+
+**必要判断**
+
+- j1（显式）：比较Kinesis Data Analytics持久化消费、摄取EC2按CPU扩缩、单shard Kinesis Data Streams→Lambda预处理→DynamoDB读取，以及SNS→多个队列订阅的解耦与多消费者交付。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：判断各链路在100,000条/秒突发下的容量、缓冲、消费隔离及新增中间处理瓶颈。〔O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各服务的消息存储/扇出定位、单shard吞吐与扩缩机制，以及SNS与队列订阅的交付和配额限制。
+
+**源异常／歧义**
+
+- O4的Amazon Simple Queue Service缩写写为Amazon SOS，服务标识不一致。
+
+### Q8
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：分布式应用迁往AWS，负载可变；旧平台由primary server协调多个计算节点，现代化需最大化弹性恢复能力与扩展性。
+
+**必要判断**
+
+- j1（显式）：比较SQS作业队列配合EC2 Auto Scaling的定时扩缩与按队列大小扩缩，对可变负载及协调层故障的适应性。〔S, O1, O2〕
+- j2（显式）：比较保留primary server并将节点纳入Auto Scaling，以CloudTrail或EventBridge接收作业、按primary或计算节点负载扩缩的完整调度链路。〔S, O3, O4〕
+
+**待官方核验**
+
+- 待查SQS、CloudTrail、EventBridge的作业接收与交付边界，以及定时、队列大小、服务器负载扩缩的指标和故障处理要求。
+
+### Q9
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：本地SMB服务器存大文件，创建后最初几天频繁访问，7天后少访问；数据增长接近容量上限，需扩容、保留最近访问文件的低延迟并提供生命周期管理。
+
+**必要判断**
+
+- j1（显式）：比较DataSync搬走超过7天数据、S3 File Gateway配合7天后转Glacier Deep Archive、FSx for Windows File Server，以及客户端工具访问S3配合7天后转Glacier Flexible Retrieval。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：判断各方案的SMB访问衔接、本地容量释放、近期访问缓存与归档后取回行为，及生命周期是否完整。〔O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查SMB/File Gateway缓存与生命周期配合、DataSync迁移后的源空间处理、FSx扩容管理及两种Glacier取回限制。
+
+### Q10
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：电商新订单经Amazon API Gateway REST API提交处理，须按接收顺序处理。
+
+**必要判断**
+
+- j1（显式）：比较API Gateway→SNS→Lambda、API Gateway→SQS FIFO/standard→Lambda，以及authorizer在处理期间阻止请求，对订单顺序和请求接收的影响。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：判断消息顺序范围与Lambda并发处理如何衔接，是否需要明确全局顺序或分组顺序。〔S, O1, O2, O4〕
+
+**待官方核验**
+
+- 待查SNS、SQS FIFO/standard的顺序语义、API Gateway集成和authorizer边界，以及Lambda消费时的顺序与并发配置。
+
+### Q11
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：EC2应用以本地文件中的用户名和密码连接Aurora；需最小化凭证管理运维。
+
+**必要判断**
+
+- j1（显式）：比较Secrets Manager自动轮换、Systems Manager Parameter Store所提自动轮换，与凭证文件迁至KMS加密S3或各EC2加密EBS的管理负担。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：判断集中存储、静态加密与数据库凭证轮换的职责差异，以及应用读取和轮换后同步所需改动。〔O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查Secrets Manager和Parameter Store的Aurora凭证轮换支持、配置要求，以及S3/EBS文件方案所需自管环节。
+
+### Q12
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：全球Web应用为ALB后EC2，静态数据在S3；自有域名注册于Route 53，需改善静态和动态数据性能并降低延迟。
+
+**必要判断**
+
+- j1（显式）：比较CloudFront同时使用S3与ALB origins，及CloudFront仅用ALB或S3并搭配Global Accelerator的静态、动态完整请求路径。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：判断Global Accelerator所提S3、ALB、CloudFront endpoints是否适用，并比较Route 53指向CloudFront、单域名指向accelerator与静动态双域名的衔接。〔O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查CloudFront多origin与动态内容处理、Global Accelerator endpoint类型，以及各DNS链路能否覆盖两类数据。
+
+### Q13
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：每月维护期间需轮换多个AWS Regions中RDS for MySQL的凭证，并最小化运维。
+
+**必要判断**
+
+- j1（显式）：比较Secrets Manager多Region secret replication加定时轮换，与Systems Manager secure string所提复制和轮换机制。〔S, O1, O2〕
+- j2（显式）：比较SSE加密S3→EventBridge→Lambda轮换，以及KMS multi-Region customer managed keys→DynamoDB global table→Lambda读取→RDS API轮换的跨Region协调与自管负担。〔S, O3, O4〕
+
+**待官方核验**
+
+- 待查跨Region secret复制与轮换职责、Parameter Store对应能力，以及自定义方案对RDS凭证更新、调度和同步的要求。
+
+### Q14
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：The Auto Scaling group scales based on CPU utilization metrics.
+- c2〔S〕：transaction data in a MySQL 8.0 database that is hosted on a large EC2 instance.
+- c3〔S〕：more read requests than write transactions.
+- c4〔S〕：automatically scale the database to meet the demand of unpredictable read workloads while maintaining high availability.
+- c5〔O1〕：Amazon Redshift with a single node for leader and compute functionality.
+- c6〔O2〕：Amazon RDS with a Single-AZ deployment
+- c7〔O2〕：Configure Amazon RDS to add reader instances in a different Availability Zone.
+- c8〔O3〕：Amazon Aurora with a Multi-AZ deployment.
+- c9〔O3〕：Configure Aurora Auto Scaling with Aurora Replicas.
+- c10〔O4〕：Amazon ElastiCache for Memcached with EC2 Spot Instances.
+
+**必要判断**
+
+- j1（显式）：MySQL 8.0事务库读多写少、不可预测读负载下，如何联合判断引擎兼容、读容量自动扩缩和跨AZ高可用；比较Redshift单节点、RDS Single-AZ及增加reader、Aurora Multi-AZ/副本扩缩、Memcached+Spot的角色？〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：针对副本扩缩组合，怎样核验已有reader前提、reader与writer扩展边界、min/max和监控响应，以及应用连接新增副本后才能利用读容量的条件？〔S, O3〕
+
+**待官方核验**
+
+- 核验MySQL版本兼容、跨AZ读卸载/故障接管及副本自动扩缩的起始前提、连接方式与响应边界。
+
+### Q15
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：迁入AWS后需保护production VPC进出流量，复现本地inspection server的流量检查与过滤功能。
+
+**必要判断**
+
+- j1（显式）：比较GuardDuty、Traffic Mirroring、Network Firewall规则与Firewall Manager规则，是否覆盖生产VPC双向流量的检查和过滤。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：区分威胁检测、流量复制、实际过滤执行与集中策略管理所需组件及流量路径。〔O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查四种服务的检查、阻断、策略管理边界，以及实现VPC进出流量过滤的部署前提。
+
+### Q16
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：数据湖包含S3和RDS for PostgreSQL；报表须覆盖全部数据源并提供可视化，仅管理团队可完整访问，其他员工仅有限访问。
+
+**必要判断**
+
+- j1（显式）：判断QuickSight连接全部数据源、建datasets并发布dashboards的方案，按IAM roles分享与按users/groups分享能否表达访问层级。〔S, O1, O2〕
+- j2（显式）：比较Glue crawler/table加ETL生成S3报表，与Glue加Athena Federated Query访问PostgreSQL后生成S3报表，对全源覆盖、可视化和bucket policy权限分层的满足程度。〔S, O3, O4〕
+
+**待官方核验**
+
+- 待查QuickSight数据源与dashboard分享主体、权限粒度，以及Glue/Athena联邦查询、报表可视化和S3访问控制的衔接。
+
+### Q17
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：新业务应用运行于两台EC2，以S3 bucket存文档；需确保两实例有权访问该bucket。
+
+**必要判断**
+
+- j1（显式）：比较将授予S3访问权限的IAM role、policy、group或user关联到EC2的方案，判断身份、权限与实例关联链路。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查EC2可关联的IAM实体、instance profile与role/policy关系，以及实例取得S3访问凭证的机制。
+
+### Q18
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Web上传大图至S3，Lambda压缩后存入另一S3 bucket；需以持久、无状态组件自动处理，选择两个动作。
+
+**必要判断**
+
+- j1（显式）：判断S3上传通知→SQS、SQS触发Lambda及成功处理后删消息，如何组合成自动处理与结果写入链路。〔S, O1, O2〕
+- j2（显式）：比较Lambda轮询S3并以内存文本跟踪、EC2轮询SQS并以本地文本记录后调用Lambda，以及EventBridge→SNS邮件交由owner继续处理，对持久性、无状态和自动化的影响。〔S, O3, O4, O5〕
+
+**待官方核验**
+
+- 待查S3通知、SQS与Lambda事件源衔接、消息确认/重试，以及内存或EC2本地状态和邮件流程的处理边界。
+
+### Q19
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：三层应用Web在VPC公有子网，应用和数据库在同VPC私有子网；独立inspection VPC内Marketplace防火墙以IP接口收包，须在到Web前检查全部入站流量，且运维最少。
+
+**必要判断**
+
+- j1（显式）：比较应用VPC公有子网中的NLB/ALB导向设备、inspection VPC的transit gateway路由，以及Gateway Load Balancer配合endpoint转发设备的跨VPC检查路径。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：判断各方案的IP包转发、设备接入协议、路由覆盖与Web前强制经过检查的部署及运维要求。〔O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查NLB、ALB、transit gateway、Gateway Load Balancer及endpoint对第三方IP设备的接入、封装和跨VPC路由要求。
+
+### Q20
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：同Region将EC2/EBS上的大量生产数据克隆到测试环境；测试修改不得影响生产，访问软件需持续高I/O，且克隆时间最短。
+
+**必要判断**
+
+- j1（显式）：比较snapshot恢复至instance store、生产EBS Multi-Attach至测试，以及snapshot恢复至独立新EBS，对数据隔离和恢复目标的满足程度。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较先创建并初始化新EBS、挂载后再恢复的流程，与启用fast snapshot restore后恢复并挂载的克隆耗时及初始I/O表现。〔S, O3, O4〕
+
+**待官方核验**
+
+- 待查snapshot可恢复目标、Multi-Attach数据共享语义、EBS恢复/初始化顺序，以及fast snapshot restore的启用范围和性能前提。
+
+### Q21
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：每日仅一个促销商品，持续24小时；高峰每小时数百万请求且毫秒级延迟，需最少运维。
+
+**必要判断**
+
+- j1（显式）：比较全站多S3 bucket/CloudFront且订单存S3、多AZ EC2 Auto Scaling加前后端两个ALB及RDS MySQL、EKS容器加Cluster Autoscaler及RDS MySQL、静态S3/CloudFront加API Gateway/Lambda及DynamoDB的端到端能力。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：判断各方案的动态订单处理、突发扩容、数据访问延迟与运维负担，并核对所提Cluster Autoscaler调整pods的职责。〔O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各托管/自管链路的扩缩与延迟约束、订单存储处理要求，以及EKS Cluster Autoscaler与pod扩缩的能力边界。
+
+### Q22
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：数字媒体存于S3，须抵御一个AZ丢失；文件冷热混合且访问模式不可预测，需最小化存储与取回的总体成本。
+
+**必要判断**
+
+- j1（显式）：比较S3 Standard、Intelligent-Tiering、Standard-IA、One Zone-IA的AZ故障覆盖、访问模式适应性及存储和取回成本组合。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查四种storage class的AZ范围、自动分层机制、存储/访问/监控费用及最小计费约束。
+
+### Q23
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：备份目前存S3 Standard，首1个月频繁访问，之后不再访问但须无限期保留；追求最高成本效益。
+
+**必要判断**
+
+- j1（显式）：比较Intelligent-Tiering自动迁移，与Lifecycle在1个月后从Standard转Glacier Deep Archive、Standard-IA或One Zone-IA的长期保留成本。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各类别的长期存储、自动分层和转换费用、最小计费期限及Lifecycle支持，按题设访问阶段比较总成本。
+
+### Q24
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：最近账单EC2成本上升，若干实例发生非预期instance type纵向扩容；需比较最近2个月成本图并深入分析扩容根因，运维最少。
+
+**必要判断**
+
+- j1（显式）：比较AWS Budgets报告、Cost Explorer细粒度过滤、Billing and Cost Management dashboard图，以及Cost and Usage Reports→S3→QuickSight交互图，对按instance type比较2个月成本的支持与运维。〔S, O1, O2, O3, O4〕
+- j2（显式）：判断各方案提供的成本细分是否足以回答题干所称纵向扩容根因，以及还缺少何种分析信息。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各成本工具的历史图表、instance type过滤与明细粒度，以及成本归因和实际变更原因的证据范围。
+
+**源异常／歧义**
+
+- “扩容根因”未明确指费用增长归因，还是发起实例类型变更的行为原因。
+
+### Q25
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：API Gateway→Lambda→Aurora PostgreSQL高量写入；PoC需大幅提高Lambda quotas，改造需提高扩展性并最小化配置工作。
+
+**必要判断**
+
+- j1（显式）：比较改写为EC2 Apache Tomcat/JDBC、改用DynamoDB配DAX/client SDK，以及拆成接收和入库两个Lambda并以SNS或SQS衔接的改造量与扩展性。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：判断SNS与SQS在接收入库解耦、流量缓冲和消费速率协调上的差异，并辨别DAX方案是否针对题设写入问题及现有接口。〔O2, O3, O4〕
+
+**待官方核验**
+
+- 待查Lambda配额与入库链路限制、SNS/SQS消费机制，以及DAX适用操作和从Aurora迁移所需接口改动。
+
+**源异常／歧义**
+
+- O2提到“existing DynamoDB API calls”，与题干现有Aurora PostgreSQL不一致；DynamoDProvision处亦有文本粘连。
+
+### Q26
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：审查AWS部署，确认S3 buckets没有未经授权的配置变更。
+
+**必要判断**
+
+- j1（显式）：比较AWS Config rules、Trusted Advisor checks、Inspector assessment template，以及S3 server access logging配合EventBridge，对S3配置变更与授权合规审查的覆盖。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：区分资源配置记录/规则评估、建议检查、漏洞评估与访问日志事件，判断如何表达“未经授权”。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各服务对S3配置历史、变更评估和规则的支持，以及server access logging与EventBridge组合可获得的事件范围。
+
+### Q27
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：产品经理需定期查看CloudWatch应用指标dashboard，现无AWS账号；提供访问须遵循最小权限。
+
+**必要判断**
+
+- j1（显式）：比较CloudWatch按邮箱分享链接、专用IAM user配CloudWatchReadOnlyAccess、员工共用IAM user配ViewOnlyAccess，以及按需启动公有子网bastion并经RDP使用缓存AWS凭证。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：判断各路径的dashboard可见范围、AWS身份需求、凭证共享和远程主机权限是否超出查看目标。〔O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查CloudWatch dashboard邮箱分享的认证与权限边界、两项managed policy范围，以及bastion缓存凭证路径的授权范围。
+
+### Q28
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：应用部署在Organizations集中管理的不同账号；需覆盖全部账号的SSO，用户和组须继续由本地自管Microsoft Active Directory管理。
+
+**必要判断**
+
+- j1（显式）：比较启用AWS SSO并经AWS Directory Service for Microsoft Active Directory建立单向forest/domain trust或双向forest trust的身份衔接。〔S, O1, O2〕
+- j2（显式）：判断仅Directory Service双向trust，或本地部署IdP并启用AWS SSO，能否完整覆盖多账号SSO且保留本地用户组管理。〔S, O3, O4〕
+
+**待官方核验**
+
+- 待查AWS SSO与Organizations、本地AD、Directory Service或外部IdP的集成要求，及trust方向、类型与用户组同步条件。
+
+### Q29
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：VoIP使用UDP，EC2位于Auto Scaling group并跨多个Regions部署；须路由到最低延迟Region并实现跨Region自动故障转移。
+
+**必要判断**
+
+- j1（显式）：比较各Region的NLB或ALB配target group/Auto Scaling group并作为Global Accelerator endpoint，对UDP、延迟选路及故障转移的支持。〔S, O1, O2〕
+- j2（显式）：比较NLB→Route 53 latency aliases→CloudFront origin，与ALB→Route 53 weighted aliases→CloudFront origin的完整协议、选路和故障处理链路。〔S, O3, O4〕
+
+**待官方核验**
+
+- 待查NLB、ALB、Global Accelerator和CloudFront的UDP支持，以及latency/weighted routing、健康检查与跨Region故障转移语义。
+
+### Q30
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：启用Performance Insights的通用型RDS for MySQL每月仅测试使用48小时，测试资源密集；降低成本且不降低DB instance计算和内存属性。
+
+**必要判断**
+
+- j1（显式）：比较测试后停止/按需启动、Auto Scaling、snapshot后终止/按需恢复，以及闲时降规格再恢复的月度总成本与资源属性约束。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：判断跨月闲置期间的停止时限、自动重启、持续计费、snapshot恢复和规格调整对下次测试准备的影响。〔O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查RDS MySQL停止期限和计费、实例Auto Scaling适用范围、snapshot恢复成本及Performance Insights相关保留与收费。
+
+### Q31
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：需检查所有EC2 instances、RDS DB instances和Redshift clusters均配置tags，并最小化检查的配置和运维工作。
+
+**必要判断**
+
+- j1（显式）：比较Config rules检测缺失/不当tags、Cost Explorer查找后手工标记，以及自编API检查在EC2定期运行或由CloudWatch调度Lambda运行的覆盖与维护负担。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：判断各机制对三种资源的tag检查支持，以及合规检测与实际补标签的职责边界。〔O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查Config tag规则的资源覆盖、Cost Explorer可见范围，以及自定义API扫描与定时执行所需配置。
+
+### Q32
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：为其他团队托管仅含HTML、CSS、客户端JavaScript和图片的网站，追求最高成本效益。
+
+**必要判断**
+
+- j1（显式）：比较AWS Fargate容器、S3 bucket托管、EC2 Web server，以及ALB→Lambda target配Express.js，对这些内容的托管能力及总体成本。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各方案静态内容托管前提、持续运行资源与请求/存储收费，以及ALB/Lambda集成所需组件。
+
+### Q33
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：在线市场高峰数十万用户；需可扩展、近实时地向多个内部应用共享数百万金融交易，并在写入文档数据库前去除敏感数据，以低延迟检索。
+
+**必要判断**
+
+- j1（显式）：比较DynamoDB写入规则脱敏后Streams共享、Firehose/Lambda脱敏写DynamoDB与S3后从S3消费、Kinesis Data Streams/Lambda脱敏写DynamoDB并从stream消费，以及S3批文件/Lambda处理后写DynamoDB。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：判断各链路的多消费者近实时性、脱敏先后顺序、文档数据检索，以及所提写入规则和Firehose目的地支持。〔O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查DynamoDB规则/Streams、Firehose目的地与转换、Kinesis多消费者和Lambda处理机制，以及S3批量路径的延迟。
+
+### Q34
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：AWS多层应用为合规、治理、审计和安全，须跟踪资源配置变化并记录针对资源的API调用历史。
+
+**必要判断**
+
+- j1（显式）：判断AWS Config、CloudTrail和CloudWatch如何分别承担配置变更与API历史两项职责，并比较选项中的互换及组合。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查三项服务对资源配置历史、API事件记录及其覆盖范围和启用要求。
+
+### Q35
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：待发布公网Web应用为VPC内EC2加ELB，DNS由第三方提供；需检测并防护大规模DDoS。
+
+**必要判断**
+
+- j1（显式）：比较账号GuardDuty、EC2 Inspector、Shield关联Route 53，以及Shield Advanced关联ELB，对DDoS检测、防护与既有第三方DNS架构的适配。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：区分检测、漏洞评估和流量防护，并判断保护资源选择及DNS是否需要改变。〔O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查GuardDuty、Inspector、Shield/Shield Advanced的DDoS职责、可保护资源，以及第三方DNS下保护ELB的条件。
+
+### Q36
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：两个Regions各有S3 bucket，全部数据须用KMS customer managed key加密；两bucket须用同一KMS key加解密，数据与key在两Region均存放，运维最少。
+
+**必要判断**
+
+- j1（显式）：比较customer managed multi-Region KMS key配客户端加密，与各Region独立KMS key配SSE-KMS，对同一key和双Region本地存放要求的满足程度。〔S, O2, O4〕
+- j2（显式）：判断SSE-S3加复制、另建KMS key但仍配置SSE-S3，以及各方案的S3 replication、加解密责任与运维差异。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查multi-Region KMS key的身份/密钥材料关系、客户端加密与SSE-S3/SSE-KMS差异，以及跨Region复制的加密处理。
+
+**源异常／歧义**
+
+- “同一KMS key”未明确指同一key资源标识，还是跨Region关联key共享的密钥材料。
+
+### Q37
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：多种新EC2工作负载需安全远程访问与管理；流程须可重复、使用AWS原生服务、遵循Well-Architected Framework且运维最少。
+
+**必要判断**
+
+- j1（显式）：比较EC2 serial console、现有及新实例绑定IAM role后用Session Manager建立所提SSH会话、公有子网bastion配统一SSH key，以及Site-to-Site VPN配本地SSH访问。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：判断各路径的实例接入前提、身份与密钥管理、网络暴露和新实例重复配置成本。〔O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查serial console适用条件、Session Manager与SSH会话所需IAM/agent/网络配置，以及bastion和VPN的管理要求。
+
+### Q38
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：静态网站托管S3并用Route 53 DNS；全球需求增长，需以最高成本效益降低用户访问延迟。
+
+**必要判断**
+
+- j1（显式）：比较复制到所有Regions加Route 53 geolocation、Global Accelerator IP关联S3并改DNS、S3前加CloudFront并改DNS，以及S3 Transfer Acceleration endpoint配DNS的访问加速与成本。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：判断各机制适用的流量方向、S3 endpoint支持、缓存或副本维护，以及DNS能否形成完整网站访问链路。〔O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查S3网站与CloudFront、Global Accelerator、Transfer Acceleration的集成边界，以及多Region复制和各加速路径的费用。
+
+### Q39
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：网站可搜索条目存储于RDS for MySQL，表超过1000万行。
+- c2〔S〕：数据库使用2 TB通用SSD存储。
+- c3〔S〕：网站每天产生数百万次数据更新。
+- c4〔S〕：部分插入耗时至少10秒，已定位为数据库存储性能问题。
+- c5〔O1〕：候选改用预置IOPS SSD。
+- c6〔O2〕：候选改用内存优化实例类型。
+- c7〔O3〕：候选改用突发性能实例类型。
+- c8〔O4〕：候选启用带MySQL原生异步复制的Multi-AZ RDS只读副本。
+
+**必要判断**
+
+- j1（显式）：如何根据已定位的存储瓶颈及高更新量，判断需要改善哪些存储性能指标？〔S, O1〕
+- j2（显式）：如何区分更换存储类型与更换实例类型对插入延迟的适用条件？〔S, O1, O2, O3〕
+- j3（显式）：如何判断只读副本及所述复制拓扑与主库写入存储瓶颈的关系？〔S, O4〕
+
+**待官方核验**
+
+- RDS for MySQL的通用SSD与预置IOPS SSD在IOPS、吞吐量及实例带宽约束方面有哪些差异，存储类型变更有哪些条件？
+- 所述Multi-AZ只读副本与MySQL异步复制组合具体代表何种拓扑，对源实例插入负载有哪些影响？
+
+**源异常／歧义**
+
+- 题干未指明通用SSD的具体类型；选项中的Multi-AZ RDS只读副本也未进一步说明拓扑，具体性能边界需结合这些信息解释。
+
+### Q40
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：数千edge devices每天生成1 TB告警，每条约2 KB；须高可用摄取存储供未来分析，14天数据可立即分析，超过14天归档，成本低且不管理额外基础设施，运维最高效。
+
+**必要判断**
+
+- j1（显式）：比较Firehose→S3→14天Lifecycle转Glacier，与跨两AZ EC2/ELB加自编S3写入脚本及相同Lifecycle的可用性、容量、成本和运维。〔S, O1, O2〕
+- j2（显式）：比较Firehose→OpenSearch每日手工snapshot并删14天旧数据，与SQS standard保留14天、消费者按年龄分析/转S3/删除，对即时分析和完整归档的满足程度。〔S, O3, O4〕
+
+**待官方核验**
+
+- 待查Firehose交付与缓冲、S3 Lifecycle、OpenSearch snapshot/删除，以及SQS保留到期和消费语义对14天分析/归档衔接的限制。
+
+### Q41
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：多SaaS数据由同一EC2接收、上传S3分析并在完成后通知用户；当前性能慢，需尽可能改善应用性能并最小化运维。
+
+**必要判断**
+
+- j1（显式）：比较EC2 Auto Scaling配S3完成事件→SNS，与每个SaaS经AppFlow→S3并用相同事件通知，对整体性能和运维的影响。〔S, O1, O2〕
+- j2（显式）：判断每源EventBridge rule→S3及第二rule→SNS，和ECS容器替代EC2配Container Insights→SNS，能否完成SaaS传输及准确的上传完成通知。〔S, O3, O4〕
+
+**待官方核验**
+
+- 待查AppFlow的SaaS/S3连接支持、S3完成事件与SNS、EventBridge目标及Container Insights事件能力，并比较链路运维。
+
+### Q42
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：高可用图像应用在单VPC的多AZ、多子网EC2上运行，实例互不通信，均经单NAT gateway上传下载S3；需最具成本效益地避免Regional数据传输费用。
+
+**必要判断**
+
+- j1（显式）：比较每AZ配置NAT gateway、改用NAT instance、S3 gateway VPC endpoint，以及EC2 Dedicated Host，对S3流量路径与Regional传输费用的影响。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：区分跨AZ传输、NAT处理及其他资源费用，判断避免目标费用后的总体成本。〔O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查跨AZ访问NAT、S3 gateway endpoint路由和收费，以及NAT instance、Dedicated Host是否改变相关传输计费。
+
+### Q43
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：本地应用产生大量时效敏感数据并备份S3；增长引发Internet带宽投诉，需长期方案保证及时备份且尽量少影响内部用户Internet连接。
+
+**必要判断**
+
+- j1（显式）：比较VPN并经VPC gateway endpoint代理流量、新建Direct Connect专供备份、每日Snowball装载寄回，以及请求解除S3 service limits，对备份时效与Internet竞争的影响。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：判断各链路的本地到S3可达性、实际带宽瓶颈和长期持续传输方式。〔O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查VPN与gateway endpoint的接入边界、Direct Connect到S3路径、Snowball周转时效，以及S3限额与本地Internet带宽的区别。
+
+### Q44
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：S3桶存有关键数据，要求防止意外删除。
+- c2〔S〕：要求选择两个步骤。
+- c3〔O1〕：候选启用桶版本控制。
+- c4〔O2〕：候选启用MFA Delete。
+- c5〔O3〕：候选创建桶策略，但未给出策略内容。
+- c6〔O4〕：候选启用默认加密。
+- c7〔O5〕：候选为对象创建生命周期策略。
+
+**必要判断**
+
+- j1（显式）：如何判断版本控制对意外删除后的数据保留和恢复提供什么保护？〔S, O1〕
+- j2（显式）：如何判断MFA Delete与版本控制的配置依赖及联合保护范围？〔S, O1, O2〕
+- j3（显式）：如何区分删除权限控制、默认加密和生命周期操作与防止意外删除目标的关系？〔S, O3, O4, O5〕
+
+**待官方核验**
+
+- 版本化桶中普通删除、删除指定版本及MFA Delete分别有哪些行为、保护范围和启用条件？
+- 桶策略、默认加密及生命周期规则对删除操作分别有哪些作用，判断策略有效性还需要哪些具体内容？
+
+### Q45
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：SNS通知新数据到达，Lambda处理并记录metadata；网络问题偶发失败后须手工重跑，需未来自动摄取全部数据，选择两个动作。
+
+**必要判断**
+
+- j1（显式）：判断SNS订阅SQS与Lambda改读SQS如何组合，以在网络失败后保留待处理数据并恢复摄取。〔S, O2, O5〕
+- j2（显式）：比较Lambda多AZ部署、增加CPU/内存和增加所提provisioned throughput，是否针对题设网络失败后的遗漏与手工恢复问题。〔S, O1, O3, O4〕
+
+**待官方核验**
+
+- 待查SNS/SQS/Lambda交付、保留、确认和重试机制，以及Lambda的AZ部署、资源配置与provisioned throughput标识和能力。
+
+### Q46
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：门店通过SFTP上传交易数据用于营销分析，部分文件超过200 GB；须检测不应包含的PII、告警管理员并自动修复，开发工作最少。
+
+**必要判断**
+
+- j1（显式）：比较S3中转配Inspector或Macie扫描，与对象上传触发自定义Lambda扫描，对SFTP接入、超200 GB文件和PII检测的适配及开发量。〔S, O1, O2, O3, O4〕
+- j2（显式）：判断所提Lifecycle删除、SNS通知管理员删除，以及SES通知加Lifecycle删除，是否同时形成告警和自动修复闭环。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查Inspector/Macie的S3 PII扫描范围和文件大小限制、Lambda处理限制，以及检测结果到通知和自动删除的集成能力。
+
+**源异常／歧义**
+
+- O2/O3仅描述通知管理员删除，未交代题干要求的自动修复；O4删除对象写为meats，指代异常。
+
+### Q47
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：即将举行的活动持续1周，须保证指定Region内三个指定AZ的EC2容量。
+
+**必要判断**
+
+- j1（显式）：比较Reserved Instances与On-Demand Capacity Reservation，分别仅指定Region或同时覆盖三个指定AZ时的容量保证范围与1周需求适配。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：判断Region/AZ级购买或预留的粒度、三个AZ需如何分别配置，以及期限承诺与容量预留的区别。〔O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查Regional/Zonal Reserved Instances和On-Demand Capacity Reservation的容量保证、AZ粒度、创建时机与期限约束。
+
+### Q48
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：网站商品catalog当前存于EC2 instance store；需高可用且存放位置持久。
+
+**必要判断**
+
+- j1（显式）：比较迁至ElastiCache for Redis、换更大EC2和instance store、迁至S3 Glacier Deep Archive或EFS，对catalog高可用、持久存储及网站访问的适配。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：判断各方案在实例故障或生命周期变化下的数据保留、可用性配置及归档取回前提。〔O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查instance store数据生命周期、Redis持久性/高可用配置、Glacier Deep Archive取回机制及EFS可用性与持久性范围。
+
+### Q49
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：通话转录文件按月存储，通话后1年内随机访问，之后少访问；不足1年的文件须尽快查询和取回，旧文件允许取回延迟，成本效益最高。
+
+**必要判断**
+
+- j1（显式）：比较全程Glacier Instant Retrieval加tags查询、Intelligent-Tiering满1年转Glacier Flexible Retrieval配Athena/Glacier Select、Standard加S3 metadata满1年转Instant Retrieval，以及Standard满1年转Deep Archive配RDS metadata。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：判断tags、S3 metadata、RDS和查询服务能否完成文件定位与取回衔接，并比较冷热阶段延迟及存储、查询、检索总成本。〔O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各storage class的访问/取回和转换限制、tags及metadata检索方式，以及Athena和S3 Glacier Select的适用数据与可用条件。
+
+### Q50
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：生产工作负载运行于1,000台EC2 Linux，使用第三方软件；须尽快为全部实例打补丁以修复严重安全漏洞。
+
+**必要判断**
+
+- j1（显式）：比较自定义Lambda、Systems Manager Patch Manager、maintenance window及Run Command自定义命令，对第三方Linux软件的大规模即时补丁执行能力。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：区分补丁目录/基线支持、调度窗口与远程命令执行，并判断1,000台实例接入、并发与执行结果跟踪要求。〔O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查Patch Manager对Linux第三方软件的支持边界、maintenance window与Run Command职责、managed node前提及批量执行配额。
+
+### Q51
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：应用通过REST API提供订单配送统计；需每天早晨同一时间提取、整理成易读HTML，并向多个邮箱发送报告，选择两个步骤。
+
+**必要判断**
+
+- j1（显式）：比较EventBridge定时调用Glue job或Lambda查询REST API，以及应用发送至Kinesis Data Firehose，对定时统计提取和HTML整理的衔接。〔S, O1, O3, O4〕
+- j2（显式）：判断SES所提格式化与邮件发送，和S3存储→事件→SNS邮件，如何与提取步骤组合以满足HTML、多收件人与每日定时要求。〔S, O2, O5〕
+
+**待官方核验**
+
+- 待查EventBridge调度、Glue/Lambda调用REST API、HTML格式化职责，以及SES和SNS邮件内容、收件人与发送限制。
+
+### Q52
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：本地应用迁至AWS，输出文件从数十GB到数百TB；数据须保持标准文件系统结构，方案须自动扩展、高可用且运维最少。
+
+**必要判断**
+
+- j1（显式）：比较ECS容器加S3、EKS容器加EBS、Multi-AZ EC2 Auto Scaling加EFS，以及相同计算部署加EBS，对文件系统语义、自动扩展、高可用和运维的整体满足程度。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：判断各存储对单文件数十GB至数百TB的限制、跨实例/AZ访问与计算扩缩时的数据持久关联要求。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查S3/EBS/EFS文件或对象大小与容量限制、文件系统语义、跨AZ共享/挂载及扩展机制，并核对各计算部署的运维前提。
+
+### Q53
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：会计记录存于Amazon S3：首1年立即可访问，再归档9年；完整10年内包括管理员和root用户在内均不得删除，并要求最大韧性。
+
+**必要判断**
+
+- j1（显式）：比较全程S3 Glacier、S3 Intelligent-Tiering及满1年由S3 Standard转入S3 Glacier Deep Archive或S3 One Zone-IA的访问、归档与韧性取舍。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较访问控制策略、10年后修改IAM策略及S3 Object Lock compliance/governance mode对完整10年不可删除要求的约束与绕过边界。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 各存储类别的访问与韧性差异、Lifecycle转换及Object Lock模式和策略对管理员/root删除权限的限制。
+
+### Q54
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：AWS上多个Windows工作负载使用两台EC2托管的Windows文件共享，双方同步并保存副本；替代存储须高可用、耐久且保持现有用户访问方式。
+
+**必要判断**
+
+- j1（显式）：比较S3加IAM认证、在现有EC2挂载S3 File Gateway、Multi-AZ FSx for Windows File Server及Multi-AZ EFS对Windows文件共享访问方式的适配。〔S, O1, O2, O3, O4〕
+- j2（显式）：评估保留EC2网关链路或迁移全部数据到托管文件系统时，高可用与耐久性由哪些部署环节承担。〔S, O2, O3, O4〕
+
+**待官方核验**
+
+- 候选存储的文件协议、认证、Windows兼容性，以及网关/EC2与Multi-AZ部署的可用性和耐久性边界。
+
+### Q55
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：VPC跨2个AZ共6个子网，每AZ各有公有、私有、数据库专用子网；EC2与RDS部署其中，只有私有子网EC2可访问RDS。
+
+**必要判断**
+
+- j1（显式）：比较数据库子网路由表排除公有CIDR、数据库安全组拒绝公有实例安全组、允许私有实例安全组及子网间peering对访问隔离的适用性。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：判断实现“仅私有EC2可访问”所依赖的安全组规则语义、规则叠加及VPC内部路由边界。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 安全组允许/拒绝与源安全组引用规则、VPC内部路由及peering的作用范围。
+
+### Q56
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：域名注册于Route 53；ca-central-1的API Gateway公开提供后端微服务API，须以公司域名和对应证书供第三方通过HTTPS安全访问。
+
+**必要判断**
+
+- j1（显式）：判断自定义域名、Regional API Gateway端点、ACM证书导入与绑定的衔接；比较证书位于ca-central-1或us-east-1、绑定端点或API的差异。〔S, O2, O3, O4〕
+- j2（显式）：比较stage变量Endpoint-URL覆盖默认URL、Route 53 alias指向Regional stage/端点及A记录指向公司域名的配置效果。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- API Gateway自定义域名的证书Region与绑定要求、stage变量用途及Route 53记录目标。
+
+### Q57
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：热门社交网站允许用户上传并分享图片，需检测不当内容，开发工作量最小。
+
+**必要判断**
+
+- j1（显式）：比较Amazon Comprehend、Amazon Rekognition、Amazon SageMaker及Fargate自部署定制ML模型的图片内容审核适配与整体开发投入。〔S, O1, O2, O3, O4〕
+- j2（显式）：区分低置信度预测的人工复核与ground truth标注，评估其在候选审核流程中的用途和衔接。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 各服务的图片审核能力、低置信度处理方式，以及定制模型训练、部署和复核所需工作。
+
+### Q58
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：关键应用容器化运行，要求可扩展和可用；公司希望专注应用维护，不负责承载容器的底层基础设施预置和管理。
+
+**必要判断**
+
+- j1（显式）：比较EC2手装Docker、ECS配EC2 worker nodes、ECS配Fargate及ECS-optimized AMI启动EC2的基础设施责任、扩展与可用性配置。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 各容器运行方式中主机预置、维护及扩缩容的责任边界；ECS-optimized AMI与Fargate的管理差异。
+
+### Q59
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：公司有超过300个全球网站和应用。
+- c2〔S〕：每天需分析超过30 TB点击流数据。
+- c3〔S〕：要求设计点击流传输和处理方案。
+- c4〔O1〕：候选用Data Pipeline归档到S3，再由EMR集群生成分析。
+- c5〔O2〕：候选用EC2自动扩缩组处理数据，送入S3数据湖供Redshift分析。
+- c6〔O3〕：候选用CloudFront缓存数据，存入S3后以对象新增事件调用Lambda处理。
+- c7〔O4〕：候选用Data Streams收集、Data Firehose传输到S3数据湖，再加载到Redshift分析。
+
+**必要判断**
+
+- j1（显式）：如何判断候选方案能否收集并传输来自大量全球站点、每日超过30 TB的点击流？〔S, O1, O2, O3, O4〕
+- j2（显式）：如何判断采集、S3落地、处理及分析各阶段的服务职责与连接方式是否完整？〔S, O1, O2, O3, O4〕
+- j3（显式）：如何比较批处理、实例处理、对象事件处理与流式交付在此数据量下的扩展及吞吐适用性？〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 各候选服务能否承担所述采集或处理职责，Data Streams、Data Firehose、S3和Redshift之间有哪些集成与加载条件？
+- 在每日超过30 TB及多来源场景下，各方案有哪些吞吐、并发、批量大小和处理时长限制，需要怎样扩展？
+
+### Q60
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：AWS网站位于ALB后，现分别处理HTTP和HTTPS；要求所有网站请求最终使用HTTPS。
+
+**必要判断**
+
+- j1（显式）：比较仅允许HTTPS的network ACL、替换URL中HTTP的规则、ALB listener重定向及改用支持SNI的NLB，区分请求阻断、URL处理与协议重定向。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- ALB listener重定向规则、network ACL适用范围及NLB/SNI与HTTP到HTTPS转换的关系。
+
+### Q61
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：两层应用中的EC2实例直接连接RDS数据库
+- c2〔S〕：应用中不得硬编码数据库凭证
+- c3〔S〕：必须定期自动轮换数据库凭证
+- c4〔S〕：要求运维开销最少
+- c5〔O1〕：元数据方案通过定时Lambda同步更新数据库和元数据中的凭证
+- c6〔O2〕：S3方案将凭证配置文件存入加密桶，并定时同步更新
+- c7〔O2〕：S3方案使用版本控制回退旧值
+- c8〔O3〕：Secrets Manager方案开启秘密自动轮换，并授权EC2角色读取
+- c9〔O4〕：Parameter Store方案保存加密参数，提出自动轮换及EC2角色访问授权
+
+**必要判断**
+
+- j1（显式）：如何判断各凭证存储方案能否避免应用硬编码，并允许EC2安全获取凭证？〔S, O1, O2, O3, O4〕
+- j2（显式）：如何判断各方案能否定期自动轮换，并保持数据库凭证与应用读取值一致？〔S, O1, O2, O3, O4〕
+- j3（显式）：如何比较托管轮换与自建定时更新、同步和回退流程的运维开销？〔S, O1, O2, O3, O4〕
+- j4（先修候选，待核验）：轮换发生后，应用需要如何重新获取凭证并衔接数据库连接？〔S〕
+
+**待官方核验**
+
+- Secrets Manager与Parameter Store分别提供哪些RDS凭证轮换能力，启用条件及EC2访问权限要求是什么？
+- 元数据及加密S3配置文件保存凭证的访问边界、同步更新和版本回退限制是什么？
+- 数据库凭证轮换期间，应用取值、缓存和连接更新需要满足哪些条件？
+
+### Q62
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：新公共Web应用部署于ALB后，边缘加密须使用外部CA签发的SSL/TLS证书，并每年在到期前轮换。
+
+**必要判断**
+
+- j1（显式）：比较ACM签发、ACM签发后导入密钥材料、ACM Private CA根CA签发及ACM导入外部证书，与外部CA及ALB证书要求的匹配。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较managed renewal与EventBridge到期通知后人工轮换的证书生命周期，判断如何满足每年到期前更新。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- ACM不同证书来源的ALB集成、密钥材料导入、托管续期资格及到期事件与替换流程。
+
+**源异常／歧义**
+
+- O2的ALUse出现文本拼接，应用证书的目标名称不完整。
+
+### Q63
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：AWS文档应用已有700,000名注册用户；新产品将平均5 MB的大.pdf转为.jpg，须保存原文件与结果，应对快速增长需求并使整体成本最优。
+
+**必要判断**
+
+- j1（显式）：比较S3 PUT事件→Lambda→S3、DynamoDB Streams→Lambda→原存储及Elastic Beanstalk上EC2程序转换的事件链路、文件承载与扩展成本。〔S, O1, O2, O3, O4〕
+- j2（显式）：评估Elastic Beanstalk配Auto Scaling时，EBS与EFS配置及最终存储位置对原文件和.jpg持久保存、跨实例使用和成本的影响。〔S, O3, O4〕
+
+**待官方核验**
+
+- 候选存储的文件大小限制、事件转换链路与Lambda处理约束，以及EBS/EFS在Auto Scaling架构中的共享和持久化边界。
+
+**源异常／歧义**
+
+- O2的存储服务名在Amazon DynamoDUse处截断并拼接后文；O4配置EFS，却要求将文件保存到EBS，目标存储表述不一致。
+
+### Q64
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：本地Windows文件服务器有超过5 TB数据，用户和应用每日访问；Windows工作负载渐迁AWS，现以Site-to-Site VPN连接，需兼顾两地低延迟访问、最少运维及不显著改变访问模式。
+
+**必要判断**
+
+- j1（显式）：比较全部迁至云端FSx for Windows File Server、本地S3 File Gateway供两地使用及按位置直连S3或使用网关的访问路径与延迟取舍。〔S, O1, O2, O3〕
+- j2（显式）：比较云端FSx加本地FSx File Gateway、云端工作负载直连FSx且本地走网关的组合，与其他方案的文件语义、迁移及整体运维差异。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- S3/FSx File Gateway的后端、缓存与文件访问语义，两地访问支持及通过VPN使用云端文件系统的限制。
+
+### Q65
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：医院通过API Gateway RESTful API和Lambda上传PDF/JPEG报告，需修改Lambda识别报告中的PHI，并使运维开销最低。
+
+**必要判断**
+
+- j1（显式）：判断PDF/JPEG文本提取与PHI识别的两阶段衔接；比较全Python库、Textract→SageMaker、Textract→Comprehend Medical及Rekognition→Comprehend Medical的适配与整体运维。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- Textract与Rekognition的文档格式和文本提取限制、Comprehend Medical的PHI输入能力，以及SageMaker或Python自建流程的维护需求。
+
+### Q66
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：大量约5 MB文件存于S3，创建后前30天频繁访问、之后少访问；至少保存4年才可删除，始终须立即访问，关键业务数据难以重建，要求成本最优。
+
+**必要判断**
+
+- j1（显式）：比较创建满30天由S3 Standard转至S3 Glacier、S3 One Zone-IA或S3 Standard-IA的即时访问、数据保护及总体成本。〔S, O1, O2, O3, O4〕
+- j2（显式）：区分创建满4年删除与满4年再转S3 Glacier的Lifecycle路径，判断其与最低保留期和持续立即可访问要求的关系。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 各存储类别的取回方式、AZ韧性、存储与请求费用及Lifecycle转换、到期时间语义。
+
+### Q67
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：多台EC2从SQS取消息、写RDS再删除消息；RDS偶现重复记录，但队列中没有重复消息，要求消息仅处理一次。
+
+**必要判断**
+
+- j1（显式）：判断重复写入与并发消费、处理耗时及接收至删除时序的关系；比较CreateQueue、AddPermission、ReceiveMessage等待时间与ChangeMessageVisibility调整的作用。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：区分减少重复消费与端到端仅处理一次，评估RDS写入和SQS删除之间是否存在需幂等或其他协调机制处理的失败窗口。〔S, O3, O4〕
+
+**待官方核验**
+
+- SQS接收等待与visibility timeout的语义、消息重投和删除条件，以及与RDS写入形成一次处理保证的边界。
+
+### Q68
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：混合架构将本地基础设施扩展至AWS Region；连接须高可用、持续低延迟并尽量省成本，主链路故障时可接受较慢流量。
+
+**必要判断**
+
+- j1（显式）：比较Direct Connect主链路加VPN备份、双VPN、同Region双Direct Connect及声称通过CLI failover属性故障时创建备份的延迟、可用性与成本取舍。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：判断备份需预先建立的连接与路由条件，以及主链路失效后的流量切换机制。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- Direct Connect/VPN的性能与冗余特征、故障切换路由要求及所述CLI failover属性的能力边界。
+
+### Q69
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：关键Web应用为ALB后EC2 Auto Scaling架构，Aurora PostgreSQL现位于单AZ；需应用高可用、停机和数据丢失最少，并使运维投入最低。
+
+**必要判断**
+
+- j1（显式）：比较多AZ Auto Scaling＋数据库Multi-AZ＋RDS Proxy，与跨Region EC2＋Route 53健康检查＋Aurora PostgreSQL Cross-Region Replication的整体故障恢复和运维取舍。〔S, O1, O2〕
+- j2（显式）：评估单AZ加每小时数据库快照恢复，以及多Region Auto Scaling加S3→事件通知→Lambda写库的部署可行性、停机与数据丢失窗口。〔S, O3, O4〕
+
+**待官方核验**
+
+- Auto Scaling的Region/AZ范围、Aurora故障恢复与复制、RDS Proxy作用，以及快照和S3异步写库链路的恢复边界。
+
+### Q70
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：HTTP应用位于NLB后，目标组关联含多台Web EC2的Auto Scaling group；NLB未识别需人工重启的HTTP错误，要求不写自定义脚本或代码地提高可用性。
+
+**必要判断**
+
+- j1（显式）：比较NLB启用应用URL的HTTP健康检查、改ALB并启用HTTP检查及基于NLB UnhealthyHostCount的CloudWatch告警，区分故障检测与实例恢复。〔S, O1, O3, O4〕
+- j2（显式）：评估健康状态如何触发Auto Scaling替换，以及告警触发替换和每分钟cron检查日志后重启的恢复链路与无自定义代码限制。〔S, O2, O3, O4〕
+
+**待官方核验**
+
+- NLB/ALB的HTTP健康检查、UnhealthyHostCount指标含义及负载均衡健康状态或告警与Auto Scaling替换的配置要求。
+
+### Q71
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：购物应用以DynamoDB保存客户信息；针对数据损坏，恢复须满足RPO 15分钟和RTO 1小时。
+
+**必要判断**
+
+- j1（显式）：比较global tables切换Region、point-in-time recovery恢复指定时间、每日导出至S3 Glacier再导入及每15分钟为表建EBS快照的损坏恢复适配。〔S, O1, O2, O3, O4〕
+- j2（显式）：分别评估恢复点粒度、损坏传播及恢复到应用可用的完整耗时，避免将跨Region可用性等同于历史数据恢复。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- DynamoDB PITR与global tables的恢复边界、备份导出和导入方式、EBS快照适用性及恢复耗时因素。
+
+### Q72
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：照片处理应用频繁上传和下载同一AWS Region内S3 buckets的图片，需降低已增加的数据传输费用。
+
+**必要判断**
+
+- j1（显式）：比较公有子网API Gateway配路由、公有子网NAT gateway配endpoint policy、应用迁公有子网经internet gateway，以及S3 VPC gateway endpoint配policy的路径、费用和访问控制。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 各路径的S3传输和中转计费、路由与部署模型，以及endpoint policy可附加的资源范围。
+
+### Q73
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Linux应用EC2在私有子网，Linux bastion EC2在公有子网；从本地网络经公司互联网连接先到bastion再到应用，须配置两端安全组，选择两项组合。
+
+**必要判断**
+
+- j1（显式）：比较bastion入站仅允许应用实例、公司内部IP范围或外部IP范围，判断互联网第一跳实际匹配的来源。〔S, O1, O2, O3〕
+- j2（显式）：比较应用SSH入站仅允许bastion私有IP或公有IP，判断VPC内第二跳的源地址并组合两跳规则。〔S, O4, O5〕
+
+**待官方核验**
+
+- 本地经互联网访问公有EC2与bastion访问私有EC2时的源IP、安全组入站及SSH连接要求。
+
+### Q74
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：两层Web应用：公有子网EC2承载公网Web层，私有子网EC2运行Microsoft SQL Server；安全优先，需选择两项安全组配置。
+
+**必要判断**
+
+- j1（显式）：区分Web层面向0.0.0.0/0的443入站与出站规则，判断公网访问所需方向。〔S, O1, O2〕
+- j2（显式）：比较数据库层从Web安全组入站1433、入站443和1433，及向Web安全组出站443和1433，判断层间连接与最小端口范围。〔S, O3, O4, O5〕
+
+**待官方核验**
+
+- HTTPS与Microsoft SQL Server的端口、源安全组引用及安全组有状态行为对入站/出站规则的影响。
+
+### Q75
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：本地多层应用拟迁AWS以提高性能；各层通过RESTful服务通信，某层过载会丢交易；需解决丢失、现代化且整体运维最高效。
+
+**必要判断**
+
+- j1（显式）：比较API Gateway→Lambda应用层＋SQS层间通信、EC2服务间SNS或SQS消息，以及仅按CloudWatch历史峰值放大EC2的解耦与过载处理。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较托管执行与EC2 Auto Scaling的整体运维；评估SNS队列长度、SQS队列长度及通信失败触发扩容的指标语义与扩缩容时机。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- SNS/SQS消息保存和解耦差异、候选监控指标及API Gateway/Lambda或EC2 Auto Scaling组合的过载与扩展边界。
+
+### Q76
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：单一工厂多台机器每日产生10 TB仪器JSON文件，存于厂内数据中心SAN；需安全传至S3供多个系统做关键近实时分析，优先传输可靠性。
+
+**必要判断**
+
+- j1（显式）：比较AWS DataSync与AWS DMS对SAN文件迁移的适配，以及分别经公网或Direct Connect时的吞吐、传输可靠性、安全和近实时需求。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- DataSync/DMS的文件源与S3目标支持、传输校验和加密机制，以及公网/Direct Connect路径的容量与可靠性限制。
+
+### Q77
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：实时数据摄取架构须包含API、流入时的数据转换及数据存储，要求整体运维开销最低。
+
+**必要判断**
+
+- j1（显式）：比较EC2托管API或API Gateway→Kinesis data stream→Kinesis Data Firehose→S3，并由Lambda转换的数据链路与整体运维责任。〔S, O1, O3〕
+- j2（显式）：比较EC2 API→Glue转换并入S3与API Gateway→Glue配Lambda转换并入S3的流处理适配；判断EC2关闭source/destination checking与链路的关系。〔S, O2, O4〕
+
+**待官方核验**
+
+- API Gateway、Kinesis、Firehose、Lambda和Glue的集成、流式转换及交付能力，以及EC2源/目标检查的作用范围。
+
+### Q78
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：用户交易数据存于DynamoDB表，必须保留7年，要求整体运维最高效。
+
+**必要判断**
+
+- j1（显式）：比较DynamoDB PITR连续备份、AWS Backup计划和保留策略、控制台按需备份转S3配Lifecycle及EventBridge→Lambda备份至S3配Lifecycle的长期保留与自动化。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：区分恢复窗口、备份保留期和备份至S3的操作路径，判断7年留存所需的备份管理前提。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- DynamoDB PITR与按需备份的保留和导出限制、AWS Backup对DynamoDB的计划/保留支持及S3 Lifecycle衔接。
+
+### Q79
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：计划使用DynamoDB并优化成本；多数早晨无使用，晚间读写常不可预测，尖峰出现非常迅速。
+
+**必要判断**
+
+- j1（显式）：比较on-demand与provisioned加auto scaling在空闲成本和突发读写响应上的取舍，并判断global secondary index或provisioned global table与该容量问题的关系。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- DynamoDB容量模式的计费、突发扩展与限制，auto scaling响应机制，以及GSI/global tables的容量与成本影响。
+
+### Q80
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：需为应用迁移将现有账户的EBS-backed AMI共享给MSP Partner账户；EBS快照由KMS customer managed key加密，要求共享方式最安全。
+
+**必要判断**
+
+- j1（显式）：比较公开AMI/快照与仅修改launchPermission授权MSP账户，并判断共享加密AMI所需的快照和KMS跨账户权限如何衔接。〔S, O1, O2, O3〕
+- j2（显式）：比较现有密钥policy允许MSP账户使用、policy信任MSP新KMS key，以及导出AMI到MSP的S3并用新key加密后复制启动的可行性与权限暴露。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 加密AMI/快照共享和导出限制、launchPermission范围及跨账户KMS key policy与重新加密流程。
+
+### Q81
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：新AWS应用的无状态处理器需并行处理作业，按待处理作业数增减节点，同时保持松耦合和作业项耐久保存。
+
+**必要判断**
+
+- j1（显式）：比较SNS topic与SQS queue作为作业入口的分发、保存及并行消费语义，并衔接包含处理器的AMI和Auto Scaling group。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较launch configuration/template及CPU、网络使用量、SQS队列项数、SNS发布消息数作为节点增减依据的适用性。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- SNS/SQS作业持久化与消费差异、Auto Scaling启动配置方式及各指标与待处理工作量的对应关系。
+
+### Q82
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：云端Web应用的Elastic Load Balancers使用导入ACM的证书；安全团队须在每张证书到期前30天收到通知。
+
+**必要判断**
+
+- j1（显式）：比较ACM规则自30天前每日发布SNS、Config检查30天内到期后经EventBridge→SNS，以及Trusted Advisor检查→CloudWatch状态告警→SNS的适用性。〔S, O1, O2, O3〕
+- j2（显式）：评估EventBridge检测30天内到期→Lambda→SNS通知链路，并比较各方案对导入证书、阈值与通知时点的覆盖。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 导入ACM证书的到期事件与阈值、Config/Trusted Advisor检查覆盖及ACM、EventBridge、CloudWatch到SNS的支持链路。
+
+### Q83
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：动态网站现托管于美国本地服务器，后端必须留在美国；产品数日后在欧洲发布，需立即改善欧洲用户加载时间。
+
+**必要判断**
+
+- j1（显式）：比较迁往us-east-1 EC2、迁至S3并跨Region复制、CloudFront custom origin指向本地服务器及Route 53 geoproximity指向本地服务器的加载改善与实施时效。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：区分动态内容交付、缓存与DNS选路的作用，判断保持美国后端时各方案所需的网站改动及源站衔接。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- CloudFront动态内容及本地custom origin支持、S3网站承载边界和Route 53 geoproximity对单一源站路径的作用。
+
+### Q84
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：开发、测试、生产均以EC2运行Web/应用/数据库三层，峰时平均CPU 30%、非峰时10%；生产每日24小时，开发测试每日至少8小时，计划自动停止闲置开发测试实例，要求购买组合成本最优。
+
+**必要判断**
+
+- j1（显式）：比较生产Spot或Spot blocks＋开发测试Reserved、生产Reserved＋开发测试On-Demand、生产On-Demand＋开发测试Spot blocks四种组合。〔S, O1, O2, O3, O4〕
+- j2（显式）：评估连续运行、每日开停及闲置时段下的承诺计费、时长和中断边界；区分购买方式优化与低CPU利用率提示的容量问题。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- Reserved、On-Demand、Spot和Spot blocks的计费承诺、停止后费用、可用时长及中断规则。
+
+### Q85
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：生产Web应用允许网页或移动端上传文档；新监管要求新文档存储后不得修改或删除。
+
+**必要判断**
+
+- j1（显式）：比较S3 Versioning＋Object Lock、S3 Lifecycle定期归档、S3 Versioning＋只读ACL及EFS只读挂载对存后不可修改和不可删除的约束范围。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：区分版本保留、归档、访问路径只读与存储层不可变性，并判断不可变保护所需的配置前提。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- S3 Object Lock与Versioning的配置和保护边界、ACL权限及EFS只读挂载能约束的修改/删除路径。
+
+### Q86
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：多台Web服务器频繁访问同一RDS MySQL Multi-AZ DB instance；连接须安全且数据库用户凭证需频繁轮换。
+
+**必要判断**
+
+- j1（显式）：比较Secrets Manager＋IAM、Systems Manager OpsCenter＋IAM、受保护S3存凭证＋IAM及Web服务器本地KMS加密文件的凭证保护、获取与轮换流程。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：判断多服务器在凭证更新后获取有效凭证并继续连接数据库所需的权限与更新衔接，区分静态加密和轮换能力。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 候选服务的机密存储与RDS MySQL凭证轮换支持、IAM/KMS权限及应用获取更新凭证的机制。
+
+### Q87
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：API Gateway调用Lambda将客户数据写入Aurora MySQL；数据库升级期间无法建连，部分事件数据未记录，需保存升级期间产生的客户数据。
+
+**必要判断**
+
+- j1（显式）：比较Lambda→RDS Proxy→数据库与延长Lambda至最大运行时长并代码重试，评估升级中断期间连接和数据保存的边界。〔S, O1, O2〕
+- j2（显式）：比较Lambda本地存储后由新函数扫描，与SQS FIFO持久接收后由新Lambda轮询写库的保存、重试和升级后补写链路。〔S, O3, O4〕
+
+**待官方核验**
+
+- RDS Proxy对升级中断的行为、Lambda最长运行与本地存储可见性，以及SQS FIFO到Lambda写库的持久化和重试限制。
+
+### Q88
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：调查公司多年美国地区数据存于3 TB且持续增长的S3 bucket，现与拥有S3 buckets的欧洲营销公司共享，要求调查公司自身数据传输费用尽量低。
+
+**必要判断**
+
+- j1（显式）：比较Requester Pays与授予营销公司跨账户访问时的访问授权和费用承担，区分费用转由请求方支付与总传输量下降。〔S, O1, O3〕
+- j2（显式）：比较跨Region复制到对方bucket与源bucket改Intelligent-Tiering后同步到对方bucket的持续传输、存储费用及公司承担范围。〔S, O2, O4〕
+
+**待官方核验**
+
+- Requester Pays的适用请求、付费主体和访问前提，以及跨账户访问、Cross-Region Replication和同步的传输计费。
+
+### Q89
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：机密审计文档存S3，bucket policy已按最小权限限制审计团队IAM用户访问；需进一步防止意外删除。
+
+**必要判断**
+
+- j1（显式）：比较S3 Versioning＋MFA Delete与各IAM用户启用MFA对删除操作、版本恢复和认证环节的保护差异。〔S, O1, O2〕
+- j2（显式）：评估将S3 Lifecycle配置到IAM用户并在审计日期拒绝s3:DeleteObject，以及KMS加密并禁止审计用户访问key，对防误删及既有文档访问的影响。〔S, O3, O4〕
+
+**待官方核验**
+
+- Versioning/MFA Delete适用操作与配置前提、IAM MFA与删除授权关系、Lifecycle作用对象及KMS权限和S3删除权限边界。
+
+### Q90
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：公开电影数据存RDS Single-AZ SQL数据库；脚本每日随机时段查询新增电影数，须在营业时间报告最终总数，但运行时妨碍开发任务性能；需最少运维解决。
+
+**必要判断**
+
+- j1（显式）：比较改Multi-AZ、建立read replica并仅由脚本查询、每日结束人工导出及ElastiCache缓存常见查询的负载隔离、数据时效与整体运维。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：判断统计结果所需的新鲜度与营业时间交付如何受复制延迟、缓存更新或日终导出时点影响，不额外设定一致性时限。〔S, O2, O3, O4〕
+
+**待官方核验**
+
+- RDS Multi-AZ和read replica的读取角色、复制延迟，以及ElastiCache更新和日终导出对统计结果时效的约束。
+
+### Q91
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：VPC内EC2应用需调用S3 API存取对象；安全规定禁止任何应用流量经过互联网。
+
+**必要判断**
+
+- j1（显式）：比较S3 gateway endpoint、将bucket放入私有子网、bucket与EC2同Region及同子网NAT gateway对S3 API实际网络路径的影响。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- S3资源与子网/Region的关系、gateway endpoint路由及NAT访问S3是否满足不经互联网的路径要求。
+
+### Q92
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：敏感用户信息存S3 bucket，需从VPC内EC2应用层安全访问，选择两项组成方案。
+
+**必要判断**
+
+- j1（显式）：比较S3 VPC gateway endpoint与NAT instance访问路径，并判断与仅允许VPC应用层访问的bucket policy如何配合。〔S, O1, O3, O5〕
+- j2（显式）：评估公开bucket对象、复制具S3策略的IAM用户凭证到EC2，以及限制应用层访问的策略对敏感数据暴露和凭证管理的差异。〔S, O2, O3, O4〕
+
+**待官方核验**
+
+- S3 endpoint与bucket policy可用限制条件、NAT路径及EC2访问S3的身份授权和长期凭证风险边界。
+
+### Q93
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：本地MySQL应用迁AWS以增强弹性与可用性，平时读负载高；每4小时全量导出生产库填充staging，期间用户延迟不可接受且开发无法使用staging；新架构须缓解延迟并避免开发等待。
+
+**必要判断**
+
+- j1（显式）：比较生产采用Aurora MySQL＋Multi-AZ Aurora Replicas与RDS MySQL＋Multi-AZ＋read replicas的读取扩展、可用性和导出干扰。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较mysqldump备份恢复、Aurora按需database cloning及将RDS standby用作staging的创建流程、角色限制和开发等待时间。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- Aurora/RDS副本和standby的用途、Aurora cloning隔离与创建约束，以及mysqldump备份恢复对生产和staging可用性的影响。
+
+### Q94
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：用户上传小文件至S3，每文件仅需一次简单转换并保存JSON供后续分析；上传后尽快处理，日需求可大量、少量或为零，要求整体运维最低。
+
+**必要判断**
+
+- j1（显式）：比较EMR读S3→脚本→Aurora、S3通知→SQS→EC2或Lambda→DynamoDB的触发及时性、弹性和整体运维。〔S, O1, O2, O3〕
+- j2（显式）：评估EventBridge→Kinesis Data Streams→Lambda→Aurora的上传事件和转换存储衔接，并与SQS链路比较队列/流及目标数据库选择。〔S, O2, O3, O4〕
+
+**待官方核验**
+
+- S3上传事件经SQS或EventBridge/Kinesis到计算服务的集成、消费扩展与闲置运维，以及JSON写入DynamoDB/Aurora的方式。
+
+### Q95
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：总部用户通过应用访问RDS MySQL产品数据；运维已定位性能下降，需快速分离读写流量并优化应用性能。
+
+**必要判断**
+
+- j1（显式）：比较改Multi-AZ后由primary或secondary AZ承担读取，与创建read replicas进行读写分离的角色和接入变更。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较read replica采用源库一半或相同计算与存储资源时的配置限制、读负载承载与复制追赶能力。〔S, O3, O4〕
+
+**待官方核验**
+
+- RDS MySQL Multi-AZ各实例的读取角色、read replica接入方式及计算/存储规格约束和复制性能影响。
+
+### Q96
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：EC2管理员将某策略关联到含多名用户的IAM组，需解释策略效果。
+
+**必要判断**
+
+- j1（显式）：依据待补策略判断EC2终止权限，区分us-east-1内外、实例IP 10.100.100.1与用户源IP 10.100.100.254，以及允许或拒绝的条件。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待补完整策略的Effect、Action、Resource、Condition，再查Region与源IP条件及IAM允许/拒绝评估规则。
+
+**源异常／歧义**
+
+- 题干提到的策略正文或图像未提供，缺少解释其权限效果所必需的输入。
+
+### Q97
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：大型本地Microsoft SharePoint部署拟迁AWS，需要Microsoft Windows共享文件存储，且须高可用并集成Active Directory进行访问控制。
+
+**必要判断**
+
+- j1（显式）：比较EFS设置AD domain、两AZ Storage Gateway file gateway提供SMB、Windows Server挂载S3为卷及FSx for Windows File Server设置AD domain的共享和认证适配。〔S, O1, O2, O3, O4〕
+- j2（显式）：评估各候选存储及其部署方式如何满足高可用，并区分多AZ网关部署与后端文件服务的可用性责任。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 候选服务的Windows/SMB与AD集成、高可用部署要求，以及Storage Gateway跨AZ和S3卷挂载方案的支持边界。
+
+### Q98
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：图片上传S3后，对象创建通知进入SQS standard queue，再触发Lambda处理并邮件返回结果；同一消息多次调用导致每图多封邮件，需最低运维解决。
+
+**必要判断**
+
+- j1（显式）：比较ReceiveMessage长轮询等待30秒与visibility timeout大于函数timeout加batch window timeout，对处理期间消息再次触发的影响。〔S, O1, O3〕
+- j2（显式）：比较改FIFO并用deduplication ID与Lambda读后处理前立即删消息的去重、集成和失败丢失边界，并衡量整体运维。〔S, O2, O4〕
+
+**待官方核验**
+
+- SQS长轮询上限、Lambda消费的visibility/batch时序和删除机制，以及S3通知到FIFO的支持与去重范围。
+
+### Q99
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：游戏应用位于本地数据中心，需要共享存储，必须允许Lustre客户端访问且服务完全托管。
+
+**必要判断**
+
+- j1（显式）：比较Storage Gateway file gateway按需协议共享、EC2 Windows自建文件共享、EFS配置Lustre及FSx for Lustre的协议适配和托管责任。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：判断候选文件系统挂接origin server并由本地应用连接所需的挂载与网络前提。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 各服务的Lustre客户端支持、托管范围，以及本地客户端访问和文件系统挂载的网络限制。
+
+### Q100
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：EC2上的容器应用须先下载安全证书才能与其他业务应用通信；需高度安全、近实时加解密，并将加密后数据存于高可用存储，整体运维最低。
+
+**必要判断**
+
+- j1（显式）：比较Secrets Manager保存加密证书＋人工更新＋细粒度IAM、Lambda配Python cryptography及KMS customer managed key授权EC2 role的加解密与访问链路。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较KMS配S3或EBS保存密文的高可用和运维取舍；评估O2将函数存S3是否涵盖加密数据存储需求。〔S, O2, O3, O4〕
+
+**待官方核验**
+
+- Secrets Manager/KMS加解密、IAM授权与近实时调用约束，S3/EBS高可用范围及自建Lambda加密流程的存储衔接。
+
+### Q101
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：IPv4 VPC跨3个AZ，每AZ各1公有和1私有子网以实现高可用；公有子网通过internet gateway上网，私有EC2需上网下载软件更新。
+
+**必要判断**
+
+- j1（显式）：比较每AZ公有子网部署NAT gateway并以本AZ私有路由表转发非VPC流量，与每AZ私有子网部署NAT instance及同AZ路由的连通性和可用性。〔S, O1, O2〕
+- j2（显式）：评估在私有子网添加第二个internet gateway或在公有子网部署egress-only internet gateway并修改私有路由，与IPv4地址和网关作用范围的匹配。〔S, O3, O4〕
+
+**待官方核验**
+
+- NAT gateway/instance的子网、出口和路由要求，跨AZ故障边界及internet gateway、egress-only internet gateway的挂接与IP版本限制。
+
+### Q102
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：本地SFTP服务器以NFS文件系统保存200 GB数据，须迁至使用EFS的EC2托管；需选择两项自动化迁移步骤。
+
+**必要判断**
+
+- j1（显式）：判断本地安装DataSync agent与创建源location的组合如何读取NFS后端并迁入EFS，区分SFTP服务与实际迁移源接口。〔S, O2, O5〕
+- j2（显式）：比较EC2与EFS同AZ、添加第二块EBS及手工OS copy命令对目标存储和自动化迁移的作用，并评估与DataSync步骤的组合。〔S, O1, O2, O3, O4, O5〕
+
+**待官方核验**
+
+- DataSync agent、NFS源与EFS目标location的支持和网络要求，以及EFS的AZ/挂载模型及SFTP接口适用性。
+
+### Q103
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Glue ETL每天固定时间处理S3中的XML，每日新增数据，但每次重复处理全部数据；需避免重新处理旧数据。
+
+**必要判断**
+
+- j1（显式）：比较job bookmarks、处理后删源数据、NumberOfWorkers设为1及FindMatches ML transform对增量识别和避免旧数据重处理的作用，保留XML输入限制。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- Glue job bookmarks对XML/S3来源的支持条件和状态语义，以及删除源数据、worker数量和FindMatches各自的作用边界。
+
+### Q104
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：网站由EC2上的Windows Web服务器承载，基础设施须高可用；需抵御来自数千IP的大规模DDoS且不接受停机，选择两项行动。
+
+**必要判断**
+
+- j1（显式）：比较Shield Advanced、GuardDuty自动封禁及CloudFront同时承载静态/动态内容的检测、防护和流量承载角色，判断组合衔接。〔S, O1, O2, O3〕
+- j2（显式）：评估Lambda自动将攻击IP加入VPC network ACL，以及Spot Auto Scaling按80% CPU目标跟踪，对数千IP攻击的规模、响应与不停机目标的影响。〔S, O4, O5〕
+
+**待官方核验**
+
+- Shield Advanced/CloudFront防护与动态内容支持、GuardDuty执行阻断的边界、network ACL容量及Spot和CPU扩缩容的可用性限制。
+
+### Q105
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：新serverless工作负载由Amazon EventBridge规则调用AWS Lambda；权限配置须遵循最小权限。
+
+**必要判断**
+
+- j1（显式）：辨析函数execution role与resource-based policy在调用授权中的作用，比较两类配置能否满足EventBridge调用要求。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较lambda:InvokeFunction与lambda:*，以及Principal为*、lambda.amazonaws.com或events.amazonaws.com时的权限范围与调用主体匹配。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查Lambda调用授权位置、EventBridge服务主体及最小Action范围。
+
+### Q106
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Amazon S3机密数据须静态加密、记录密钥使用供审计、每年轮换密钥，并使运维最省。
+
+**必要判断**
+
+- j1（显式）：比较SSE-C、SSE-S3、SSE-KMS手动轮换与自动轮换，能否同时覆盖加密、密钥使用审计及年度轮换，并比较整体运维负担。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查各加密方式的密钥管理责任、使用日志与年度轮换能力及配置限制。
+
+### Q107
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：共享单车高峰期位置追踪采用多层架构；位置数据须可经REST API存取，并供既有分析平台使用。
+
+**必要判断**
+
+- j1（显式）：比较Athena＋S3、API Gateway＋Lambda、QuickSight＋Redshift、API Gateway＋Kinesis Data Analytics，能否衔接REST API、位置数据存取与既有分析平台。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：区分API入口、处理、分析展示与持久化职责，识别各组合为完成位置数据存取仍需的组件。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查各组合的REST集成方式、数据写入读取路径及持久化边界。
+
+**源异常／歧义**
+
+- O2、O4未明确位置数据的持久化存储，题目要求的完整存取范围存在省略。
+
+### Q108
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：汽车销售网站的挂牌数据存于Amazon RDS；售出后须从网站移除挂牌，并把数据发送给多个目标系统。
+
+**必要判断**
+
+- j1（显式）：比较RDS数据库更新触发Lambda与RDS event notification，能否捕获售出相关变更并传递所需业务数据。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较共享SQS标准队列、FIFO队列、SQS向多个SNS topic扇出及SNS向多个SQS队列扇出，能否让各目标获得数据并通过Lambda更新目标。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查RDS通知与数据变更事件范围、Lambda触发衔接、SQS消费语义及SNS/SQS扇出方向。
+
+**源异常／歧义**
+
+- 未说明RDS引擎及数据库更新触发机制，RDS event notification是否指业务数据变更存在题意歧义。
+
+### Q109
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：数据存于S3，必须防止被更改
+- c2〔S〕：新上传对象保持不可变，期限不确定，直到公司决定修改
+- c3〔S〕：仅账户内特定用户可以具备删除对象的能力
+- c4〔O1〕：Glacier方案提出WORM保管库锁策略
+- c5〔O2〕：保留期方案开启Object Lock和版本控制，设置100年及默认治理模式
+- c6〔O3〕：审计方案跟踪修改事件，通知后从备份版本恢复
+- c7〔O4〕：法律保留方案开启Object Lock和版本控制，对对象添加法律保留
+- c8〔O4〕：法律保留方案给需删除对象的用户添加指定权限
+
+**必要判断**
+
+- j1（显式）：如何区分不定期不可变要求与固定100年保留期、治理模式及法律保留的适用条件？〔S, O2, O4〕
+- j2（显式）：如何判断解除保护、修改对象与删除对象分别需要什么权限，能否仅授予指定用户？〔S, O4〕
+- j3（显式）：如何判断保管库锁、对象锁及修改后恢复是否满足S3新对象的预防性保护要求？〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- S3 Object Lock的版本控制前提、治理模式与法律保留的期限、修改和解除规则分别是什么？
+- s3:PutObjectLegalHold与解除保留、删除对象之间是什么权限关系，还需要哪些权限？
+- Glacier保管库锁与S3对象保护的资源范围有何区别，CloudTrail加恢复流程能提供何种保护？
+
+**源异常／歧义**
+
+- 题干含“ability 10 delete”字样，连接词存在文字异常；未擅自改写原文。
+
+### Q110
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：EC2网站同步缩放上传图片并将缩放图存入S3，上传缓慢；需两项组合降低耦合、改善网站性能且运维最省。
+
+**必要判断**
+
+- j1（显式）：比较上传至S3 Glacier、由Web服务器上传原图至S3、浏览器通过presigned URL直传S3，对上传路径、性能与耦合的影响。〔S, O1, O2, O3〕
+- j2（显式）：比较S3 Event Notifications在上传后调用Lambda缩图与EventBridge定时调用Lambda缩图，并判断其与上传方案的完整组合。〔S, O2, O3, O4, O5〕
+
+**待官方核验**
+
+- 官方待查浏览器预签名上传、S3/Glacier上传与事件能力，以及事件驱动和定时缩图的衔接与运维差异。
+
+### Q111
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：现有ActiveMQ队列、消费者、MySQL均运行于EC2；需整体最高可用性且运维复杂度低。
+
+**必要判断**
+
+- j1（显式）：比较跨AZ增加自管ActiveMQ与Amazon MQ跨两个AZ的active/standby，以及自管MySQL跨AZ复制与RDS for MySQL Multi-AZ的组合。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较仅在另一AZ增加消费者EC2与消费者跨两个AZ的Auto Scaling group，对端到端可用性、容量恢复和整体运维的影响。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查ActiveMQ/Amazon MQ故障切换、消费者跨AZ与Auto Scaling、MySQL复制及RDS Multi-AZ的恢复和管理边界。
+
+### Q112
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：本地容器化Web应用因请求快速增长而容量不足；迁AWS需最少代码修改、最少开发投入及最低运维开销。
+
+**必要判断**
+
+- j1（显式）：比较ECS Fargate＋Service Auto Scaling＋ALB、两台EC2＋ALB、重写为受支持语言的多个Lambda＋API Gateway、ParallelCluster HPC的迁移适配与扩展方式。〔S, O1, O2, O3, O4〕
+- j2（显式）：评估各完整方案对现有容器代码复用、开发改造及持续基础设施运维的总体要求。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查各运行平台的容器支持、请求扩展机制、代码迁移要求与基础设施管理责任。
+
+### Q113
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：迁移本地50 TB报表数据；无额外网络带宽，须尽快开始传输，期间暂停现有应用；每周自定义转换作业迁后须在AWS继续，运维最省。
+
+**必要判断**
+
+- j1（显式）：比较DataSync、Snowcone、Snowball Edge Storage Optimized及其含EC2 compute方案，在无额外带宽、50 TB容量和启动时机下的适配。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较以Glue重建转换作业、在Snowcone部署现有应用、在AWS EC2运行现有应用，并评估与离线迁移组合后的云端执行及运维负担。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查传输方式的网络依赖、设备容量与计算配置，以及Glue/设备/云端EC2承载每周转换的要求。
+
+### Q114
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：用户上传照片及相框选择元数据；当前单台EC2处理、DynamoDB存元数据；用户增长且并发随时段和星期显著波动，须可扩展。
+
+**必要判断**
+
+- j1（显式）：比较Lambda处理、Kinesis Data Firehose处理与固定三台EC2，能否承载照片处理及显著变化的并发。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较照片与元数据同存DynamoDB、由Firehose存储、照片存S3且元数据保留DynamoDB、同存io2 EBS的组合适配与扩展边界。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查照片处理服务能力、DynamoDB对象限制及S3、Firehose、io2 EBS的存储和并发访问模式。
+
+### Q115
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：公共子网中的EC2处理S3医疗客户文件，当前经互联网访问且无需其他网络访问；文件传输须走私有路径、不得经过互联网。
+
+**必要判断**
+
+- j1（显式）：比较公共子网经NAT gateway、仅用安全组限制S3 prefix list、迁私有子网并关联S3 VPC endpoint路由、移除internet gateway并走Direct Connect，能否满足实际传输路径要求。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查NAT、安全组前缀列表、S3 VPC endpoint及Direct Connect的路由与互联网路径边界。
+
+### Q116
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：替换维护补丁负担重的CMS网站；每年更新4次、无需动态内容，须高扩展性、增强安全且运维最省，需两项组合。
+
+**必要判断**
+
+- j1（显式）：比较S3 static website hosting、Lambda管理并提供内容、EC2 Auto Scaling＋ALB的静态网站部署适配与总体运维。〔S, O3, O4, O5〕
+- j2（显式）：比较CloudFront与AWS WAF web ACL能否承担选项所述HTTPS功能，并与网站托管方案组合满足安全和扩展目标。〔S, O1, O2, O3, O4, O5〕
+
+**待官方核验**
+
+- 官方待查静态托管、CloudFront与WAF的HTTPS责任及其与S3/Lambda/ALB的集成限制。
+
+### Q117
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：应用日志已存CloudWatch Logs log group；须近实时将全部日志存入Amazon OpenSearch Service，且运维最省。
+
+**必要判断**
+
+- j1（显式）：比较CloudWatch Logs subscription、日志组触发自定义Lambda写入、Firehose以日志组为源及OpenSearch为目标的完整投递路径与运维。〔S, O1, O2, O3〕
+- j2（显式）：评估每台应用服务器安装Kinesis Agent并经Kinesis Data Streams送OpenSearch，能否覆盖既有日志组的全部日志及近实时要求，并比较新增管理工作。〔S, O4〕
+
+**待官方核验**
+
+- 官方待查CloudWatch Logs各订阅目标与投递配置、Firehose源定义、Kinesis Agent/Streams至OpenSearch所需衔接及延迟。
+
+### Q118
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：跨多个AZ的EC2 Web应用访问约900 TB文本仓库；存储须始终随高需求扩展，整体成本最优。
+
+**必要判断**
+
+- j1（显式）：比较Amazon EBS、Amazon EFS、Amazon OpenSearch Service与Amazon S3对900 TB文档访问、跨AZ应用使用和需求扩展的适配及总成本。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查各存储的容量、扩展与跨AZ访问限制，以及此类文档仓库的计费维度。
+
+### Q119
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：跨多个账户的API Gateway REST APIs部署于us-east-1、ap-southeast-2；须防SQL injection与cross-site scripting，管理投入最少。
+
+**必要判断**
+
+- j1（显式）：比较两Region分别配置AWS WAF并关联Regional web ACL至API stage，与两Region通过AWS Firewall Manager集中配置WAF规则的防护及跨账户管理。〔S, O1, O2〕
+- j2（显式）：评估AWS Shield在两个或仅一个Region部署并关联Regional web ACL的提议，能否覆盖指定攻击、服务及双Region范围。〔S, O3, O4〕
+
+**待官方核验**
+
+- 官方待查WAF、Firewall Manager、Shield的攻击防护职责、API stage关联范围及跨账户跨Region管理要求。
+
+### Q120
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：自管DNS在us-west-2的NLB后有3台EC2，新增eu-west-1的NLB及3台EC2；用户主要在美国和欧洲，须路由至全部实例以改善性能与可用性。
+
+**必要判断**
+
+- j1（显式）：比较Global Accelerator standard accelerator双Region endpoint groups＋两个NLB，与Route 53 geolocation＋CloudFront接NLB或6台EIP实例，以及改ALB后latency routing＋CloudFront的完整路径。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：辨析DNS流量协议与CloudFront、Global Accelerator、NLB、ALB的兼容性，以及地域、延迟路由和故障切换对目标覆盖的影响。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查各入口支持的DNS承载协议、endpoint/origin类型及跨Region路由与健康处理。
+
+### Q121
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：OLTP使用未加密RDS DB instance，部署为Multi-AZ且每日快照；须确保今后数据库及快照始终加密。
+
+**必要判断**
+
+- j1（显式）：比较加密最新快照副本后恢复替换实例、加密EBS并复制快照再启用DB加密、加密快照恢复至现有实例、仅复制到SSE-KMS S3的迁移路径。〔S, O1, O2, O3, O4〕
+- j2（显式）：判断各路径能否同时覆盖运行中数据库与未来每日快照，而非仅改变副本存放位置的加密。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查RDS现有实例加密变更、快照加密复制与恢复目标限制，以及后续快照加密继承。
+
+### Q122
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：为开发者的应用数据加密建立可扩展密钥管理基础设施，并降低运维负担。
+
+**必要判断**
+
+- j1（显式）：比较MFA保护、AWS KMS、ACM创建存储分配密钥、IAM policy限制用户访问，区分访问保护措施与完整密钥管理能力及总体运维。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查KMS、ACM的密钥用途与生命周期管理范围，以及MFA/IAM对该基础设施的作用边界。
+
+### Q123
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：动态Web应用运行于两个EC2实例。
+- c2〔S〕：公司自有SSL证书已安装在每个实例上用于SSL终止。
+- c3〔S〕：流量增长后，加解密使Web服务器计算容量达到上限，目标是提升应用性能。
+- c4〔O1〕：候选新建ACM证书并安装到每个实例。
+- c5〔O2〕：候选把证书迁至S3桶，并让EC2引用该桶进行SSL终止。
+- c6〔O3〕：候选新增EC2代理承载证书，并将连接转发到现有实例。
+- c7〔O4〕：候选将自有证书导入ACM，由ALB的HTTPS监听器使用。
+
+**必要判断**
+
+- j1（显式）：如何判断方案是否改变SSL终止位置，并减少现有Web实例的加解密计算负载？〔S, O1, O2, O3, O4〕
+- j2（显式）：如何判断自有证书迁移、ACM证书使用及HTTPS监听器配置能否形成可运行的终止链路？〔S, O1, O2, O3, O4〕
+- j3（显式）：如何比较新增EC2代理与负载均衡终止方案在流量增长时的性能承载方式？〔S, O3, O4〕
+
+**待官方核验**
+
+- ACM新建及导入证书分别有哪些部署、导出和服务集成限制，S3引用证书的描述需要哪些实际终止组件？
+- EC2代理与ALB HTTPS监听器分别如何处理SSL终止及后端连接，哪些配置会影响Web实例负载？
+
+### Q124
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：高度动态的批处理需大量EC2，作业无状态、可随时启停且无负面影响，通常总耗时60分钟以上；方案须可扩展且成本有效。
+
+**必要判断**
+
+- j1（显式）：比较EC2 Spot、Reserved、On-Demand与迁至AWS Lambda，对动态容量、可中断特性、60分钟以上作业执行方式及总成本的适配。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查EC2购买模式的承诺与中断差异，以及Lambda执行时限和长批处理所需拆分条件。
+
+### Q125
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：两层电商网站由负载均衡器向 EC2 转发流量，数据库层使用 RDS 实例。
+- c2〔S〕：EC2 和 RDS 均不得暴露于公共互联网。
+- c3〔S〕：EC2 必须访问互联网，通过第三方网页服务完成订单支付。
+- c4〔S〕：应用必须高可用。
+- c5〔S〕：要求选择两个配置项组成方案。
+- c6〔O1〕：候选通过自动扩缩组在私有子网启动 EC2。
+- c7〔O1〕：该私有 EC2 候选在私有子网部署 RDS 多可用区实例。
+- c8〔O2〕：候选网络包含跨两个可用区的两个私有子网和两个 NAT 网关。
+- c9〔O2〕：该双私有子网候选将 ALB 部署在私有子网。
+- c10〔O3〕：候选通过自动扩缩组在跨两个可用区的公有子网启动 EC2。
+- c11〔O3〕：该公有 EC2 候选在私有子网部署 RDS 多可用区实例。
+- c12〔O4〕：候选网络包含一个公有子网、一个私有子网及跨两个可用区的两个 NAT 网关。
+- c13〔O4〕：该单公有子网候选将 ALB 部署在公有子网。
+- c14〔O5〕：候选网络包含跨两个可用区的两个公有子网、两个私有子网及两个 NAT 网关。
+- c15〔O5〕：该双公有子网候选将 ALB 部署在公有子网。
+
+**必要判断**
+
+- j1（显式）：如何判断 EC2 与 RDS 的部署及访问配置是否满足不向公共互联网暴露的要求？〔S, O1, O3〕
+- j2（显式）：如何判断 EC2 经 NAT 访问第三方支付服务所需的子网、路由与网关衔接条件？〔S, O1, O2, O4, O5〕
+- j3（显式）：如何综合判断 ALB、EC2、RDS 与 NAT 的子网数量和可用区分布是否满足高可用？〔S, O1, O2, O3, O4, O5〕
+- j4（显式）：如何将两个候选配置组合为一致的端到端访问路径，同时满足网站流量接入、实例隔离、支付出站与高可用？〔S, O1, O2, O3, O4, O5〕
+
+**待官方核验**
+
+- 公有或私有子网、实例公网寻址、ALB 类型与安全控制分别如何影响实例暴露及网站访问路径？
+- 用于互联网出站的 NAT 网关与 ALB 分别有哪些子网、路由和可用区部署要求，如何评估整条路径的单可用区故障影响？
+- 自动扩缩组与 RDS 多可用区部署各自需要哪些配置，才能共同实现应用层与数据库层的高可用？
+
+**源异常／歧义**
+
+- O4 与 O5 的原始标签均为 D，按原始序号分别保留。
+
+### Q126
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：全部数据当前在S3 Standard，须至少保留25年；最近2年的数据须高度可用、立即可取，同时降低存储成本。
+
+**必要判断**
+
+- j1（显式）：比较Lifecycle立即或2年后转Deep Archive、Intelligent-Tiering启用归档、立即转One Zone-IA再于2年后转Deep Archive，对近期可用性/取回及长期保留成本的整体适配。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查各层可用性、取回时延、归档触发时间及Lifecycle/Intelligent-Tiering的配置与成本限制。
+
+### Q127
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：媒体系统迁AWS需至少10 TB用于视频处理并追求最高I/O性能、300 TB高持久性媒体存储、900 TB不再使用的媒体归档存储。
+
+**必要判断**
+
+- j1（显式）：比较Amazon EBS与EC2 instance store满足至少10 TB视频处理及最大I/O性能目标的配置边界。〔S, O1, O2, O3, O4〕
+- j2（显式）：结合性能层选择，比较300 TB层采用S3或EFS、900 TB归档层采用S3 Glacier或S3的完整三层服务组合。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查EBS/instance store容量与I/O条件，以及S3、EFS、S3 Glacier的持久性和归档适配。
+
+### Q128
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：AWS容器应用无状态、可容忍底层基础设施中断；整体成本与运维开销均须尽量低。
+
+**必要判断**
+
+- j1（显式）：比较Spot与On-Demand对可中断容器负载的购买成本及运行要求。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较EC2 Auto Scaling group直接运行容器与EKS managed node group的管理责任，并评估四种购买模式/部署组合的总体取舍。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查Spot中断处理、两种部署方式的节点及容器管理范围与整体计费。
+
+### Q129
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：本地多层Web应用以容器运行于多台Linux主机，连接存用户记录的PostgreSQL；基础设施维护和容量规划限制增长，需两项组合改善。
+
+**必要判断**
+
+- j1（显式）：比较数据库迁Aurora、Web应用迁EC2或ECS Fargate，对既有容器/PostgreSQL适配、基础设施维护及容量规划负担的影响。〔S, O1, O2, O5〕
+- j2（显式）：比较CloudFront内容分发、Web与数据库间ElastiCache，与上述迁移措施的作用差异，判断两项组合能否解决所述增长瓶颈。〔S, O1, O2, O3, O4, O5〕
+
+**待官方核验**
+
+- 官方待查Aurora兼容性、ECS Fargate/EC2容量管理责任及CloudFront、ElastiCache对维护与容量问题的覆盖范围。
+
+### Q130
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：EC2应用跨多个AZ，位于ALB后方的Auto Scaling group；CPU利用率约40%时性能最佳，须维持组内期望性能。
+
+**必要判断**
+
+- j1（显式）：比较simple scaling、target tracking、Lambda更新desired capacity与scheduled scaling，能否根据CPU约40%的目标持续调整容量。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查各扩缩策略的反馈机制、指标聚合与目标值表达，以及组级控制对实例性能的覆盖边界。
+
+### Q131
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：文件共享应用以S3 bucket存储，所有文件须经CloudFront distribution提供，禁止直接通过S3 URL访问。
+
+**必要判断**
+
+- j1（显式）：比较每bucket仅授权CloudFront、IAM user授权后分配给CloudFront、bucket policy以distribution ID为Principal及bucket ARN为资源、OAI关联distribution并独占读取权限，能否建立有效源站授权并阻止绕过访问。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查CloudFront源站访问身份、S3 policy的Principal/资源语法及直接S3访问限制。
+
+### Q132
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：网站提供历史性能报告下载；须全球扩展、成本有效、减少基础设施预置，并尽可能快速响应。
+
+**必要判断**
+
+- j1（显式）：比较CloudFront＋S3、Lambda＋DynamoDB、ALB＋EC2 Auto Scaling、Route 53＋internal ALBs，对全球报告下载、访问入口、响应时延、预置资源及成本的整体适配。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查各组合的文件交付、全球分发及外部访问能力，并比较容量管理责任和计费。
+
+### Q133
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：本地Oracle迁AWS并升级至最新可用版本；须设置DR、保留底层OS访问，尽量减少日常及DR设置运维。
+
+**必要判断**
+
+- j1（显式）：比较EC2、RDS for Oracle、RDS Custom for Oracle对OS访问、版本升级和日常管理责任的适配。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较EC2跨Region数据库复制、RDS跨Region自动备份复制快照、RDS Custom跨Regionread replica、RDS另一AZ standby的部署组合与DR运维。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查Oracle版本与OS访问支持，以及各平台跨Region复制/备份、read replica和Multi-AZ standby的DR限制。
+
+### Q134
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：应用迁serverless，需用题干所称SL分析S3中既有及新增数据；数据须加密并复制至另一Region，运维最省。
+
+**必要判断**
+
+- j1（显式）：比较Amazon Athena与Amazon RDS承担S3数据查询，对serverless目标、既有/新增数据分析及运维的适配。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较新bucket重新装载＋SSE-KMS multi-Region keys，与既有bucket装载＋SSE-S3，两类方案结合CRR能否覆盖加密及既有/新增对象跨Region复制。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查Athena/RDS的S3查询方式、CRR对既有及新增对象的处理，以及SSE-KMS multi-Region keys/SSE-S3复制配置。
+
+**源异常／歧义**
+
+- 题干使用SL，未明确查询语言，可能为SQL笔误。
+
+### Q135
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：公司VPC须私有连接外部提供方VPC中的指定服务，访问范围仅该服务，连接仅能由公司VPC发起。
+
+**必要判断**
+
+- j1（显式）：比较VPC peering＋路由、公司公共子网NAT gateway＋路由、提供方创建virtual private gateway后使用PrivateLink、提供方创建VPC endpoint后使用PrivateLink，对私有性、服务范围及发起方向的适配。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：辨析PrivateLink提供方与使用方所需组件、创建主体和连接方向，评估选项所述gateway/endpoint能否组成完整连接。〔S, O2, O4〕
+
+**待官方核验**
+
+- 官方待查peering、NAT及PrivateLink的可达范围、方向性，以及PrivateLink两端组件与角色要求。
+
+**源异常／歧义**
+
+- O4未明确提供方所建VPC endpoint的类型与角色，存在组件指代歧义。
+
+### Q136
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：本地PostgreSQL迁Aurora PostgreSQL；迁移期间源库须持续在线可访问，Aurora须与源库保持同步，需两项组合。
+
+**必要判断**
+
+- j1（显式）：判断ongoing replication task与AWS DMS replication server如何组合承接在线迁移及持续同步。〔S, O1, O3〕
+- j2（显式）：比较本地数据库备份、AWS SCT schema转换及EventBridge同步监控，在持续同步方案中的必要性、职责及是否足以替代数据复制。〔S, O2, O4, O5〕
+
+**待官方核验**
+
+- 官方待查DMS在线装载/持续复制组件与前提，以及备份、SCT、EventBridge在该迁移中的能力边界。
+
+### Q137
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Organizations为各业务单位创建独立管理的专用账户；曾漏收root email通知，今后不得漏收且通知仅限账户管理员。
+
+**必要判断**
+
+- j1（显式）：比较转发给全组织、root email使用少数管理员distribution lists并配置alternate contacts、单管理员接收再转发，对覆盖、人员依赖与管理员范围的影响。〔S, O1, O2, O3〕
+- j2（显式）：比较所有现有/新账户共用root email并配置alternate contacts，与按账户设置管理员分发列表的账户标识及通知管理要求。〔S, O2, O4〕
+
+**待官方核验**
+
+- 官方待查AWS账户root email约束、alternate contacts通知范围及Organizations集中配置方式。
+
+### Q138
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：电商订单经RabbitMQ队列由另一应用处理并存PostgreSQL，三者各在同一AZ的独立EC2；重构须最高可用性且运维最少。
+
+**必要判断**
+
+- j1（显式）：比较Amazon MQ所述RabbitMQ active/standby冗余对与自管RabbitMQ Multi-AZ Auto Scaling group，并结合应用Multi-AZ Auto Scaling评估消息处理链可用性。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较PostgreSQL自管Multi-AZ Auto Scaling group与RDS for PostgreSQL Multi-AZ，评估其与队列、应用层构成的四种完整架构及整体运维。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查Amazon MQ for RabbitMQ支持的部署/故障切换模式，以及Auto Scaling管理有状态队列和数据库、RDS Multi-AZ的限制。
+
+### Q139
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：文件每日进初始S3，当前定时人工审查复制至供QuickSight使用的分析S3；数量与大小增长，须到达即自动复制、对副本运行Lambda模式匹配并送SageMaker Pipelines，运维最省。
+
+**必要判断**
+
+- j1（显式）：比较Lambda复制与S3 replication，能否在文件进入初始bucket后自动送至分析bucket并适应数量和大小增长。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较分析bucket以s3:ObjectCreated:Put直接通知Lambda及SageMaker Pipelines，与经EventBridge ObjectCreated规则双目标分发；判断与两种复制方式的事件衔接。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查复制对象产生的S3/EventBridge事件、Put事件覆盖、直接通知目标与EventBridge目标支持，以及复制方式的规模限制。
+
+### Q140
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：EC2数据摄取用量零散不可预测且可随时中断；Fargate前端与Lambda API未来1年用量可预测；需两种购买选项组成最低成本方案。
+
+**必要判断**
+
+- j1（显式）：比较摄取层使用Spot、On-Demand与1-year All Upfront Reserved Instances，对不规律且可中断负载的成本适配。〔S, O1, O2, O4〕
+- j2（显式）：比较前端/API采用1-year Compute Savings Plan与1-year EC2 Instance Savings Plan，对Fargate及Lambda的覆盖、承诺与成本，并组合摄取层购买方案。〔S, O1, O2, O3, O4, O5〕
+
+**待官方核验**
+
+- 官方待查Spot/On-Demand/Reserved计费取舍及两类Savings Plans对Fargate、Lambda的适用范围和1年承诺。
+
+### Q141
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：全球新闻、当地警报及天气门户提供个性化静态/动态混合内容，经HTTPS从ALB后EC2 API server交付；须使全球用户时延最低。
+
+**必要判断**
+
+- j1（显式）：比较单Region以ALB为CloudFront origin交付全部内容，与CloudFront仅交付静态、动态直连ALB的路径及个性化内容处理。〔S, O1, O3〕
+- j2（显式）：比较双Region通过Route 53 latency或geolocation路由交付全部内容，与单Region CloudFront方案的全球时延取舍。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查CloudFront动态/个性化HTTPS交付与缓存配置，以及Route 53 latency、geolocation的实际选择依据。
+
+### Q142
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：高可用游戏应用依赖修改过的Linux kernel且仅支持UDP；前端须低时延、路由至最近edge location，并为应用入口提供静态IP。
+
+**必要判断**
+
+- j1（显式）：比较Route 53→ALB、CloudFront→NLB、Global Accelerator→NLB、API Gateway→ALB，对UDP、最近边缘、静态入口IP及低时延的完整适配。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较Lambda配合Application Auto Scaling与EC2配合EC2 Auto Scaling group，对修改Linux kernel及高可用部署的支持，并与入口链路组合。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查各入口协议/静态IP/边缘路由能力，以及Lambda与EC2的内核控制和Auto Scaling支持。
+
+### Q143
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：本地单体应用迁AWS，尽量保留前后端代码但拆为不同团队管理的小应用；须高扩展性及最低运维。
+
+**必要判断**
+
+- j1（显式）：比较Lambda＋API Gateway、Amplify＋API Gateway/Lambda、EC2＋ALB/Auto Scaling、ECS＋ALB的前后端代码复用及拆分独立应用所需改造。〔S, O1, O2, O3, O4〕
+- j2（显式）：评估各完整方案的请求路由、独立服务管理、扩展机制与总体运维责任，保留ECS作为ALB目标提法的集成判断。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查各平台部署及代码适配要求、ALB与ECS目标集成、独立应用扩展与管理边界。
+
+### Q144
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：全球电商使用Aurora；月度大报表运行时应用变慢，CloudWatch显示ReadIOPS及CPUUtilizalion尖峰；需最具成本效益的改善方案。
+
+**必要判断**
+
+- j1（显式）：比较将月报迁Redshift或Aurora Replica，与扩大Aurora实例或增加Provisioned IOPS，能否缓解报表对交易应用的影响并优化整体成本。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查报表卸载与Aurora读取路径、实例扩容及Provisioned IOPS配置支持，并比较相应成本和资源隔离效果。
+
+### Q145
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：PHP分析软件、Web server与MySQL同在单台EC2 On-Demand；高峰性能下降并出现5xx，须以最具成本效益的方式无缝扩展。
+
+**必要判断**
+
+- j1（显式）：比较RDS for MySQL＋AMI启动第二台On-Demand EC2，与Aurora MySQL＋CPU超过75%时Lambda停机改实例类型，以及Aurora＋AMI/launch template/Auto Scaling/Spot Fleet的容量与成本路径。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较两台固定EC2经ALB或Route 53 weighted routing分流、停机纵向扩容、ALB连接Auto Scaling group，对高峰5xx及无缝扩展的影响。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查数据库迁移兼容性、ALB/weighted routing扩展行为、停机改型及launch template所述Spot Fleet与Auto Scaling集成。
+
+### Q146
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：生产无状态Web应用运行于ALB后EC2 On-Demand；每工作日8小时高负载、夜间中等稳定、周末低负载；降EC2成本不得影响可用性。
+
+**必要判断**
+
+- j1（显式）：比较全量Spot、Reserved基线＋Spot增量、On-Demand基线＋Spot增量、Dedicated基线＋On-Demand增量，如何匹配时段负载并权衡总成本与中断可用性风险。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查各购买模式价格与承诺、中断特性，以及基线/弹性容量组合维持可用性所需条件。
+
+### Q147
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：关键应用日志须保留10年，每月产生超过10 TB；近1个月日志经常用于排障，更早日志很少访问，须成本最优。
+
+**必要判断**
+
+- j1（显式）：比较日志初存S3或CloudWatch Logs，再用AWS Backup或S3 Lifecycle将超过1个月日志转Deep Archive的四种路径，能否满足访问分层、10年保留及最低成本。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查AWS Backup与S3 Lifecycle的源/目标支持、CloudWatch Logs转存路径及Deep Archive保留和取回成本。
+
+### Q148
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：SNS接收新数据通知，Lambda处理并存储；偶因网络故障失败且需人工重跑，须确保全部通知最终被处理。
+
+**必要判断**
+
+- j1（显式）：比较增加SNS重试次数及间隔，与配置SQS on-failure destination并让Lambda处理队列，能否覆盖故障通知的保留、重放及最终处理。〔S, O3, O4〕
+- j2（显式）：区分通知投递失败与Lambda处理失败，并评估Lambda多AZ部署提议、增加CPU/内存，是否解决所述网络失败后的恢复要求。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查SNS→Lambda投递重试、Lambda异步失败目的地的配置主体与限制，以及SQS后续消费和重放流程。
+
+### Q149
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：事件数据须在收到时处理，整个处理过程保持写入次序，并使运维开销最少。
+
+**必要判断**
+
+- j1（显式）：比较SQS FIFO＋Lambda、SNS＋Lambda订阅、SQS standard＋Lambda独立处理、SNS＋SQS订阅，在端到端保序、消费处理完整性和运维上的差异。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查各消息类型与Lambda消费的顺序保证、并发/重试对顺序的影响，以及SNS＋SQS仍需的处理衔接。
+
+### Q150
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：应用迁EC2须设基础设施告警；CPU短暂超过50%无需行动，但CPU超过50%且磁盘read IOPS同时偏高须尽快行动，并减少误报。
+
+**必要判断**
+
+- j1（显式）：比较CloudWatch composite alarms、dashboards、Synthetics canaries、single metric alarms多阈值提议，能否表达CPU与read IOPS同时满足的告警条件并兼顾响应速度和误报。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查告警条件组合、单指标多阈值能力、评估时间窗及dashboard/canary对基础设施联合告警的作用。
+
+### Q151
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：数据中心迁AWS，合规只许使用ap-northeast-3，管理员不得将VPC连接互联网；需两项方案。
+
+**必要判断**
+
+- j1（显式）：比较Control Tower data residency guardrails与Organizations SCPs，能否同时限制Region及管理员建立VPC互联网连接。〔S, O1, O3〕
+- j2（显式）：比较WAF＋账户Region设置、每VPC outbound NACL拒绝0.0.0.0/0＋逐用户IAM限制、Config检测告警，对禁止行为的执行范围与预防/检测差异。〔S, O2, O4, O5〕
+
+**待官方核验**
+
+- 官方待查guardrail/SCP适用操作及Region范围、WAF与账户设置能力、NACL方向/IAM覆盖，以及Config检测与阻止边界。
+
+### Q152
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：三层新员工培训应用每天仅使用12小时，数据存于RDS for MySQL，须尽量降低成本。
+
+**必要判断**
+
+- j1（显式）：比较Session Manager的IAM policy/role/trust配置后自动启停DB、EC2角色＋cron启停EC2、Lambda启停DB＋EventBridge定时规则，判断实际调度目标与完整执行链。〔S, O1, O3, O4〕
+- j2（显式）：评估ElastiCache for Redis在DB停止期间提供数据、DB启动后失效缓存的提议，能否保持应用所需数据访问并降低整体成本。〔S, O2〕
+
+**待官方核验**
+
+- 官方待查RDS启停支持与费用、Session Manager/cron/Lambda调度职责、EventBridge调用链及缓存替代数据库的限制。
+
+### Q153
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：数百万铃声文件在S3 Standard，每个至少128 KB；超过90天下载稀少，须降低存储费用并保持热门文件随时可用。
+
+**必要判断**
+
+- j1（显式）：比较初始即用Standard-IA、Intelligent-Tiering配置90天后降层、S3 Inventory管理并在90天后迁Standard-IA、Lifecycle在90天后迁Standard-IA的机制、访问适配与总成本。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查Inventory/Intelligent-Tiering/Lifecycle迁移能力、90天配置、128 KB相关限制及存储/监控/取回计费。
+
+### Q154
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：医疗试验结果存S3；少数科学家可新增文件，其他用户仅只读；任何用户均不得修改或删除文件，每份自创建起至少保留1年。
+
+**必要判断**
+
+- j1（显式）：比较Object Lock governance＋所述1年legal hold与compliance＋365天retention，对任何用户不可修改/删除及至少1年保留的约束，包括绕过和期限表达。〔S, O1, O2〕
+- j2（显式）：比较IAM role＋bucket policy限制修改删除、对象新增时Lambda记录hash标记修改，与锁定方案在新增/只读授权、预防及检测上的覆盖差异。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查Object Lock模式、legal hold与retention期限及覆盖范围，以及IAM权限和hash检测对新增、覆盖、删除的控制边界。
+
+### Q155
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：AWS Web应用的机密媒体文件存S3；须缓存并向全球用户快速、可靠交付，不受请求地理位置影响。
+
+**必要判断**
+
+- j1（显式）：比较DataSync连接S3与应用、Global Accelerator连接S3与应用、CloudFront连接S3与edge servers、SQS连接S3与应用，能否完成全球缓存分发及机密内容交付。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查各服务的S3集成、缓存/全球内容交付职责及机密文件访问控制能力。
+
+### Q156
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：不同数据库批数据与网络传感器/API实时流须汇集处理后暂存于不同S3 buckets；后续一次性查询并导入BI展示KPI，运维最省，需两项组合。
+
+**必要判断**
+
+- j1（显式）：比较Lake Formation blueprints＋Glue抓取/提取并以Parquet载入S3、Lambda逐记录送Redshift、Glue转JSON送多个OpenSearch clusters，对批流摄取、处理与指定S3落地的覆盖。〔S, O3, O4, O5〕
+- j2（显式）：比较Athena或Kinesis Data Analytics承担一次性查询并结合QuickSight展示KPI，判断与摄取/落地步骤组合后的端到端需求及运维。〔S, O1, O2, O3, O4, O5〕
+
+**待官方核验**
+
+- 官方待查Lake Formation/Glue对所述批流源的支持、格式和落地路径，以及Athena/Kinesis Data Analytics临时查询与QuickSight衔接。
+
+### Q157
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Aurora PostgreSQL DB cluster已启用automated backups；全部数据须保留5年并在5年后删除，数据库操作审计日志须无限期保留，需两项组合。
+
+**必要判断**
+
+- j1（显式）：比较manual snapshot、automated backups lifecycle、automatic retention设5年、AWS Backup保留5年，对长期保留及到期删除的覆盖与管理方式。〔S, O1, O2, O3, O5〕
+- j2（显式）：判断DB cluster导出CloudWatch Logs能否覆盖数据库操作审计及无限期留存，并与5年数据/备份保留删除方案衔接。〔S, O1, O2, O3, O4, O5〕
+
+**待官方核验**
+
+- 官方待查Aurora自动备份期限、manual snapshot与AWS Backup生命周期/删除能力，以及审计启用、CloudWatch Logs导出和日志保留设置。
+
+**源异常／歧义**
+
+- 全部数据5年后删除未明确指在线数据库数据、备份或两者，选项主要围绕备份保留。
+
+### Q158
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：音乐活动视频需实时直播并随后点播，面向全球观众；同一服务需改善两种流媒体的性能。
+
+**必要判断**
+
+- j1（显式）：比较 Amazon CloudFront、AWS Global Accelerator、Amazon Route 53、Amazon S3 Transfer Acceleration 对全球直播与点播交付的适用性，区分内容分发、网络加速、DNS 与对象传输加速。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查四种服务的加速对象、流媒体支持及源站衔接限制。
+
+### Q159
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：公开的 Amazon API Gateway＋AWS Lambda 应用遭 botnet 欺诈请求激增；需选两项措施阻止未授权用户请求。
+
+**必要判断**
+
+- j1（显式）：判断 usage plan＋共享 API key、Lambda 内按欺诈 IP 忽略请求、AWS WAF 恶意请求规则分别能否承担授权控制或请求过滤，以及过滤发生的位置。〔S, O1, O2, O3〕
+- j2（显式）：比较 public API 改 private API 并更新 DNS、每用户 IAM role 并在调用时 AssumeRole 对合法用户可达性和授权流程的影响，确定可组合的两项措施。〔S, O4, O5〕
+
+**待官方核验**
+
+- 待查 API key 的授权边界、AWS WAF 与 API Gateway 的集成、private API 可达条件及 IAM 调用授权流程。
+
+### Q160
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：AWS 分析应用每月约产生 300 MB JSON 数据；灾备备份需保留 30 天，必要时毫秒级访问，成本最低。
+
+**必要判断**
+
+- j1（显式）：比较 Amazon OpenSearch Service（Amazon Elasticsearch Service）、Amazon S3 Glacier、Amazon S3 Standard、Amazon RDS for PostgreSQL 的备份适用性、访问延迟及该数据量和保留期下的总成本。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查候选服务的访问或恢复时延、最低存储期限、计费粒度与运行费用；明确 Amazon S3 Glacier 名称所指存储类别。
+
+### Q161
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：小型 Python 应用每日执行数千次，处理 JSON 并将结果写入本地 SQL 数据库；迁往 AWS 后需高可用、最大化扩展性并最小化运维。
+
+**必要判断**
+
+- j1（显式）：比较 S3＋多 EC2＋Aurora 与 S3 到达触发 Lambda＋Aurora 的处理链路、扩展方式和运维负担。〔S, O1, O2〕
+- j2（显式）：比较 EBS Multi-Attach＋多 EC2＋RDS 与 SQS 消息＋ECS EC2 launch type 容器＋RDS 的输入承载、并发处理、数据库衔接及高可用运维要求。〔S, O3, O4〕
+
+**待官方核验**
+
+- 待查 S3 事件处理、EBS Multi-Attach 共享访问限制、SQS 消息限制及各计算和数据库组合的扩展与可用性配置。
+
+### Q162
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Linux 金融风险 HPC 每次短期使用数百台 EC2 Spot Instances，产生数千输出文件，最终持久保存供分析和长期使用。
+- c2〔S〕：需将本地数据复制到长期持久存储，供全部 EC2 处理；高性能文件系统需与持久存储集成，读写数据集及输出文件。
+
+**必要判断**
+
+- j1（显式）：比较 FSx for Lustre＋S3 与 FSx for Windows File Server＋S3 对 Linux HPC、多实例共享和持久层数据读写衔接的适用性。〔S, O1, O2〕
+- j2（显式）：判断 S3 Glacier＋EBS、S3 bucket＋VPC endpoint＋EBS gp2 是否能组成所需高性能共享文件系统和长期持久存储链路。〔S, O3, O4〕
+
+**待官方核验**
+
+- 待查各组合的 Linux 文件访问、共享范围、S3 集成与数据导入导出机制，以及 Glacier 和 EBS gp2 的相关限制。
+
+### Q163
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：本地构建的容器应用迁往 AWS，部署后不久将有数千用户；团队不熟悉大规模容器部署，需高可用并最小化运维。
+
+**必要判断**
+
+- j1（显式）：比较 ECR＋ECS Fargate 与 ECR＋ECS EC2 launch type，均采用 target tracking 时的扩展、高可用与基础设施管理责任。〔S, O1, O2〕
+- j2（显式）：比较 EC2 自建镜像仓库＋跨 AZ 容器主机＋CloudWatch CPU 监控按需加机，与含容器镜像的 AMI＋跨 AZ Auto Scaling group＋CPU 告警扩容的运维和可用性。〔S, O3, O4〕
+
+**待官方核验**
+
+- 待查 ECS 两种 launch type 的部署和扩展机制，以及自管 EC2、镜像仓库和 AMI 方案的高可用配置责任。
+
+### Q164
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：发送应用发送带负载的消息，处理应用接收并处理这些消息。
+- c2〔S〕：需要在两个应用之间采用 AWS 消息服务。
+- c3〔S〕：发送量约为每小时 1,000 条消息。
+- c4〔S〕：消息可能需要长达 2 天才处理完成。
+- c5〔S〕：处理失败的消息必须保留，且不得影响剩余消息的处理。
+- c6〔S〕：目标是运维效率最高。
+- c7〔O1〕：候选在 EC2 自建 Redis，由两个应用使用，并执行消息存储、处理和删除。
+- c8〔O2〕：候选使用 Kinesis 数据流接收消息，处理应用通过 KCL 集成。
+- c9〔O3〕：候选将发送和处理应用接入 SQS，并配置死信队列收集处理失败的消息。
+- c10〔O4〕：候选由发送应用写入 SNS 主题，处理应用通过订阅接收通知。
+
+**必要判断**
+
+- j1（显式）：如何判断各候选的消息保留与处理时限能否覆盖约每小时 1,000 条、长达 2 天的消息处理需求？〔S, O1, O2, O3, O4〕
+- j2（显式）：如何判断处理失败的消息能否被保留和隔离，同时不阻碍其余消息继续处理？〔S, O1, O2, O3, O4〕
+- j3（先修候选，待核验）：需要区分队列、数据流和主题订阅的哪些接收、确认、重试及消费推进语义，才能实现两个应用间的可靠衔接？〔S, O1, O2, O3, O4〕
+- j4（显式）：如何比较自建 Redis、KCL 消费、队列与死信配置、主题订阅所需的部署和持续运维工作？〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 各候选的消息保留、接收后处理时限、确认或检查点及重试限制分别是什么，如何覆盖题目中 2 天的不同可能含义？
+- 各候选对处理失败消息的隔离、保留和后续重处理提供哪些机制，消费者失败会怎样影响剩余消息的推进？
+- 各候选需要客户承担哪些基础设施管理、消费者协调和失败处理工作？
+
+**源异常／歧义**
+
+- “长达 2 天才处理完成”未明确指排队等待时间、单条处理耗时还是端到端完成时间；这些解释会影响时限与保留需求的提取。
+
+### Q165
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：静态网站使用 Amazon CloudFront 和 Amazon S3 origin；安全策略要求所有网站流量均经 AWS WAF 检查。
+
+**必要判断**
+
+- j1（显式）：比较按 AWS WAF ARN 限制 bucket policy、CloudFront 请求先转发 WAF、按 CloudFront IP 配置 security group 并关联 WAF、OAI 限制 S3＋distribution 启用 WAF，判断检查路径及阻止直接访问源站的能力。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查 AWS WAF 的 CloudFront 关联方式、S3 bucket policy 可用主体、security group 适用范围及 OAI 源站访问限制。
+
+### Q166
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：全球活动的每日报告为 S3 中的静态 HTML，预计全球用户产生数百万次浏览；需高效、有效地交付。
+
+**必要判断**
+
+- j1（显式）：比较 presigned URLs、复制到全部 Regions、Route 53 geoproximity、CloudFront 以 S3 为 origin 对全球大规模静态内容交付的作用和架构负担。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查四种机制的内容交付、缓存、地域路由及复制边界。
+
+### Q167
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：生产应用由 EC2 fleet 并行处理 SQS 消息，消息量不可预测且常有间歇流量；应用必须持续处理、无停机，并使成本最低。
+
+**必要判断**
+
+- j1（显式）：比较全部 Spot 或全部 Reserved Instances 按最大容量配置，与 Reserved 基线＋Spot 或 On-Demand 增量的成本和持续处理能力；区分单实例中断与应用整体停机。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各购买方式的容量与中断特性，以及 SQS 并行消费者在混合容量和实例中断下维持处理的条件。
+
+### Q168
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：团队所有 AWS accounts 均属于大型 AWS Organizations；需限制特定服务或操作，可扩展且在单一位置维护权限。
+
+**必要判断**
+
+- j1（显式）：比较 ACL、关联 user groups 的 security group、逐账户 cross-account roles 拒绝访问、在 root organizational unit 设置拒绝访问的 SCP，其控制对象、组织覆盖及集中维护方式。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查 Organizations 中 SCP 的附加层级、继承与适用账户范围，以及 ACL、security group、IAM role 的权限控制边界。
+
+### Q169
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：公开 Web 应用使用 ALB，近期发生 Web 攻击；需降低针对应用的 DDoS 风险。
+
+**必要判断**
+
+- j1（显式）：比较向 ALB 添加 Amazon Inspector agent、配置 Amazon Macie、启用 AWS Shield Advanced、用 Amazon GuardDuty 监控 ALB 的防护对象、部署可行性及 DDoS 风险降低作用。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各安全服务的检测与缓解范围，以及与 ALB 的支持和集成方式。
+
+### Q170
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Web 应用运行在 ALB 后的 EC2；新策略要求仅允许来自一个指定国家的访问。
+
+**必要判断**
+
+- j1（显式）：比较 EC2 security group、ALB security group、VPC 内 ALB 上的 AWS WAF、EC2 子网 network ACL 能否表达并执行国家来源限制。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各控制层的国家匹配能力、规则配置和 ALB 集成限制。
+
+### Q171
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：API 根据商品价格自动计算税费，仅假日季查询激增并导致响应变慢；需可扩展且有弹性的方案。
+
+**必要判断**
+
+- j1（显式）：比较单 EC2 承载 API 和计算、API Gateway REST API＋Lambda、ALB＋两台 EC2、API Gateway＋单 EC2 API 的端到端弹性及季节性高峰响应能力。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查 API Gateway、Lambda 和固定 EC2 组合的扩展行为、调用衔接及计算输入要求。
+
+**源异常／歧义**
+
+- 题干以商品价格作为税费计算依据，O2、O3、O4 仅描述接收或传递商品名称，未说明价格来源。
+
+### Q172
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：应用新建 CloudFront distribution，已使用 HTTPS；用户提交的敏感信息需额外保护，贯穿整个应用栈且仅指定应用可访问。
+
+**必要判断**
+
+- j1（显式）：比较 CloudFront signed URL、signed cookie、field-level encryption profile、HTTPS Only 协议策略，对内容访问授权、传输保护和敏感字段跨应用栈保护的适用性。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：识别限制敏感信息仅由指定应用读取所需的字段选择、加密与解密权限边界。〔S, O3〕
+
+**待官方核验**
+
+- 待查 CloudFront 各安全机制的保护范围、field-level encryption 密钥与解密流程，以及两类协议策略的配置对象。
+
+**源异常／歧义**
+
+- O4 将 Origin Protocol Policy 与 Viewer Protocol Policy 混写，具体要求配置哪一策略不清。
+
+### Q173
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：浏览器游戏向全球数百万用户交付 S3 中相同的视频和图片；需降低源站负载，并使交付成本最低。
+
+**必要判断**
+
+- j1（显式）：比较 Web servers 前的 Global Accelerator、Redis 或 Memcached，与 S3 bucket 前的 CloudFront web distribution，对共享媒体交付、源站请求减少及总成本的影响。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各方案的缓存对象、S3 衔接、全球交付路径及费用构成。
+
+### Q174
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：多层应用的六台前端 EC2 位于单 AZ Auto Scaling group、ALB 后；仅改基础设施、不改应用，实现高可用。
+
+**必要判断**
+
+- j1（显式）：比较两个 Regions 各三台实例的 Auto Scaling group、两个 AZ 各三台实例、可快速在另一 Region 建实例的 template、ALB round-robin 配置，对故障隔离和持续可用性的作用及部署边界。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查 Auto Scaling group 与 ALB 的 Region/AZ 范围，及预部署冗余、模板恢复和流量分配的差异。
+
+### Q175
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：订单应用使用 API Gateway＋Lambda＋Aurora PostgreSQL；销售突增时大量数据库连接导致 CPU、内存高，部分订单超时未处理。
+- c2〔S〕：需防止超时，且应用改动尽可能少。
+
+**必要判断**
+
+- j1（显式）：比较 Lambda provisioned concurrency＋多 Region global database，与 RDS Proxy＋Lambda 改连 proxy endpoint，能否处理连接压力及所需改动。〔S, O1, O2〕
+- j2（显式）：比较跨 Region read replica＋API Gateway query string 路由，与 DMS 迁往 DynamoDB＋修改 Lambda，对订单读写、连接瓶颈和迁移改动的影响。〔S, O3, O4〕
+
+**待官方核验**
+
+- 待查 RDS Proxy 连接管理、Aurora global database/read replica 的读写边界、API Gateway 路由及 DMS 迁移限制。
+
+### Q176
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：私有子网 EC2 应用需访问 DynamoDB table；要求最安全且流量不离开 AWS network。
+
+**必要判断**
+
+- j1（显式）：比较 DynamoDB VPC endpoint、公共子网 NAT gateway、私有子网 NAT instance、VPC internet gateway 的访问路径、部署条件和安全控制。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查 DynamoDB endpoint 与 NAT、internet gateway 的路由和网络路径边界及访问控制能力。
+
+### Q177
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：DynamoDB 存储媒体元数据，读密集且延迟高；无人员承担新增运维，需提升性能效率且不重新配置应用。
+
+**必要判断**
+
+- j1（显式）：比较 ElastiCache for Redis、DynamoDB Accelerator（DAX）、DynamoDB global tables、启用 Auto Discovery 的 ElastiCache for Memcached，对读性能、应用接入改动和运维负担的影响。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查四种方案的客户端、endpoint 或代码调整要求、读加速方式及管理责任，严格核对“不重新配置应用”的可满足性。
+
+### Q178
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：EC2 与 RDS DB instance 均在单一 AWS Region；需备份到另一 Region，运维最少。
+
+**必要判断**
+
+- j1（显式）：比较 AWS Backup 与 Amazon DLM 同时复制 EC2、RDS 备份的资源覆盖、跨 Region 能力及集中管理。〔S, O1, O2〕
+- j2（显式）：比较复制 AMI＋跨 Region RDS read replica，与复制 EBS snapshots＋RDS snapshots 导出 S3＋CRR 的备份语义、恢复链路和运维步骤。〔S, O3, O4〕
+
+**待官方核验**
+
+- 待查各服务支持的备份资源和跨 Region 操作，以及 RDS replica、snapshot export、S3 CRR 与可恢复备份的差异。
+
+### Q179
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：EC2 应用使用用户名和密码访问 RDS；需将凭证安全保存为 Systems Manager Parameter Store secure parameter。
+
+**必要判断**
+
+- j1（显式）：比较通过 IAM role 或直接向 EC2 分配 IAM policy，授予参数读取及加密该参数的 KMS key Decrypt 权限的身份绑定方式。〔S, O1, O2〕
+- j2（显式）：判断 parameter—EC2 信任关系且 principal 为 RDS，或 DB instance—EC2 信任关系且 principal 为 Systems Manager，能否形成应用读取解密参数所需授权链。〔S, O3, O4〕
+
+**待官方核验**
+
+- 待查 EC2 实例身份承载方式、Parameter Store 读取和 KMS 解密授权，以及 IAM trust policy 的对象与 principal 规则。
+
+### Q180
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：API 驱动通信平台由 API Gateway 对外提供 API，后端为 NLB 后的 EC2；需防 SQL injection 等 Web exploits，并检测、缓解大型复杂 DDoS，选两项使防护最强。
+
+**必要判断**
+
+- j1（显式）：比较 AWS WAF 保护 NLB 或 API Gateway 的关联可行性、检查位置和 Web exploit 覆盖。〔S, O1, O3〕
+- j2（显式）：比较 NLB＋Shield Advanced、GuardDuty＋Shield Standard、API Gateway＋Shield Standard 的检测与缓解范围，并与 Web 防护组成两项方案。〔S, O2, O4, O5〕
+
+**待官方核验**
+
+- 待查 AWS WAF、Shield Advanced/Standard、GuardDuty 对 API Gateway 和 NLB 的支持、攻击覆盖及集成边界。
+
+### Q181
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：现有 EC2 单体数据处理应用顺序执行、结果顺序无要求，只能靠增大实例扩展；计划重写为 ECS 微服务，需确定服务间通信方式。
+
+**必要判断**
+
+- j1（显式）：比较生产者写 SQS、消费者取消息，与生产者发布 SNS、消费者订阅的通信语义、处理分工和扩展方式。〔S, O1, O2〕
+- j2（显式）：比较 Lambda 中转 data object，与 DynamoDB 写入＋Streams API 检测新条目并取数，对微服务解耦、数据传递和消费协调的适用性。〔S, O3, O4〕
+
+**待官方核验**
+
+- 待查 SQS、SNS、Lambda 中转和 DynamoDB Streams 的交付、消费、顺序及扩展限制。
+
+### Q182
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：本地 MySQL 迁往 AWS；此前数据库停机严重影响业务，需可靠方案、最小化数据丢失，并将每笔事务存于至少两个节点。
+
+**必要判断**
+
+- j1（显式）：比较 RDS 三 AZ 三节点同步复制、RDS MySQL Multi-AZ 同步复制、跨 Region read replica 所称同步复制，其事务持久化与可用性配置。〔S, O1, O2, O3〕
+- j2（显式）：判断 EC2 MySQL 触发 Lambda 同步复制至 RDS MySQL 的链路，能否保证每笔事务的多节点保存和故障时可靠性。〔S, O4〕
+
+**待官方核验**
+
+- 待查相关 RDS 部署的节点/AZ 数、复制与提交语义、跨 Region replica 模式，以及 Lambda 复制链路的事务保证。
+
+### Q183
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：新建动态订购网站需高可用，最小化服务器维护和补丁工作，并随需求变化尽快扩展读、写容量。
+
+**必要判断**
+
+- j1（显式）：比较 S3 静态内容＋API Gateway/Lambda 动态内容＋CloudFront，与 EC2 Auto Scaling group＋ALB 承载全部内容的可用性、扩展和维护责任。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较 DynamoDB on-demand、Aurora Auto Scaling、DynamoDB provisioned write capacity 的读写扩展范围和速度，并结合各选项完整网站架构判断。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查候选计算架构的托管边界，以及各数据库容量模式对读、写容量的扩展机制和响应限制。
+
+### Q184
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：工程账户通过一对 Direct Connect 连接本地数据中心，所有非 VPC 流量路由至 virtual private gateway。
+- c2〔S〕：团队通过控制台新建 Lambda，需访问数据中心私有子网内的数据库。
+
+**必要判断**
+
+- j1（显式）：比较将 Lambda 配入 VPC 并设置适当 security group、另建 VPN 并路由 Lambda 流量、仅更新 VPC route tables、让 Lambda 不借助 ENI 使用 Elastic IP 的连接可行性与必要性。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查 Lambda 默认与 VPC 网络接入、ENI/EIP 限制，以及经现有 Direct Connect、VGW 和安全组访问本地数据库的条件。
+
+### Q185
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：ECS 应用生成原图的缩小版本，并调用 S3 API 保存；需为应用授予 S3 访问权限。
+
+**必要判断**
+
+- j1（显式）：比较修改所谓 S3 role 并重启容器、创建 S3 权限 IAM role 并在 task definition 设置 taskRoleArn、security group＋cluster launch configuration、IAM user＋以该用户登录重启 EC2，识别容器应用获得 API 凭证和权限的路径。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查 ECS taskRoleArn、任务凭证分发、IAM role/user 权限边界及 security group 与 S3 API 授权的区别。
+
+### Q186
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Windows 应用迁往 AWS，需供跨多个 AZ 部署的多台 EC2 Windows 实例挂载共享 Windows 文件系统。
+
+**必要判断**
+
+- j1（显式）：比较 Storage Gateway volume gateway、FSx for Windows File Server、EFS、单 EBS volume 多实例挂载的 Windows 文件系统适配、共享语义及跨 AZ 访问范围。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查四种存储的客户端与协议支持、多实例挂载和 AZ 范围限制。
+
+### Q187
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：电商架构包含负载均衡前端、容器应用和关系数据库；需高可用并尽可能减少人工干预，选两项。
+
+**必要判断**
+
+- j1（显式）：比较 RDS Multi-AZ 与 RDS＋另一 AZ 的一个或多个 replicas，在数据库高可用、故障处理和人工介入方面的差异。〔S, O1, O2〕
+- j2（显式）：比较 EC2 自建 Docker cluster、ECS Fargate、ECS EC2 launch type 承载动态应用负载时的可用性和管理责任，与数据库措施组成两项方案。〔S, O3, O4, O5〕
+
+**待官方核验**
+
+- 待查 RDS Multi-AZ 与 replicas 的故障转移行为，以及三种容器部署的高可用配置和运维边界。
+
+### Q188
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：现有数据湖使用 S3，新合作方必须通过 SFTP 上传文件；需高可用且运维最少。
+
+**必要判断**
+
+- j1（显式）：比较公开 endpoint 的 Transfer Family SFTP server 直达 S3，与把 S3 File Gateway 当作 SFTP server 的协议和目的地衔接。〔S, O1, O2〕
+- j2（显式）：比较私有子网单 EC2＋合作方 VPN＋cron 上传 S3，与私有子网多 EC2＋NLB SFTP listener＋cron 上传 S3 的外部可达性、高可用和运维负担。〔S, O3, O4〕
+
+**待官方核验**
+
+- 待查 Transfer Family、S3 File Gateway 的协议与 S3 集成，以及 EC2/NLB/VPN 方案的端到端可达性和高可用要求。
+
+**源异常／歧义**
+
+- O3 的“VPInstruct”存在文本粘连或缺字，网络部署描述不完整。
+
+### Q189
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：合同文档需保存 5 年，期间不得覆盖或删除；需静态加密并每年自动轮换密钥，以最少运维选两项措施。
+
+**必要判断**
+
+- j1（显式）：比较 S3 Object Lock governance 与 compliance mode 对 5 年不可覆盖、不可删除及绕过权限的约束。〔S, O1, O2〕
+- j2（显式）：比较 SSE-S3、KMS customer managed keys、KMS customer provided（imported）keys 的轮换配置、年度自动轮换能力及运维，与保留措施组成两项方案。〔S, O3, O4, O5〕
+
+**待官方核验**
+
+- 待查 Object Lock 两种模式的保留与绕过规则，以及各密钥类型的自动轮换支持和周期限制。
+
+### Q190
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Java 和 PHP Web 应用由本地迁往 AWS；需频繁测试新功能，且采用高可用托管方案、运维最少。
+
+**必要判断**
+
+- j1（显式）：比较 S3 static hosting＋Lambda 动态处理，与 Elastic Beanstalk 多环境＋URL swapping，对现有 Java/PHP 应用承载、功能测试和托管目标的适用性。〔S, O1, O2〕
+- j2（显式）：比较 Java/PHP EC2＋Auto Scaling groups＋ALB，与容器化后运行 EC2＋AWS Load Balancer Controller 动态导流测试，评估部署衔接、高可用及运维责任。〔S, O3, O4〕
+
+**待官方核验**
+
+- 待查各平台的 Java/PHP 支持、Elastic Beanstalk URL swapping，以及 AWS Load Balancer Controller 所需部署环境和流量控制方式。
+
+### Q191
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：订单应用将客户信息存于 RDS for MySQL；员工在正常营业时间运行一次性报表查询，长查询造成订单处理超时；需消除超时且不阻止员工查询。
+
+**必要判断**
+
+- j1（显式）：比较将报表查询迁往 read replica、将订单应用分布至 primary 和 read replica、迁往 DynamoDB on-demand、将报表改至非高峰，对负载隔离、订单读写及员工查询需求的影响。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查 RDS MySQL read replica 的读写及复制边界，以及各方案对查询兼容性和营业时间访问的影响。
+
+### Q192
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：医院将大量历史书面记录扫描上传 AWS，且每日新增数百份；需分析文档、提取医疗信息并存储，以便应用执行 SQL 查询，最大化扩展性和运维效率，选两项。
+
+**必要判断**
+
+- j1（显式）：比较 EC2 自建 MySQL 与 S3＋Athena 保存、查询文档信息的扩展及运维方式。〔S, O1, O2〕
+- j2（显式）：比较 EC2 Auto Scaling 自定义提取程序、上传触发 Lambda＋Rekognition＋Transcribe Medical、上传触发 Lambda＋Textract＋Comprehend Medical 的扫描件转文字与医疗信息提取链路，并与存储查询方案组合。〔S, O3, O4, O5〕
+
+**待官方核验**
+
+- 待查各 AI 服务的输入类型、OCR 和医疗实体提取能力，以及 Lambda 触发、S3 数据组织和 Athena SQL 查询的衔接要求。
+
+### Q193
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：EC2 批处理应用后端有多个 RDS 数据库，产生大量数据库读取；需减少数据库读取次数并确保高可用。
+
+**必要判断**
+
+- j1（显式）：比较 RDS read replicas、ElastiCache for Redis、Route 53 DNS caching、ElastiCache for Memcached 对实际数据库读取次数和高可用的作用，区分分担读取、缓存数据与缓存 DNS。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各方案的缓存对象、数据库访问衔接，以及 Redis/Memcached 的冗余和故障处理配置。
+
+### Q194
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：关键应用的数据库必须运行于 EC2，需高可用并在破坏性事件发生时自动故障转移。
+
+**必要判断**
+
+- j1（显式）：比较同 Region 跨 AZ 双 EC2 数据库 cluster＋复制，与跨 Region 双 EC2＋复制并切换至第二 Region，判断自动故障转移机制及故障覆盖。〔S, O1, O3〕
+- j2（显式）：比较单 EC2＋AMI 备份＋CloudFormation 重建，与单 EC2＋AMI 备份＋EC2 automatic recovery，对数据库持续可用、状态恢复和自动故障转移的满足程度。〔S, O2, O4〕
+
+**待官方核验**
+
+- 待查数据库 cluster/复制所需自动切换配置，以及 AMI、CloudFormation、EC2 automatic recovery 的状态和故障恢复边界。
+
+### Q195
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：客户端订单由 EC2 处理后存入 RDS；系统故障时用户需重新提交处理，需具韧性且停机后能自动处理订单。
+
+**必要判断**
+
+- j1（显式）：比较 EC2 Auto Scaling＋EventBridge rule 触发 ECS task、Auto Scaling＋ALB 接收订单、Auto Scaling＋SQS 接收并由 EC2 消费，对订单保存、恢复后处理和计算恢复的作用。〔S, O1, O2, O3〕
+- j2（显式）：判断 SNS＋订阅 Lambda＋Systems Manager Run Command 指挥 EC2 处理消息的交付、失败恢复和处理衔接是否满足自动恢复目标。〔S, O4〕
+
+**待官方核验**
+
+- 待查各消息与调用链的持久化、确认、重试及故障后消费机制，以及 Auto Scaling、ALB 和 Run Command 的职责边界。
+
+### Q196
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：大型 EC2 fleet 应用持续读写增长中的 DynamoDB table，但仅需最近 30 天数据；需最小化成本和开发工作。
+
+**必要判断**
+
+- j1（显式）：比较每 30 天重部署完整 CloudFormation stack 并删除旧 stack、EC2 Marketplace 监控程序＋Streams 时间戳＋删除脚本、Streams 新增事件触发 Lambda 清理旧数据的保留语义和维护成本。〔S, O1, O2, O3〕
+- j2（显式）：评估应用为每个新 item 添加“当前时间戳＋30 天”的属性并设为 TTL，与其他清理方案在逐项过期、开发量及成本上的差异。〔S, O4〕
+
+**待官方核验**
+
+- 待查 DynamoDB TTL 属性格式与删除时效、Streams 事件语义，以及脚本清理和 stack 替换的数据保留影响。
+
+### Q197
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：本地 Windows Server 上的 Microsoft .NET 应用使用 Oracle Database Standard Edition；迁往 AWS 时需最少开发改动，AWS 应用环境需高可用，选两项。
+
+**必要判断**
+
+- j1（显式）：比较重构为 Lambda .NET Core、Elastic Beanstalk .NET platform Multi-AZ rehost、EC2 Amazon Linux AMI replatform 的运行兼容性、改动和高可用配置。〔S, O1, O2, O3〕
+- j2（显式）：比较 DMS 将 Oracle 迁至 DynamoDB Multi-AZ 或 RDS Oracle Multi-AZ 的数据库兼容性、应用改动与高可用衔接，并与计算方案组合。〔S, O4, O5〕
+
+**待官方核验**
+
+- 待查 .NET/Windows 平台兼容性、Oracle Standard Edition 的 RDS Multi-AZ 支持，以及 DMS 异构与同构迁移的改造要求。
+
+### Q198
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：本地 Kubernetes cluster 运行容器应用并使用 MongoDB；部分环境迁往 AWS，当前不能修改代码或部署方法，需最少运维。
+
+**必要判断**
+
+- j1（显式）：比较 ECS EC2、ECS Fargate、EKS EC2、EKS Fargate 对既有 Kubernetes 部署方法和基础设施运维的影响。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较 EC2 自管 MongoDB、DynamoDB、DocumentDB（with MongoDB compatibility）的接口兼容性及运维，并逐一检查其与各计算方案的完整组合是否无需代码改动。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查 EKS Fargate 的工作负载与部署限制、DocumentDB 对所用 MongoDB 功能的兼容边界，以及替代数据库的应用接入要求。
+
+### Q199
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：AWS 呼叫中心需识别多个说话人、生成转录文件并查询分析业务模式；转录文件须保留 7 年用于审计。
+
+**必要判断**
+
+- j1（显式）：比较 Rekognition、Transcribe、Translate 对多说话人识别和转录生成的适用性，保留各选项完整处理链。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较 S3＋machine learning models、Athena、Redshift＋SQL、S3＋Textract 的转录查询分析方式，并检查存储和 7 年审计保留链路是否完整。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查候选服务的音频、文字及图像处理边界，转录与 Athena/Redshift 的数据衔接，以及长期保存配置。
+
+**源异常／歧义**
+
+- O2 未明确转录文件存储位置；全部选项均未明确 7 年保留配置。
+
+### Q200
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：应用由 Cognito 管理用户，登录后经 API Gateway REST API 获取 DynamoDB 数据；需 AWS 托管的 API 访问控制，减少开发并使运维最少。
+
+**必要判断**
+
+- j1（显式）：比较 Lambda authorizer、每用户 API key＋Lambda 验证、每请求 email header＋Lambda 授权、Cognito user pool authorizer 的身份验证依据、托管集成和开发运维量。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查 API Gateway REST API authorizer 与 Cognito 的集成、请求身份凭据要求，以及 API key/email header 的授权边界。
+
+### Q201
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：面向移动 App 用户的营销通信服务需发送 SMS 确认消息、允许用户回复，并将回复保留一年供分析。
+
+**必要判断**
+
+- j1（显式）：比较 Connect contact flow＋Lambda、Pinpoint journey＋Kinesis data stream、SQS＋Lambda、SNS FIFO topic＋Kinesis subscription 对双向 SMS 和回复处理的端到端支持。〔S, O1, O2, O3, O4〕
+- j2（显式）：检查回复或事件如何进入分析与归档链路，并满足一年保存；区分消息发送、回复接收与流数据保留。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查双向 SMS 的服务与号码条件、Pinpoint 事件导出、SNS FIFO/Kinesis 集成，以及 Kinesis 保留和长期归档限制。
+
+### Q202
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：数据迁至 S3 bucket 后必须静态加密，密钥每年自动轮换，运维最少。
+
+**必要判断**
+
+- j1（显式）：比较 SSE-S3 内置轮换、KMS customer managed key 自动轮换并设 bucket default encryption、同类 KMS key 每年手动轮换、上传前用 customer key material 加密后导入 KMS 并启用自动轮换，对年度自动轮换及完整加密链路的满足程度。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各密钥来源的轮换周期、自动轮换支持、S3 默认加密行为，以及客户端加密与 KMS imported key 的衔接。
+
+### Q203
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：EC2 Web 应用接收短信预约并写 SQS；另一 EC2 应用发送邀请和确认邮件，预约成功后写 DynamoDB；业务扩张后邀请延迟增大，需解决。
+
+**必要判断**
+
+- j1（显式）：比较 DynamoDB 前加 DAX、接收应用前加 API Gateway 或 CloudFront、发送邀请应用加入按 SQS queue depth 扩展的 Auto Scaling group，各措施针对的链路阶段及对邀请等待时间的作用。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查队列深度驱动消费者扩展的配置与指标，以及 DAX、API Gateway、CloudFront 对该异步处理链路的作用边界。
+
+### Q204
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：零售公司有超过 5,000 万活跃客户、每日超过 25,000 笔订单；购买数据存 S3，其他客户数据存 RDS。
+- c2〔S〕：需向多个团队提供全部数据用于分析，支持细粒度数据权限，且运维最少。
+
+**必要判断**
+
+- j1（显式）：比较购买数据直接写 RDS＋RDS access controls，与定时 Lambda 复制 RDS 至 S3＋Glue crawler＋Athena＋S3 policies 的数据汇集、权限粒度和运维。〔S, O1, O2〕
+- j2（显式）：比较 Lake Formation data lake＋Glue JDBC connection 至 RDS＋注册 S3＋Lake Formation access controls，与 Redshift cluster＋定时 Lambda 复制两源＋Redshift access controls 的完整接入和治理链路。〔S, O3, O4〕
+
+**待官方核验**
+
+- 待查 Lake Formation/Glue 的 RDS 与 S3 接入流程、各权限机制的控制粒度，以及复制和分析平台的运维要求。
+
+### Q205
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：本地营销网站为单服务器静态文档，管理员更新不频繁、当前用 SFTP 上传；迁往 AWS 后已建 CloudFront distribution。
+- c2〔S〕：需为 CloudFront origin 设计最具成本效益且有韧性的网站托管架构。
+
+**必要判断**
+
+- j1（显式）：比较 Lightsail Web server＋SFTP、EC2 Auto Scaling＋ALB＋SFTP、私有 S3＋OAI bucket policy＋AWS CLI、公有 S3 website hosting＋AWS Transfer for SFTP 的源站衔接、韧性和成本。〔S, O1, O2, O3, O4〕
+- j2（显式）：区分现有 SFTP 工作方式与必须保留的要求，评估各上传路径及公有/私有源站访问方式对整体方案的影响。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查 CloudFront 与 S3 website/私有 bucket origin 的访问方式、OAI 限制、Transfer SFTP 集成，以及服务器方案的成本与维护责任。
+
+### Q206
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：公司管理 AMI，目前复制到创建 AMI 的同一 Region；需捕获账户内 AWS API 调用，每次调用 EC2 CreateImage 均告警，运维最少。
+
+**必要判断**
+
+- j1（显式）：比较 Lambda 查询 CloudTrail logs、CloudTrail 日志投递 S3 时 SNS 通知＋Athena 建表查询、EventBridge 匹配 CreateImage＋SNS、CloudTrail logs 以 SQS FIFO 为 target＋Lambda＋SNS 的事件捕获、过滤和告警链路。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查 CloudTrail 与 EventBridge API 事件集成、SNS 日志投递通知粒度、CloudTrail 投递目标，以及各链路的告警配置与运维要求。
+
+### Q207
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：异步 API 由 API Gateway 接入，Lambda 先将请求存入 DynamoDB，再按请求类型分派给微服务。
+- c2〔S〕：DynamoDB 已按预算配置最大吞吐，仍有可用性问题并丢请求；需解决且不影响现有用户。
+
+**必要判断**
+
+- j1（显式）：比较 API Gateway server-side throttling、DAX＋Lambda 缓冲写入、DynamoDB secondary index、SQS＋Lambda 缓冲写入，对请求接纳、写入压力、持久保存和既有用户的影响。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：识别在预算内吞吐不变时，接收、缓冲、写入和后续微服务分派所需的重试及消费协调条件。〔S, O2, O4〕
+
+**待官方核验**
+
+- 待查 DAX 的写入与缓冲边界、SQS/Lambda 的持久化和重试机制，以及 throttling、secondary index 对请求和写入容量的影响。
+
+### Q208
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：需将 EC2 数据上传 S3；全部 API 调用和数据均不得经过公共互联网路由，且仅该 EC2 实例可上传。
+
+**必要判断**
+
+- j1（显式）：比较同子网 S3 interface VPC endpoint、所称同 AZ gateway VPC endpoint＋security groups、nslookup 获取所称 S3 私有 IP 后加路由、从公开 ip-ranges.json 获取所称私有 IP 后加路由的部署与私网访问可行性。〔S, O1, O2, O3, O4〕
+- j2（显式）：评估各选项共同采用的 bucket resource policy 仅允许 EC2 IAM role，能否将上传权限限定到指定实例，并覆盖 API 与数据路径约束。〔S, O1, O2, O3, O4〕
+- j3（先修候选，待核验）：区分 IAM role 身份限制与单实例限制，识别角色是否可被其他主体使用及网络路径是否需额外约束。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查 S3 两类 VPC endpoint 的范围、路由、DNS 和 security group 支持，IP 来源的含义，以及 bucket policy、实例角色和 endpoint 条件的访问边界。
+
+### Q209
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：新应用运行于跨多个AZ自动伸缩的Amazon EC2 On-Demand Instances，全天频繁扩缩，由ALB分流；须支持分布式会话数据管理，允许改代码。
+
+**必要判断**
+
+- j1（显式）：比较Amazon ElastiCache、ALB sticky sessions、AWS Systems Manager Session Manager及AWS STS GetSessionToken的会话含义与适用范围，判断其能否在跨AZ频繁扩缩时满足分布式应用会话管理。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各机制的会话用途、状态存储位置及实例缩容后的会话可用性。
+
+### Q210
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：订单收集与履约分别运行于EC2 Auto Scaling group；收集快、履约慢，高峰均须合理伸缩，扩缩事件不得丢数据，并优化AWS资源利用率。
+
+**必要判断**
+
+- j1（显式）：比较按CPU设置高峰最低容量、CPU告警经Amazon SNS按需创建Auto Scaling groups，以及收集与履约各用一个Amazon SQS队列并由EC2轮询的容量与缓冲方案。〔S, O1, O2, O3, O4〕
+- j2（显式）：判断SQS队列通知与backlog per instance指标作为两组伸缩依据的差异，以及队列消费和缩容如何兼顾不丢订单与资源利用率。〔S, O3, O4〕
+
+**待官方核验**
+
+- 待查CloudWatch/SNS与Auto Scaling的动作衔接、SQS伸缩信号及backlog per instance的定义和消费可靠性限制。
+
+### Q211
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：公司有多个生产应用；目标应用包含跨多个Region的Amazon EC2、AWS Lambda、Amazon RDS、Amazon SNS、Amazon SQS资源，均以application标签及对应应用值标识；须最快识别全部带标签组件。
+
+**必要判断**
+
+- j1（显式）：比较AWS CloudTrail、AWS CLI逐服务逐Region查询、Amazon CloudWatch Logs Insights及AWS Resource Groups Tag Editor的标签资源发现覆盖范围与实现速度。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各工具按标签键值跨服务、跨Region列举资源的能力、覆盖限制与查询步骤。
+
+### Q212
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：数据库每天导出至Amazon S3供其他团队访问，单对象2–5 GB；访问模式变化快且不确定，须立即可用并保持可访问最长3个月，以不增加检索时间的最低成本选择存储类。
+
+**必要判断**
+
+- j1（显式）：比较S3 Intelligent-Tiering、S3 Glacier Instant Retrieval、S3 Standard及S3 Standard-IA在该访问模式下的即时访问、存储与检索费用、监控费用和最低存储期限。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查四种存储类的访问延迟、计费项目、最低期限及Intelligent-Tiering层级设置限制。
+
+### Q213
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：新移动应用须过滤流量，保护ALB免受cross-site scripting、SQL injection等常见应用层攻击；基础设施和运维人员少，须减少服务器管理、更新和安全维护责任。
+
+**必要判断**
+
+- j1（显式）：比较ALB关联AWS WAF规则、Amazon S3公开网站托管、AWS Shield Advanced保护ALB，以及新增ALB→EC2第三方防火墙→现有ALB链路的攻击防护范围与总体运维负担。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各方案的应用层过滤能力、ALB集成方式及服务器维护责任。
+
+### Q214
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：报告系统每天向Amazon S3交付数百个.csv文件；须转换为Apache Parquet并写入转换后数据桶，开发工作量最少。
+
+**必要判断**
+
+- j1（显式）：比较Amazon EMR/Apache Spark应用经EMRFS输出、AWS Glue crawler配合ETL job、AWS Batch Bash作业定义及array job，以及S3事件触发AWS Lambda的格式转换链路与开发工作量。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各方案的CSV→Parquet支持、数据发现和触发方式、所需自编代码及运行限制。
+
+### Q215
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：本地NAS有700 TB备份，供低频监管请求访问并保留7年；须1个月内迁至AWS，现有公网连接可专用于传输的带宽为500 Mbps，迁移与存储总成本最低。
+
+**必要判断**
+
+- j1（显式）：比较AWS Snowball配合生命周期转S3 Glacier Deep Archive、VPN配合AWS CLI写S3 Glacier、新建500 Mbps AWS Direct Connect配合S3及Deep Archive生命周期，以及本地AWS DataSync agent从NAS复制至S3 Glacier的完整路径。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：依据700 TB、500 Mbps和1个月期限评估传输可行性，并比较设备交付、网络开通、迁移及7年低频存储访问的总成本。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查迁移工具的NAS及目标存储类支持、设备与线路准备时间、有效吞吐和长期归档计费限制。
+
+### Q216
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：无服务器网站以含数百万对象的Amazon S3桶作为Amazon CloudFront源站；加载对象前未设置桶加密，须以最少工作量覆盖全部现有及未来对象的加密。
+
+**必要判断**
+
+- j1（显式）：比较新建默认加密桶并本地下载重传、原桶默认加密配合S3 Inventory CSV及S3 Batch Operations copy、设置AWS KMS/SSE-KMS并启用版本控制，以及控制台逐对象Modify的既有与新增对象覆盖及操作规模。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查默认加密对既有对象的影响、Inventory与Batch Operations copy的加密流程、控制台操作能力及更换源站桶所需衔接。
+
+### Q217
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：全球Web应用运行于ALB后的Amazon EC2，数据存于Amazon Aurora；须设计灾备，可容忍最多30分钟停机及潜在数据丢失，主基础设施健康时灾备无需承担负载。
+
+**必要判断**
+
+- j1（显式）：比较预置所需基础设施、第二Region缩小部署、完整复制及灾后由AWS Backup恢复基础设施，结合Amazon Route 53 active-passive或active-active的负载承担与恢复时间。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较第二Region Aurora Replica、最新快照恢复数据库及所谓第二primary instance与上述部署和切换方式的组合，评估数据损失与恢复目标。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查跨Region Aurora复制、快照及AWS Backup恢复能力、主实例拓扑和Route 53切换机制所涉及的恢复时间与数据恢复点。
+
+### Q218
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：EC2位于公有子网并有弹性IP。
+- c2〔S〕：实例当前关联默认安全组。
+- c3〔S〕：默认网络ACL已被修改为阻止所有流量。
+- c4〔S〕：要求从任意位置访问443端口，选择两个步骤。
+- c5〔O1〕：候选安全组规则允许来自任意IPv4源的TCP 443。
+- c6〔O2〕：候选安全组规则允许发往任意IPv4目的地的TCP 443。
+- c7〔O3〕：候选ACL规则仅描述允许来自任意IPv4源的TCP 443。
+- c8〔O4〕：候选ACL规则对入站和出站均允许TCP 443。
+- c9〔O5〕：候选ACL规则允许入站TCP 443及出站TCP 32768-65535，地址范围均为任意IPv4。
+
+**必要判断**
+
+- j1（显式）：如何判断安全组规则的方向、源和目的地址是否符合公网443访问要求？〔S, O1, O2〕
+- j2（显式）：如何判断网络ACL对请求和返回流量分别需要哪些方向与端口范围？〔S, O3, O4, O5〕
+- j3（显式）：如何判断所选两个步骤能否共同建立完整访问路径，并使新规则实际作用于实例？〔S, O1, O2, O3, O4, O5〕
+
+**待官方核验**
+
+- 安全组与网络ACL的状态跟踪、规则方向和返回流量处理有何差异，32768-65535适用于哪些客户端端口条件？
+- 创建安全组后，还需哪些关联操作才能让规则作用于现有EC2实例？
+
+**源异常／歧义**
+
+- 安全组选项只写创建安全组，未明确将其关联到当前使用默认安全组的实例，组合步骤的完整性存在表述缺口。
+
+### Q219
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：有状态应用须在EC2完成内存任务；现用AWS CloudFormation部署M5实例，流量增长后性能下降、访问延迟；须以最高运维效率解决。
+
+**必要判断**
+
+- j1（显式）：比较控制台改为T3加Auto Scaling group、CloudFormation增加Auto Scaling group并手动调desired/max capacity，以及CloudFormation改为R5的资源匹配、状态处理和运维效率。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较声称使用CloudWatch内置EC2内存指标与安装CloudWatch agent生成自定义应用延迟指标，对性能跟踪和未来容量规划的适用性及采集配置。〔S, O3, O4〕
+
+**待官方核验**
+
+- 待查T3/M5/R5资源特征、有状态扩缩限制、EC2默认指标范围及CloudWatch agent自定义指标采集要求。
+
+### Q220
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：新Amazon API Gateway API请求量高度波动，可连续数小时零请求；处理为异步，但请求后几秒内应完成，须选择API调用的最低成本计算服务。
+
+**必要判断**
+
+- j1（显式）：比较AWS Glue job、AWS Lambda function、Amazon EKS容器服务及Amazon ECS with Amazon EC2的API调用衔接、启动与处理延迟、空闲成本和弹性。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各计算服务的异步调用集成、启动延迟、伸缩与最低计费资源限制。
+
+### Q221
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：应用运行于一组Amazon Linux EC2实例；所有应用日志合规保留7年，报告工具须能同时访问全部文件，存储方案成本最优。
+
+**必要判断**
+
+- j1（显式）：比较Amazon EBS、Amazon EFS、EC2 instance store及Amazon S3的长期持久保存、全部日志并发访问方式和7年成本；区分题目要求与额外的共享文件系统假设。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各存储的持久性、并发访问接口与限制，以及长期存储和读取计费。
+
+### Q222
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：外部供应商须访问公司AWS账户执行工作；自动化工具运行于供应商自有AWS账户，供应商当前没有公司账户的IAM访问权限。
+
+**必要判断**
+
+- j1（显式）：比较公司账户IAM role向供应商IAM role委派并附权限、创建带密码IAM user、将供应商账户IAM user加入公司IAM group，以及以AWS account为类型创建identity provider并附权限，判断跨账户自动化授权链路如何成立。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查跨账户角色信任与权限配置、自动化凭证使用，以及IAM group和identity provider的成员与类型限制。
+
+### Q223
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Java Spring Boot应用以pod运行在私有子网Amazon EKS，须写Amazon DynamoDB表且流量不得暴露到互联网；选择两个配合步骤。
+
+**必要判断**
+
+- j1（显式）：比较为EKS pod配置足够权限的IAM role、IAM user及在Java代码嵌入access keys的身份授权方式。〔S, O1, O2, O5〕
+- j2（显式）：判断私有子网network ACL允许出站与创建DynamoDB VPC endpoint各自承担的网络作用，以及如何与pod授权组合满足无互联网写入。〔S, O1, O2, O3, O4, O5〕
+
+**待官方核验**
+
+- 待查EKS pod获取AWS权限的机制、DynamoDB VPC endpoint与路由配置，以及network ACL的作用边界。
+
+### Q224
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Web应用已rehost至单一Region内EC2；须重构为高可用、容错架构，流量随机到达所有运行实例；选择两个步骤。
+
+**必要判断**
+
+- j1（显式）：比较Amazon Route 53 failover、weighted和multivalue answer routing对随机分流、实例覆盖与故障处理的适用性。〔S, O1, O2, O3〕
+- j2（显式）：比较两个AZ内2+1共3台与2+2共4台EC2的部署，判断其与所选DNS策略如何共同满足高可用、容错及全部运行实例随机接流。〔S, O4, O5〕
+
+**待官方核验**
+
+- 待查三种Route 53策略的返回与健康检查机制，以及两种AZ实例分布的故障容量判据。
+
+**源异常／歧义**
+
+- 未给出所需容量或每AZ最低实例数，3台与4台部署之间缺少明确的必要容量判据。
+
+### Q225
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：媒体公司将本地用户活动收集分析迁至AWS，数据持续增长至PB级；须高可用摄取，并以SQL按需分析既有和新增数据，运维开销最低。
+
+**必要判断**
+
+- j1（显式）：比较Amazon Kinesis data stream→S3、Kinesis Data Firehose→Amazon Redshift、S3到达事件→AWS Lambda，以及跨AZ EC2摄取服务→Amazon RDS Multi-AZ的完整数据路径、规模与运维负担。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：逐条检查候选路径是否包含可成立的投递衔接和面向历史、新增PB级数据的按需SQL查询能力，识别选项未说明的必要组件。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各摄取目标与投递集成、PB级存储查询支持及SQL分析所需组件和运维责任。
+
+### Q226
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：当前单台EC2上的RESTful服务接收数千远程设备原始数据，转换后将全部数据存入S3；设备将增至数百万，须高度可扩展且运维最少，选择两个步骤。
+
+**必要判断**
+
+- j1（显式）：比较Route 53向多EC2分流、增加EC2、Amazon SQS缓冲后由EC2处理，以及API Gateway→Kinesis data stream→Kinesis Data Firehose→S3的摄取扩展路径。〔S, O2, O3, O4, O5〕
+- j2（显式）：判断AWS Glue处理S3原始数据如何与摄取路径配合，并比较候选组合是否完整保留接收、转换和存储全部数据的流程及总体运维目标。〔S, O1, O2, O3, O4, O5〕
+
+**待官方核验**
+
+- 待查API Gateway、Kinesis、Firehose、S3与Glue的投递和处理衔接、扩展限制及EC2消费方案维护要求。
+
+### Q227
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：通过AWS Organizations父账户强制多个账户使用CloudTrail，日志须保留3年；目标S3桶启用Versioning，已有3年删除当前对象的Lifecycle；第4年新增日志量稳定但对象总数继续增长，须最低成本删除超过3年的对象。
+
+**必要判断**
+
+- j1（显式）：比较在组织CloudTrail trail设置过期、S3 Lifecycle同时删除当前与历史版本、AWS Lambda枚举删除，以及父账户取得对象所有权，对版本化日志累计与3年删除目标的作用和成本。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查S3版本化桶的当前/非当前版本及删除标记生命周期语义、CloudTrail过期配置边界和对象所有权影响。
+
+### Q228
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：API接收监控设备实时数据并写Amazon RDS供后续分析；流量波动，高峰因数据库写入能力不足而超时；须尽量减少数据库连接，并确保高峰不丢数据。
+
+**必要判断**
+
+- j1（显式）：比较增加DB内存、改RDS Multi-AZ并向所有活动实例写入、API→Amazon SQS→AWS Lambda→数据库，以及API→Amazon SNS→AWS Lambda→数据库的缓冲、写入拓扑和连接压力。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：检查异步消费的并发、重试和失败保留如何受控，避免仅更换消息入口而未满足连接减少与数据不丢失。〔S, O3, O4〕
+
+**待官方核验**
+
+- 待查RDS Multi-AZ写入端点语义、SQS/SNS与Lambda的投递重试及并发控制能力。
+
+### Q229
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：公司自管EC2 MySQL数据库，随需求手动管理复制与伸缩；须简化数据库计算容量增减，以最少运维投入实现整体性能、伸缩和持久性改善。
+
+**必要判断**
+
+- j1（显式）：比较迁移Amazon Aurora Serverless for Aurora MySQL或Aurora PostgreSQL、合并为更大MySQL并使用更大EC2，以及数据库层EC2 Auto Scaling group的引擎迁移改动、容量管理、复制与持久性及总体运维效果。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查Aurora Serverless引擎兼容与容量管理机制，以及自管MySQL纵向扩容和EC2 Auto Scaling的数据库状态管理要求。
+
+### Q230
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：现有两个NAT instances可能无法承受应用流量；替代方案须高可用、容错并自动扩展。
+
+**必要判断**
+
+- j1（显式）：比较两个NAT gateways部署于相同或不同AZ、跨AZ NAT instances配合Auto Scaling groups与Network Load Balancers，以及跨AZ Spot Instances配合NLB的转发架构、故障域与自动扩展能力。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查NAT gateway的AZ与扩展边界，以及NAT instance配合NLB、Auto Scaling或Spot的路由和故障恢复要求。
+
+### Q231
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：带Elastic IP的EC2应用位于VPC A，须访问VPC B数据库；两个VPC属于同一AWS账户，要求最安全的访问方案。
+
+**必要判断**
+
+- j1（显式）：比较数据库security group允许应用公网IP的全部流量、VPC peering、数据库公开访问并分配公网IP，以及VPC B新增带Elastic IP的EC2代理全部请求的连通性与暴露范围。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查VPC peering路由与安全控制要求，以及公网数据库、全流量放行和代理路径的访问边界。
+
+### Q232
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：客户演示环境运行于EC2，每个环境独立VPC；建立RDP或SSH访问时须通知运维团队。
+
+**必要判断**
+
+- j1（显式）：比较CloudWatch Application Insights检测后创建Systems Manager OpsItems、配置带AmazonSSMManagedInstanceCore的instance profile、VPC Flow Logs→CloudWatch Logs metric filters→alarm通知，以及EventBridge EC2 Instance State-change Notification→SNS通知的事件覆盖与告警链路。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各事件源能否识别所需RDP/SSH访问状态，以及日志过滤、告警和运维通知的配置边界。
+
+**源异常／歧义**
+
+- “访问已建立”未明确指网络连接获准、连接建立还是用户成功登录，检测证据要求可能不同。
+
+### Q233
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：新建AWS账户须保护root user访问；选择两个动作。
+
+**必要判断**
+
+- j1（显式）：比较root强密码、MFA、root access keys存入加密S3桶、将root加入管理权限group及给root附inline policy的适用性与账户根身份保护作用。〔S, O1, O2, O3, O4, O5〕
+
+**待官方核验**
+
+- 待查root身份的密码、MFA和access keys管理建议，以及IAM group与inline policy对root的适用限制。
+
+### Q234
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：新Web CRM使用ALB后的多台EC2、EBS卷及Amazon Aurora；应用全部数据须同时满足静态和传输中加密。
+
+**必要判断**
+
+- j1（显式）：比较AWS KMS与AWS Certificate Manager在EBS/Aurora静态加密和ALB传输加密中的分工、对调两者用途、root账户全局加密开关，以及BitLocker配合将TLS证书密钥导入KMS并附ALB的方案。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：检查“全部传输中数据”涉及的客户端、ALB、EC2和Aurora链路，判断选项描述的配置是否足以覆盖所需范围及是否依赖未说明配置。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查KMS、ACM和BitLocker的资源支持边界、ALB证书要求，以及后端与数据库连接加密的独立配置要求。
+
+### Q235
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：本地Oracle迁至Amazon Aurora PostgreSQL；多个应用写相同表，逐个迁移且每次间隔1个月；读写量高，迁移全程两库数据须保持同步。
+
+**必要判断**
+
+- j1（显式）：比较AWS DataSync初迁配合AWS DMS CDC或full load plus CDC，以及AWS Schema Conversion Tool配合DMS；区分memory optimized与compute optimized replication instance、全部表与仅最大表映射对高读写迁移的覆盖。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：检查逐应用迁移时两库实际写入方向和同表变更同步需求，判断候选复制任务是否覆盖整个过渡期，是否需要处理双向变更或冲突。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查Oracle→Aurora PostgreSQL的schema转换、初始加载与CDC支持、复制实例选型及迁移期双库写入同步限制。
+
+**源异常／歧义**
+
+- 未明确应用迁移期间两库是否同时接受同表写入，以及“保持同步”要求的复制方向。
+
+### Q236
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：图片分享应用三层分别为单台EC2前端、单台EC2应用层和单台EC2 MySQL；须可扩展、高可用，应用改动最少。
+
+**必要判断**
+
+- j1（显式）：比较S3前端/Lambda/DynamoDB、S3前端/EC2 Auto Scaling/内存优化数据库实例，以及前端和应用层各用负载均衡Multi-AZ Elastic Beanstalk的整体改造、伸缩与高可用效果。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较Amazon RDS多read replicas与RDS Multi-AZ，结合数据库或S3存储并提供用户图片的差异，评估完整方案而非仅单层能力。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各托管部署与数据迁移的应用兼容性、Multi-AZ和read replicas的作用，以及图片存储服务衔接。
+
+### Q237
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：VPC-A中EC2应用须安全访问VPC-B另一EC2上的文件；两个VPC属于不同AWS账户，连接不得有单点故障或带宽顾虑。
+
+**必要判断**
+
+- j1（显式）：比较跨账户VPC peering、为VPC-B EC2设置VPC gateway endpoints、VPC-B附virtual private gateway并从VPC-A路由，以及为EC2创建private VIF并加路由的适用拓扑、可用性与带宽限制。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各连接机制支持的目标资源、跨账户配置、必要底层连接及可用性和吞吐边界。
+
+### Q238
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：工程团队以独立AWS账户实验；每个账户当月Amazon EC2使用量超过指定阈值时须尽快通知，方案成本最优。
+
+**必要判断**
+
+- j1（显式）：比较Cost Explorer每日或每月服务成本报告配合EC2过滤与Amazon SES阈值通知、逐账户月度EC2 cost budget配合AWS Budgets/SNS，以及小时级Cost and Usage Reports→Athena→EventBridge定时查询→SNS的阈值覆盖、通知时效与成本。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各成本与用量工具的指标口径、数据更新延迟、阈值通知集成和额外查询费用。
+
+**源异常／歧义**
+
+- 题干使用“EC2使用量阈值”，选项主要描述成本阈值，未明确计量单位或是否将usage指代支出。
+
+### Q239
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：客户端必须通过HTTPS端点调用微服务。
+- c2〔S〕：微服务必须使用IAM认证调用。
+- c3〔S〕：逻辑由单个Go 1.x Lambda函数实现。
+- c4〔S〕：目标是最高部署运维效率。
+- c5〔O1〕：候选创建API Gateway REST API，方法集成Lambda并启用IAM认证。
+- c6〔O2〕：候选创建函数URL并指定AWS_IAM认证。
+- c7〔O3〕：候选使用CloudFront及Lambda@Edge，并在函数中实现IAM认证逻辑。
+- c8〔O4〕：候选使用CloudFront Functions部署函数，并指定AWS_IAM认证。
+
+**必要判断**
+
+- j1（显式）：如何判断各HTTPS接入方案能否调用单个Lambda并满足IAM认证要求？〔S, O1, O2, O3, O4〕
+- j2（显式）：如何判断Go 1.x函数与区域Lambda、Lambda@Edge及CloudFront Functions的部署和执行模型是否兼容？〔S, O1, O2, O3, O4〕
+- j3（显式）：如何比较API配置、函数URL及自定义边缘认证逻辑在部署和维护上的工作量？〔S, O1, O2, O3, O4〕
+- j4（先修候选，待核验）：使用IAM认证的HTTPS调用需要哪些客户端签名及服务端授权配置？〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- API Gateway REST API与Lambda函数URL的IAM认证、调用权限及客户端请求签名分别有哪些要求？
+- 题目所述Go 1.x函数在各候选执行环境中的运行时支持及部署限制是什么，边缘方案是否提供所述AWS_IAM认证配置？
+
+### Q240
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：数据仓库已迁AWS且已有AWS Direct Connect；办公室用户用可视化工具查询，平均返回50 MB结果、每网页约500 KB，结果不缓存；须使数据出站传输费用最低。
+
+**必要判断**
+
+- j1（显式）：比较可视化工具部署本地或数据仓库同Region、用户或查询经互联网或同Region地点Direct Connect的四种组合，按50 MB查询结果与500 KB网页实际跨AWS边界的路径比较出站费用。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查同Region服务间、互联网出站及同Region地点Direct Connect出站的计费边界与费率。
+
+### Q241
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：在线学习公司迁AWS，学生记录在PostgreSQL；数据须始终在多个Region可用且在线，运维开销最少。
+
+**必要判断**
+
+- j1（显式）：比较EC2 PostgreSQL cluster、Amazon RDS for PostgreSQL Multi-AZ、RDS跨Region read replica及跨Region复制DB snapshots的地域覆盖、在线访问方式、持续可用性和运维开销。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各部署的Region/AZ范围、跨Region复制与快照恢复访问方式，及其运维责任。
+
+### Q242
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Web应用使用7台EC2；每次DNS查询须返回全部健康EC2实例的IP地址。
+
+**必要判断**
+
+- j1（显式）：比较Simple、Latency、Multivalue及Geolocation routing policy对健康筛选、一次DNS响应多地址及7台实例全部健康地址返回要求的支持。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各DNS策略的健康检查关联、地址选择规则及单次响应数量限制。
+
+### Q243
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：研究数据文件存于Amazon S3，各诊所具有只读权限；须以最低延迟供全国诊所的本地文件型应用使用。
+
+**必要判断**
+
+- j1（显式）：比较每诊所部署AWS Storage Gateway file gateway VM、AWS DataSync迁移到本地处理、每诊所volume gateway VM，以及本地服务器连接Amazon EFS的文件接口、数据本地性、S3衔接和只读访问保持。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查file/volume gateway、DataSync和EFS的访问协议、缓存或复制机制、本地连接及权限映射要求。
+
+### Q244
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：内容管理系统的Web服务器与数据库同在单台EC2；须使网站平台高可用，并按用户需求伸缩。
+
+**必要判断**
+
+- j1（显式）：比较同AZ手动增加EC2并配置ALB，与由原实例创建AMI、跨两个AZ配置ALB和Auto Scaling group的Web层方案。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较RDS加自动备份、Aurora加同AZ或另一AZ read replica，以及独立EC2数据库加S3定时备份；结合各自Web层方案判断全平台高可用与伸缩覆盖。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查ALB/Auto Scaling跨AZ部署、AMI应用配置，以及数据库备份、replica和独立实例对可用性及恢复的作用。
+
+### Q245
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：应用每个环境以ALB向单一target group中至少2台EC2分流，实例属于各环境Auto Scaling group；须开发和生产两个环境，生产有高峰，目标为开发环境最低成本配置。
+
+**必要判断**
+
+- j1（显式）：比较开发target group仅保留1台实例、ALB改least outstanding requests算法、同时缩小两个环境实例规格，以及降低开发Auto Scaling group最大实例数对开发成本、至少2台限制和生产高峰承载的影响。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查target group成员与Auto Scaling容量的关系、最大容量对实际费用的影响，以及ALB算法和实例规格调整的成本作用。
+
+### Q246
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Web应用EC2位于多个AZ的私有子网；已配置internet-facing ALB并将实例设为target group，但互联网流量未到实例，须调整架构恢复访问。
+
+**必要判断**
+
+- j1（显式）：比较改NLB并在公有子网部署NAT gateway、EC2移公有子网且放行0.0.0.0/0出站、EC2子网默认路由指IGW且放行出站，以及各AZ建公有子网供ALB使用并配置到私有子网路由的入站路径与子网职责。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查internet-facing ALB的子网与路由要求、到私有targets的连通条件，以及NAT、IGW和安全组出站规则的作用边界。
+
+### Q247
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Amazon RDS for MySQL事务量增长导致读取慢，拟增加read replica；须选择实施前的两个动作。
+
+**必要判断**
+
+- j1（显式）：判断在源RDS启用binlog replication、设置failover priority、等待长事务完成、创建并指定Region的global table，以及启用自动备份并将保留期设为非0，哪些属于创建read replica所需或相关准备。〔S, O1, O2, O3, O4, O5〕
+
+**待官方核验**
+
+- 待查RDS for MySQL read replica的备份与复制前提、创建过程对长事务的影响，以及failover priority/global table的适用范围。
+
+### Q248
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：EC2分析软件接受用户任务，处理已上传S3的数据
+- c2〔S〕：部分提交数据没有被处理
+- c3〔S〕：EC2的CPU利用率持续达到或接近100%
+- c4〔S〕：需提高性能并随用户负载扩展
+- c5〔O1〕：O1复制实例，并将全部实例放在ALB后
+- c6〔O2〕：O2创建S3 VPC端点并修改软件引用端点
+- c7〔O3〕：O3停机更换CPU和内存更强的实例类型后重启
+- c8〔O4〕：O4将请求放入SQS，按队列大小扩展EC2组，并修改软件从队列读取
+
+**必要判断**
+
+- j1（显式）：如何依据持续CPU饱和及任务未处理现象，区分计算容量、请求承接和S3访问路径方面的改动？〔S, O1, O2, O3, O4〕
+- j2（显式）：如何判断静态增加实例、纵向升级及按队列大小自动扩展对用户负载变化的适配性？〔S, O1, O3, O4〕
+- j3（显式）：如何判断请求排队与工作实例消费的衔接能否缓冲积压，并支持S3数据处理任务完成？〔S, O4〕
+
+**待官方核验**
+
+- SQS与EC2 Auto Scaling可采用哪些队列指标和扩展策略，消息接收、确认及重试需满足什么条件？
+- ALB、实例类型升级和S3 VPC端点分别影响哪些性能环节，哪些配置才能提供随负载变化的处理容量？
+
+### Q249
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：AWS云中媒体应用需要共享存储，客户端须使用SMB访问，方案必须完全托管。
+
+**必要判断**
+
+- j1（显式）：比较Storage Gateway volume gateway创建文件共享、tape gateway配合S3、自管EC2 Windows file share role，以及Amazon FSx for Windows File Server连接origin server和应用服务器的SMB接口与托管责任。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各网关与FSx的协议和存储接口、服务器连接要求及自管组件范围。
+
+### Q250
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：安全团队要求使用VPC Flow Logs记录网络流量；日志前90天频繁访问，之后仍须间歇访问。
+
+**必要判断**
+
+- j1（显式）：比较CloudWatch目标且log group在90天过期、Kinesis目标保留90天、CloudTrail目标再存启用S3 Intelligent-Tiering的桶，以及S3目标在90天后Lifecycle转S3 Standard-IA的目标支持与后续可访问性。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查VPC Flow Logs支持的目标、目标保留期限，以及S3转层与删除对90天后访问的差异。
+
+### Q251
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：新VPC私有子网中的EC2没有互联网出站能力，但须每月从外部供应商下载安全更新。
+
+**必要判断**
+
+- j1（显式）：比较私有子网默认路由直接指IGW、公有子网NAT gateway作为私有子网默认路由、同私有子网NAT instance作为默认路由，以及创建IGW和同子网NAT instance但默认路由仍指IGW的完整出站连通性。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查IGW、NAT gateway和NAT instance的子网位置、地址及路由前提和返回流量路径。
+
+### Q252
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：客户案件文件是重要核心资产，数量持续增长；须供多个EC2应用服务器同时访问，存储内置冗余。
+
+**必要判断**
+
+- j1（显式）：比较Amazon EFS、Amazon EBS、Amazon S3 Glacier Deep Archive及AWS Backup对增长文件集、多EC2同时访问、内置冗余和日常文件使用方式的适用性。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各方案的共享访问接口、容量扩展、冗余范围及归档或备份恢复前置要求。
+
+### Q253
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Policy1和Policy2均附于同一IAM group，工程师IAM user加入该group；须判断其可执行的操作。
+
+**必要判断**
+
+- j1（显式）：依据两份策略的有效权限合并与拒绝评估，判断删除IAM users、directories、EC2 instances及CloudWatch Logs日志各自是否获授权；须先取得实际策略内容及相关资源范围。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待补齐Policy1、Policy2，并查IAM策略组合、显式拒绝及各候选删除操作的action/resource匹配规则。
+
+**源异常／歧义**
+
+- 输入仅给出Policy1、Policy2名称，未提供策略正文或图示，无法据此确定有效权限。
+
+### Q254
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：三层应用迁至VPC后，EC2各层之间security group入站与出站规则未遵循最小权限；须纠正。
+
+**必要判断**
+
+- j1（显式）：比较以instance ID、security group ID、VPC CIDR或subnet CIDR作为规则源或目标的支持范围与授权粒度，判断如何表达层间最小权限。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查security group入站/出站可用的源目标类型、组引用语义及CIDR覆盖边界。
+
+### Q255
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：电商结账先写订单数据库并调用支付服务；超时后用户重交表单，导致同一预期交易生成多个不同订单；须重构以防重复建单。
+
+**必要判断**
+
+- j1（显式）：比较Web→Kinesis Data Firehose供支付服务取消息、CloudTrail记录请求路径触发Lambda查库支付，以及先存订单再发送订单号到SNS供轮询或SQS FIFO供消费后删除的完整衔接。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：区分表单重交造成重复建单与消息重复处理，检查订单写入、消息去重、消费重试及支付幂等的边界，判断候选方案是否覆盖题干实际重复来源。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查Firehose、CloudTrail、SNS和SQS FIFO的消费与触发支持、去重标识及期限，以及消息去重对数据库重复建单的覆盖条件。
+
+### Q256
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：文档审阅应用以S3存储；须防止意外删除、保留全部文档版本，同时允许用户下载、修改、上传；选择两个动作。
+
+**必要判断**
+
+- j1（显式）：比较只读bucket ACL、bucket versioning、向桶附IAM policy、MFA Delete及AWS KMS加密的作用与配置适用性，判断何种组合兼顾版本保留、防误删和正常读写。〔S, O1, O2, O3, O4, O5〕
+
+**待官方核验**
+
+- 待查S3版本与删除语义、MFA Delete前提和操作范围，以及ACL、bucket policy与加密的作用边界。
+
+### Q257
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：须报告账户内所有应用的EC2 Auto Scaling事件，用无服务器方案将状态数据存S3，供仪表盘近实时更新，且不得影响EC2启动速度。
+
+**必要判断**
+
+- j1（显式）：比较CloudWatch metric stream→Kinesis Data Firehose→S3、EMR收集→Firehose→S3、EventBridge定时触发Lambda直接写S3，以及启动bootstrap安装Kinesis Agent→Firehose→S3的无服务器程度和启动影响。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：检查指标流、定时状态采集及实例agent能否覆盖所需Auto Scaling事件与状态，以及采集间隔和投递缓冲是否满足近实时。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各数据源可获取的Auto Scaling事件/指标、Firehose投递延迟、定时采集能力及agent部署范围。
+
+### Q258
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：应用每小时向S3放入数百个.csv文件，每个1 GB；每次上传均须转Apache Parquet并写S3输出桶，运维开销最少。
+
+**必要判断**
+
+- j1（显式）：比较S3 PUT逐文件触发Lambda下载并转换、PUT触发Lambda启动Apache Spark job、Glue table/crawler配合定时Lambda调用Athena再转换结果，以及PUT触发Lambda启动Glue ETL job的完整处理链路、触发及时性和运维负担。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：按每文件1 GB、每小时数百文件检查转换运行时间、内存/临时存储、并发与作业启动限制，避免仅依据事件触发方式评估。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查Lambda、Spark、Athena和Glue ETL的CSV→Parquet支持、运行资源限制、事件调用与作业并发能力。
+
+### Q259
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：所有Amazon RDS DB instances须按新策略每日备份，至少保留2年；备份须一致且可恢复。
+
+**必要判断**
+
+- j1（显式）：比较AWS Backup vault配合每日计划、创建后2年到期并分配RDS实例，RDS每日快照配2年保留与Amazon DLM删除，事务日志存CloudWatch Logs保留2年，以及DMS CDC经replication instance流向S3并Lifecycle在2年后删除所谓快照的备份语义与恢复覆盖。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查RDS与AWS Backup的计划、保留及一致性恢复支持，RDS原生保留上限、DLM资源范围，以及日志/CDC与可恢复备份的差异。
+
+### Q260
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Windows Server SMB合规共享迁AWS，现由本地自管Active Directory控制文件夹与文件访问；已创建Amazon FSx for Windows File Server，迁后仍须由原AD groups限制SMB共享、文件夹和文件访问。
+
+**必要判断**
+
+- j1（显式）：比较Active Directory Connector配合AD groups映射IAM groups、Restrict=Compliance标签配合同类映射、直接关联FSx的IAM service-linked role，以及将FSx file system加入原Active Directory的身份衔接与文件级授权能力。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查FSx加入自管AD的要求、SMB共享与文件权限的AD组应用方式，以及IAM、标签和AD Connector的授权边界。
+
+### Q261
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：零售网站面向全球，EC2位于跨多个AZ的Auto Scaling group并在Elastic Load Balancer后；须按客户设备提供不同内容版本，选择两个动作。
+
+**必要判断**
+
+- j1（显式）：判断Amazon CloudFront缓存多个内容版本与Lambda@Edge按User-Agent提供特定对象各自所需的设备识别、内容选择和缓存区分配置，以及组合适用性。〔S, O1, O3〕
+- j2（显式）：比较NLB配置host header向不同实例转发，以及AWS Global Accelerator→NLB后进行host-based或path-based routing的层次、路由能力和设备版本匹配条件。〔S, O2, O4, O5〕
+
+**待官方核验**
+
+- 待查CloudFront缓存键与设备/User-Agent处理、Lambda@Edge触发能力，以及NLB和Global Accelerator的host/path路由支持边界。
+
+### Q262
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：ElastiCache位于Cache VPC，应用EC2位于App VPC；两者均在us-east-1，需以最低成本实现访问。
+
+**必要判断**
+
+- j1（显式）：比较VPC peering与Transit VPC及双方路由配置的连通性和成本。〔S, O1, O2, O3, O4〕
+- j2（显式）：区分在ElastiCache集群、peering connection或Transit VPC上配置安全组入站规则的可行性，以及引用应用安全组的条件。〔O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查：同Region跨VPC访问ElastiCache的路由、安全组引用、资源关联限制及连接方案成本。
+
+### Q263
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：多个微服务需以容器部署到AWS，尽量减少持续维护和扩缩容工作，不能管理额外基础设施；需选两项组合。
+
+**必要判断**
+
+- j1（显式）：比较ECS cluster与跨多AZ自建Kubernetes control plane、worker nodes的组合及基础设施管理责任。〔S, O1, O2, O5〕
+- j2（显式）：比较ECS EC2与Fargate launch type的维护、扩缩容责任，并判断desired tasks≥2与Kubernetes每微服务replicas≥2在完整部署组合中的作用。〔O1, O3, O4, O5〕
+
+**待官方核验**
+
+- 官方待查：ECS集群与服务的依赖、EC2/Fargate及自建Kubernetes的管理边界和任务/副本配置。
+
+### Q264
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：网站部署于10台EC2，由Route 53导流；部分DNS查询返回不健康实例IP并导致偶发超时，需消除此问题。
+
+**必要判断**
+
+- j1（显式）：比较逐实例配置Route 53 simple或failover记录并关联health check，对多实例健康筛选和DNS响应的适用性。〔S, O1, O2〕
+- j2（显式）：比较CloudFront以EC2为origin并关联实例health check，与ALB执行health check且Route 53指向ALB的端到端健康路由机制。〔O3, O4〕
+
+**待官方核验**
+
+- 官方待查：Route 53各路由策略的健康检查支持，以及CloudFront、ALB对EC2健康状态和故障流量的处理。
+
+### Q265
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：web、application、database三层应用需高可用；HTTPS内容尽量靠近边缘、交付时间最短，并选择最安全方案。
+
+**必要判断**
+
+- j1（显式）：比较public ALB连接冗余EC2时，EC2置于public或private subnets对安全和高可用的影响。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较CloudFront以public ALB或EC2实例为origin的HTTPS交付链路、源站可达性和暴露面，并结合子网部署评估完整方案。〔O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查：CloudFront到ALB/EC2的origin连接要求、HTTPS配置，以及public ALB配合不同EC2子网的安全边界。
+
+### Q266
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：游戏平台对延迟敏感，延迟影响体验和公平性；已在每个AWS Region部署ALB后的EC2 Auto Scaling groups，需监控应用健康并转向健康端点。
+
+**必要判断**
+
+- j1（显式）：比较Global Accelerator的应用端口listener、各Region端点及ALB组合，与CloudFront以ALB或S3为origin、沿用origin cache headers并使用Lambda的全球流量处理方案。〔S, O1, O2, O3〕
+- j2（显式）：区分全球应用端点健康路由与DynamoDB数据存储加DAX内存缓存对题目延迟和故障转向目标的作用。〔O4〕
+
+**待官方核验**
+
+- 官方待查：Global Accelerator、CloudFront/Lambda及DynamoDB/DAX在现有多Region ALB架构中的健康检测、流量转向和延迟优化边界。
+
+### Q267
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：100万移动用户的数据使用情况需近实时分析、近实时加密，并集中以Apache Parquet格式存储供后续处理；运维开销最低。
+
+**必要判断**
+
+- j1（显式）：比较Kinesis Data Streams与Kinesis Data Firehose向S3落地的完整链路，判断加密、Parquet转换及集中存储如何衔接。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较Kinesis Data Analytics与EMR的近实时分析和运维需求；评估O1/O2所提Lambda转送至分析组件的必要性及链路可行性。〔O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查：各Kinesis组件与EMR、Lambda、S3的集成方式，以及近实时分析、加密和Parquet转换能力与限制。
+
+### Q268
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：比分网站采用ALB后EC2和RDS for MySQL；数据库读取性能导致长延迟和中断，需改善体验并尽量少改架构。
+
+**必要判断**
+
+- j1（显式）：比较数据库前置ElastiCache与应用和数据库间加入RDS Proxy，对读取瓶颈的作用及改造需求。〔S, O1, O2〕
+- j2（显式）：比较将EC2应用迁至Lambda或将RDS for MySQL迁至DynamoDB，能否针对读取问题且满足最少架构改动。〔O3, O4〕
+
+**待官方核验**
+
+- 官方待查：ElastiCache、RDS Proxy的优化边界，以及Lambda/DynamoDB迁移对该读取场景的作用和应用改造要求。
+
+### Q269
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：RDS支持的电商网站因分析师只读SQL查询增多而性能下降，需解决问题且尽量少改现有网站应用。
+
+**必要判断**
+
+- j1（显式）：比较将分析师查询移至RDS read replica、导出至DynamoDB、加载至ElastiCache或复制至Redshift，对生产读取负载隔离、SQL查询延续和应用改动的影响。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：识别各候选方案的数据复制/同步和查询接口要求，以评估迁移分析查询的额外工作。〔O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查：RDS read replica与DynamoDB、ElastiCache、Redshift的SQL支持、数据同步方式和读取负载隔离边界。
+
+### Q270
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：集中AWS账号的多个S3 buckets存日志；数据必须在上传前完成静态加密，同时传输中也需加密。
+
+**必要判断**
+
+- j1（显式）：比较client-side encryption、server-side encryption、强制SSE-S3的bucket policy及默认AWS KMS key方案的加密发生位置和时机。〔S, O1, O2, O3, O4〕
+- j2（显式）：分别评估各方案对上传前加密与传输中加密的覆盖，区分数据预先加密和传输通道保护。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查：S3客户端/服务端加密、SSE-S3策略及默认KMS加密的执行时点，以及上传传输保护要求。
+
+### Q271
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：每晚1 AM启动批处理，峰值容量每晚相同；当前扩容需1小时才能达到目标EC2容量，需快速到位、完成后缩容且成本有效。
+
+**必要判断**
+
+- j1（显式）：比较提高Auto Scaling group minimum或maximum、scheduled scaling到目标算力、每次扩容增加更多EC2，对固定时间固定峰值的准备速度和成本的影响。〔S, O1, O2, O3, O4〕
+- j2（显式）：判断各容量或策略调整如何保留批处理完成后的缩容能力，并与提前达到目标容量衔接。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查：Auto Scaling minimum/maximum、scheduled scaling和扩容步长的行为及其与缩容策略的关系。
+
+### Q272
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：动态多语言网站位于us-west-1，采用ALB后EC2；全球其他地区请求延迟高，需快速高效服务且不在多个Region重建现有架构。
+
+**必要判断**
+
+- j1（显式）：比较CloudFront以现有ALB或替换后的S3网站为origin，以及API Gateway HTTP integration连接ALB并启用stage cache，对动态网站和全球访问的适配。〔S, O1, O2, O3〕
+- j2（显式）：评估基于Accept-Language的缓存区分；比较额外Region部署EC2 NGINX缓存并用Route 53 geolocation导流的架构改动和交付链路。〔O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查：CloudFront/API Gateway缓存请求头、origin/integration要求，以及多Region NGINX和Route 53 geolocation方案的能力边界。
+
+### Q273
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：快速增长的电商当前单Region运行；需异Region DR，数据库以尽可能低延迟保持更新，其余基础设施以缩减容量运行并可扩容，目标最低RTO。
+
+**必要判断**
+
+- j1（显式）：比较Aurora global database与RDS Multi-AZ DB instance对异Region数据库更新和复制延迟要求的适配。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较pilot light与warm standby的常态运行范围、缩减容量、扩容恢复步骤及RTO，并与数据库方案组合评估。〔O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查：两类数据库部署的Region/AZ边界和复制机制，以及pilot light、warm standby的运行与恢复特征。
+
+### Q274
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：EC2应用需DR，RTO小于4小时；正常运营使用尽可能少的AWS资源，并使方案运维最有效率。
+
+**必要判断**
+
+- j1（显式）：比较AMI备份并复制到secondary Region后按需部署，与secondary Region或secondary AZ常驻EC2，对恢复范围、RTO和日常资源占用的影响。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较Lambda加自定义脚本与CloudFormation在secondary Region自动部署基础设施的维护成本和恢复流程。〔O1, O2〕
+
+**待官方核验**
+
+- 官方待查：AMI跨Region复制和恢复依赖、CloudFormation与自定义自动化的部署边界，以及常驻Region/AZ方案的恢复特征。
+
+### Q275
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：内部浏览器应用运行于ALB后、跨多AZ的EC2 Auto Scaling group；工作时20台、夜间2台，开工时慢而上午稍晚恢复，需解决并最低成本。
+
+**必要判断**
+
+- j1（显式）：比较开门前scheduled action设置desired capacity=20与同时设置minimum/maximum=20，对提前备容、后续弹性和费用的影响。〔S, O1, O4〕
+- j2（显式）：比较降低CPU阈值并缩短cooldown的step scaling、target tracking，与定时提前扩容对日初延迟的适配。〔O2, O3, O1, O4〕
+
+**待官方核验**
+
+- 官方待查：scheduled action的desired/minimum/maximum语义，以及step scaling、target tracking的阈值和cooldown行为。
+
+### Q276
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：多层应用采用EC2 Auto Scaling group和RDS for Oracle，依赖Oracle专有PL/SQL；流量持续增加但增速不可预测、之后趋稳，EC2过载且数据库存储耗尽。
+- c2〔S〕：Auto Scaling group仅定义minimum healthy instance count，无扩缩容指标；需自动应对增长，选两项。
+
+**必要判断**
+
+- j1（显式）：比较RDS for Oracle storage Auto Scaling、低剩余空间alarm及迁往Aurora，能否自动扩展存储并保留Oracle专有PL/SQL需求。〔S, O1, O2, O3〕
+- j2（显式）：比较以average CPU或average free memory作为Auto Scaling指标，对不可预测流量增长和EC2过载的适配。〔O4, O5〕
+- j3（先修候选，待核验）：确认候选扩缩容指标的采集配置要求，以及仅告警到实际自动扩容之间的动作依赖。〔O3, O4, O5〕
+
+**待官方核验**
+
+- 官方待查：RDS存储自动扩展、Oracle/Aurora兼容边界，以及EC2 CPU/内存指标采集和扩缩容动作配置。
+
+### Q277
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：视频上传转码服务当前用EFS Standard收集存储，供多台EC2 Linux实例访问处理；增长后存储过贵，需最具成本效益方案。
+
+**必要判断**
+
+- j1（显式）：比较Storage Gateway for files与for volumes承担视频存储和处理的接口、部署及成本。〔S, O1, O2〕
+- j2（显式）：比较EFS处理后转EBS，与S3长期存储、临时复制到处理服务器所附EBS的生命周期、并行处理访问和总成本。〔O3, O4〕
+
+**待官方核验**
+
+- 官方待查：Storage Gateway、EFS、S3和EBS的访问模型、视频处理数据搬运及存储/传输成本差异。
+
+### Q278
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：员工数据具有层级结构关系
+- c2〔S〕：高流量查询要求最低延迟响应
+- c3〔S〕：必须保护敏感数据
+- c4〔S〕：若员工数据包含财务信息，需每月收到电子邮件
+- c5〔S〕：要求选择两个步骤组合
+- c6〔O1〕：O1采用Redshift层级存储并每月卸载至S3
+- c7〔O2〕：O2采用DynamoDB层级存储并每月导出至S3
+- c8〔O3〕：O3配置Macie，经EventBridge每月向Lambda发送事件
+- c9〔O4〕：O4用Athena分析S3数据，并以QuickSight发布和分享仪表板
+- c10〔O5〕：O5配置Macie，经EventBridge及SNS订阅发送每月通知
+
+**必要判断**
+
+- j1（显式）：如何判断Redshift与DynamoDB对层级员工数据建模及高流量最低延迟查询的适用性？〔S, O1, O2〕
+- j2（显式）：如何判断每月导出至S3与敏感财务信息发现之间的衔接，并区分发现信息与保护信息的要求？〔S, O1, O2, O3, O5〕
+- j3（显式）：如何区分事件送达Lambda、SNS订阅通知和仪表板分享，能否按财务信息存在条件发送每月邮件？〔S, O3, O4, O5〕
+- j4（显式）：如何检查两个步骤的组合是否共同覆盖查询、敏感数据保护、每月检测及邮件通知全流程？〔S, O1, O2, O3, O4, O5〕
+
+**待官方核验**
+
+- Redshift与DynamoDB支持哪些层级数据访问方式及S3定期导出机制，其延迟和高流量适用条件是什么？
+- Macie如何检测S3中的财务信息，检测周期、敏感数据保护边界及EventBridge发现事件的规则是什么？
+- EventBridge、Lambda与SNS如何实现按条件每月发送邮件，哪些调度、过滤及订阅步骤还需配置，仪表板分享提供什么通知能力？
+
+### Q279
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：DynamoDB表需每月备份；备份须可用6个月并保留7年。
+
+**必要判断**
+
+- j1（显式）：比较AWS Backup plan的每月1日备份、6个月转cold storage、7年保留，与DynamoDB on-demand backup转S3 Glacier Flexible Retrieval并用S3 Lifecycle删除的可行性。〔S, O1, O2〕
+- j2（显式）：比较SDK脚本加EventBridge每月1日备份、2日转换/删除，与CLI加EventBridge cron并在命令指定生命周期的调度、冷存储及删除支持。〔O3, O4〕
+
+**待官方核验**
+
+- 官方待查：DynamoDB各备份方式的cold storage、S3 Glacier转移、生命周期API/CLI参数及恢复可用性。
+
+**源异常／歧义**
+
+- “可用6个月”与“保留7年”未说明6个月后的恢复可用性或访问时限，需区分可用期与存储层级要求。
+
+### Q280
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：网站使用CloudFront，已启用分配日志并保存至公司S3桶
+- c2〔S〕：需进行高级日志分析并构建可视化
+- c3〔O1〕：O1采用Athena标准SQL分析S3日志，并提出用Glue可视化
+- c4〔O2〕：O2采用Athena标准SQL分析S3日志，并提出用QuickSight可视化
+- c5〔O3〕：O3提出用DynamoDB标准SQL分析S3日志，并用Glue可视化
+- c6〔O4〕：O4提出用DynamoDB标准SQL分析S3日志，并用QuickSight可视化
+
+**必要判断**
+
+- j1（显式）：如何判断Athena与DynamoDB对S3中CloudFront日志进行标准SQL分析的适用性及准备条件？〔S, O1, O2, O3, O4〕
+- j2（显式）：如何区分Glue与QuickSight在日志处理、数据组织和结果可视化中的职责？〔S, O1, O2, O3, O4〕
+- j3（显式）：如何判断所选分析工具与可视化工具能否衔接成完整的S3日志分析流程？〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- Athena和DynamoDB分别如何支持选项所述的S3日志SQL查询，需要何种数据定义、导入或连接步骤？
+- Glue与QuickSight各自的可视化能力和查询结果集成方式是什么？
+
+### Q281
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Web服务器使用RDS for PostgreSQL；合规要求所有生产数据库RPO小于1秒。
+
+**必要判断**
+
+- j1（显式）：比较RDS Multi-AZ、单AZ auto scaling、主库单AZ加另一AZ多个read replicas，以及单AZ加DMS CDC，对复制时效和故障数据损失的保障。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：区分RPO与容量伸缩、读扩展及迁移复制的目标，识别满足小于1秒所需的复制与持久化保证。〔O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查：RDS for PostgreSQL各部署/复制机制及DMS CDC的同步方式、复制延迟和RPO保障范围。
+
+### Q282
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Web 应用的 EC2 实例部署在 VPC 私有子网中。
+- c2〔S〕：ALB 跨公有子网部署，并向 EC2 转发网页流量。
+- c3〔S〕：实例入站流量须限定来自 ALB，并阻止实例私有子网内外的任何其他来源。
+- c4〔O1〕：候选通过路由表将互联网流量导向实例私有 IP。
+- c5〔O2〕：候选将实例安全组的允许来源限定为 ALB 安全组。
+- c6〔O3〕：候选将实例移入公有子网并分配弹性 IP。
+- c7〔O4〕：候选在 ALB 安全组允许任意端口的 TCP 流量。
+
+**必要判断**
+
+- j1（显式）：如何判断实例入站规则能否只接受 ALB 流量，并排除同子网及子网外的其他来源？〔S, O2〕
+- j2（显式）：如何区分路由、公有子网和弹性 IP 所改变的可达性，与题目要求的来源限制？〔S, O1, O3〕
+- j3（显式）：如何判断控制应施加在 ALB 还是实例安全组，以及任意 TCP 端口规则是否覆盖所需限制？〔S, O2, O4〕
+
+**待官方核验**
+
+- 安全组引用另一安全组作为来源时，如何识别 ALB 到目标实例的流量，现有其他入站规则会怎样影响来源限制？
+- 路由表、实例公网寻址及 ALB 与实例各自的安全组分别控制什么，如何共同决定候选路径的可达性与准入？
+
+### Q283
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Linux仿真应用每5分钟向NFS输出中间数据；Windows桌面可视化应用读取输出且要求SMB。
+- c2〔S〕：当前同步两套文件系统造成重复数据和资源低效；需迁至AWS，两个应用均不改代码。
+
+**必要判断**
+
+- j1（显式）：比较Lambda加S3、ECS加FSx File Gateway，以及Linux/Windows EC2加SQS或FSx for NetApp ONTAP，对原应用运行形态和数据交换的兼容。〔S, O1, O2, O3, O4〕
+- j2（显式）：判断各存储/交换方案如何同时满足NFS和SMB访问、5分钟输出及减少双份文件同步，且无需代码修改。〔O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查：候选计算平台对原应用的兼容，以及FSx File Gateway、FSx for NetApp ONTAP、S3、SQS的协议和共享数据访问边界。
+
+### Q284
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：管理层需按user列出AWS billed items的报告，用于部门预算，要求最高效取得信息。
+
+**必要判断**
+
+- j1（显式）：比较Athena查询、Cost Explorer创建下载报告、billing dashboard下载账单，以及修改AWS Budgets通过SES告警，能否提供所需按user归集的明细及相应准备工作。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：识别按user归集费用所需的身份/成本归属字段与可用账单数据来源。〔S, O1, O2, O3〕
+
+**待官方核验**
+
+- 官方待查：各成本工具的报告、下载和分组维度，以及Athena所需数据源、Budgets/SES告警与明细报告的能力区别。
+
+**源异常／歧义**
+
+- user未说明是IAM user、账号用户还是成本归属人，题干也未提供可用于按人归集的标记或映射。
+
+### Q285
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：S3静态网站需加入含动态服务端组件的联系表单，收集姓名、email、电话和留言；每月访问少于100次，目标最低成本。
+
+**必要判断**
+
+- j1（显式）：比较ECS动态页面加SES连接第三方邮件，与API Gateway endpoint→Lambda→SES的表单提交和邮件链路及低访问量成本。〔S, O1, O2〕
+- j2（显式）：比较迁往Lightsail或t2.micro EC2 LAMP、以client-side scripting构建表单并接WorkMail，能否覆盖服务端处理及其常驻资源和改造成本。〔O3, O4〕
+
+**待官方核验**
+
+- 官方待查：候选托管/无服务器方案的表单服务端能力、SES/WorkMail集成路径及低流量计费。
+
+### Q286
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：静态网站采用CloudFront前置S3并使用数据库后端；Git更新未显示，但webhooks配置正常且Git→S3 CI/CD报告部署成功，需使更新可见。
+
+**必要判断**
+
+- j1（显式）：比较CloudFront cache invalidation、增加ALB、数据库层加入ElastiCache Redis/Memcached，以及ACM验证SSL证书，对部署成功后旧内容仍显示的作用。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：区分源站部署状态、边缘缓存内容、数据库缓存与TLS证书状态，定位需要更新的内容交付层。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查：CloudFront缓存更新/失效机制，以及ALB、ElastiCache和ACM是否涉及该内容更新路径。
+
+### Q287
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：本地Windows应用迁AWS，含application、business、Microsoft SQL Server database三层；需SQL Server native backups、Data Quality Services及层间共享文件处理。
+
+**必要判断**
+
+- j1（显式）：比较三层均运行于EC2，与应用/业务层EC2、数据库层RDS，对指定SQL Server功能及管理需求的适配。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较FSx File Gateway、FSx for Windows File Server、EFS和Provisioned IOPS SSD io2 EBS承担Windows层间共享文件的接口与部署条件，并与数据库方案组合。〔O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查：EC2/RDS的SQL Server native backups与Data Quality Services支持，以及候选存储的Windows协议、多实例共享和网关部署条件。
+
+### Q288
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Linux web服务器群迁AWS，需访问共享文件存储中的部分内容，不得修改应用。
+
+**必要判断**
+
+- j1（显式）：比较S3 Standard直接访问、CloudFront以S3为origin、所有服务器挂载EFS，以及所有服务器挂载同一gp3 EBS，对原应用文件访问和共享语义的适配。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：识别文件挂载、对象/HTTP访问及多主机卷挂载的接口和并发访问限制，评估零应用改动的可行性。〔O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查：S3、CloudFront、EFS及gp3 EBS的Linux访问方式、多主机共享/挂载条件与应用兼容边界。
+
+### Q289
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Lambda需读取同一AWS账号内的一个S3 bucket，要求最安全授权。
+
+**必要判断**
+
+- j1（显式）：比较S3 bucket policy、Lambda附加IAM role及其policy、代码嵌入access key/secret key的身份与凭证管理方式。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较仅授予目标bucket读取与授予账号全部S3 buckets读取的权限范围，并评估bucket policy所需授权主体。〔O1, O2, O4〕
+
+**待官方核验**
+
+- 官方待查：Lambda execution role与S3 bucket policy的授权关系、凭证来源及单bucket读取的最小权限配置。
+
+### Q290
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Web应用运行于随用户需求伸缩的EC2 Auto Scaling group，需优化成本且不作长期承诺。
+
+**必要判断**
+
+- j1（显式）：比较仅Dedicated Instances、仅On-Demand、On-Demand+Spot、On-Demand+Reserved Instances的承诺要求、成本及弹性采购组合。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：识别Spot中断风险及混合实例采购与Auto Scaling配合的条件，避免额外假定题目未给出的中断容忍度。〔O3〕
+
+**待官方核验**
+
+- 官方待查：各EC2购买选项的期限承诺、计费和中断特征，以及Auto Scaling混合采购配置。
+
+### Q291
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：公开流媒体经CloudFront交付，视频存S3；需控制访问者，部分用户custom HTTP client不支持cookies，另有用户不能修改hardcoded URLs；选两项且用户影响最小。
+
+**必要判断**
+
+- j1（显式）：分别比较signed cookies与signed URLs对不支持cookies、不能改URL两类用户的适配，并判断两种方法如何组合覆盖用户群。〔S, O1, O2〕
+- j2（显式）：比较AppSync、JWT和Secrets Manager作为候选访问控制方案时，对CloudFront/S3交付链路及客户端改造的要求。〔O3, O4, O5〕
+
+**待官方核验**
+
+- 官方待查：CloudFront signed cookies/URLs的客户端要求，以及AppSync、JWT、Secrets Manager用于该访问控制场景的集成边界。
+
+### Q292
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：平台从多个来源接收实时流数据，写入S3前需转换，转换后可用SQL查询；选两条完整方案。
+
+**必要判断**
+
+- j1（显式）：比较Kinesis Data Streams→Kinesis Data Analytics→Firehose→S3、MSK→Glue→S3，以及DMS→EMR→S3的实时摄取、先转换后落地衔接。〔S, O1, O2, O3〕
+- j2（显式）：比较MSK→Kinesis Data Analytics直接写S3与Kinesis Data Streams→Glue→Firehose→S3的集成要求，并区分Athena和RDS query editor查询S3转换数据的适用性。〔O1, O2, O3, O4, O5〕
+
+**待官方核验**
+
+- 官方待查：各候选摄取/转换/交付组件的流式集成、S3输出路径，以及Athena与RDS query editor的数据源和SQL查询边界。
+
+### Q293
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：本地volume备份方案到寿命终点；新方案使用AWS备份时须保持全部数据本地可访问，并自动、安全地传输至AWS。
+
+**必要判断**
+
+- j1（显式）：比较Snowball的S3 endpoint、Snowball Edge file interface与Storage Gateway volume方案，对持续本地访问和自动安全备份的适配。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较本地运行gateway appliance时，cached volumes仅配置部分本地cache，与stored volumes映射本地存储，对全部数据本地保留/访问及挂载方式的差异。〔O3, O4〕
+
+**待官方核验**
+
+- 官方待查：Snowball系列的数据访问与迁移周期，以及Storage Gateway cached/stored volumes的本地数据范围、挂载和自动加密传输机制。
+
+### Q294
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：EC2应用需访问S3 bucket，流量不得经过internet。
+
+**必要判断**
+
+- j1（显式）：比较Route 53 private hosted zone、S3 gateway VPC endpoint、NAT gateway及VPC到S3 bucket的Site-to-Site VPN提议，是否形成不经internet的实际访问路径。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：区分DNS解析配置与数据路由路径，并识别endpoint/VPN对端和路由配置要求。〔O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查：S3 gateway VPC endpoint的路由机制、NAT访问路径，以及S3与Site-to-Site VPN的对端连接边界。
+
+### Q295
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：AWS中TB级客户数据含PII，供3个应用使用；仅1个应用需处理PII，另2个必须在处理前移除PII，目标最低运维开销。
+
+**必要判断**
+
+- j1（显式）：比较DynamoDB加代理层按请求拦截处理，与S3加S3 Object Lambda在返回前转换，如何按应用保留或移除PII及其维护需求。〔S, O1, O2〕
+- j2（显式）：比较预处理后分别保存到3个S3 buckets或3个DynamoDB tables的定制数据集，与按请求转换在TB级数据上的复制、更新和运维负担。〔O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查：S3 Object Lambda及代理层的请求时转换、应用身份区分与PII过滤路径，以及多份数据集维护限制。
+
+### Q296
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：同账号新VPC需与development VPC peering；现有CIDR为192.168.0.0/24，需选择满足peering要求的最小有效CIDR block。
+
+**必要判断**
+
+- j1（显式）：比较10.0.1.0/32、192.168.0.0/24、192.168.1.0/32和10.0.1.0/24的VPC CIDR有效性、与现有网段的重叠及地址块大小。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查：VPC IPv4 CIDR前缀长度范围、peering网段重叠限制及“最小地址块”的判断方法。
+
+### Q297
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：5台EC2由ALB target group分流；每台CPU通常低于10%，偶发升至65%；需自动伸缩、优化成本并在突发时保有足够CPU。
+
+**必要判断**
+
+- j1（显式）：比较两种接入现有ALB/target group并纳入EC2的Auto Scaling方案：均min=2、desired=3、max=6，但仅一项配置ASGAverageCPUUtilization target tracking、目标50%。〔S, O2, O3〕
+- j2（显式）：比较CPUUtilization<20%时CloudWatch调用Lambda终止一台实例，与平均CPU<20%或>50%时SNS邮件通知人工增减，是否覆盖自动双向伸缩及突发容量。〔O1, O4〕
+
+**待官方核验**
+
+- 官方待查：Auto Scaling容量边界与target tracking的区别、现有实例接入行为，以及告警→Lambda终止和SNS人工处理的伸缩覆盖。
+
+### Q298
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：关键业务应用采用ALB、EC2 Auto Scaling group和RDS DB instance；当前EC2与数据库均单AZ，需加入第二AZ实现高可用。
+
+**必要判断**
+
+- j1（显式）：比较每AZ各建subnet，与一个或两个subnets横跨两AZ的提议，及Auto Scaling group跨两AZ分布实例的网络配置。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较RDS仅连接各网络与配置Multi-AZ deployment，对数据库故障恢复及整条应用链路高可用的作用。〔O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查：subnet的AZ范围、ALB/Auto Scaling跨AZ配置，以及RDS网络连接配置与Multi-AZ部署的区别。
+
+### Q299
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：约8 TB数据由数百台Amazon Linux EC2分布处理；存储要求sub-millisecond延迟和至少6 GBps吞吐。
+
+**必要判断**
+
+- j1（显式）：比较FSx for NetApp ONTAP导入原始数据、挂载EC2且volume tiering policy为ALL或NONE的性能与数据层级差异。〔S, O1, O4〕
+- j2（显式）：比较S3存原始数据并与FSx for Lustre配置import/export、挂载EC2时，persistent SSD或HDD对8 TB规模、延迟及6 GBps吞吐的适配。〔O2, O3〕
+
+**待官方核验**
+
+- 官方待查：FSx for NetApp ONTAP各tiering policy及FSx for Lustre persistent SSD/HDD的容量、吞吐、延迟和S3集成配置边界。
+
+### Q300
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：本地硬件容量不足，需迁移legacy应用到AWS；应用24小时/天、7天/周运行，数据库存储持续增长，目标最具成本效益。
+
+**必要判断**
+
+- j1（显式）：比较应用层EC2 Spot、Reserved与On-Demand的持续运行适配和成本，并评估与数据层购买方式组合后的整体费用。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较数据层S3、RDS On-Demand、Aurora Reserved和RDS Reserved，对legacy数据库访问、持续存储增长及长期运行成本的适配。〔O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查：各EC2/数据库购买选项的承诺与中断特征，以及S3、RDS、Aurora的数据接口、存储增长机制和计费组合。
+
+### Q301
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：30 TB数据需从本地Windows file server迁至FSx for Windows File Server；共享1 Gbps链路，需尽量提高传输性能、可控带宽以减少其他部门影响，并在未来5天内完成。
+
+**必要判断**
+
+- j1（显式）：比较Snowcone、FSx File Gateway、DataSync和Transfer Family的源/目标兼容、迁移机制、带宽控制及5天交付适配。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：评估30 TB在共享1 Gbps链路和限速条件下的所需有效吞吐、可用传输窗口及离线设备准备时间。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查：候选服务对Windows/FSx迁移、带宽节流、传输性能及设备交付流程的支持与限制。
+
+### Q302
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：移动app将慢动作视频以raw格式上传S3并直接读取；文件过大导致缓冲和播放问题，需整体最大化性能与扩展性、最小化运维；选两项组合。
+
+**必要判断**
+
+- j1（显式）：比较CloudFront交付缓存、DataSync复制到其他Region的S3，以及Local Zones中EC2 Auto Scaling group交付缓存，对移动播放和运维的作用。〔S, O1, O2, O4〕
+- j2（显式）：比较Elastic Transcoder与EC2 Auto Scaling group转为合适格式，并与交付方案组合评估大文件、播放、扩展性及整体运维目标。〔O3, O5, O1, O2, O4〕
+
+**待官方核验**
+
+- 官方待查：候选交付/复制方案与视频转码方案的能力、集成和管理责任，以及合适输出格式对移动播放的要求。
+
+### Q303
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：新应用运行于ECS cluster，tasks使用Fargate；预期上线高流量并监测CPU和内存，利用率下降时需降低成本。
+
+**必要判断**
+
+- j1（显式）：比较EC2 Auto Scaling按历史时段伸缩、EC2 simple scaling响应ECS指标告警，与Application Auto Scaling target tracking对Fargate任务的控制范围。〔S, O1, O3, O4〕
+- j2（显式）：比较CloudWatch指标告警触发Lambda自定义伸缩ECS与托管target tracking，对CPU/内存变化、缩容降费及维护工作的适配。〔O2, O4〕
+
+**待官方核验**
+
+- 官方待查：ECS Fargate service scaling支持的控制服务、CPU/内存指标、target tracking告警机制及自定义Lambda伸缩接口。
+
+### Q304
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：已在另一AWS Region建DR站点，需定期在两个Region的NFS文件系统间往返传输大量数据，要求最低运维开销。
+
+**必要判断**
+
+- j1（显式）：比较DataSync、Snowball devices、自建EC2 SFTP server和DMS，对跨Region NFS文件传输、周期调度、两个方向传输及维护工作的适配。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：识别往返传输所需的任务方向、网络连接和文件更新处理配置，避免将需求自行扩大为自动双向冲突解决。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查：各服务的NFS源/目标支持、跨Region部署、定时任务与传输方向限制及自建组件需求。
+
+### Q305
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：AWS云中游戏应用需共享存储，允许SMB clients访问数据，方案必须fully managed。
+
+**必要判断**
+
+- j1（显式）：比较DataSync task作为可挂载文件系统、自建EC2 Windows file share、FSx for Windows File Server连接origin/application server，以及S3加IAM role并挂载的共享存储提议。〔S, O1, O2, O3, O4〕
+- j2（显式）：分别评估各方案的SMB访问链路、挂载/连接条件及管理责任，区分数据传输、对象访问与共享文件服务。〔O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查：DataSync、FSx for Windows File Server、S3和EC2 Windows file share的SMB、挂载与fully managed边界。
+
+### Q306
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：EC2上的延迟敏感应用需内存数据库，每分钟超过100,000次事务且要求高网络吞吐；网络设计需成本有效并尽量减少数据传输费。
+
+**必要判断**
+
+- j1（显式）：比较同Region同AZ的cluster placement group，与同Region跨AZ的partition placement group，对延迟、吞吐和传输费用的影响。〔S, O1, O2〕
+- j2（显式）：比较跨AZ Auto Scaling按network utilization target或step scaling扩容，能否针对题目的网络拓扑、吞吐与传输成本目标。〔O3, O4〕
+
+**待官方核验**
+
+- 官方待查：cluster/partition placement group的AZ与网络特征、跨AZ数据传输计费，以及网络指标伸缩的配置边界。
+
+### Q307
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：主要在本地运行应用服务器，现决定迁AWS；需减少本地iSCSI存储扩容，仅最近访问的数据留在本地。
+
+**必要判断**
+
+- j1（显式）：比较S3 File Gateway、Storage Gateway Tape Gateway，以及Volume Gateway stored/cached volumes的接口、本地数据保留范围和云端存储方式。〔S, O1, O2, O3, O4〕
+- j2（显式）：判断候选方案如何保留iSCSI访问并以近期访问数据为本地工作集，减少本地容量增长。〔O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查：各Gateway类型的iSCSI/文件/磁带接口，以及stored与cached volumes的本地缓存和数据存放行为。
+
+### Q308
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：多个账号使用consolidated billing，若干活跃高性能RDS for Oracle On-Demand实例已运行90天；财务可访问合并账单账号及各账号的Trusted Advisor。
+- c2〔S〕：需选正确账号查看RDS建议并选降低RDS成本的适当check，共选两项。
+
+**必要判断**
+
+- j1（显式）：比较从RDS实际运行账号查看建议，与从consolidated billing账号一次查看全部RDS checks的可见范围。〔S, O1, O2〕
+- j2（显式）：比较RDS Reserved Instance Optimization、RDS Idle DB Instances和Redshift Reserved Node Optimization，对活跃、已运行90天的Oracle On-Demand实例成本问题的适配。〔O3, O4, O5〕
+
+**待官方核验**
+
+- 官方待查：Trusted Advisor相关check的账号范围、汇总能力、评估窗口和适用资源/使用状态。
+
+### Q309
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：为优化存储成本，需识别不再访问或很少访问的S3 buckets，要求最低运维开销。
+
+**必要判断**
+
+- j1（显式）：比较S3 Storage Lens advanced activity metrics与Management Console的S3 dashboard，能否直接提供bucket访问活跃度及识别依据。〔S, O1, O2〕
+- j2（显式）：比较CloudWatch BucketSizeBytes加Athena分析，与CloudTrail S3 object monitoring加CloudWatch Logs，对访问频率的观测能力、数据接入和运维负担。〔O3, O4〕
+
+**待官方核验**
+
+- 官方待查：各dashboard和指标的访问活动维度、BucketSizeBytes含义，以及Athena/CloudTrail/CloudWatch Logs分析链路和配置要求。
+
+### Q310
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：AI/ML大型格式化数据集存于us-east-1的S3；购买网站采用ALB后多EC2，购买后发S3 signed URL；客户在北美和欧洲，需降低传输成本并保持或改善性能。
+
+**必要判断**
+
+- j1（显式）：比较现有S3开启Transfer Acceleration并保留S3 signed URLs，与CloudFront以S3为origin并改用CloudFront signed URLs的交付、授权和总成本。〔S, O1, O2〕
+- j2（显式）：比较eu-central-1新增S3并Cross-Region Replication、就近访问且保留S3 signed URLs，与应用从S3读取后向用户stream并自行授权，对复制/传输成本、性能及访问控制的影响。〔O3, O4〕
+
+**待官方核验**
+
+- 官方待查：S3 Transfer Acceleration、CloudFront、跨Region复制和EC2代理交付的费用与性能，以及两类signed URLs的授权链路。
+
+### Q311
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：保险报价请求须按quote type分离、24小时内响应且不得丢失；方案需最大化运维效率、最小化维护。
+
+**必要判断**
+
+- j1（显式）：比较按类型建Kinesis Data Streams并由后端KCL取消息、按类型建SNS topic及订阅Lambda，以及单SNS topic按message filtering分发至各后端SQS queue的路由、持久化和处理链路。〔S, O1, O2, O3〕
+- j2（显式）：比较按类型Firehose投递OpenSearch后由服务器搜索处理，与其余候选方案在24小时响应、失败重试、防丢失及维护工作上的差异。〔O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查：候选消息链路的过滤、保留、确认/重试和消费者机制，以及Firehose/OpenSearch作为请求处理通道的限制。
+
+### Q312
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：应用运行于多台EC2，每台附多个EBS data volumes；实例配置和数据均需每晚备份，并能在不同AWS Region恢复，要求最高运维效率。
+
+**必要判断**
+
+- j1（显式）：比较AWS Backup plan每晚备份并跨Region复制时，将EC2 instances或仅EBS volumes作为resources，对实例配置及全部数据的覆盖。〔S, O2, O3〕
+- j2（显式）：比较Lambda定时EBS snapshots并复制至不同Region或不同AZ，与AWS Backup完整恢复方案的范围和维护需求。〔O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查：AWS Backup对EC2/EBS资源的备份内容、多卷恢复及跨Region复制，以及EBS snapshot的Region/AZ作用范围。
+
+### Q313
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：AWS移动app需面向数百万用户扩展，使获授权用户能在移动设备观看公司内容。
+
+**必要判断**
+
+- j1（显式）：比较public S3 bucket配合KMS keys串流，与CloudFront提供signed URLs的内容交付、观看授权和规模适配。〔S, O1, O3〕
+- j2（显式）：比较移动app与AWS间建立IPsec VPN或Client VPN，对用户接入、内容授权及数百万用户串流扩展的要求。〔O2, O4〕
+
+**待官方核验**
+
+- 官方待查：CloudFront signed URLs、S3/KMS和两类VPN在内容授权、移动客户端连接及规模化分发中的能力边界。
+
+### Q314
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：全球销售团队低频访问本地MySQL数据库；需迁AWS、尽量少停机，并为未来用户增加避免预先选择特定instance type。
+
+**必要判断**
+
+- j1（显式）：比较Aurora MySQL、Aurora Serverless for MySQL、Redshift Spectrum和RDS for MySQL的MySQL兼容、实例选型责任及低频到增长负载的容量管理。〔S, O1, O2, O3, O4〕
+- j2（显式）：分别评估候选服务对最小停机目标的支持，区分迁移切换停机与迁移后数据库可用性。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查：各服务的MySQL工作负载兼容、实例/容量配置和伸缩行为，以及迁移与运行阶段的停机限制。
+
+**源异常／歧义**
+
+- minimal downtime未明确指迁移切换期间还是迁移后运行期间，可能影响需判断的可用性范围。
+
+### Q315
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：本地自定义应用漏洞曾导致入侵；应用正迁至Amazon EC2，需主动扫描实例漏洞并发送详细发现报告。
+
+**必要判断**
+
+- j1（显式）：比较AWS Shield、Amazon Macie加AWS Lambda、部署agent的Amazon GuardDuty或Amazon Inspector，判断各自能否承担所需漏洞扫描。〔S, O1, O2, O3, O4〕
+- j2（显式）：评估Lambda将发现记入AWS CloudTrail，与自动生成并分发详细报告的能力差异及扫描结果衔接。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各服务的扫描对象、agent要求、发现输出及Lambda与CloudTrail的报告链路。
+
+### Q316
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：现由Amazon EC2脚本轮询并处理Amazon SQS消息；需降低运营成本，同时处理持续增长的消息量。
+
+**必要判断**
+
+- j1（显式）：比较扩大EC2规格、EventBridge在低利用率时关机、迁移至匹配runtime的AWS Lambda、Systems Manager Run Command按需执行，在消息消费连续性、扩展与成本上的取舍。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查SQS消费与Lambda的集成、扩展方式，以及关机或按需执行方案的触发和消息处理保障。
+
+### Q317
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：旧应用只能输出CSV至Amazon S3且不可修改；COTS只能分析Amazon Redshift或S3中的数据，不能处理.csv；需最少运维使旧数据可用。
+
+**必要判断**
+
+- j1（显式）：评估定时AWS Glue ETL写Redshift、EC2 Python加cron将CSV转.sql写S3、S3事件触发Lambda ETL写DynamoDB、EventBridge每周启动EMR ETL写Redshift，是否形成COTS可消费的数据链路。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较托管ETL、自管脚本、事件函数与周期性集群的调度和维护负担。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各ETL方案的输入输出支持、COTS可消费格式及调度和集群运维差异。
+
+### Q318
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：IT已全部迁至AWS；用户绕过变更流程创建过大EC2及修改安全组，需跟踪、审计资源清单和配置变更；选两项。
+
+**必要判断**
+
+- j1（显式）：比较AWS CloudTrail审计与AWS Config规则在操作记录、配置历史及合规审计上的作用和组合。〔S, O1, O4〕
+- j2（显式）：区分EC2数据生命周期策略、Trusted Advisor安全面板、CloudFormation恢复旧配置，与持续跟踪和审计变更的匹配程度。〔S, O2, O3, O5〕
+
+**待官方核验**
+
+- 待查各服务对资源清单、配置历史、操作归因、合规检查和配置恢复的能力边界。
+
+### Q319
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：数百台Amazon EC2 Linux实例原用共享SSH密钥管理；必须移除全部共享密钥，提供安全访问且管理开销最少。
+
+**必要判断**
+
+- j1（显式）：比较Systems Manager Session Manager、AWS STS按需一次性SSH密钥、保留共享SSH的堡垒机、Cognito custom authorizer加Lambda临时SSH密钥，能否消除共享密钥并满足规模化访问管理。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查Session Manager接入前提、STS和Cognito/Lambda所提SSH密钥链路的支持，以及各方案管理负担。
+
+### Q320
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：现有 EC2 实例群从本地数据源摄取数据。
+- c2〔S〕：数据格式为 JSON，摄取速率最高可达 1 MB/s。
+- c3〔S〕：现状是在 EC2 重启时丢失传输中的数据。
+- c4〔S〕：需要可扩展的近实时查询，并尽量减少数据丢失。
+- c5〔O1〕：候选将数据发布到 Kinesis Data Streams，再用 Kinesis Data Analytics 查询。
+- c6〔O2〕：候选经 Kinesis Data Firehose 投递到 Redshift，并在 Redshift 查询。
+- c7〔O3〕：候选先将摄取数据保存在 EC2 实例存储中。
+- c8〔O3〕：实例存储候选经 Firehose 投递到 S3，再用 Athena 查询。
+- c9〔O4〕：候选先将摄取数据保存在 EBS 卷中。
+- c10〔O4〕：EBS 候选向 ElastiCache for Redis 发布数据，并通过订阅 Redis 通道查询。
+
+**必要判断**
+
+- j1（显式）：如何沿摄取、暂存和发布链路识别 EC2 重启时的数据丢失窗口，并比较各候选的恢复条件？〔S, O1, O2, O3, O4〕
+- j2（显式）：如何比较各完整链路从数据进入到可查询的延迟，判断是否满足近实时需求？〔S, O1, O2, O3, O4〕
+- j3（显式）：如何判断各链路对 JSON 数据、最高 1 MB/s 摄取及后续扩展的支持条件和瓶颈？〔S, O1, O2, O3, O4〕
+- j4（先修候选，待核验）：需要区分流式查询、投递后查询和通道订阅的哪些语义，才能判断它们是否提供题目所需的摄取数据查询？〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 各摄取和存储环节有哪些持久性、确认、重试及重放机制，实例重启前后哪些数据能够恢复？
+- Data Streams 与 Data Analytics、Firehose 与 Redshift、Firehose 与 S3/Athena 这些组合的缓冲、查询可见延迟、JSON 处理及吞吐限制分别是什么？
+- Redis 通道订阅与可查询数据存储之间有什么语义差异，所述发布订阅链路对断连、恢复和查询有哪些限制？
+
+### Q321
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：需确保上传至Amazon S3 bucket的所有对象均加密。
+
+**必要判断**
+
+- j1（显式）：区分PutObject策略检查s3:x-amz-acl是否存在、是否为private、aws:SecureTransport是否为true、x-amz-server-side-encryption是否存在，分别约束的安全属性及加密覆盖范围。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查这些请求字段和策略条件的有效写法、加密语义，以及缺失加密header时的处理。
+
+**源异常／歧义**
+
+- 题干未明确加密指传输中还是静态加密；选项同时涉及两种语义。
+
+### Q322
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：移动端上传图片后生成缩略图，最长60秒；需更快确认原图已收到，并在应用层间异步分派请求。
+
+**必要判断**
+
+- j1（显式）：比较上传事件触发Lambda、Step Functions编排、SQS排队生成缩略图、SNS双订阅，能否解耦接收确认与缩略图处理。〔S, O1, O2, O3, O4〕
+- j2（显式）：区分收到原图即发应用消息，与缩略图完成后才通知或推送的时序，评估其对响应目标的影响。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各异步触发、排队和编排链路的确认时点、执行耦合及通知方式。
+
+### Q323
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：楼内各入口badge reader通过HTTPS发送人员及入口访问尝试；系统须高可用、处理消息，并供安保团队分析结果。
+
+**必要判断**
+
+- j1（显式）：比较单EC2 HTTPS处理后写S3、API Gateway HTTPS调用Lambda写DynamoDB、Route 53导向Lambda写DynamoDB、Site-to-Site VPN加S3 gateway VPC endpoint直接写S3，检查接入、处理、存储和高可用完整性。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查HTTPS接入和服务调用支持、S3 endpoint与VPN可达性，以及各链路的高可用和处理能力。
+
+### Q324
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：需要为主要本地文件存储卷制定灾难恢复方案。
+- c2〔S〕：现有文件卷通过本地存储服务器上的 iSCSI 设备挂载。
+- c3〔S〕：现有数据量为数百 TB。
+- c4〔S〕：用户须从本地系统立即访问所有文件类型，且不经历延迟。
+- c5〔S〕：目标是对现有基础设施改动最少。
+- c6〔O1〕：候选文件网关以本地 VM 部署。
+- c7〔O1〕：文件网关候选使用 10 TB 本地缓存，并要求现有应用改用 NFS。
+- c8〔O1〕：文件网关候选在灾后启动 EC2 并挂载保存文件的 S3 桶。
+- c9〔O2〕：磁带网关候选将现有全部数据备份到虚拟磁带库。
+- c10〔O2〕：磁带备份在初次备份完成后每晚运行。
+- c11〔O2〕：磁带候选在灾后启动 EC2，并从虚拟磁带库恢复数据到 EBS。
+- c12〔O3〕：缓存卷候选使用 Volume Gateway cached volume 和 10 TB 本地缓存。
+- c13〔O3〕：缓存卷候选通过 iSCSI 接入现有文件服务器，并复制全部文件。
+- c14〔O3〕：缓存卷候选定时创建快照，灾后将快照恢复到 EBS 并附加给 EC2。
+- c15〔O4〕：存储卷候选使用与现有文件卷容量相同的 Volume Gateway stored volume。
+- c16〔O4〕：存储卷候选通过 iSCSI 接入现有文件服务器，并复制全部文件。
+- c17〔O4〕：存储卷候选定时创建快照，灾后将快照恢复到 EBS 并附加给 EC2。
+
+**必要判断**
+
+- j1（显式）：如何判断各候选的本地数据驻留范围与缓存容量能否满足数百 TB、所有文件类型均需立即访问的要求？〔S, O1, O2, O3, O4〕
+- j2（显式）：如何比较改用 NFS、保留 iSCSI 及接入备份软件对现有应用和基础设施的改动？〔S, O1, O2, O3, O4〕
+- j3（显式）：如何判断文件、磁带和卷快照三类灾后恢复路径能否在 EC2 上恢复所需文件访问？〔S, O1, O2, O3, O4〕
+- j4（先修候选，待核验）：需要区分哪些在线访问、缓存未命中、备份时点与灾后恢复条件，才能解释题目中的立即访问要求？〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 文件网关、缓存卷和存储卷在协议、本地完整数据保留、缓存未命中访问及容量方面有哪些限制？
+- 各候选所述 S3 挂载、虚拟磁带库恢复和卷快照恢复到 EBS 的流程，需要哪些服务能力、格式及恢复步骤？
+
+**源异常／歧义**
+
+- “不经历延迟”未给出可测量阈值，也未明确是否包含灾后恢复期间；提取时须保留本地日常访问与灾后恢复的区别。
+
+### Q325
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：S3托管Web应用以Amazon Cognito认证并返回JWT，访问另一S3 bucket的受保护资源时失败；需补足用户访问权限。
+
+**必要判断**
+
+- j1（显式）：评估Cognito identity pool承担IAM role、修改S3 ACL、重新部署以处理所称最终一致性、identity pool自定义属性映射授权，分别能否补足从JWT身份到S3权限的链路。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查Cognito各类pool、JWT、临时凭证和IAM role的衔接，以及ACL、属性映射和所提一致性解释的适用性。
+
+### Q326
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：大型资产存于S3 Standard，经S3 API并行multipart upload，同对象再次上传会覆盖；前30天频繁访问，之后较少且各对象模式不一致。
+- c2〔S〕：需优化存储成本并维持高可用和韧性；选两项。
+
+**必要判断**
+
+- j1（显式）：比较30天后转S3 Intelligent-Tiering、Standard-IA或One Zone-IA，对不一致访问模式、成本及可用性和韧性的匹配。〔S, O1, O4, O5〕
+- j2（显式）：评估Lifecycle清理未完成multipart uploads与过期object delete markers，各自适用前提及与存储类别调整的组合价值。〔S, O2, O3〕
+
+**待官方核验**
+
+- 待查存储类别的费用和可用性差异，以及multipart upload、覆盖、版本与delete marker清理的关联。
+
+### Q327
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：含高度敏感数据的EC2位于VPC私有子网；仅可按第三方URL访问批准的软件仓库更新，须阻断其他互联网流量。
+
+**必要判断**
+
+- j1（显式）：比较私有子网出站路由经AWS Network Firewall并用domain list规则、AWS WAF按源/目的IP过滤、安全组出站指定URL、ALB承接出站并用URL listener规则，判断URL白名单与出站阻断链路。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各组件的流量方向、URL或域名/IP匹配粒度、路由接入方式及默认阻断配置。
+
+### Q328
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：三层电商：S3网站接入销售API；API运行于ALB后三台EC2，含静态/动态前端及异步销售worker。
+- c2〔S〕：新品发布会导致销售请求突然大增，需确保全部请求成功处理。
+
+**必要判断**
+
+- j1（显式）：比较CloudFront缓存静态或动态内容，并配合直接增加EC2、按网络流量Auto Scaling、ALB前ElastiCache或SQS接收后由EC2处理，对突发请求承接和最终处理的整体效果。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：检查缓存、扩容响应与异步请求缓冲的职责差异，以及网站至队列和worker的衔接。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查CloudFront缓存适用性、ElastiCache与ALB所提拓扑、Auto Scaling响应和SQS异步处理保障。
+
+### Q329
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：EC2实例存在未定期打补丁的问题
+- c2〔S〕：需对大规模EC2实例群定期进行安全扫描
+- c3〔S〕：需按固定计划打补丁，并报告每个实例的补丁状态
+- c4〔O1〕：O1提出Macie扫描软件漏洞，每个实例以cron定时打补丁
+- c5〔O2〕：O2提出GuardDuty扫描软件漏洞，Session Manager定时打补丁
+- c6〔O3〕：O3提出Detective扫描软件漏洞，EventBridge定时规则打补丁
+- c7〔O4〕：O4提出Inspector扫描软件漏洞，Patch Manager定时打补丁
+
+**必要判断**
+
+- j1（显式）：如何区分选项中各安全服务对EC2软件漏洞扫描的对象、能力和定期覆盖方式？〔S, O1, O2, O3, O4〕
+- j2（显式）：如何判断cron、Session Manager、EventBridge及Patch Manager能否完成大规模实例的定时补丁执行？〔S, O1, O2, O3, O4〕
+- j3（显式）：如何判断扫描与补丁方案的组合能否提供每个实例的补丁状态报告？〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- Macie、GuardDuty、Detective及Inspector各自对EC2软件漏洞扫描有哪些支持和前提？
+- 各补丁执行方式的调度、实例管理前提及逐实例补丁合规报告能力是什么，EventBridge规则还需何种执行目标？
+
+### Q330
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：计划在Amazon RDS DB instances存储数据，必须静态加密。
+
+**必要判断**
+
+- j1（显式）：区分AWS KMS key加DB instance encryption、自建key存Secrets Manager、ACM证书加SSL/TLS、IAM证书加SSL/TLS，对RDS静态加密目标的适用性。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查RDS静态加密的密钥来源和启用方式，以及证书、凭证存储与传输加密的边界。
+
+### Q331
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：须在30天内将20 TB从数据中心迁至AWS；网络带宽15 Mbps，利用率不得超过70%。
+
+**必要判断**
+
+- j1（显式）：比较AWS Snowball、AWS DataSync、安全VPN和S3 Transfer Acceleration，在带宽上限与迁移时限下的交付可行性。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：估算可用网络吞吐和20 TB传输时间，并纳入离线设备准备、运输与导入时间。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各迁移方式的网络依赖、加速边界及Snowball端到端交付时限。
+
+### Q332
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：本地Windows file server因远程使用增长而容量不足；敏感文件仅限授权员工访问，并须安全下载至员工设备。
+
+**必要判断**
+
+- j1（显式）：比较公网子网EC2加员工IP白名单、FSx for Windows File Server加本地Active Directory和Client VPN、S3 private VPC endpoint加signed URL、S3 public VPC endpoint加IAM Identity Center，评估身份授权、安全下载和容量迁移链路。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各方案的远程可达性、用户级授权、传输保护、signed URL权限语义及所提VPC endpoint类型。
+
+### Q333
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：应用在ALB后EC2 Auto Scaling group跨多个AZ运行；每月1日午夜月末财务批处理使CPU立即达100%、应用变慢受扰，需承载负载并避免停机。
+
+**必要判断**
+
+- j1（显式）：比较ALB前CloudFront、CPU驱动simple scaling、按月scheduled scaling、ElastiCache分担负载，对固定时点突发CPU批处理的准备时机和容量效果。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查scheduled与simple scaling的启动时序，以及缓存对该批处理负载的适用条件。
+
+### Q334
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：客户须使用本地Microsoft Active Directory身份，通过现有SFTP客户端下载S3文件；不得改客户应用，运维最少。
+
+**必要判断**
+
+- j1（显式）：比较Transfer Family SFTP加集成Active Directory认证、DMS同步加Active Directory、DataSync加IAM Identity Center、Windows EC2自建SFTP加IAM，评估协议、身份、S3接入及运维组合。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各服务的SFTP下载与S3支持、本地Active Directory集成方式及是否需改客户端。
+
+### Q335
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：需求突然增长，须从AMI在Auto Scaling group中启动大型EC2实例，并将初始化延迟降至最低。
+
+**必要判断**
+
+- j1（显式）：比较register-image加Step Functions替换AMI、EBS fast snapshot restore后制AMI并替换、DLM AMI生命周期加Lambda修改、EventBridge触发AWS Backup生命周期且以容量限制作事件源，对初始化瓶颈的作用及链路可行性。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查EBS快照初始化与fast snapshot restore限制、AMI在Auto Scaling中的更新方式及所提自动化触发支持。
+
+### Q336
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：多层Web应用由EC2应用层访问Aurora MySQL；数据库凭证须加密且每14天轮换，操作工作最少。
+
+**必要判断**
+
+- j1（显式）：比较KMS加Secrets Manager secret关联Aurora并设14天轮换、Parameter Store用户名String/密码SecureString加Lambda、KMS加密EFS凭证文件和权限加Lambda、KMS加密S3凭证文件和定期下载加Lambda的完整凭证生命周期。〔S, O1, O2, O3, O4〕
+- j2（显式）：检查轮换对象是否为数据库凭证、数据库与存储副本同步、应用读取更新及自建流程负担；保留EFS方案所述轮换key的用语差异。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查Aurora凭证加密及14天轮换支持、各存储方案权限和应用更新衔接。
+
+**源异常／歧义**
+
+- EFS方案称在Aurora轮换key，但题干要求轮换数据库凭证，轮换对象用语不一致。
+
+### Q337
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：RDS for MySQL含一个primary和五个read replicas，定期执行stored procedures；副本延迟不得超过1秒，流量高峰却增加。
+- c2〔S〕：须尽量降低复制延迟，同时尽量少改应用代码并减少持续运维。
+
+**必要判断**
+
+- j1（显式）：比较迁Aurora MySQL加Aurora Replicas/Auto Scaling并换native functions、Redis缓存加应用查询改造并换Lambda、EC2 MySQL大型compute optimized副本并保留stored procedures、DynamoDB加大量RCUs/on-demand并换streams的整体迁移效果。〔S, O1, O2, O3, O4〕
+- j2（显式）：评估各方案的复制或读取时效、stored procedures替代语义、代码改动和运维负担。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查高峰复制延迟、Aurora兼容性和扩展机制、各stored procedures替代方案及DynamoDB容量配置组合。
+
+### Q338
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：高流量SaaS全部数据位于Aurora MySQL cluster；DR须复制至第二AWS Region，并追求最高成本效益。
+
+**必要判断**
+
+- j1（显式）：比较MySQL binlog复制至第二Region且保留一个DB instance、Aurora global database建立后移除第二Region实例、DMS持续复制后移除实例、global database第二Region至少一个实例，评估持续复制可行性及成本。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查三种跨Region复制机制的目标实例依赖、无实例次级cluster支持及相关费用。
+
+### Q339
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：自定义应用内嵌凭证访问RDS for MySQL；需提高安全性且编程工作最少。
+
+**必要判断**
+
+- j1（显式）：比较应用从KMS加载凭证并自动轮换key、从Secrets Manager加载应用用户凭证并自建Lambda轮换、Secrets Manager配置轮换计划、Parameter Store存储并配置轮换计划，区分凭证保管与key/数据库凭证轮换。〔S, O1, O2, O3, O4〕
+- j2（显式）：评估移除内嵌凭证、数据库端更新、应用读取及轮换自动化所需的开发工作。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查KMS、Secrets Manager和Parameter Store的凭证存储及轮换边界，特别是托管计划与自建Lambda的差异。
+
+### Q340
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：网站由ALB后EC2 fleet及Aurora数据库组成，已报告SQL injection漏洞，需解决。
+
+**必要判断**
+
+- j1（显式）：比较ALB前AWS WAF及web ACL、ALB listener固定响应、Shield Advanced自动阻断、Inspector自动阻断，对SQL injection识别和拦截的适用性与部署衔接。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各服务对SQL injection的检测、规则配置和阻断能力，以及WAF与ALB的关联方式。
+
+### Q341
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：S3 data lake由Lake Formation治理；QuickSight需联结湖中数据与Aurora MySQL运营数据可视化，并使营销团队仅访问数据库部分列；运维最少。
+
+**必要判断**
+
+- j1（显式）：比较EMR仅取所需列直写SPICE、Glue Studio导入S3并用IAM policy且QuickSight直连S3、Glue Elastic Views物化至S3并用bucket policy且直连S3、Lake Formation blueprint导入并列级授权且QuickSight经Athena的完整链路。〔S, O1, O2, O3, O4〕
+- j2（显式）：区分抽取时省略列与对QuickSight用户执行列级授权，检查联结分析和各授权层的覆盖及运维负担。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各导入/物化与QuickSight数据源支持，及IAM、S3 bucket policy、Lake Formation的列级授权范围。
+
+### Q342
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：EC2 Auto Scaling group每周执行脚本批处理，交易量变化，每次基线CPU至少60%；须提前30分钟预置容量。
+- c2〔S〕：现人工修改参数，无资源分析所需实例数量趋势；需最少运维自动调整desired capacity。
+
+**必要判断**
+
+- j1（显式）：比较CPU目标60%的dynamic scaling、每周提前30分钟且人工设desired/min/max的scheduled scaling、CPU目标60%并提前30分钟启动的predictive scaling，对容量数量预测和提前准备的覆盖。〔S, O1, O2, O3〕
+- j2（显式）：评估CPU达60%时EventBridge触发Lambda将desired/max增加20%，与预测及定时策略的响应时机和维护差异。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查预测所需历史及预启动配置、各扩展策略的容量计算方式和EventBridge指标触发链路。
+
+### Q343
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：MySQL运行在私有子网EC2并有定时备份；DR设计必须跨多个AWS Regions，运维最少。
+
+**必要判断**
+
+- j1（显式）：比较EC2 MySQL跨Region standby复制、RDS Multi-AZ并在不同AZ读复制、Aurora global database主/DR Region双cluster、定时备份至S3并CRR后异地恢复，评估Region覆盖和恢复链路。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较迁移至托管数据库、维护自管复制、维护备份与恢复流程的总体运维负担。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查Region与AZ部署边界、跨Region复制和备份恢复支持及相应管理工作。
+
+### Q344
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Java应用使用Amazon SQS，现无法解析超过256 KB消息；需支持最大50 MB且代码修改最少。
+
+**必要判断**
+
+- j1（显式）：比较SQS Extended Client Library for Java将大于256 KB消息存S3、改用EventBridge、调整SQS大小上限、将大消息存EFS并由SQS引用，对50 MB载荷传递、取回解析及代码改动的影响。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各消息大小限制的可配置性、Extended Client Library的载荷卸载与取回机制及EFS引用所需自建逻辑。
+
+### Q345
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：需限制主Web应用内容访问，并使用授权机制保护内容
+- c2〔S〕：要求无服务器架构，初始认证用户少于100人
+- c3〔S〕：需集成主Web应用并向全球提供内容
+- c4〔S〕：需随用户增长扩展，同时尽可能降低登录延迟
+- c5〔S〕：要求成本效益最高
+- c6〔O1〕：O1组合Cognito认证、Lambda@Edge授权及CloudFront全球分发
+- c7〔O2〕：O2组合托管Microsoft AD认证、Lambda授权及ALB全球服务
+- c8〔O3〕：O3组合Cognito认证、Lambda授权及S3 Transfer Acceleration全球服务
+- c9〔O4〕：O4组合托管Microsoft AD认证、Lambda@Edge授权及Elastic Beanstalk全球服务
+
+**必要判断**
+
+- j1（显式）：如何区分认证与内容授权，并判断各组合能否集成现有Web应用和限制内容访问？〔S, O1, O2, O3, O4〕
+- j2（显式）：如何判断全球内容分发与授权执行位置对登录链路延迟的影响？〔S, O1, O2, O3, O4〕
+- j3（显式）：如何在少于100名初始用户及后续增长条件下，比较各组合的无服务器适配性、扩展能力和成本？〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- Cognito、Directory Service及Lambda或Lambda@Edge的认证授权集成条件、部署限制、延迟路径和计费方式分别是什么？
+- CloudFront、ALB、S3 Transfer Acceleration和Elastic Beanstalk各自如何提供选项所述的全球Web内容访问，其服务范围及无服务器适配条件是什么？
+
+### Q346
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：本地老旧NAS向工作站提供SMB和NFS；不买新NAS、不续支持合同，部分热数据但大量闲置。
+- c2〔S〕：须迁至S3、使用S3 Lifecycle且保持客户端原有体验；已确定使用Storage Gateway。
+
+**必要判断**
+
+- j1（显式）：比较Volume Gateway、Tape Gateway、Amazon FSx File Gateway和Amazon S3 File Gateway的客户端协议、存储后端、冷热数据处理及Lifecycle衔接，评估替换NAS的适配性。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各gateway的SMB/NFS接口、S3直接存储和Lifecycle支持，以及保留工作站体验所需配置。
+
+### Q347
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：EC2应用现标准化为特定instance family及多种size；未来3年最大化节省，但未来6个月内须可按使用情况更换family和size。
+
+**必要判断**
+
+- j1（显式）：比较Compute Savings Plan、EC2 Instance Savings Plan、Zonal Reserved Instances、Standard Reserved Instances的3年成本与family/size变更灵活性及承诺限制。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各定价承诺的期限、折扣、family/size及AZ绑定和变更规则。
+
+### Q348
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：大量穿戴设备参与者的数据存DynamoDB并供应用分析；负载恒定、可预测，须不超预测预算且成本效益最高。
+
+**必要判断**
+
+- j1（显式）：比较provisioned加Standard-IA及reserved capacity、provisioned指定RCUs/WCUs、on-demand设置较高RCUs/WCUs、on-demand指定RCUs/WCUs并reserved capacity的配置可行性和成本。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：区分负载可预测性与Standard-IA所需的访问/存储成本画像，检查题干信息是否足以比较组合总成本。〔S, O1, O2〕
+
+**待官方核验**
+
+- 待查容量模式、RCUs/WCUs与reserved capacity的组合限制，以及Standard-IA与其他表类别的费用差异。
+
+**源异常／歧义**
+
+- 题干未给数据访问频率或存储与请求成本占比，含Standard-IA的组合成本比较存在信息缺口。
+
+### Q349
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：机密数据位于ap-southeast-3的Aurora PostgreSQL数据库。
+- c2〔S〕：数据库使用KMS客户管理密钥加密。
+- c3〔S〕：须将备份安全共享给收购方的另一AWS账户，目标也在ap-southeast-3。
+- c4〔O1〕：候选创建快照后复制为未加密快照，再跨账户共享。
+- c5〔O2〕：候选把目标账户加入KMS密钥策略，再共享数据库快照。
+- c6〔O3〕：候选使用另一AWS管理的KMS密钥创建快照，把目标账户加入密钥别名后共享。
+- c7〔O4〕：候选下载数据库快照后上传S3，并通过桶策略授权目标账户。
+
+**必要判断**
+
+- j1（显式）：如何判断同区域跨账户共享Aurora加密备份需要哪些快照权限和密钥权限？〔S, O2〕
+- j2（显式）：如何区分客户管理密钥、AWS管理密钥、密钥策略与密钥别名在跨账户授权中的作用？〔S, O2, O3〕
+- j3（显式）：如何判断复制为未加密快照或下载再上传S3的流程是否可执行，并满足机密备份安全共享要求？〔S, O1, O4〕
+
+**待官方核验**
+
+- Aurora PostgreSQL加密快照跨账户共享、复制或恢复有哪些权限和密钥类型限制，密钥别名能否承担所述授权操作？
+- 加密快照能否复制为未加密快照，数据库快照下载与S3导出分别支持什么产物和使用方式？
+
+### Q350
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：us-east-1中100 GB RDS for Microsoft SQL Server Single-AZ保存客户交易，需高可用和自动恢复。
+- c2〔S〕：每年数次报表使交易入账变慢；需改善报表性能，选两项步骤组成方案。
+
+**必要判断**
+
+- j1（显式）：评估改Multi-AZ、快照恢复至另一AZ新RDS、跨AZ read replica承接全部报表、迁RDS Custom、RDS Proxy将报表限制在maintenance window的能力及组合，分别覆盖可用性和报表目标。〔S, O1, O2, O3, O4, O5〕
+- j2（先修候选，待核验）：检查SQL Server引擎配置对跨AZ读副本和读流量分离的支持，并区分恢复副本与可查询报表副本。〔S, O1, O2, O3〕
+
+**待官方核验**
+
+- 待查RDS SQL Server的Multi-AZ、read replica适用限制、快照恢复语义及RDS Proxy所提调度能力。
+
+### Q351
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：数据管理应用迁至AWS，须转为更分布式、采用serverless概念的event-driven workflow，并最小化运维。
+
+**必要判断**
+
+- j1（显式）：比较Glue编排并调用Lambda、Step Functions调用EC2步骤、EventBridge按计划调用Lambda、Step Functions state machine调用Lambda，对工作流协调、事件驱动、serverless执行和运维目标的整体适配。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各服务的步骤编排与触发支持，以及定时调用、状态机协调和EC2执行的运维差异。
+
+### Q352
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：在线多人游戏使用UDP，部署于八个AWS Regions；须尽量减少端到端延迟和丢包。
+
+**必要判断**
+
+- j1（显式）：比较每Region transit gateway及跨Region peering、Global Accelerator UDP listener及各Region endpoint group、所称启用UDP的CloudFront及多Region origin、跨Region VPC peering mesh并启用UDP，对全球玩家接入的适用性。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查UDP协议支持、全球接入与Region间互联的职责边界，以及延迟和丢包优化机制。
+
+### Q353
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：三层Web应用位于单AZ EC2；自管MySQL使用1 TB io2 EBS，峰值读写IOPS描述为1,000。
+- c2〔S〕：需减少中断、稳定性能、降低成本并保留双倍IOPS能力；数据库须迁至完全托管、高可用、容错方案。
+
+**必要判断**
+
+- j1（显式）：比较RDS for MySQL Multi-AZ配io2 Block Express或gp2、S3 Intelligent-Tiering、两台大型EC2 active-passive，评估数据库兼容性、托管程度、容错、IOPS余量和总体成本。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查RDS可用存储类型、gp2容量与IOPS关系及io2费用，结合1 TB容量与双倍峰值要求比较。
+
+**源异常／歧义**
+
+- “1,000 IOPS for both reads and writes”未明确读写合计还是各1,000，影响双倍IOPS容量基准。
+
+### Q354
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：serverless应用使用API Gateway、Lambda及RDS for PostgreSQL；高峰或不可预测流量时数据库连接超时增多，需减少失败且代码修改最少。
+
+**必要判断**
+
+- j1（显式）：比较降低Lambda并发、启用RDS Proxy、扩大RDS instance class容纳更多连接、迁DynamoDB on-demand，对连接压力、应用失败、服务能力和代码改动的影响。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查RDS Proxy与PostgreSQL/Lambda连接管理、并发限制和扩容的效果，以及迁DynamoDB所需改造。
+
+### Q355
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：旧应用每小时运行CPU密集batch job；本地64 vCPU、512 GiB服务器平均耗时15分钟；迁AWS后须在15分钟内完成且运维最少。
+
+**必要判断**
+
+- j1（显式）：比较Lambda functional scaling、ECS加Fargate、Lightsail加AWS Auto Scaling、AWS Batch on EC2，对定时CPU密集任务的时长、计算资源、调度和运维适配。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：以现有硬件和运行时间为性能基准，检查资源上限、启动开销及并行化前提，避免直接把现有规格当成不可降低的硬要求。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各服务的执行时限、CPU/内存规格、扩展及批处理调度能力。
+
+### Q356
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：数据现存S3 Standard，75%在30天后很少访问；全部数据仍须立即可访问并保持相同高可用和韧性，存储成本最低。
+
+**必要判断**
+
+- j1（显式）：比较30天后转Glacier Deep Archive、Standard-IA、One Zone-IA及立即转One Zone-IA，在访问时延、可用性/韧性、转换时点和费用上的取舍。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各类别的检索时延、AZ部署、可用性和韧性，以及最短存储和访问费用。
+
+### Q357
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：公共游戏排行榜迁至AWS；动态应用由ALB后EC2 Windows Server承载，含静态文件与动态server-side code；需高可用存储，选两项。
+
+**必要判断**
+
+- j1（显式）：比较静态文件存S3后由CloudFront或ElastiCache作边缘缓存的链路和职责。〔S, O1, O2〕
+- j2（显式）：比较server-side code存EFS、FSx for Windows File Server或gp2 EBS并挂载每台EC2共享，对Windows兼容、多实例共享和高可用的适配，组成两项方案。〔S, O3, O4, O5〕
+
+**待官方核验**
+
+- 待查边缘缓存服务定位，以及各文件/块存储的Windows协议、并发挂载和高可用限制。
+
+### Q358
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：应用运行于ALB后EC2，ALB为CloudFront origin；S3中超过十亿张图，每秒处理数千张；需动态缩放并向客户端提供合适格式，运维最少。
+
+**必要判断**
+
+- j1（显式）：比较EC2外部图像库、CloudFront origin request policy按User-Agent转换、Lambda@Edge加外部图像库并关联图片behaviors、response headers policy按User-Agent转换，评估实际转换执行点、格式选择、规模及运维。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查CloudFront两类policy与Lambda@Edge的执行能力、图像库和运行限制，以及请求变体与缓存衔接。
+
+### Q359
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：医院病历存S3；所有PHI须传输中和静态加密，且合规团队须管理静态加密key。
+
+**必要判断**
+
+- j1（显式）：比较ACM public SSL/TLS证书关联S3，与bucket policy使用aws:SecureTransport限制HTTPS/TLS的传输保护方式。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较默认SSE-KMS并由合规团队管理KMS keys、默认SSE-S3并声称由团队管理其keys、Macie保护和管理，对静态加密及key管理权的覆盖；评估完整组合。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查S3 TLS强制方式、ACM关联支持、SSE-KMS与SSE-S3的管理权限及Macie职责。
+
+### Q360
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：API Gateway private gateway的两个REST APIs位于同一VPC；BuyStock调用CheckFunds检查资金，日志显示调用走互联网；须改为VPC内通信且代码修改最少。
+
+**必要判断**
+
+- j1（显式）：比较HTTP中增加X-API-Key授权header、interface endpoint、gateway endpoint、两API间插入SQS，对私有网络路径、原有同步资金检查及代码改动的影响。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查API Gateway private REST API的endpoint类型、DNS和调用路径配置，以及授权header与网络路径的区别。
+
+**源异常／歧义**
+
+- 题干将API Gateway private gateway及两API描述为位于VPC内，同时报告走互联网，未说明实际endpoint、DNS与调用方部署。
+
+### Q361
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：AWS多人游戏应用须以亚毫秒延迟读取数据，并对历史数据执行一次性查询；运维最少。
+
+**必要判断**
+
+- j1（显式）：比较热数据用RDS并定期脚本导S3、直接S3加Lifecycle至Deep Archive并用Athena、DynamoDB加DAX并table export至S3后用Athena、DynamoDB经Kinesis Data Streams及Firehose写S3，对低延迟读取和历史查询完整链路的覆盖。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较自建导出、托管表导出和流式归档的维护负担，检查归档后查询所需访问状态与组件。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各热读取路径的延迟、DynamoDB导出及流式链路支持、Athena查询和Deep Archive数据访问前提。
+
+### Q362
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：付款系统要求同一payment ID的消息按发送顺序接收，否则可能错误处理付款；选两项。
+
+**必要判断**
+
+- j1（显式）：比较DynamoDB以payment ID为partition key、Kinesis data stream以其为partition key、Memcached以其为key、SQS以其为message attribute、SQS FIFO以其为message group，对同一付款消息顺序的语义和保障。〔S, O1, O2, O3, O4, O5〕
+
+**待官方核验**
+
+- 待查各key、attribute和message group的分组与排序作用，以及发送至接收链路的顺序前提。
+
+### Q363
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：游戏系统须将unique events并发发送给独立的leaderboard、matchmaking及authentication服务；需AWS event-driven系统保证事件顺序。
+
+**必要判断**
+
+- j1（显式）：比较EventBridge event bus、SNS FIFO topics、SNS standard topics、SQS FIFO queues，对多服务并发分发、事件唯一性语义及顺序保障的整体适配。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：厘清所需顺序范围及unique是否要求去重，再判断单队列消费与发布订阅分发的差异。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各机制的fan-out、排序范围、去重语义及下游订阅约束。
+
+**源异常／歧义**
+
+- 未明确事件顺序是全局还是按组，也未明确unique仅描述事件还是要求去重。
+
+### Q364
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：医院患者症状应用确定采用SQS及SNS；数据须静态和传输中加密，且仅授权医院人员可访问；选两项步骤。
+
+**必要判断**
+
+- j1（显式）：比较SQS开启SSE并修改default key policy，与指定KMS customer managed key后用key policy或IAM policy限制key使用；并比较queue policy强制TLS的覆盖。〔S, O1, O4, O5〕
+- j2（显式）：比较SNS指定customer managed key加key policy，与开启加密、修改default key policy并由topic policy强制TLS；评估两项组合对SNS/SQS加密及人员授权的整体覆盖。〔S, O2, O3〕
+
+**待官方核验**
+
+- 待查SQS/SNS密钥类型和default key policy可修改性、key policy与IAM policy授权关系及TLS条件策略。
+
+### Q365
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：RDS支持的Web应用曾因DBA误改表数据而丢失数据；须能针对最近30天任一变更，恢复至其发生前5分钟的数据库状态。
+
+**必要判断**
+
+- j1（显式）：比较read replicas、manual snapshots、automated backups和Multi-AZ deployments，对30天恢复窗口及变更前5分钟时间点恢复的覆盖，区分复制、可用性与历史恢复。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查RDS备份保留期、时间点恢复粒度和可恢复时间范围，以及误操作在副本中的处理。
+
+### Q366
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：API Gateway前接Lambda业务逻辑和DynamoDB，Cognito user pools识别用户；须仅允许已订阅用户访问premium content，运维最少。
+
+**必要判断**
+
+- j1（显式）：比较API caching/throttling、WAF按订阅过滤、DynamoDB premium content细粒度IAM权限、API usage plans加API keys限制未订阅用户，判断能否将Cognito用户身份与订阅授权关联。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：检查流量计量/限制、网络过滤与用户订阅授权的边界，以及premium请求路径上的授权执行点。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各机制的用户身份和订阅状态识别能力、API keys与usage plans的安全语义及Cognito衔接。
+
+### Q367
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：全球UDP应用现用Route 53 latency-based routing，运行于美国、亚洲、欧洲本地数据中心的冗余服务器；合规要求保持本地部署，需改善整体性能和可用性。
+
+**必要判断**
+
+- j1（显式）：比较三个AWS Regions中的NLB或ALB承接本地endpoints，检查UDP、混合网络可达性及保留本地应用的兼容性。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较负载均衡器注册至Global Accelerator后CNAME指向accelerator DNS，与Route 53 latency record指向三台负载均衡器、作为CloudFront origin后CNAME指向CloudFront DNS的端到端路径和效果。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查UDP支持、本地target连接和注册条件、Global Accelerator与CloudFront入口及DNS链路的性能和故障切换机制。
+
+### Q368
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：所有新IAM users的密码须满足指定复杂度和强制轮换周期。
+
+**必要判断**
+
+- j1（显式）：比较AWS account整体password policy、逐IAM user password policy、第三方软件、CloudWatch监听Create_newuser事件设密码，对统一复杂度、持续轮换和新用户覆盖的适用性。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查IAM密码策略作用域、复杂度/过期配置，以及所提CloudWatch事件与自动设密链路支持。
+
+### Q369
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：应用已迁EC2 Linux；单实例按计划运行多个各1小时任务，由不同团队以不同语言编写；需解决性能与扩展问题且运维最少。
+
+**必要判断**
+
+- j1（显式）：比较AWS Batch jobs加EventBridge调度、将实例容器化并用App Runner按需执行jobs、Lambda加EventBridge调度、AMI加Auto Scaling group复制实例，对多语言长任务的执行、调度及扩展适配。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：检查1小时执行时限、任务隔离与并行调度，以及复制整台实例时任务分配和重复运行控制所需工作。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各服务的任务时限、语言/容器支持、批处理调度与扩展机制，以及App Runner按需job模式的适用性。
+
+### Q370
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：公共三层Web应用部署于VPC内跨多个AZ的EC2；私有子网实例须经互联网访问许可证服务器，要求托管且运维维护最少。
+
+**必要判断**
+
+- j1（显式）：比较NAT instance与NAT gateway，以及分别部署在公有或私有子网并作为各私有子网默认路由目标的组合，判断互联网出口及托管运维适配性。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查两类NAT的托管边界、子网部署与互联网出口路由要求。
+
+### Q371
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：新建EKS承载数字媒体流应用，managed node group使用EBS存储；所有静态数据须由AWS KMS中的customer managed key加密，选两项且运维开销最少。
+
+**必要判断**
+
+- j1（显式）：比较Kubernetes加密插件、建集群后启用既有EBS加密、目标Region默认EBS加密并指定密钥的实施时点、覆盖范围及运维差异。〔S, O1, O2, O3〕
+- j2（显式）：判断关联具备密钥权限的IAM role与把密钥存入Kubernetes secret两种提议，如何与EKS、EBS及KMS衔接并组成两项方案。〔S, O4, O5〕
+
+**待官方核验**
+
+- 待查EBS默认及既有卷加密、EKS角色的KMS授权、Kubernetes插件与secret提议的可实施性和数据覆盖。
+
+### Q372
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：迁移Oracle单表中的数百万高分辨率GIS图像，每个地理编码唯一对应一图像/行；灾害时每几分钟更新数万图像，要求高可用、可扩展且成本最优。
+
+**必要判断**
+
+- j1（显式）：比较图像与编码全部存RDS for Oracle Multi-AZ、全部存DynamoDB并在高负载时配DAX，以及图像存S3、编码和URL分别存DynamoDB或RDS for Oracle Multi-AZ的组合。〔S, O1, O2, O3, O4〕
+- j2（显式）：判断图像存储限制、按编码定位和高频更新下的扩展、可用性、缓存作用与总成本差异。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各存储的图像/记录大小限制、更新扩展与计费，以及DAX对该负载的适用范围。
+
+### Q373
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：汽车IoT数据经Kinesis Data Firehose存S3，每年数万亿对象；每日早晨用近30天数据重训，每年4次用近12个月数据分析及训练；1年内须最小延迟可用，1年后归档，成本最优。
+
+**必要判断**
+
+- j1（显式）：比较初始使用S3 Intelligent-Tiering、Standard-IA、Standard且30天后转Standard-IA，对访问延迟、对象规模及总成本的适配。〔S, O1, O2, O3, O4〕
+- j2（显式）：区分通过S3 Lifecycle在1年后转Glacier Deep Archive，与配置Intelligent-Tiering自动执行该转换的能力及配置边界。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各类访问/监控/转换费用与延迟、Lifecycle转换规则及Intelligent-Tiering归档机制。
+
+### Q374
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：us-east-1内3个独立VPC的业务应用须互通，并持续每天向单一本地数据中心的延迟敏感应用发送数百GB数据；网络方案须成本效益最高。
+
+**必要判断**
+
+- j1（显式）：比较每VPC一条Site-to-Site VPN、每VPC第三方设备加IPsec VPN、3条Direct Connect经Direct Connect gateway分别连接VPC，以及1条Direct Connect衔接transit gateway并挂载3个VPC的拓扑。〔S, O1, O2, O3, O4〕
+- j2（显式）：判断各拓扑能否同时覆盖VPC间互通、本地连接、持续数据量及延迟目标，并比较整体成本。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查VPN与Direct Connect的连接、时延及计费差异，Direct Connect gateway/transit gateway互联和路由要求。
+
+### Q375
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：电商分布式订单工作流包含多个serverless函数、AWS服务和人工审批；须组合多个Lambda形成响应式serverless应用，并编排EC2、容器或本地服务器上的数据与服务，运维开销最少。
+
+**必要判断**
+
+- j1（显式）：比较Step Functions、AWS Glue job、SQS，以及Lambda加EventBridge的工作流编排、人工审批等待及跨运行环境集成能力与运维负担。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各方案的状态/审批编排机制、Lambda及外部工作节点集成边界和所需自建逻辑。
+
+### Q376
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：RDS for MySQL主要连接来自serverless应用，流量随机大幅波动，高需求时出现数据库连接拒绝；须以最少运维解决。
+
+**必要判断**
+
+- j1（显式）：比较应用经RDS Proxy连接、在应用与数据库间部署ElastiCache for Memcached、迁移到更高I/O实例类，以及配置Multi-AZ并让应用切换实例，对突发连接拒绝的针对性和运维差异。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查连接管理、缓存、I/O扩容和Multi-AZ的能力边界及应用接入要求。
+
+### Q377
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：新审计系统集中收集EC2操作系统版本、补丁和已安装软件信息；Auto Scaling group创建的全部实例须在启动及终止时立即成功上报，实施效率最高。
+
+**必要判断**
+
+- j1（显式）：比较定时Lambda远程脚本、Auto Scaling lifecycle hooks、自定义launch configuration user data，以及声称由Auto Scaling在启停时调用的OS脚本，能否覆盖两个生命周期时点并保障上报完成。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查生命周期事件触发、等待/完成机制，user data与OS脚本的执行时机和集成要求。
+
+### Q378
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：实时多人游戏客户端以UDP与Auto Scaling group服务器通信，平台须适应日间需求突增；玩家分数及其他非关系型数据须由数据库无需人工干预地扩展。
+
+**必要判断**
+
+- j1（显式）：比较Route 53、Network Load Balancer及Application Load Balancer对UDP流量分配和弹性服务器接入的适配。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较Aurora Serverless、DynamoDB on-demand、Aurora Global Database及DynamoDB global tables的数据模型和自动扩展，并按原选项保留其与流量分配组件的组合。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查流量入口的UDP支持和数据库非关系型存储、容量扩展及全球化功能差异。
+
+### Q379
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：前端经API Gateway调用Lambda；函数加载大量库后连接RDS处理并返回数据；须使所有用户响应延迟尽可能低，且运营变更最少。
+
+**必要判断**
+
+- j1（显式）：比较前端直连数据库绕过API、Lambda provisioned concurrency、S3缓存查询结果，以及增大数据库以增加连接数，分别针对何种延迟环节及所需变更。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查Lambda初始化与provisioned concurrency机制，以及直连、缓存和数据库扩容对该请求链延迟的作用边界。
+
+### Q380
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：本地工作负载迁往AWS，已使用多台EC2及RDS DB instances；须按营业时间自动启停，营业时间外停用，成本和基础设施维护最少。
+
+**必要判断**
+
+- j1（显式）：比较EC2 elastic resize与数据库缩至零、Marketplace定时启停方案、额外EC2上的crontab shell脚本，以及EventBridge定时调用Lambda启停两类实例的可实施性、成本与维护量。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查EC2/RDS启停及缩容限制、停止期间费用和定时自动化集成方式。
+
+### Q381
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：三层应用以PostgreSQL存文档元数据，文档存S3；每月按关键词检索元数据生成报告，关系查询耗时数小时；报告须加速且不妨碍修改或新增文档，应用代码改动最少。
+- c2〔S〕：题干同时描述文档通常只写一次且频繁更新。
+
+**必要判断**
+
+- j1（显式）：比较DocumentDB加可扩展read replica、Aurora PostgreSQL加Aurora Replica，以及RDS for PostgreSQL Multi-AZ secondary查询方案的报告读取能力、写入隔离和代码兼容性。〔S, O1, O2, O3〕
+- j2（显式）：判断改用DynamoDB存文档、固定写容量与自动读扩展，对既有S3文档/元数据分工、持续修改及报告改造的影响。〔S, O4〕
+
+**待官方核验**
+
+- 待查副本/备用节点的可读性、读取扩展与写入影响，以及数据库兼容和迁移改动。
+
+**源异常／歧义**
+
+- “通常只写一次”与“频繁更新”的描述存在语义张力，写入模式需澄清。
+
+### Q382
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：三层传感器数据应用路径为用户设备→NLB→EC2 Web层→EC2应用层→数据库；目标为改善传输中数据安全。
+
+**必要判断**
+
+- j1（显式）：比较NLB TLS listener及服务器证书、Shield Advanced加NLB上的WAF、改ALB并启用WAF，以及用KMS加密EC2 EBS卷，对传输安全的作用范围与部署可行性。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查NLB TLS终止和证书配置、WAF关联对象及各提议覆盖的安全层面。
+
+### Q383
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：商业现成软件由本地迁AWS，许可证按socket/core计量，须复用今年较早购入的许可证；容量和运行时间需求可预测，选择最具成本效益的EC2定价。
+
+**必要判断**
+
+- j1（显式）：比较Dedicated Hosts与Dedicated Instances的许可证适配及socket/core控制或可见性，并比较各自Reserved与On-Demand定价对可预测负载的成本影响。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查现有许可证迁移条件、Dedicated Hosts/Instances差异及预留定价条款。
+
+### Q384
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Linux EC2跨多个AZ，须共享高可用、POSIX兼容且数据持久性最高的存储；前30天频繁访问，之后低频访问，成本最优。
+
+**必要判断**
+
+- j1（显式）：比较S3 Standard转Glacier或Standard-IA、EFS Standard转Standard-IA，以及EFS One Zone转One Zone-IA的共享/POSIX适配、AZ部署、可用性与持久性。〔S, O1, O2, O3, O4〕
+- j2（显式）：判断各生命周期策略对30天后低频访问的访问体验与总成本影响。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查S3/EFS访问接口、跨AZ与One Zone保障，以及分层策略和费用。
+
+### Q385
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：新VPC含2个负载均衡器公有子网、2个Web私有子网、2个MySQL私有子网；Web仅用HTTPS；负载均衡器安全组已允许0.0.0.0/0访问443，每资源须最小必要访问。
+
+**必要判断**
+
+- j1（显式）：比较以security group或network ACL实施Web 443与MySQL 3306规则，区分Web来源为0.0.0.0/0或负载均衡器，以及数据库来源为Web安全组的表达和最小权限适配。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查security group/network ACL支持的来源引用、作用范围及分层访问规则。
+
+### Q386
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：多层电商应用前后端均在EC2，后端访问RDS for MySQL；频繁返回相同数据集的数据库调用造成变慢，须改善后端性能。
+
+**必要判断**
+
+- j1（显式）：比较SNS存调用、ElastiCache缓存大数据集、RDS for MySQL read replica缓存调用，以及Kinesis Data Firehose流式发送调用，对重复读取及后端性能的适配。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查缓存、读副本、通知及流式交付的功能边界和应用接入方式。
+
+### Q387
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：新部署工程师须使用CloudFormation模板创建多种AWS资源，遵守最小权限；选择两项行动。
+
+**必要判断**
+
+- j1（显式）：比较root凭证，以及新IAM user加入附PowerUsers、AdministratorAccess或仅CloudFormation actions策略的组，对工程师栈操作权限的覆盖和最小化。〔S, O1, O2, O3, O4〕
+- j2（显式）：判断显式限定栈资源权限的IAM role与工程师身份权限如何组合，并通过该role启动栈。〔S, O4, O5〕
+- j3（先修候选，待核验）：识别工程师把执行角色交给CloudFormation所需的授权与信任关系，判断是否影响两项方案落地。〔O4, O5〕
+
+**待官方核验**
+
+- 待查CloudFormation调用者/执行角色权限分工、角色信任及传递权限和各托管策略范围。
+
+### Q388
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：同一VPC内两层应用：Web EC2 Auto Scaling group位于跨AZ公有子网，RDS for MySQL位于独立私有子网；Web须读产品数据但连接失败，数据库运行正常，network ACL、安全组及路由表仍为默认配置。
+
+**必要判断**
+
+- j1（显式）：比较私有子网ACL显式放行、增加VPC内部路由、拆分两个VPC后peering，以及RDS安全组允许Web安全组入站，结合默认配置定位需修复的访问控制环节。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查默认ACL、安全组及VPC路由行为，和RDS以Web安全组为来源的配置要求。
+
+### Q389
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：在线广告大数据集位于单AZ的RDS for MySQL；业务报告查询不得影响生产数据库写操作。
+
+**必要判断**
+
+- j1（显式）：比较RDS read replicas处理报告、数据库置于ELB后横向扩展、增大实例同时处理读写，以及Multi-AZ处理报告，对查询与生产写入隔离的适配。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查RDS读副本与Multi-AZ的读取用途、实例扩展和ELB接入限制。
+
+### Q390
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：三层电商运行于ALB后的EC2 Auto Scaling group，电商数据在RDS for MariaDB Multi-AZ；须优化交易期间客户会话管理，并持久保存会话数据，选择两项方案。
+
+**必要判断**
+
+- j1（显式）：比较ALB sticky sessions、DynamoDB会话表、Cognito user pool、ElastiCache for Redis cluster及Systems Manager Application Manager在会话路由、会话状态存储和身份管理上的适用范围。〔S, O1, O2, O3, O4, O5〕
+- j2（显式）：判断候选方案的会话数据持久性及实例伸缩/故障时的状态保持条件，区分会话亲和与持久存储要求。〔S, O1, O2, O3, O4, O5〕
+
+**待官方核验**
+
+- 待查各服务的会话能力及DynamoDB、Redis的持久性、复制与故障恢复配置边界。
+
+### Q391
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：无状态三层Web应用使用动态伸缩EC2 Auto Scaling group，数据库为RDS for PostgreSQL，EC2无需临时本地存储；RPO为2小时，备份策略须最大化可扩展性并优化资源利用。
+
+**必要判断**
+
+- j1（显式）：比较EC2每2小时EBS快照、EBS snapshot lifecycle policy和保留Web/应用层最新AMI，对无状态动态伸缩环境的恢复与资源利用影响。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较数据库每2小时EBS快照的提议、RDS自动备份及其与point-in-time recovery的组合，判断2小时RPO及各完整备份方案的适配。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查RDS备份/PITR及底层卷访问边界，AMI与EBS快照对伸缩实例重建的适用性。
+
+### Q392
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：新公共Web应用使用EC2 Web层及RDS for MySQL数据库层；须安全地面向全球动态IP客户开放，配置两层安全组。
+
+**必要判断**
+
+- j1（显式）：比较Web 443来源为0.0.0.0/0或客户IP，以及数据库3306来源为Web安全组、客户IP或0.0.0.0/0的原选项组合，判断动态客户端可达性和分层访问限制。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查安全组CIDR与安全组来源引用规则及动态IP下的授权范围。
+
+### Q393
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：支付公司把全部客户语音录音存S3，须提取音频文本并从文本移除所有客户PII。
+
+**必要判断**
+
+- j1（显式）：比较Kinesis Video Streams加Lambda模式扫描、S3触发Lambda启动Textract、S3触发Lambda启动启用PII redaction的Transcribe并另存S3，以及EventBridge启动Connect contact flow转录加Lambda扫描的完整处理链。〔S, O1, O2, O3, O4〕
+- j2（显式）：判断各链路对已存录音的输入支持、文本提取、PII移除及触发/输出衔接是否覆盖需求。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查音频转录与PII redaction能力边界，以及Textract、Connect、Kinesis Video Streams和事件集成的适用输入。
+
+### Q394
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：多层电商运行于EC2及最新代RDS for MySQL Multi-AZ，存储为2,000 GB EBS gp3；CloudWatch Logs显示读写IOPS数量高于20,000时总会性能下降，须改善高需求期应用性能。
+
+**必要判断**
+
+- j1（显式）：比较改magnetic、增加gp3 IOPS、改Provisioned IOPS SSD io2，以及把2,000 GB gp3拆为两个1,000 GB gp3卷，对该RDS配置的可实施性与I/O瓶颈适配。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查RDS for MySQL各存储类型IOPS配置/性能限制、容量关联及多卷配置边界。
+
+### Q395
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：上周生产部署期间IAM user修改了账户内多种AWS资源，部分安全组规则不符合预期；须追溯具体修改者。
+
+**必要判断**
+
+- j1（显式）：比较GuardDuty、Inspector、CloudTrail及AWS Config能否提供安全组变更事件与IAM身份关联信息，并区分威胁、漏洞、配置历史和操作审计用途。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查四项服务对安全组变更、调用者身份及上周记录的查询能力与记录条件。
+
+### Q396
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：自管DNS部署在不同AWS Regions的EC2上，并作为Global Accelerator standard accelerator的endpoints；须防护DDoS攻击。
+
+**必要判断**
+
+- j1（显式）：比较订阅Shield Advanced后保护accelerator或EC2，以及将含rate-based rule的WAF web ACL关联accelerator或EC2，判断DNS流量防护与资源关联可行性。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查Shield Advanced可保护资源、WAF可关联对象及其对DNS/DDoS流量的覆盖边界。
+
+### Q397
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：每日定时聚合、过滤S3销售记录供分析，单对象最大10 GB，作业最长1小时；CPU和内存用量恒定且预先已知，运行运维工作最少。
+
+**必要判断**
+
+- j1（显式）：比较EventBridge直接定时调用Lambda、经API Gateway HTTP API调用Lambda，以及定时启动ECS Fargate task或EC2型ECS task的时长/资源适配与运维开销；EC2方案含至少1台实例的Auto Scaling group。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查Lambda时限与资源限制、ECS两种launch type的资源配置及EventBridge定时集成。
+
+### Q398
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：须在2周内将本地NAS的600 TB敏感数据迁往AWS，传输中须加密；现有互联网上传100 Mbps，方案成本最优。
+
+**必要判断**
+
+- j1（显式）：比较S3 multipart upload经HTTPS、NAS至最近Region的VPN、多个Snowball Edge Storage Optimized设备导入S3，以及新建10 Gbps Direct Connect并经VPN入Region存S3的时限、加密与成本。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：估算600 TB在100 Mbps下的传输时间，并识别设备交付/拷贝和Direct Connect开通时间对2周期限的影响。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查Snow设备容量、加密及迁移流程，Direct Connect开通与VPN集成和各方案费用/吞吐限制。
+
+### Q399
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Web应用通过API Gateway区域API端点提供当前股票价格。
+- c2〔S〕：API请求增多，需防止HTTP洪泛使应用离线。
+- c3〔S〕：目标是最低运维开销。
+- c4〔O1〕：候选在区域API前配置CloudFront，最大TTL为24小时。
+- c5〔O2〕：候选将带速率规则的区域WAF Web ACL关联到API Gateway阶段。
+- c6〔O3〕：候选监控CloudWatch Count指标，达到预定速率后告警安全团队。
+- c7〔O4〕：候选在区域API前配置CloudFront与Lambda@Edge，通过函数阻止超过预定速率的IP请求。
+
+**必要判断**
+
+- j1（显式）：如何判断速率规则或自定义边缘函数能否针对区域API实施HTTP洪泛防护？〔S, O2, O4〕
+- j2（显式）：如何区分请求监控告警、缓存减载和主动阻断对防止应用离线的作用？〔S, O1, O2, O3, O4〕
+- j3（显式）：如何在当前股价数据需求下，比较缓存配置、托管规则及自定义限速逻辑的运维开销？〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 区域WAF Web ACL与API Gateway阶段的关联条件、速率规则的统计及阻断行为是什么？
+- CloudFront最大TTL、Count指标告警及Lambda@Edge自定义限速分别有哪些防护能力、状态管理要求和数据新鲜度影响？
+
+### Q400
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：气象数据销售Web应用使用DynamoDB；每次记录新天气事件须通知4个内部团队经理，不得影响现有应用性能，运维开销最少。
+
+**必要判断**
+
+- j1（显式）：比较DynamoDB transactions发通知、现有应用发布至4个SNS topics、DynamoDB Streams触发后发布至单一SNS topic，以及记录标记加每分钟cron扫描后通知SQS的事件捕获与多团队分发链路。〔S, O1, O2, O3, O4〕
+- j2（显式）：判断各链路对新记录识别、现有应用性能、团队订阅方式及运维负担的差异。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查DynamoDB事务/Streams通知能力、触发至SNS的集成及SNS/SQS分发语义。
+
+### Q401
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：现有本地应用因意外断电导致数据库服务器崩溃并丢失数据；迁AWS后须高可用、有韧性、无单点故障，并可随用户需求扩展。
+
+**必要判断**
+
+- j1（显式）：比较跨AZ或单AZ的EC2 Auto Scaling group，以及RDS Multi-AZ、EC2数据库加Auto Recovery、单AZ RDS read replica故障后提升、跨AZ双EC2数据库加EBS Multi-Attach的完整组合。〔S, O1, O2, O3, O4〕
+- j2（显式）：判断各组合的故障域、数据保护、故障切换、共享存储可行性与应用伸缩是否覆盖整体目标。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查RDS部署/副本恢复差异、EC2 Auto Recovery边界及EBS Multi-Attach的AZ和数据库使用限制。
+
+### Q402
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：EC2应用将大量流数据发送至默认配置的Kinesis Data Streams，每隔一天消费并写S3供BI；S3未收到全部已发送数据，须修复。
+
+**必要判断**
+
+- j1（显式）：结合隔日消费与默认设置，比较修改保留期、改用KPL生产、增加shards吞吐，以及S3 Versioning，对数据在生产、保留、消费和落盘阶段缺失的针对性。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查Kinesis默认保留期及调整范围、KPL与shard容量作用，以及S3 Versioning的保护边界。
+
+### Q403
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Lambda应用须获得上传文件至S3的权限；开发者已有具备所需S3权限的IAM user及有效凭证。
+
+**必要判断**
+
+- j1（显式）：比较修改Lambda resource policy、函数内用既有IAM凭证签名、新建IAM user但仍用既有凭证，以及给Lambda附具备所需权限的execution role，判断出站S3访问授权的适配。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查Lambda资源策略与执行角色权限分工、运行时凭证取得及S3请求授权机制。
+
+### Q404
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Serverless应用在S3上传新文档时调用Lambda处理；营销活动后大量文档未被处理，须改善架构。
+
+**必要判断**
+
+- j1（显式）：比较把Lambda timeout设为15分钟、S3 replication暂存文档、增加Lambda并负载均衡，以及请求先入SQS再作为Lambda event source，对活动后漏处理和处理容量的适配。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：区分执行超时、并发/限流及事件积压等可能原因，识别题干未提供的诊断证据，避免直接认定故障机制。〔S, O1, O3, O4〕
+
+**待官方核验**
+
+- 待查S3事件调用Lambda的重试/并发行为及SQS事件源的缓冲、重试和处理容量配置。
+
+### Q405
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：软件演示环境为ALB后的EC2 Auto Scaling group，工作时间流量显著增加，周末无需运行；须选两项使系统随需求扩展。
+
+**必要判断**
+
+- j1（显式）：比较按请求率调整ALB容量、调整VPC internet gateway容量、跨多个Regions部署EC2，以及按实例CPU使用率target tracking伸缩Auto Scaling group的扩展对象与适配。〔S, O1, O2, O3, O4〕
+- j2（显式）：判断scheduled scaling将周末minimum、maximum、desired capacity均设为0并在周初恢复，如何与需求驱动伸缩组成两项方案。〔S, O4, O5〕
+
+**待官方核验**
+
+- 待查ALB/internet gateway容量管理边界、target tracking及scheduled scaling的设置与联动。
+
+### Q406
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：两层架构含公有Web子网及数据库子网；Web须向互联网开放443，RDS for MySQL仅允许Web服务器经3306访问，选择两项配置。
+
+**必要判断**
+
+- j1（显式）：比较公有子网ACL拒绝到0.0.0.0/0的3306出站与Web安全组允许0.0.0.0/0的443入站，对所需通信路径的影响。〔S, O1, O3〕
+- j2（显式）：比较数据库安全组以公有子网CIDR或Web安全组为3306来源，以及在安全组中显式拒绝其他流量的提议，判断来源精度、规则可表达性及两项组合。〔S, O2, O4, O5〕
+
+**待官方核验**
+
+- 待查安全组allow/deny规则、来源引用及ACL出站规则对Web至数据库流量的影响。
+
+### Q407
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：AWS游戏应用须使用完全托管的共享存储，并允许Lustre clients访问。
+
+**必要判断**
+
+- j1（显式）：比较DataSync task提供可挂载文件系统、Storage Gateway file gateway协议共享、EFS配置Lustre，以及FSx for Lustre连接源服务器与应用服务器的提议，判断协议、共享访问和托管适配。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查四类服务的文件系统提供方式、客户端协议、挂载/连接要求及托管边界。
+
+### Q408
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：数千台地理分散远端设备通过UDP发送数据，应用立即处理并按需回传消息，不保存数据；须最小化设备传输延迟并快速故障切换到另一Region。
+
+**必要判断**
+
+- j1（显式）：比较Route 53 failover与Global Accelerator作为双Region入口的延迟、故障检测及切换机制。〔S, O1, O2, O3, O4〕
+- j2（显式）：按原组合比较双Region NLB调用Lambda、Global Accelerator接NLB及ECS Fargate、Global Accelerator接ALB及ECS Fargate、Route 53接ALB及ECS Fargate的UDP收发与目标集成可行性。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查双Region入口故障切换、UDP支持、NLB/ALB目标类型及Fargate接入要求。
+
+**源异常／歧义**
+
+- O2的负载均衡器目标句出现“NLProcess”拼接残缺，目标关系表述不完整。
+
+### Q409
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Windows IIS Web应用依赖本地NAS文件共享；计划Web服务器迁至跨多个AZ的EC2并接Elastic Load Balancer，各实例连接替代存储；文件共享替代方案须韧性及持久性最高。
+
+**必要判断**
+
+- j1（显式）：比较将文件共享迁至RDS、Storage Gateway、FSx for Windows File Server或EFS，对Windows IIS共享访问、跨AZ部署及韧性/持久性目标的适配。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查候选服务的文件共享接口、Windows兼容性、跨AZ部署与持久性保障。
+
+### Q410
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：新应用运行于EC2并写入EBS；所有写入EBS的数据须静态加密。
+
+**必要判断**
+
+- j1（显式）：比较附加声明EBS加密的IAM role、创建加密EBS卷后挂载、给EC2添加Encrypt=True标签，以及KMS key policy强制账户EBS加密的提议，判断实际加密实施点与覆盖。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查EBS卷加密配置及IAM role、实例标签、KMS key policy对启用加密的作用边界。
+
+### Q411
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：本地Web服务器加MySQL数据库将迁AWS；每月初重负载、每周初中负载、周内使用不可预测；数据库平台须成本有效且无需数据库修改。
+
+**必要判断**
+
+- j1（显式）：比较DynamoDB、RDS for MySQL、MySQL-compatible Aurora Serverless，以及Auto Scaling group中的EC2自管MySQL，对数据库兼容、波动负载伸缩和总体成本的适配。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查MySQL兼容与迁移限制、数据库容量伸缩/计费机制及EC2 Auto Scaling用于数据库的边界。
+
+### Q412
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：图像托管对象存于S3；须避免意外公开，整个AWS账户的全部S3对象始终保持私有。
+
+**必要判断**
+
+- j1（显式）：比较GuardDuty监控bucket policy加Lambda自动修复、Trusted Advisor发现后邮件通知并手改、Resource Access Manager发现后SNS触发Lambda，以及账户级S3 Block Public Access加Organizations SCP禁止IAM users更改设置的覆盖与防护时点。〔S, O1, O2, O3, O4〕
+- j2（显式）：判断发现/修复与预防性阻止公开的差异，以及账户级设置与SCP组合的适用范围和前提。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各服务的S3公开访问检测/修复能力、Block Public Access账户覆盖及SCP限制边界。
+
+### Q413
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：EC2两层电商应用含Web和独立数据库层；用户增长造成营销及订单确认邮件显著延迟，须减少复杂投递问题处理时间并最小化运维开销。
+
+**必要判断**
+
+- j1（显式）：比较新增专用EC2邮件层、该邮件层配Auto Scaling group、Web经SES发送，以及Web经SNS发送，对邮件投递、流量增长及排障/运维目标的适配。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查SES与SNS的邮件用途、投递管理能力及自管EC2邮件层的维护边界。
+
+### Q414
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：业务系统每天生成数百份CSV报告并保存到网络共享；须近实时存入AWS供分析，管理开销最少。
+
+**必要判断**
+
+- j1（显式）：比较DataSync每日结束定时传S3、改用S3 File Gateway网络共享、开发应用在自动化工作流调用DataSync API，以及Transfer for SFTP加脚本轮询上传，对近实时性和管理负担的适配。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查File Gateway写入S3机制、DataSync调度/API执行方式及SFTP轮询链路的延迟与维护要求。
+
+### Q415
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：PB级数据位于多个S3 Standard buckets，访问频率不同且部分模式未知；须为每个bucket优化S3成本，运维效率最高。
+
+**必要判断**
+
+- j1（显式）：比较Lifecycle转Intelligent-Tiering、storage class analysis后逐对象决定并迁移、Lifecycle转Glacier Instant Retrieval或One Zone-IA，对未知访问模式、成本及运维效率的适配。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查自动分层与分析工具能力、候选存储类的访问/费用/可用性差异及Lifecycle转换要求。
+
+### Q416
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：全球电商快速增长，Web应用部署在AWS。
+- c2〔S〕：应用同时包含静态和动态内容。
+- c3〔S〕：OLTP数据存放在RDS，用户页面加载缓慢。
+- c4〔S〕：要求选择两个动作解决问题。
+- c5〔O1〕：候选配置Redshift集群。
+- c6〔O2〕：候选设置CloudFront分配。
+- c7〔O3〕：候选把动态Web内容托管在S3。
+- c8〔O4〕：候选为RDS实例创建只读副本。
+- c9〔O5〕：候选为RDS实例配置Multi-AZ部署。
+
+**必要判断**
+
+- j1（显式）：如何判断全球访问场景下静态与动态内容分别适用哪些分发、缓存和托管方式？〔S, O2, O3〕
+- j2（显式）：如何区分OLTP数据库的查询扩展、可用性部署与分析型处理对页面性能的作用？〔S, O1, O4, O5〕
+- j3（显式）：如何判断所选两个动作能否共同解决所述页面加载问题，并比较它们对内容交付、OLTP访问各环节的作用及所需衔接？〔S, O1, O2, O3, O4, O5〕
+
+**待官方核验**
+
+- CloudFront与S3分别支持哪些动态内容处理和缓存方式，应用需要怎样配置源站与请求转发？
+- RDS只读副本、Multi-AZ部署与Redshift在OLTP读取扩展及应用接入方面有哪些能力和限制？
+
+### Q417
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：应用使用EC2及Lambda，账户内VPC含公私子网，EC2在某VPC私有子网；Lambda须直接网络访问EC2；至少运行1年且Lambda数量将增长，须最大化全部应用资源节省并保持服务间低延迟。
+
+**必要判断**
+
+- j1（显式）：比较EC2 Instance Savings Plan与Compute Savings Plan的资源覆盖，并比较优化Lambda duration、memory、invocations及是否包含数据传输量的整体节省方案。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较Lambda连接EC2所在私有子网、同VPC公有子网或保留Lambda service VPC的直连与延迟适配，并保留其与各Savings Plan及优化动作的原组合。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查Savings Plans对EC2/Lambda的覆盖与承诺期、Lambda VPC网络路径及相关传输计费。
+
+### Q418
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：团队须访问开发及生产两个账户的S3；现用开发账户独立IAM users及有适当权限的IAM group，生产账户已建具有目标bucket访问策略的IAM role；须遵守最小权限。
+
+**必要判断**
+
+- j1（显式）：比较给开发用户Administrator Access、在生产role trust policy加入开发账户principal、关闭生产bucket的Block Public Access，以及生产账户为每人另建独立凭证用户的跨账户访问与最小权限适配。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：区分生产角色的S3权限、信任关系及开发身份承担该角色的授权，识别题干已有权限是否足够。〔S, O2〕
+
+**待官方核验**
+
+- 待查跨账户AssumeRole的双方策略要求、账户principal范围及S3访问授权关系。
+
+### Q419
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Organizations已启用全部功能，EC2仅在ap-southeast-2运行，现有SCP禁止其他Region建资源；安全要求全部静态数据加密，但审计发现未加密EBS；须使任何IAM user或root新启动EC2均用加密EBS，尽量少影响建卷员工，选择两项。
+
+**必要判断**
+
+- j1（显式）：比较EC2控制台启用EBS encryption account attribute并指定默认密钥，与在Organizations management account指定Default EBS volume encryption的配置作用域。〔S, O1, O5〕
+- j2（显式）：比较向root OU附permission boundary或SCP、逐账户修改IAM policies，按ec2:Encrypted=false拒绝ec2:CreateVolume的可实施性、IAM/root覆盖及对员工影响，并与默认加密组成两项方案。〔S, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查EBS默认加密的账户/Region范围、Organizations管理账户边界，以及SCP、permission boundary、IAM策略的附着对象与root约束。
+
+### Q420
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：生产数据库拟用RDS for PostgreSQL DB cluster减少耗时管理；须高可用，多数场景自动故障切换少于40秒，卸载primary读取并使成本尽可能低。
+
+**必要判断**
+
+- j1（显式）：比较Multi-AZ DB instance加1个read replica、Multi-AZ DB cluster另加2个read replicas、读取Multi-AZ pair的secondary，以及Multi-AZ DB cluster reader endpoint的读取拓扑与故障切换适配。〔S, O1, O2, O3, O4〕
+- j2（显式）：判断各部署的可读节点、额外副本需求及成本，综合评估少于40秒目标与运维简化。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查RDS PostgreSQL两类Multi-AZ部署的典型切换时间、secondary可读性、reader endpoint及副本费用。
+
+**源异常／歧义**
+
+- O2将部署名写为“Multi-AZ DB duster deployment”，疑为术语拼写异常。
+
+### Q421
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：现有高可用SFTP由两台带elastic IP的EC2 Linux接收互联网可信IP流量，共享附加存储，账户按Linux users管理；拟改serverless，须高IOPS、高度可配置安全并保留用户权限控制。
+
+**必要判断**
+
+- j1（显式）：比较Transfer Family SFTP搭配加密EBS、加密EFS或默认加密S3的后端接入、高IOPS及用户权限模型。〔S, O1, O2, O3, O4〕
+- j2（显式）：保留原组合比较public endpoint限制可信IP、带elastic IP且互联网可达的VPC endpoint加安全组，以及私有子网internal VPC endpoint加安全组，判断互联网接入与安全控制适配。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查Transfer Family后端支持、用户/文件权限映射、存储性能及端点类型的EIP、安全组和互联网可达性限制。
+
+### Q422
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：独立ML微服务启动时从Amazon S3读取约1 GB模型数据并载入内存；异步API支持单次或批量请求及指定结果接收位置。
+- c2〔S〕：服务数百用户；使用不规律，模型可能闲置数天或数周，也可能一次收到数千请求。
+
+**必要判断**
+
+- j1（显式）：比较NLB→Lambda、ALB→读取SQS的ECS、SQS事件→Lambda及SQS→ECS的请求链路，判断如何衔接异步批处理与指定结果投递。〔S, O1, O2, O3, O4〕
+- j2（显式）：评估启动加载与内存需求、长期闲置和突发积压下的执行及扩缩方式；区分App Mesh按队列扩集群、Auto Scaling调整Lambda vCPU、ECS集群与服务副本共同按队列伸缩的提议。〔S, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查NLB/ALB与计算后端的集成、SQS触发和消费方式，以及Lambda资源配置、App Mesh和ECS扩缩能力与边界。
+
+### Q423
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：拟将题干所指JSON作为identity-based policy授予权限；要求识别两类可附加对象。
+
+**必要判断**
+
+- j1（显式）：区分Role、Group、Organization、Amazon ECS resource、Amazon EC2 resource作为identity-based policy附加对象的资格。〔S, O1, O2, O3, O4, O5〕
+
+**待官方核验**
+
+- 待查identity-based policy可附加的IAM身份类型及身份与组织、服务资源的区别。
+
+**源异常／歧义**
+
+- 题干提及JSON policy，但输入未包含该JSON。
+
+### Q424
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：现用EC2 On-Demand运行自定义应用；前端须24小时、每周7天运行，后端仅按负载短时运行且数量日内变化；须按负载扩缩，目标成本最低。
+
+**必要判断**
+
+- j1（显式）：比较前端Reserved Instances或Spot Instances，搭配后端Fargate、Spot Instances或Reserved Instances的组合，评估持续运行、短时弹性与总成本。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查Reserved Instances、Spot Instances及Fargate的计费、容量与中断边界，以及现有应用迁移和按负载扩缩要求。
+
+### Q425
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：本地高容量块存储工作负载将迁至EC2；每日峰值不超过15,000 IOPS，磁盘性能须独立于容量配置，目标成本最低。
+
+**必要判断**
+
+- j1（显式）：比较gp2、io2、gp3、io1在容量与IOPS耦合、性能上限及费用上的差异。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查四类EBS卷的独立性能配置能力、15,000 IOPS适配条件及容量和性能计费。
+
+### Q426
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：医疗应用数据频繁变化；本地存储即将耗尽，须安全迁移现有数据到AWS，并满足新法规对存储数据各层级访问的审计要求。
+
+**必要判断**
+
+- j1（显式）：比较DataSync、Snowcone、S3 Transfer Acceleration和Storage Gateway迁至S3的方式，评估持续变化数据、安全性与本地容量压力。〔S, O1, O2, O3, O4〕
+- j2（显式）：区分CloudTrail data events与management events的审计范围，并判断各迁移与日志组合能否覆盖所需访问层级。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各迁移工具的变化数据同步与安全机制，以及CloudTrail两类事件对S3访问的覆盖范围。
+
+### Q427
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：复杂Java应用使用MySQL数据库，必须部署于Apache Tomcat并实现高可用。
+
+**必要判断**
+
+- j1（显式）：比较Lambda+API Gateway、Elastic Beanstalk负载均衡环境+滚动部署、迁库ElastiCache，以及EC2同机部署MySQL与应用后制作AMI并配置launch template+Auto Scaling group的适配性。〔S, O1, O2, O3, O4〕
+- j2（显式）：判断各方案如何同时保留Tomcat运行要求与MySQL数据需求，并处理应用部署及数据库拓扑对高可用的影响。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查相关平台的Tomcat支持、滚动部署及负载均衡行为、ElastiCache与MySQL的用途差异，以及同机数据库随ASG扩缩的边界。
+
+### Q428
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：API Gateway、Lambda、DynamoDB构成serverless应用；Lambda须读写指定表，目标为最安全授权。
+
+**必要判断**
+
+- j1（显式）：比较IAM用户长期密钥置于Lambda环境变量或Parameter Store SecureString，与IAM执行角色的授权及凭证暴露面。〔S, O1, O2, O3〕
+- j2（显式）：辨别信任Lambda或DynamoDB的角色、表读写权限策略，以及通过函数配置或代码设置执行角色的组合与衔接要求。〔S, O2, O4〕
+
+**待官方核验**
+
+- 待查Lambda执行角色的信任主体、权限与配置方式，以及两种长期密钥存储路径的访问控制边界。
+
+### Q429
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：所指IAM policy附加于IAM group，且是该组唯一策略；要求分析组成员有效权限。
+
+**必要判断**
+
+- j1（显式）：依据完整策略判断Allow/Deny及语句顺序的作用，区分全部EC2操作或仅StopInstances/TerminateInstances受MFA限制，以及us-east-1与所有Region的权限范围。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 取得缺失策略后，待查其Action、Resource、Condition及Allow/Deny组合的评估规则；同时区分组策略授权与成员整体有效权限。
+
+**源异常／歧义**
+
+- 输入缺少题干所指IAM policy，无法定位具体权限条件。
+- 仅说明该组没有其他策略，未说明成员是否另有策略或权限限制；“有效权限”的评估范围未明确。
+
+### Q430
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：传感器上传.csv至S3后须尽快转图用于自动图形报告；图像1个月后失去价值，原始.csv须保留用于每年两次ML训练，训练与审计提前数周计划；选两步骤且成本最低。
+
+**必要判断**
+
+- j1（显式）：比较EC2 Spot每小时下载转换与S3上传事件调用Lambda转换并回存的时效、执行方式及费用。〔S, O1, O2〕
+- j2（显式）：比较.csv上传1天后转S3 Glacier、One Zone-IA或Standard-IA，以及图像30天到期或保留RRS的组合；评估保留、预定取回与成本目标。〔S, O3, O4, O5〕
+
+**待官方核验**
+
+- 待查事件转换与定时转换的成本及时效，以及各存储类别的生命周期转移时限、最短计费、取回与冗余限制。
+
+### Q431
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：VPC内三层网页游戏使用RDS for MySQL，多玩家同时在线；须近实时显示top-10排行榜，并支持停止和恢复游戏且保留当前分数。
+
+**必要判断**
+
+- j1（显式）：比较ElastiCache for Memcached缓存、ElastiCache for Redis计算并缓存、CloudFront缓存排行榜、RDS for MySQL只读副本计算并承担读取的方案，评估并发排名、更新时效与停启后分数保留。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各方案的排名计算、缓存更新、数据持久与恢复能力，以及只读副本的数据延迟和查询角色。
+
+### Q432
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：电商需构建并训练ML模型，呈现复杂场景及客户趋势；模型须与报告平台集成，让增强数据直接用于BI仪表板，运维最少。
+
+**必要判断**
+
+- j1（显式）：比较Glue ML transform→OpenSearch、SageMaker→QuickSight、Marketplace预建ML AMI→OpenSearch，以及QuickSight calculated fields建模训练并可视化的完整链路与运维负担。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各服务的模型构建训练范围、增强数据到BI的集成方式，以及ML AMI和托管方案的运维责任。
+
+### Q433
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：AWS Organizations内多个账户承载生产与非生产负载；须防止成本用量标签被修改。
+
+**必要判断**
+
+- j1（显式）：比较自定义AWS Config rule、CloudTrail trail、SCP及CloudWatch logs的预防与观测作用；评估选项中的授权主体例外如何在多账户范围实施。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各服务对标签修改的阻止能力、SCP适用范围及授权主体例外的表达方式。
+
+### Q434
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：应用使用ELB后方ASG内EC2及DynamoDB表；须能在另一AWS Region提供服务，停机时间最少。
+
+**必要判断**
+
+- j1（显式）：比较灾备Region预建ASG与负载均衡器，或用CloudFormation按需创建计算资源；结合DynamoDB global table或按需新建表，评估完整恢复链路与停机时间。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较DNS failover与CloudWatch alarm→Lambda→更新Route 53的故障检测和流量切换方式。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查跨Region计算预置、DynamoDB数据复制和DNS切换的依赖、恢复时间及检测更新机制。
+
+### Q435
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：20 TB本地MySQL须在2周内迁至AWS，停机最少，并选择成本最低的迁移方案。
+
+**必要判断**
+
+- j1（显式）：比较Snowball Edge Storage Optimized、Snowmobile、Snowball Edge Compute Optimized with GPU及“1 GB dedicated Direct Connect”的容量、交付周期、传输时间与费用。〔S, O1, O2, O3, O4〕
+- j2（显式）：评估DMS+SCT与离线设备或网络链路配合进行初始迁移、持续变化复制及最终切换的流程。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查设备及专线交付和容量限制、DMS/SCT离线迁移衔接与持续复制条件，并估算20 TB在2周窗口内的时间和成本。
+
+**源异常／歧义**
+
+- O4将Direct Connect规格写为“1 GB”，未明确是否指带宽，单位存在歧义。
+
+### Q436
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：PostgreSQL已从本地迁至RDS for PostgreSQL；新品成功后数据库负载增加，须不增加基础设施承载更大负载，成本最低。
+
+**必要判断**
+
+- j1（显式）：比较购买reserved DB instances后增大现有实例、转Multi-AZ、购买reserved DB instances后新增实例、转on-demand的容量变化与费用；区分计费选择、实例规格、实例数量和可用性部署。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各方案对实际处理容量、基础设施数量及成本的影响，以及预留计费与实例扩容的关系。
+
+### Q437
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：电商运行于ALB后方ASG内EC2；变动IP的非法外部系统产生高请求率并影响性能，存在DDoS担忧；须阻止非法请求且尽量少影响合法用户。
+
+**必要判断**
+
+- j1（显式）：比较Inspector关联ALB、WAF关联ALB并限速、ALB相关network ACL封禁，以及GuardDuty配置限速保护的提议；评估动态来源、请求速率控制与合法用户影响。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各服务的ALB集成与主动阻断能力、限速规则作用范围，以及network ACL在动态IP场景的控制边界。
+
+### Q438
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：会计数据位于私有子网RDS实例；外部审计方有独立AWS账户且须获得自己的数据库副本，目标为最安全共享。
+
+**必要判断**
+
+- j1（显式）：比较只读副本+IAM数据库认证、导出文本至S3+新IAM用户、RDS snapshot复制至S3+共享用户密钥，以及加密snapshot跨账户共享+KMS key授权的副本获取与安全边界。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查RDS副本、快照、S3导出及跨账户恢复的支持方式，IAM数据库认证条件，以及加密快照与KMS key共享权限。
+
+### Q439
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：现有VPC地址范围较小，EC2数量增长导致未来IP不足；须以最少运维解决。
+
+**必要判断**
+
+- j1（显式）：比较原VPC增加IPv4 CIDR并建子网，与第二VPC通过peering、Transit Gateway或EC2 VPN设备+virtual private gateway互联；评估新资源放置、路由调整与运维负担。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查VPC附加CIDR及子网限制、三种跨VPC连接的路由要求与组件维护差异。
+
+### Q440
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：测试用RDS for MySQL终止前先用mysqldump备份，再创建final DB snapshot；新测试周期须从最近备份创建MySQL-compatible Aurora实例，选两种方案。
+
+**必要判断**
+
+- j1（显式）：区分RDS snapshot与mysqldump逻辑备份导入Aurora的路径：直接导入、经S3导入，以及DMS读取snapshot或S3中的dump；判断所需源格式和恢复步骤。〔S, O1, O2, O3, O4, O5〕
+
+**待官方核验**
+
+- 待查Aurora支持的RDS snapshot迁移、S3导入文件格式与逻辑恢复方式，以及DMS可使用的迁移源。
+
+**源异常／歧义**
+
+- 题干要求使用“最近备份”，但描述先dump后final snapshot且要求选两方案；是否也允许较早dump未明确。
+
+### Q441
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：多层应用运行于ALB后方、跨多个AZ的ASG内Amazon Linux EC2；大量静态内容访问导致新增On-Demand实例，须以最低成本重构。
+
+**必要判断**
+
+- j1（显式）：比较ASG改用Reserved Instances或Spot Instances、S3静态内容经CloudFront分发，以及API Gateway后方Lambda提供静态内容的成本与架构适配性。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各计费选择与ASG的关系、静态内容卸载和缓存的请求链路，以及API Gateway/Lambda提供静态内容的限制与费用。
+
+### Q442
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：多个AWS账户存有数PB数据，使用Lake Formation管理数据湖；数据科学团队须向工程团队安全共享选定数据供分析，运维最少。
+
+**必要判断**
+
+- j1（显式）：比较复制到公共账户+IAM角色、各源账户执行Lake Formation Grant、Data Exchange私有发布，以及Lake Formation tag-based access control跨账户授权的选择粒度、安全性与维护规模。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查Lake Formation跨账户授权及标签权限机制、Grant对象和条件、Data Exchange私有共享，以及IAM角色信任与权限策略的分工。
+
+### Q443
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：可扩展网页应用面向全球不同地理区域用户；用户上传下载各自独有、最大达GB级的数据；须兼顾成本、最低传输延迟与最高性能。
+
+**必要判断**
+
+- j1（显式）：比较S3+Transfer Acceleration、S3+CacheControl headers、EC2 Auto Scaling+CloudFront及EC2 Auto Scaling+ElastiCache，评估应用托管、独有大对象双向传输和缓存适用性。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各方案的上传下载加速、缓存复用、对象大小和应用托管限制及费用。
+
+### Q444
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：应用由单个RDS实例和同一AZ内两台手工配置的EC2 Web服务器组成；员工误删数据库曾导致24小时不可用，须最大化整体基础设施可靠性。
+
+**必要判断**
+
+- j1（显式）：比较RDS Multi-AZ+deletion protection与API Gateway→Lambda双写两个数据库，判断故障冗余、误删防护和应用衔接。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较单EC2+termination protection、ALB+跨AZ ASG、跨AZ Spot ASG+CloudWatch健康告警，评估实例恢复、流量分配、AZ故障及中断风险，并与数据库方案组合。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查删除及终止保护范围、RDS Multi-AZ与双写的可靠性边界，以及ALB、ASG、Spot和告警在故障恢复中的职责。
+
+### Q445
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：本地NAS有700 TB数据，混合环境具10 Gbps Direct Connect；监管要求90天内迁云，须高效无中断，传输期间仍可访问和更新数据。
+
+**必要判断**
+
+- j1（显式）：比较本地DataSync agent→S3任务、Snowball Edge Storage Optimized离线备份运输、rsync经Direct Connect直写S3及磁带运输；评估持续访问、变化数据同步和90天窗口。〔S, O1, O2, O3, O4〕
+- j2（显式）：判断离线运输后将目标S3 bucket挂载至本地文件系统的提议如何衔接访问与更新，以及各方案所需接口和实施步骤。〔S, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查NAS到S3迁移与增量同步支持、Direct Connect可用传输路径、rsync/S3接口兼容性及设备、磁带和S3挂载流程。
+
+### Q446
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：S3中PDF数据受法律要求约束，所有新旧数据均须保留7年，运维最少。
+
+**必要判断**
+
+- j1（显式）：比较Versioning+7年Lifecycle删除+MFA delete，与Object Lock governance或compliance retention mode的保留保障和管理权限边界。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较默认7年保留对新对象的处理，以及重复制现有对象或使用S3 Batch Operations使旧对象合规的完整性和运维量。〔S, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查Object Lock启用条件、两种模式的覆盖与绕过限制、旧对象批量设置保留的方式，以及Versioning/MFA delete/Lifecycle的保障范围。
+
+### Q447
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：无状态网页应用由API Gateway调用Lambda；计划跨多个AWS Region部署，须提供Region故障转移并将流量路由至多个Region。
+
+**必要判断**
+
+- j1（显式）：比较Route 53各Region健康检查+active-active、CloudFront多源站+所称健康检查、Transit Gateway连接各Region API Gateway端点，以及主Region ALB以API Gateway主机名为目标的路由链路与故障切换。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各服务支持的API Gateway端点集成、健康检测与跨Region路由机制，以及ALB目标类型和CloudFront源站切换限制。
+
+### Q448
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Management VPC经VPN/customer gateway连接数据中心单台设备；Production VPC通过virtual private gateway连接两条Direct Connect；两VPC由一条peering互通，须消除架构中的单点故障。
+
+**必要判断**
+
+- j1（显式）：识别本地设备、VPN、virtual private gateway、双Direct Connect及peering各层冗余边界；比较增加VPC间VPN、Management第二virtual private gateway、第二customer gateway设备及VPN组、第二peering的实际作用。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查VPN和peering的服务冗余、单VPC网关及同对VPC peering限制，以及双本地设备的独立故障路径。
+
+### Q449
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Oracle应用依赖需特权访问的第三方数据库功能；因数据库、备份与数据中心维护资源有限，须快速迁至AWS且成本最低。
+
+**必要判断**
+
+- j1（显式）：比较RDS for Oracle并替换第三方功能、RDS Custom for Oracle定制、EC2 Oracle AMI定制，以及重写代码迁RDS for PostgreSQL并移除Oracle APEX依赖的权限、迁移时间、改造和运维成本。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各托管程度下的特权访问、第三方功能及自定义支持，备份运维责任和跨引擎改造要求。
+
+**源异常／歧义**
+
+- O4引入Oracle APEX依赖，题干仅说明第三方功能，未确认具体使用Oracle APEX。
+
+### Q450
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：单服务器三层网页应用须迁至AWS，符合Well-Architected Framework及安全、可扩展、弹性最佳实践；选三项组合。
+
+**必要判断**
+
+- j1（显式）：比较两AZ内保留原架构的私有EC2+ASG，与将Web、应用、数据库分层到各自私有子网、Web及应用层分别ASG的部署方式。〔S, O1, O3〕
+- j2（显式）：判断Web层前ELB、security group层间引用及network ACL的组合如何实现访问入口、分层隔离与流量控制。〔S, O1, O2, O3, O4, O5, O6〕
+- j3（显式）：比较私有子网单RDS及其访问控制，与私有子网RDS Multi-AZ DB cluster且仅允许应用层security groups访问的数据库部署，判断三项组合的整体弹性。〔S, O2, O4, O6〕
+
+**待官方核验**
+
+- 待查分层私网架构的入口与路由要求、ASG/ELB跨AZ协作、security group引用与NACL边界，以及RDS单实例和Multi-AZ DB cluster差异。
+
+### Q451
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：应用与数据库迁AWS后将使用ECS、Direct Connect、RDS；须识别公司运维团队负责的三项活动。
+
+**必要判断**
+
+- j1（显式）：区分RDS基础设施、OS与平台、实例创建和维护窗口配置、所有主次数据库版本补丁安装、数据中心物理安全的责任边界。〔S, O1, O2, O4, O5〕
+- j2（显式）：判断ECS监控、补丁、日志及主机入侵检测附加软件配置，以及Direct Connect传输加密的客户责任和部署依赖。〔S, O3, O6〕
+
+**待官方核验**
+
+- 待查RDS维护及版本升级责任、ECS各运行模式的主机管理边界，以及Direct Connect传输加密的配置责任。
+
+**源异常／歧义**
+
+- 未说明ECS使用EC2还是Fargate，O3涉及主机补丁和入侵检测，责任判断可能依赖该部署方式。
+
+### Q452
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Java作业现运行于EC2，每小时执行一次、耗时10秒、需1 GB内存；平时CPU低，短时突发占满可用CPU，须优化运行成本。
+
+**必要判断**
+
+- j1（显式）：比较A2C容器化后用Fargate 0.5 vCPU/1 GB、Lambda 1 GB+EventBridge每小时调度、现有AMI仅停止容器，以及定时停启EC2的资源适配、调度可行性和费用。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查Java执行与容器化支持、内存和CPU分配、短作业计费粒度，以及容器停止和EC2停启的调度及成本差异。
+
+### Q453
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：须备份EC2数据及多个S3 bucket；法规要求备份保留指定期限，期间不得更改。
+
+**必要判断**
+
+- j1（显式）：比较AWS Backup vault lock governance或compliance mode+backup plan、Data Lifecycle Manager自动快照及S3 File Gateway+Lifecycle，对两类数据源和保留期内不可更改的覆盖。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各方案的EC2/S3备份范围、保留锁定及管理员修改边界，重点区分Vault Lock两种模式。
+
+### Q454
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：资源分布多个AWS Region与账户，前员工未交接资源清单；须构建所有账户工作负载及关系映射，运维效率最高。
+
+**必要判断**
+
+- j1（显式）：比较Systems Manager Inventory详细报告地图、Step Functions收集后手工绘图、Workload Discovery on AWS生成架构图，以及X-Ray查看并绘制关系的发现范围、自动化与维护量。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各工具的跨账户跨Region资源发现、基础设施关系映射和图表生成能力及接入条件。
+
+### Q455
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Organizations内部分账户预算不同；须在指定期间达到各自预算阈值时告警并自动阻止新增资源，选三项组合。
+
+**必要判断**
+
+- j1（显式）：比较AWS Budgets预算设置于所述Cost and Usage Reports区域或Billing dashboards的路径，以及按账户、金额和期间配置的衔接。〔S, O1, O2〕
+- j2（显式）：比较Budgets执行actions使用IAM user或role，以及告警后结合Config rule或SCP阻止新增资源的权限、触发与执行链路。〔S, O3, O4, O5, O6〕
+
+**待官方核验**
+
+- 待查Budgets创建与账户范围、budget actions支持的执行身份和动作、SCP与Config rule的阻止能力及阈值触发机制。
+
+### Q456
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：应用EC2当前运行在单一AWS区域，需备份到第二个区域。
+- c2〔S〕：还要求在第二个区域预置EC2资源。
+- c3〔S〕：须从一个AWS账户集中管理EC2实例。
+- c4〔S〕：目标是最具成本效益。
+- c5〔O1〕：候选在第二区域维持相近数量EC2的灾备计划，并配置数据复制。
+- c6〔O2〕：候选创建时间点EBS快照并定期复制到第二区域。
+- c7〔O3〕：候选用AWS Backup备份计划配置EC2跨区域备份。
+- c8〔O4〕：候选在第二区域部署相近数量EC2，并用DataSync传输数据。
+
+**必要判断**
+
+- j1（显式）：如何判断跨区域快照、EC2备份及数据复制分别覆盖哪些恢复所需资源与配置？〔S, O1, O2, O3, O4〕
+- j2（显式）：如何判断各方案能否支持第二区域资源预置及单账户集中管理，而不只完成数据传输？〔S, O1, O2, O3, O4〕
+- j3（显式）：如何比较持续部署相近数量EC2与保存跨区域恢复副本的整体成本？〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- AWS Backup的EC2备份与EBS快照跨区域复制分别保留哪些资源元数据，恢复和集中管理能力及限制是什么？
+- DataSync及所述复制方案能覆盖哪些EC2恢复需求，各方案的跨区域传输、存储和运行资源如何计费？
+
+**源异常／歧义**
+
+- 题干未说明第二区域资源需持续运行还是恢复时创建；这会影响备份方案是否覆盖资源预置要求及成本比较。
+
+### Q457
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：应用须向产品制造商传输数据，必须使用AS2协议；传输时由公司现有IdP认证应用用户。
+
+**必要判断**
+
+- j1（显式）：比较DataSync+Lambda认证、AppFlow+ECS task认证、Transfer Family+Lambda认证及Storage Gateway+Cognito identity pool，判断AS2传输与既有IdP用户认证如何在同一链路衔接。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各服务AS2支持范围、传输方向与身份认证模型，以及Lambda、ECS和Cognito接入现有IdP的接口及协议限制。
+
+### Q458
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：返现服务使用API Gateway REST API；计算资源需1 GB内存、2 GB存储，数据须采用关系格式；选两项附加服务且管理最少。
+
+**必要判断**
+
+- j1（显式）：比较EC2、Lambda和EKS作为REST API计算后端的资源配置、2 GB存储语义、集成及管理负担。〔S, O1, O2, O5〕
+- j2（显式）：比较RDS与DynamoDB对关系数据需求的适配，并判断与计算服务组合后的连接和管理要求。〔S, O3, O4〕
+
+**待官方核验**
+
+- 待查计算服务的内存和存储配置、API Gateway集成及数据库连接方式，以及RDS/DynamoDB数据模型和运维边界。
+
+**源异常／歧义**
+
+- 计算资源的2 GB存储未说明是否临时或持久，可能影响服务适配判断。
+
+### Q459
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Organizations多账户资源创建标签时带department标签；会计须跨账户归集各部门EC2支出，已有全组织Cost Explorer访问并须从其获取全部报告，运维效率最高。
+
+**必要判断**
+
+- j1（显式）：比较在management或member account激活department cost allocation tag，以及user-defined与AWS-defined类型；判断与Cost Explorer按标签分组、EC2筛选的单报告流程如何衔接。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查成本分配标签分类、组织内激活权限与范围，以及Cost Explorer跨账户按部门汇总EC2成本的配置条件。
+
+### Q460
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Salesforce SaaS账户与S3间须安全交换数据；静态数据须使用AWS KMS customer managed keys加密，传输中也须加密；Salesforce API访问已启用。
+
+**必要判断**
+
+- j1（显式）：比较Lambda函数、Step Functions任务工作流、AppFlow flows及Salesforce custom connector的数据传输链路，判断传输加密、KMS CMK静态加密及访问授权如何实现。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各路径的Salesforce/S3连接、传输方向、传输加密、CMK配置与密钥权限要求。
+
+**源异常／歧义**
+
+- 题干未提供明确提问句或优化目标，只有场景与安全要求。
+
+### Q461
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：移动游戏部署单一AWS Region，使用ASG内多台EC2和DynamoDB；全球用户与服务器同时使用TCP及UDP通信，目标用户延迟最低。
+
+**必要判断**
+
+- j1（显式）：比较Global Accelerator或CloudFront与ALB或NLB的四种组合，判断TCP/UDP监听、端点或源站集成及ASG实例注册的完整链路和全球延迟。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查Global Accelerator、CloudFront、ALB和NLB支持的协议、端点/源站及监听器组合，以及与EC2 ASG的注册方式。
+
+### Q462
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：EC2订单应用将订单写入Aurora，高峰偶尔处理不及时；须尽快且可靠地将订单写入数据库。
+
+**必要判断**
+
+- j1（显式）：比较SNS直接订阅数据库端点、SNS加ASG消费者，与SQS加ASG消费者写库的缓冲、消费及可靠落库链路；评估EC2纵向扩容和ALB在方案中的作用。〔S, O1, O2, O3, O4〕
+- j2（显式）：区分持续先入SQS与EC2达CPU阈值才入队、ASG扩展与定时扩展，判断流量突发时的写入速度和处理连续性。〔S, O2, O4〕
+
+**待官方核验**
+
+- 待查SNS数据库订阅与消费接口、SQS可靠消费及重试边界，以及各扩展触发方式对队列处理时延的影响。
+
+### Q463
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：床垫IoT传感器每床每晚约2 MB数据上传S3；须逐床处理汇总并尽快提供结果，每次处理需1 GB内存且30秒内完成，成本最低。
+
+**必要判断**
+
+- j1（显式）：比较Glue Scala job、EMR Spark script、Lambda Python script及Glue PySpark job的启动和触发、资源适配、短任务时效与费用。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各执行方式的最小资源、启动时延、S3触发集成与计费粒度对2 MB、1 GB、30秒任务的影响。
+
+### Q464
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：购物应用订单位于RDS for PostgreSQL Single-AZ实例；须消除单点、尽量减少数据库停机，且不得修改应用代码。
+
+**必要判断**
+
+- j1（显式）：比较原实例修改为Multi-AZ、新建Multi-AZ并从snapshot恢复、跨AZ只读副本+Route 53 weighted records，以及将RDS放入最少两实例的EC2 ASG+加权DNS；评估数据写入、故障转移、端点连续性与实施停机。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查RDS原地Multi-AZ转换及快照恢复流程、只读副本写入和故障转移边界，以及RDS与EC2 ASG、加权DNS的集成限制。
+
+### Q465
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：应用部署于同一AZ内多台EC2 Nitro-based实例；须能在多实例间同时写入多个块存储卷，以提高应用可用性。
+
+**必要判断**
+
+- j1（显式）：比较gp3、st1、io2、gp2与EBS Multi-Attach的组合，判断同AZ Nitro多实例并发挂载和写入的适配条件。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：明确共享块卷并发写入时应用或文件系统所需的协调与数据一致性条件，区分多挂载能力与应用可用性保障。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各卷型Multi-Attach支持、AZ/Nitro及挂载限制，以及多写入者协调与故障隔离要求。
+
+### Q466
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：无状态两层应用使用单AZ EC2和RDS Multi-AZ DB instance；须实现应用高可用。
+
+**必要判断**
+
+- j1（显式）：比较跨AZ EC2 ASG+ALB、EC2 snapshot送往另一Region、Route 53 latency-based routing，以及Route 53规则+跨AZ ALB，判断计算冗余、流量分发与恢复路径是否构成完整高可用方案。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查ASG、ALB、Route 53及跨Region快照分别提供的故障处理能力和依赖，及其与现有单AZ计算层的衔接。
+
+### Q467
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Organizations成员账户已购买Compute Savings Plan；负载变化后未充分利用承诺，用量低于已购计算能力的50%。
+
+**必要判断**
+
+- j1（先修候选，待核验）：若目标为提高现有承诺利用率，比较购买成员账户或management account开启discount sharing、迁入其他账户负载，以及在Reserved Instance Marketplace出售剩余Savings Plan承诺的可行性与调整范围。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查Organizations内Compute Savings Plan折扣共享的控制账户与适用范围、跨账户利用条件，以及承诺转售限制。
+
+**源异常／歧义**
+
+- 题干缺少提问句和明确目标；提高承诺利用率仅由场景及选项推断。
+
+### Q468
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：微服务搜索目录须以REST APIs向用户提供前端；API须访问私有VPC子网中容器化后端。
+
+**必要判断**
+
+- j1（显式）：比较API Gateway REST API或WebSocket API，以及private VPC link或security group访问私有子网ECS的四种组合，判断协议与私有后端连接链路。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查API Gateway两类API的私有集成能力、VPC link所需中间端点或负载均衡器，以及security group与网络连接的职责边界。
+
+### Q469
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：S3原始数据用于多种客户分析，访问模式随分析类型变化且不可预测、不可控制；须降低S3成本。
+
+**必要判断**
+
+- j1（显式）：比较replication转Standard-IA、Lifecycle转Standard-IA或Intelligent-Tiering，以及Inventory识别未访问对象后转Intelligent-Tiering的机制、访问模式适配与成本。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查replication、Lifecycle及Inventory在类别迁移和访问识别中的能力，以及Standard-IA与Intelligent-Tiering的自动分层、取回和计费限制。
+
+### Q470
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：EC2应用使用IPv6，须主动经互联网连接外部应用；安全策略禁止外部服务主动建立到EC2的连接。
+
+**必要判断**
+
+- j1（显式）：比较将子网路由指向NAT gateway、internet gateway、virtual private gateway或egress-only internet gateway，判断IPv6出站、返回流量与外部主动入站的控制。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各网关的IPv6及协议转换支持、路由目的范围和有状态连接方向限制。
+
+### Q471
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：VPC内容器应用访问S3，开发阶段每天存取1 TB；须降低成本，并尽可能避免流量经过互联网。
+
+**必要判断**
+
+- j1（显式）：比较S3 Intelligent-Tiering、Transfer Acceleration、关联全部VPC route tables的gateway VPC endpoint，以及所述关联route tables的interface endpoint，评估存储与传输费用、私网路径及接入方式。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查S3两类VPC endpoint的路由、DNS和关联机制及费用，并区分存储分层、传输加速与私网访问能力。
+
+### Q472
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：移动聊天应用使用DynamoDB；新消息读取延迟须尽量低，同时应用改动最少。
+
+**必要判断**
+
+- j1（显式）：比较DAX+修改端点、DynamoDB read replicas+read endpoint、读容量翻倍且保留端点，以及Redis替换读取端点的延迟收益、接入改动与容量瓶颈适配。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：评估新消息的读取模式、缓存命中与数据新鲜度要求，区分降低单次读取延迟和缓解读取限流的目标。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查DAX与Redis的读取一致性、缓存及客户端集成，DynamoDB副本和读取端点支持，以及增加RCU对延迟的作用条件。
+
+### Q473
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：静态网站运行于ALB后的Amazon EC2；流量增长，公司担忧成本增加。
+
+**必要判断**
+
+- j1（显式）：比较CloudFront边缘缓存、ALB连接ElastiCache及WAF web ACL缓存规则能否承接静态内容请求并控制成本。〔S, O1, O2, O3〕
+- j2（显式）：评估另一Region新增ALB并将用户路由到最近Region的完整访问路径及数据传输成本取舍。〔S, O4〕
+
+**待官方核验**
+
+- 待查各候选的缓存职责、连接或路由支持及相关费用差异。
+
+**源异常／歧义**
+
+- 题干未提供明确问句；O1使用state files，与题干static content的对应含义不明。
+
+### Q474
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：多个Region的VPC原先承载区域隔离工作负载；现需所有Region的全部VPC互通，管理工作量最少。
+
+**必要判断**
+
+- j1（显式）：比较区域内及跨Region VPC peering、跨Region Direct Connect gateways、区域内Transit Gateway加跨Region peering、跨Region PrivateLink的全互通能力与管理规模。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各方案的连接范围、转发与路由模型、跨Region支持及连接维护复杂度。
+
+### Q475
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Amazon ECS容器需高持久共享文件系统，同一Region每个AZ均需mount target；使用AWS Backup管理跨Region复制，RPO为8小时。
+
+**必要判断**
+
+- j1（显式）：比较FSx for Windows File Server Multi-AZ、FSx for NetApp ONTAP Multi-AZ、EFS Standard与FSx for OpenZFS的共享访问、持久性及逐AZ mount target配置。〔S, O1, O2, O3, O4〕
+- j2（显式）：评估各文件系统与AWS Backup跨Region备份、复制及恢复流程能否满足8小时RPO。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各文件系统的AZ访问模型及AWS Backup跨Region能力、调度和恢复限制。
+
+### Q476
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：公司即将快速增长，需配置既有用户并向新用户授权；已决定按部门将新用户加入IAM groups，要求最安全的附加授权方式。
+
+**必要判断**
+
+- j1（显式）：比较SCP、向IAM groups附加最小权限IAM roles、附加最小权限IAM policy、IAM roles结合permissions boundary的授权链与安全边界。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查IAM groups可关联的权限对象，以及SCP、role、policy、permissions boundary各自的授权或限制作用。
+
+### Q477
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：IAM group需列出指定S3 bucket并删除其中对象；已附加策略但无法删除，修正须遵守最小权限。
+
+**必要判断**
+
+- j1（显式）：判断应补充怎样的IAM statement，以授权目标bucket对象删除并保留所需列举权限，避免扩大操作或资源范围。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查S3列举与对象删除所需的Action、Resource范围及现有策略对最终权限的影响。
+
+**源异常／歧义**
+
+- 题干引用的现有IAM policy未提供；O1至O4仅有选项字母，无法提取候选statement差异。
+
+### Q478
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：律所数百个文件须公开可读；指定未来日期前禁止任何人修改或删除，要求最安全方案。
+
+**必要判断**
+
+- j1（显式）：比较S3静态网站配只读IAM权限、Versioning加Object Lock与公开只读bucket policy、事件触发Lambda从私有bucket恢复原版、对文件夹设置Object Lock的公开读取及防篡改路径。〔S, O1, O2, O3, O4〕
+- j2（显式）：区分指定日期前阻止修改删除与事后恢复；评估保留期、锁定范围和权限主体能否覆盖“任何人”。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查Object Lock前提、作用粒度与保留模式，及IAM权限、bucket policy和恢复流程对公开访问与不可变性的限制。
+
+### Q479
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：手动原型包含Auto Scaling group、ALB和Amazon RDS；充分验证后需立即自动部署开发及生产环境，并跨两个AZ。
+
+**必要判断**
+
+- j1（显式）：比较Systems Manager复制配置、按原型定义CloudFormation模板、AWS Config资源清单及部署、Elastic Beanstalk自动引用原型的可重复部署能力与跨AZ配置方式。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各服务从既有原型到环境部署的职责、模板或配置要求，以及对所列资源和两个AZ的支持。
+
+### Q480
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：业务应用运行于EC2，S3存储加密对象；EC2与S3之间任何应用流量均不得经过公共互联网。
+
+**必要判断**
+
+- j1（显式）：比较AWS KMS、VPC endpoint、private subnet和virtual private gateway能否构成符合要求的EC2到S3通信路径，区分加密与网络路径控制。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各候选的网络职责及S3私有访问所需端点、路由和连接条件。
+
+### Q481
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：AWS三层应用以Multi-AZ RDS for MySQL为数据库、ElastiCache为缓存；客户向数据库新增条目时须添加或更新缓存，缓存数据必须始终与数据库匹配。
+
+**必要判断**
+
+- j1（显式）：比较lazy loading、write-through、adding TTL及AWS AppConfig caching strategy在写入触发、缓存更新和一致性要求上的适用性。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各策略的读写流程、更新及失败处理语义，以及对“始终匹配”的保证边界。
+
+### Q482
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：将100 GB本地历史数据迁移至S3，本地互联网为100 Mbps；传输须加密，新数据以后直接存S3，运维开销最少。
+
+**必要判断**
+
+- j1（显式）：比较AWS CLI s3 sync直传、DataSync、Snowball及IPsec VPN加s3 cp的传输加密、迁移规模适配与一次性设置维护成本。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各迁移路径的加密方式、部署前提及在100 GB、100 Mbps场景下的操作负担。
+
+### Q483
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Windows container封装运行于.NET 6 Framework的Windows作业；每10分钟执行一次，每次1–3分钟，迁往AWS并追求最低成本。
+
+**必要判断**
+
+- j1（显式）：比较Lambda容器镜像加EventBridge、AWS Batch加Fargate、ECS Fargate scheduled task、ECS Fargate standalone task加Windows task scheduler对Windows容器及周期执行的支持。〔S, O1, O2, O3, O4〕
+- j2（显式）：评估短时任务按次启动与持续运行容器内调度在运行时长、空闲资源及计费上的差异。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各运行平台的Windows容器兼容性、定时调度方式、启动与最小计费限制。
+
+### Q484
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：从多个独立AWS账户转向统一多账户架构，并为不同业务单元新建大量账户；须通过集中企业目录认证访问，选择两项行动组合。
+
+**必要判断**
+
+- j1（显式）：评估AWS Organizations启用all features并创建账户，与直接将组织认证接到AWS Directory Service的组织管理及认证职责差异。〔S, O1, O4〕
+- j2（显式）：比较Cognito identity pool接IAM Identity Center、SCP结合将Identity Center加入Directory Service、组织内Identity Center集成企业目录的认证链；判断两项行动如何衔接。〔S, O2, O3, O5, O1, O4〕
+
+**待官方核验**
+
+- 待查Organizations、SCP、IAM Identity Center、Cognito和Directory Service的职责及受支持的企业目录集成关系。
+
+### Q485
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：旧新闻视频归档很少恢复；需要时最多5分钟可用，要求成本最低。
+
+**必要判断**
+
+- j1（显式）：比较S3 Glacier的Expedited与Standard retrievals、S3 Standard-IA及S3 One Zone-IA的恢复时限与低频访问总成本。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各存储及取回方式的可用时延、容量保障条件、存储与取回费用及最低存储计费限制。
+
+### Q486
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：AWS三层应用包含静态网站展示层、容器化逻辑层及关系数据库；目标是简化部署并降低运维成本。
+
+**必要判断**
+
+- j1（显式）：比较S3、CloudFront、EC2 Reserved Instances承担静态内容角色的方式，以及ECS或EKS配Fargate或EC2、再配managed RDS cluster的完整三层组合。〔S, O1, O2, O3, O4〕
+- j2（显式）：评估各组合的部署管理工作与整体运维成本，不要求每个组件分别改善两个目标。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查静态托管与分发职责、ECS/EKS及Fargate/EC2的管理边界和组合成本差异。
+
+### Q487
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：存储须高可用、可扩展、无最小容量要求，并以原生协议供AWS及本地多台Linux实例挂载；本地到VPC已有Site-to-Site VPN。
+
+**必要判断**
+
+- j1（显式）：比较FSx Multi-AZ、EBS Multi-Attach、EFS多mount targets、EFS单mount target加多access points的共享文件系统、Linux及本地访问、容量和可用性差异。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查候选的协议、跨本地挂载及最小容量限制，并区分mount target和access point对访问与可用性的作用。
+
+**源异常／歧义**
+
+- O1仅写Amazon FSx Multi-AZ deployments，未指定FSx文件系统类型。
+
+### Q488
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：成立4年的媒体公司使用AWS Organizations all features；成员账户账单信息不得被任何人访问，包括成员账户root user。
+
+**必要判断**
+
+- j1（显式）：比较向财务IAM group附加Billing managed policy、identity-based Deny、在组织根层附加SCP Deny、切换consolidated billing feature set对成员账户及root user的控制范围。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查账单访问权限、不同策略对root user的适用范围、SCP继承及Organizations feature set切换限制。
+
+### Q489
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：云端电商通过SNS将订单发至本地仓库HTTPS endpoint，部分消息未收到；需保留未投递消息以供最长14天分析，开发工作最少。
+
+**必要判断**
+
+- j1（显式）：比较SNS dead letter queue以Kinesis Data Stream、SQS或DynamoDB TTL为目标，与应用和SNS之间新增14天保留SQS的失败捕获位置、保留能力及开发负担。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查SNS向HTTPS订阅投递失败的处理、DLQ支持目标及配置位置、14天消息保留和分析访问方式。
+
+### Q490
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：DynamoDB存储玩家位置、玩家数据和排行榜；需以最少编码持续备份至S3，不影响应用可用性，也不影响表已定义的RCUs。
+
+**必要判断**
+
+- j1（显式）：比较EMR加Hive、开启PITR后直接导出S3、DynamoDB Streams加Lambda、定期Lambda导出加PITR的备份连续性、S3落地、读取容量影响和编码量。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查PITR持续备份与S3导出的关系、各导出路径的RCU及可用性影响、更新捕获和调度限制。
+
+### Q491
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：银行信用卡数据校验应用采用异步处理；须安全且每个请求至少处理一次，要求成本最低。
+
+**必要判断**
+
+- j1（显式）：比较Lambda event source mapping配SQS standard或FIFO、SSE-KMS或SSE-SQS的投递与处理语义、安全性和成本。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较向Lambda execution role授予kms:Decrypt与向Lambda function授予encryption key invocation permission的权限主体、操作及消费链适配性。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查队列与Lambda至少一次处理语义、两种加密方式的密钥权限要求及费用差异。
+
+### Q492
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：多个开发AWS账户因人员持续使用过大EC2实例而超年度预算；需集中限制这些账户创建资源，开发工作最少。
+
+**必要判断**
+
+- j1（显式）：比较Systems Manager批准模板、Organizations OU加SCP限制instance types、EventBridge触发Lambda事后停止、强制Service Catalog产品的集中约束范围、创建前后控制及开发工作。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各方案限制EC2实例类型及绕过路径的控制能力、跨账户管理方式和所需实现工作。
+
+### Q493
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：需用AI评估客服通话质量，当前4种语言含英语、未来增加语言；无资源定期维护ML模型，需将录音文字译为英语并生成书面情感分析报告，选择三项步骤。
+
+**必要判断**
+
+- j1（显式）：比较Comprehend翻译音频、Polly音频转文字、Transcribe音频转文字的角色与语言覆盖，识别候选录音处理步骤。〔S, O1, O3, O4〕
+- j2（显式）：比较Translate文字译英语及Lex或Comprehend生成情感报告的职责，评估三个步骤的输入输出衔接与模型维护负担；审视选项“any language”的范围。〔S, O2, O4, O5, O6〕
+
+**待官方核验**
+
+- 待查各服务的音频或文字输入、翻译及情感分析能力、受支持语言和托管模型维护边界。
+
+### Q494
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：管理员在部署操作中使用AWS CLI终止EC2，收到403 Access Denied；使用附有IAM policy的IAM role，需判断失败原因。
+
+**必要判断**
+
+- j1（显式）：比较EC2 resource-based Deny、策略缺少Principal、Action未授权终止，以及请求不来自192.0.2.0/24或203.0.113.0/24的解释所需证据。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查相关策略类型、EC2终止操作授权及来源CIDR条件的评估规则，并结合缺失策略核对。
+
+**源异常／歧义**
+
+- 题干引用的IAM policy未提供，无法确定Action、条件或其他策略内容。
+
+### Q495
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：内部审计需检查Lake Formation数据湖关联S3 bucket，发现客户或员工PII及财务信息，包括护照号和信用卡号。
+
+**必要判断**
+
+- j1（显式）：比较Audit Manager的PCI DSS审计、S3 Inventory加Athena、Macie managed identifiers discovery job、S3 Select跨bucket报告对实际敏感数据内容发现的覆盖。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各服务扫描对象内容、查询清单及收集合规证据的职责差异，以及目标敏感数据类型支持。
+
+### Q496
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：本地应用同时使用block和NFS storage且容量不足；需高性能、支持本地缓存、不重构应用的方案，选择两项行动组合。
+
+**必要判断**
+
+- j1（显式）：比较将S3挂载为文件系统、Storage Gateway file gateway、Snowball Edge NFS mounts及本地挂载EFS对现有NFS、容量扩展和本地缓存的适配。〔S, O1, O2, O3, O5〕
+- j2（显式）：评估Storage Gateway volume gateway承接现有block storage的接口及缓存方式，并与文件存储候选组成覆盖两种访问需求的方案。〔S, O1, O2, O3, O4, O5〕
+
+**待官方核验**
+
+- 待查候选的block/NFS接口、本地缓存、数据持久化及应用改动要求。
+
+### Q497
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：私有子网EC2大量读写同Region S3，当前经公共子网NAT gateway；需以最低成本降低数据输出费用。
+
+**必要判断**
+
+- j1（显式）：比较公共子网NAT instance加私有路由、私有子网NAT instance加公共路由、VPC gateway endpoint加私有路由、第二个NAT gateway加私有路由的S3路径及总成本。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各路径的子网与路由前提、NAT数据处理及传输费用、gateway endpoint相关费用和运维成本。
+
+### Q498
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：高分辨率图片以S3对象最新版本供应用使用以减少应用改动；仅需保留最近两个版本，要求降低S3费用且运维最少。
+
+**必要判断**
+
+- j1（显式）：比较S3 Lifecycle、Lambda检查并删旧版本、S3 Batch Operations及停用versioning能否按对象保留最近两个版本，并维持当前访问方式。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：明确最近两个版本如何计入current与noncurrent版本，以及删除条件、执行时机是否影响精确保留目标。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查版本保留计数、Lifecycle删除条件、Batch Operations支持及停用versioning对既有版本和费用的影响。
+
+### Q499
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：现有1 Gbps Direct Connect平均利用率低于10%；需降低连接成本且不降低安全性。
+
+**必要判断**
+
+- j1（显式）：比较新建1 Gbps连接并跨账户共享、控制台新建200 Mbps连接、经Direct Connect Partner订购1 Gbps并共享、为既有账户订购200 Mbps hosted connection的可行性及成本安全取舍。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查dedicated与hosted连接的可订购带宽、供应渠道、跨账户共享方式及费用和安全边界。
+
+### Q500
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：多个本地Windows file servers的文件需迁移整合至FSx for Windows File Server；必须保留文件权限、访问权不得改变，选择两种方案。
+
+**必要判断**
+
+- j1（显式）：评估本地DataSync agents与Snowcone上运行DataSync agents直接定时迁至FSx的部署和权限保留路径。〔S, O1, O4〕
+- j2（显式）：比较AWS CLI先复制至S3、拆盘寄AWS导入S3、Snowball Edge Storage Optimized经CLI复制并寄回导入S3，再由DataSync到FSx的端到端权限保留与流程支持。〔S, O2, O3, O5〕
+
+**待官方核验**
+
+- 待查DataSync及各中转、设备路径对Windows文件权限元数据的保留、agent部署和导入方式限制。
+
+### Q501
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：客户支付数据平均每分钟收到一次；须先实时分析，再摄取到S3数据湖，要求运维效率最高。
+
+**必要判断**
+
+- j1（显式）：比较Kinesis Data Streams加Lambda、Glue加Kinesis Data Analytics、Kinesis Data Firehose加Kinesis Data Analytics、API Gateway加Lambda的摄取与实时分析组合。〔S, O1, O2, O3, O4〕
+- j2（显式）：评估各组合完成分析后写入S3的完整衔接、处理顺序和额外运维工作，避免仅覆盖摄取或分析。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查候选间流式输入输出、S3交付集成、实时处理与缓冲行为及所需自建组件。
+
+### Q502
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：CMS网站运行于单台EC2，数据库为Aurora MySQL Multi-AZ，图片存实例挂载的EBS；选择两项行动以改善网站整体性能及韧性。
+
+**必要判断**
+
+- j1（显式）：比较每台EC2挂载S3、从主EC2提供NFS、每台EC2挂载EFS的共享图片路径及故障依赖。〔S, O1, O2, O3〕
+- j2（显式）：评估由AMI构建ALB后Auto Scaling group、至少两台实例的共同架构，比较Global Accelerator与CloudFront的访问加速作用，并与共享图片方案组合满足整体目标。〔S, O4, O5, O1, O2, O3〕
+
+**待官方核验**
+
+- 待查图片共享与挂载语义、实例扩展时的状态访问，以及Global Accelerator和CloudFront的流量、缓存及可用性差异。
+
+### Q503
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：基础设施监控服务新增跨客户AWS账户功能，需调用API描述EC2并读取CloudWatch metrics；要求最安全的账户访问方式。
+
+**必要判断**
+
+- j1（显式）：比较客户只读IAM role信任公司账户、serverless token vending machine发放临时role凭证、客户IAM user长期密钥加密保管、Cognito用户密码加密保管并使用role的信任链及凭证风险。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：评估第三方多客户访问所需的最小权限、客户隔离及防止跨客户角色误用的信任条件。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查跨账户角色信任及临时凭证流程、token vending与Cognito路径前提，以及第三方访问的客户隔离控制。
+
+### Q504
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：需连接us-east-1内横跨数百AWS账户的多个VPC；网络团队有独立AWS账户集中管理，要求运维效率最高。
+
+**必要判断**
+
+- j1（显式）：比较逐对VPC peering并更新子网路由、每VPC经NAT gateway及internet gateway互联、网络账户Transit Gateway加各VPC静态路由、每VPC VPN gateway连接集中transit VPC的规模与管理负担。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各拓扑的跨账户连接、共享或授权、路由前提及数百账户规模下的维护限制。
+
+### Q505
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：EC2 Auto Scaling group当前使用On-Demand，每日本地时间00:00–06:00运行批处理；实例作业失败可由其他实例重处理，要求成本最低。
+
+**必要判断**
+
+- j1（显式）：比较覆盖实例family的1年Savings Plan、匹配instance type及OS的1年Reserved Instance、launch template改Spot并按CPU扩容、增大实例并按CPU扩容的成本与任务适配性。〔S, O1, O2, O3, O4〕
+- j2（显式）：结合每日6小时运行窗口和可重处理特征，评估承诺用量、空闲计费及中断重试对整体成本和完成要求的影响。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各购买方式的承诺及匹配规则、Spot中断行为，以及Auto Scaling配置和计费差异。
+
+### Q506
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：社交网站新增用户照片上传，大型活动期间需求显著增加；需承受上传流量并获得最高扩展性。
+
+**必要判断**
+
+- j1（显式）：比较浏览器经应用服务器再传S3、浏览器直传Storage Gateway file gateway、应用生成S3 presigned URLs后浏览器直传S3、浏览器直传EFS的协议、数据路径与扩展瓶颈。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查浏览器上传支持、presigned URLs授权方式及各路径对服务器、网关或文件系统的容量依赖。
+
+### Q507
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：旅行订票数据库现位于北美单一数据中心；应用须独立部署至多个AWS Regions服务全球用户，预订数据库更新平均延迟低于1秒。
+- c2〔S〕：必须维持一个全球一致的primary reservation database。
+
+**必要判断**
+
+- j1（显式）：比较DynamoDB global table、Aurora MySQL跨Region Read Replicas、RDS MySQL跨Region read replicas、各Region Aurora Serverless加Lambda事件流同步的主库、复制与一致性模型。〔S, O1, O2, O3, O4〕
+- j2（显式）：评估各Region使用本地Regional endpoint时的读写目标及更新路径，能否同时满足单一主库、全球一致性和平均低于1秒的更新延迟。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各数据库的跨Region读写端点、复制与一致性语义、同步延迟及更新时延保证边界。
+
+**源异常／歧义**
+
+- “更新延迟”未明确指客户端写入响应还是跨Region传播；“globally consistent”未明确一致性级别。
+
+### Q508
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：多个 Windows Server 工作负载已迁至 us-west-1 的 EC2。
+- c2〔S〕：当前按需手工备份工作负载并创建镜像。
+- c3〔S〕：us-west-1 发生自然灾害时，要求在 us-west-2 快速恢复。
+- c4〔S〕：EC2 数据丢失不得超过 24 小时。
+- c5〔S〕：要求自动化 EC2 备份。
+- c6〔S〕：要求选择两项，且管理工作最少。
+- c7〔O1〕：候选使用基于标签的 EC2-backed AMI 生命周期策略，每天备份两次。
+- c8〔O1〕：该 AMI 候选按需复制镜像。
+- c9〔O2〕：另一 AMI 候选同样基于标签，每天备份两次。
+- c10〔O2〕：另一 AMI 候选配置复制到 us-west-2。
+- c11〔O3〕：候选在两个区域建立 AWS Backup 备份库，并按 EC2 标签制定备份计划。
+- c12〔O3〕：双区域备份库候选使用定时 Lambda 作业将备份复制到 us-west-2。
+- c13〔O4〕：候选使用 AWS Backup 备份库和按 EC2 标签制定的备份计划。
+- c14〔O4〕：该备份计划指定 us-west-2 为复制目标，每天备份两次。
+- c15〔O5〕：另一 AWS Backup 候选使用按 EC2 标签制定的计划，每天备份两次。
+- c16〔O5〕：另一 AWS Backup 候选按需复制到 us-west-2。
+
+**必要判断**
+
+- j1（显式）：如何结合备份间隔、复制时机与完成时间，判断灾难发生时目标区域的数据丢失能否控制在 24 小时内？〔S, O1, O2, O3, O4, O5〕
+- j2（显式）：如何判断各候选是否在区域灾难前已将可恢复的 Windows EC2 备份准备到目标区域，并支持快速恢复？〔S, O1, O2, O3, O4, O5〕
+- j3（显式）：如何比较生命周期策略、AWS Backup 原生计划和定时 Lambda 复制的自动化程度与管理工作？〔S, O1, O2, O3, O4, O5〕
+- j4（先修候选，待核验）：需要区分 AMI 生命周期备份与 AWS Backup 恢复点的哪些对象、区域复制及恢复条件，才能评估完整恢复方案？〔S, O1, O2, O3, O4, O5〕
+
+**待官方核验**
+
+- AMI 生命周期策略与 AWS Backup 对基于标签的 EC2 定时备份、跨区域复制及目标区域恢复分别有哪些支持条件？
+- 备份时间点、备份完成时间与跨区域复制完成时间应如何共同用于评估 24 小时数据丢失上限及快速恢复要求？
+- 定时 Lambda 复制与备份计划内配置复制分别需要哪些额外组件、权限、调度和失败处理？
+
+### Q509
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：图像处理两层应用跨两个AZ，各有公私子网；ALB使用公共子网，应用EC2使用私有子网。
+- c2〔S〕：少量IP产生数百万非法请求导致性能下降；调查长期方案期间需立即缓解。
+
+**必要判断**
+
+- j1（显式）：比较web层或应用层security group入站deny与对应子网network ACL入站deny的支持及作用位置，判断何处可阻断原始恶意IP并及时缓解。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查security group与network ACL的拒绝规则、ALB到应用层的源地址呈现及跨两个AZ子网的规则覆盖。
+
+### Q510
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：应用运行于ap-southeast-2和eu-west-1；eu-west-1 VPC应用须安全访问ap-southeast-2 VPC数据库。
+
+**必要判断**
+
+- j1（显式）：比较跨Region VPC peering与Transit Gateway peering的连接和路由链，保留子网路由表更新要求及网关部署前提。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较在eu-west-1应用security group允许数据库IP、在ap-southeast-2数据库security group引用远端应用security group ID或允许应用IP的方向及跨Region适用性。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查跨Region peering及Transit Gateway路由要求、security group跨Region引用限制与应用到数据库的入站授权位置。
+
+### Q511
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：软件使用PostgreSQL schema，需为开发者配置多个开发环境及数据库；每个环境平均使用8小时工作日的一半，要求成本最低。
+
+**必要判断**
+
+- j1（显式）：比较每环境独立Aurora PostgreSQL、RDS for PostgreSQL Single-AZ、Aurora On-Demand PostgreSQL-Compatible、S3 bucket加S3 Object Select的数据库兼容性及间歇使用成本。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各候选的PostgreSQL执行能力、容量与空闲计费方式，并澄清两种Aurora表述对应的部署模式。
+
+**源异常／歧义**
+
+- O1未指定Aurora容量模式；O3的Aurora On-Demand表述不足以明确其与O1的部署差异。
+
+### Q512
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：公司使用AWS Organizations，资源按账户打标签，已有AWS Backup备份基础设施；需覆盖所有AWS资源且运维开销最少。
+
+**必要判断**
+
+- j1（显式）：比较AWS Config发现未标记资源后程序化补标签并按标签备份、Config发现未运行资源并加入backup vault、账户所有者人工审查、Inspector发现不合规资源的覆盖与执行链。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：明确AWS Backup可支持的资源范围、跨账户发现及备份选择方式，评估“所有资源”覆盖是否存在遗漏。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查Config与Inspector的发现范围、标签与backup plan选择机制、backup vault职责及AWS Backup资源和跨账户支持边界。
+
+### Q513
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：AWS社交应用允许用户上传图片，须自动缩放供多种设备显示；全天流量不可预测，要求高可用并最大化扩展性。
+
+**必要判断**
+
+- j1（显式）：比较S3静态网站加Lambda缩放并存S3、CloudFront静态网站加Step Functions缩放并存RDS、单EC2动态网站本机缩放并存S3、自动扩展ECS网站加SQS作业及EC2处理的完整链路。〔S, O1, O2, O3, O4〕
+- j2（显式）：评估托管、触发、缩放计算及存储各环节的衔接与瓶颈，判断整体高可用和突发流量扩展性。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各服务的托管或编排职责、图片处理执行方式、事件集成和各链路的扩展及故障依赖。
+
+### Q514
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：EC2微服务迁往EKS以扩展；合规要求control plane endpoint private access=true、public access=false，data plane必须位于private subnets；当前node无法加入cluster。
+
+**必要判断**
+
+- j1（显式）：比较补充AmazonEKSNodeRole权限、创建interface VPC endpoints、重建公共子网nodes并限制security groups、允许node security group出站流量对加入cluster的作用及合规适配。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：区分node访问Kubernetes private endpoint与访问所需AWS服务的网络及身份前提，确定需哪些诊断证据才能定位失败环节。〔S, O1, O2, O4〕
+
+**待官方核验**
+
+- 待查私有EKS node加入流程中的IAM、DNS、endpoint、路由及security group要求，并区分各类端点。
+
+**源异常／歧义**
+
+- 未给出具体错误、现有IAM权限、出站规则及端点配置，仅凭私有部署条件无法明确失败环节。
+
+### Q515
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：本地应用迁往AWS并考虑Amazon Redshift；需从候选中选择三项适用用例。
+
+**必要判断**
+
+- j1（显式）：评估Redshift Data APIs服务传统、容器及事件驱动应用、client-side与server-side encryption、在指定时段且应用不活跃时构建分析工作负载的适用性。〔S, O1, O2, O3〕
+- j2（显式）：评估缓存以减轻后端数据库压力、全球扩展至petabytes和每分钟数千万请求、通过控制台创建cluster secondary replica是否属于所述Redshift用例或能力。〔S, O4, O5, O6〕
+
+**待官方核验**
+
+- 待查Redshift的Data API、加密与时段化分析能力，以及缓存、全球请求规模和secondary replica的具体支持及术语含义。
+
+### Q516
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：面向客户的API用于读取财务信息，年度高峰期请求增多；需计算宿主，持续低延迟响应且运维开销最少。
+
+**必要判断**
+
+- j1（显式）：比较ALB加ECS、ALB加EKS、API Gateway加Lambda provisioned concurrency、API Gateway加Lambda reserved concurrency的低延迟、峰值容量与运维取舍。〔S, O1, O2, O3, O4〕
+- j2（显式）：区分两类Lambda concurrency配置在执行环境准备、并发限制及高峰扩展中的作用，评估持续低延迟所需配置。〔S, O2, O4〕
+
+**待官方核验**
+
+- 待查各计算组合的管理责任、扩展及启动延迟，以及provisioned与reserved concurrency的行为差异。
+
+### Q517
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：所有Systems Manager Session Manager logs需发送到S3归档，要求运维效率最高。
+
+**必要判断**
+
+- j1（显式）：比较控制台启用S3 session logging、CloudWatch agent到log group后导出S3、Systems Manager document经EventBridge每日上传服务器日志、CloudWatch Logs subscription到Kinesis Data Firehose再到S3的日志覆盖及运维链。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查Session Manager日志原生目的地与覆盖限制，以及agent、定时上传、导出和subscription交付的配置要求。
+
+### Q518
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：RDS MySQL DB instance磁盘空间不足；需不停机增加磁盘容量，操作工作最少。
+
+**必要判断**
+
+- j1（显式）：比较启用RDS storage autoscaling、增大DB instance size、改Provisioned IOPS storage type、备份后扩容恢复并停止旧实例对实际容量、停机和操作量的影响。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查RDS容量、实例规格及IOPS的区别，storage autoscaling触发与限制，以及各变更或恢复流程的可用性影响。
+
+### Q519
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：咨询公司向全球客户提供AWS数据收集分析方案及工具；需集中管理、部署一套通用内容，供客户自助使用。
+
+**必要判断**
+
+- j1（显式）：比较向客户提供CloudFormation templates、Service Catalog products、Systems Manager templates、AWS Config items的集中管理、部署与自助消费能力。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各候选的可部署内容、集中分发与版本管理、自助配置和客户访问机制。
+
+### Q520
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：新EC2 web应用使用DynamoDB后端；流量不可预测，读写吞吐预计中至高，需随流量扩展且成本最低。
+
+**必要判断**
+
+- j1（显式）：比较provisioned读写加设定最大容量的auto scaling与on-demand mode的扩展响应、容量限制及不可预测流量成本。〔S, O1, O2, O3, O4〕
+- j2（显式）：在两种容量模式下比较DynamoDB Standard与Standard-IA table class，结合中高读写吞吐评估整体费用。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查容量模式的扩展与计费规则、auto scaling上限，以及Standard和Standard-IA的存储与请求费用差异。
+
+### Q521
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：各业务团队独立AWS账户均属于Organizations，各自持有DynamoDB库存表；共享账户的中央报表应用需读取全部团队表，要求认证最安全。
+
+**必要判断**
+
+- j1（显式）：比较Secrets Manager保存认证secret并每30天轮换、各业务IAM user长期密钥每30天手动轮换、跨账户角色链、ACM identity certificates的认证可行性及安全性。〔S, O1, O2, O3, O4〕
+- j2（显式）：评估业务账户BU_ROLE的表访问policy和信任APP_ROLE的trust policy，与共享账户APP_ROLE调用STS AssumeRole的权限如何组成最小权限读取链。〔S, O3〕
+
+**待官方核验**
+
+- 待查DynamoDB认证方式、跨账户AssumeRole双侧权限及信任配置、凭证生命周期和轮换责任。
+
+### Q522
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：EKS容器应用全天工作负载不稳定，需随负载缩容和扩容；选择两项步骤，运维开销最少。
+
+**必要判断**
+
+- j1（显式）：评估Metrics Server与horizontal pod autoscaling、Cluster Autoscaler调整node数量的职责、指标依赖及两层扩缩衔接。〔S, O2, O3〕
+- j2（显式）：比较Lambda自行调整cluster、API Gateway连接EKS、App Mesh观察网络活动与上述扩缩机制的作用及额外运维工作，判断两项组合覆盖范围。〔S, O1, O2, O3, O4, O5〕
+
+**待官方核验**
+
+- 待查HPA、Metrics Server和Cluster Autoscaler的依赖及扩缩边界，以及其他候选是否提供所需控制能力。
+
+### Q523
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：微服务serverless web应用需从多个DynamoDB tables取数据，不得影响应用基线性能，要求运维效率最高。
+
+**必要判断**
+
+- j1（显式）：比较AppSync pipeline resolvers、CloudFront加Lambda@Edge、edge-optimized API Gateway加Lambda、Athena Federated Query加DynamoDB connector的多表取数、请求编排及运维方式。〔S, O1, O2, O3, O4〕
+- j2（显式）：评估各取数路径对既有应用处理、响应时延及基线性能的影响，并明确满足无影响要求所需的集成边界。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各候选的DynamoDB集成、多表调用执行模型、延迟与资源开销及托管职责。
+
+### Q524
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：已开启AWS CloudTrail；需分析排查IAM权限相关Access Denied和Unauthorized错误，投入最少。
+
+**必要判断**
+
+- j1（显式）：比较AWS Glue或AWS Batch自定义脚本、Amazon Athena查询、Amazon QuickSight搜索加仪表板对CloudTrail错误分析的适配性及实施工作量。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各服务访问、查询及展示CloudTrail日志的能力、依赖与工作量差异。
+
+### Q525
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：将现有AWS使用成本接入运营成本仪表板；需程序化获取本年度成本及未来12个月预测，运维开销最少。
+
+**必要判断**
+
+- j1（显式）：比较AWS Cost Explorer API分页访问与下载.csv报告，在程序化集成、本年度数据及12个月预测方面的适配性。〔S, O1, O2〕
+- j2（显式）：评估AWS Budgets actions经FTP发送数据、Budgets reports经SMTP发送数据的可行性，以及相对Cost Explorer方案的运维差异。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查Cost Explorer历史与预测窗口、分页及报告导出，以及Budgets actions/reports的数据输出和FTP/SMTP集成限制。
+
+### Q526
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Amazon Aurora PostgreSQL writer在扩容演练中故障转移，造成应用停机3分钟；需减少此类停机且运维开销最少。
+
+**必要判断**
+
+- j1（显式）：区分增加Aurora只读副本、使用ElastiCache for Memcached承载负载、引入Amazon RDS Proxy并改用代理端点，对故障转移期间应用停机的作用与改造量。〔S, O1, O3, O4〕
+- j2（显式）：比较同Region第二个Aurora PostgreSQL集群并切换writer端点，与现有集群增强或代理方案的恢复衔接及运维负担。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查Aurora故障转移、客户端连接恢复、只读副本、Memcached及RDS Proxy的相关能力，并核对第二集群切换依赖。
+
+### Q527
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：订阅流媒体当前在单一Region运行；web和application层为ELB后的EC2 Auto Scaling groups，数据库描述为跨多个AZ的Aurora global database cluster。
+- c2〔S〕：计划全球扩展，应用停机最少，选择容错能力最强的方案。
+
+**必要判断**
+
+- j1（显式）：比较将现有Auto Scaling groups扩展至第二Region的AZ，与在第二Region另行部署web/application层的部署边界与区域故障隔离。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较Aurora global database、Aurora PostgreSQL跨Region Replica及AWS DMS复制至独立数据库；结合Route 53健康检查、failover routing和必要的secondary提升，判断完整跨Region恢复链路。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查Auto Scaling的Region边界、各Aurora/DMS复制与提升机制，以及Route 53路由切换和数据库可写恢复的衔接限制。
+
+### Q528
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：每天周期性经FTP接收数千小文件；现有本地夜间批处理耗时数小时，迁AWS后需尽快处理且尽量少改FTP客户端。
+- c2〔S〕：每文件处理3–8分钟，仅成功后删除输入文件；运维效率最高。
+
+**必要判断**
+
+- j1（显式）：比较EC2自建FTP与AWS Transfer Family FTP，以及S3 Glacier Flexible Retrieval、EBS、S3 Standard后端的接入兼容性和运维负担。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较EventBridge夜间触发AWS Batch、S3到达事件触发Batch、S3事件触发Lambda的端到端链路，覆盖事件与存储来源匹配、3–8分钟执行及成功后删除。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查Transfer Family FTP后端、S3事件与Batch/Lambda集成、Glacier取回依赖及Lambda执行时限和删除流程。
+
+### Q529
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：将含事务性、敏感数据的数据库迁至AWS，目标为提高安全性并减少数据库运维开销。
+
+**必要判断**
+
+- j1（显式）：比较EC2自管数据库、Amazon RDS及将数据迁至S3的事务工作负载适配性与运维责任。〔S, O1, O2, O3, O4〕
+- j2（显式）：区分EC2配KMS AWS managed key、RDS静态加密、S3配Macie、RDS配CloudWatch Logs所提供的安全作用，判断各组合是否满足敏感数据库保护目标。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各存储/数据库方案的事务适配、托管边界及KMS、静态加密、Macie和CloudWatch Logs的保护范围。
+
+### Q530
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：在线多人游戏同时使用TCP和UDP；Route 53将流量指向不同Region的多个NLB，需为用户增长提高性能并降低延迟。
+
+**必要判断**
+
+- j1（显式）：比较CloudFront置于NLB前并增大Cache-Control max-age、替换为ALB并使用Route 53 latency routing、Global Accelerator置于NLB前并匹配listener端口、NLB后接API Gateway并配置API及stage method caching，对TCP/UDP链路和跨Region延迟目标的适配性。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各入口的TCP/UDP、NLB集成、监听端口、全球路由及缓存适用范围。
+
+### Q531
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：第三方数据源以webhook通知新数据可用；已有Lambda负责回调后取数，需供第三方调用且运维效率最高。
+
+**必要判断**
+
+- j1（显式）：比较Lambda function URL、ALB前置Lambda、SNS topic及SQS queue公开hostname作为webhook接收入口的调用方式、Lambda衔接及配置负担。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查function URL与ALB的外部HTTP调用方式，以及SNS/SQS端点接收普通webhook并触发Lambda的接口与授权要求。
+
+### Q532
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：单Region工作负载由API Gateway REST API提供访问，DNS使用Route 53；每位客户需独立且安全的URL，选三步并使运维效率最高。
+
+**必要判断**
+
+- j1（显式）：判断域名注册、Route 53通配域名/记录、API Gateway custom domain和证书绑定如何组成访问链路；比较通配方案与每客户hosted zone、多个API endpoints的差异。〔S, O1, O3, O5, O6〕
+- j2（显式）：判断匹配custom domain的ACM wildcard certificate应如何选择同Region或不同Region并接入API Gateway，与另外两步形成完整安全URL方案。〔S, O1, O2, O3, O4, O5, O6〕
+
+**待官方核验**
+
+- 待查REST API通配custom domain、Route 53解析、ACM证书Region与绑定方式，以及多客户共享入口的限制。
+
+### Q533
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：法规禁止S3数据包含PII，已发现部分对象含PII；需自动检测并通知安全团队。
+
+**必要判断**
+
+- j1（显式）：比较Macie与GuardDuty对S3 PII检测的适配性，并区分SensitiveData、SensitiveData:S3Object/Personal及CRITICAL事件过滤表述。〔S, O1, O2, O3, O4〕
+- j2（显式）：判断检测结果经EventBridge过滤后，SNS通知与SQS通知方案如何送达安全团队，覆盖完整告警链路。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查检测服务范围、finding/EventBridge事件字段与类型，以及SNS/SQS向团队投递通知所需配置。
+
+### Q534
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：多账号VPC flow logs和CloudTrail logs集中存于中央账号S3 bucket；前30天高可用且频繁分析，再备份保留60天，创建90天后删除，成本最低。
+
+**必要判断**
+
+- j1（显式）：比较创建30天后转S3 Standard、Standard-IA、Glacier Flexible Retrieval或One Zone-IA，对各阶段访问、高可用、备份及成本目标的适配性。〔S, O1, O2, O3, O4〕
+- j2（显式）：判断90天到期删除与O2/O4同时在90天转Glacier Flexible Retrieval的生命周期组合如何执行，是否符合保留和删除时序。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各storage class的可用性、取回和计费限制，以及同日transition/expiration的生命周期处理规则。
+
+### Q535
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：新建Amazon EKS集群；所有存于EKS的secrets必须在Kubernetes etcd键值存储中加密。
+
+**必要判断**
+
+- j1（显式）：区分新KMS key配EKS KMS secrets encryption、新KMS key配Secrets Manager管理/轮换/存储、默认EKS配EBS CSI add-on，以及创建alias/aws/ebs key并启用账号EBS默认加密，对etcd secrets加密的覆盖范围。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查EKS etcd secrets加密配置、KMS key与alias限制，以及Secrets Manager、EBS CSI和EBS默认加密的作用边界。
+
+### Q536
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：生产RDS for PostgreSQL当前Single-AZ；数据科学家需近实时只读访问并运行不影响生产的复杂查询，方案须高可用且成本最低。
+
+**必要判断**
+
+- j1（显式）：比较维护窗口内扩容生产库，与Multi-AZ instance deployment配置更大secondary standby并供查询，对生产隔离、可读性及高可用的适配性。〔S, O1, O2〕
+- j2（显式）：比较Multi-AZ instance deployment加两个read replicas，与Multi-AZ cluster deployment加两个readable standby及read endpoints，在近实时读取、高可用和总体成本方面的差异。〔S, O3, O4〕
+
+**待官方核验**
+
+- 待查RDS PostgreSQL各Multi-AZ部署的节点规格、可读端点、复制延迟、故障恢复及副本成本差异。
+
+### Q537
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：三层web应用跨三个AZ，含ALB、保存用户session的EC2 web server及EC2上的MySQL；需应对突增流量、未来扩容并在三个AZ高可用。
+
+**必要判断**
+
+- j1（显式）：判断web层迁入三AZ Auto Scaling group后，Redis、Memcached或DynamoDB保存session并配合读缓存的状态共享、扩展及高可用适配性。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较RDS for MySQL Multi-AZ DB cluster、Single-AZ RDS，以及DynamoDB配DAX的数据库迁移与缓存组合，判断整个三层架构是否满足容量和三AZ高可用目标。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查Redis/Memcached状态持久性与高可用、RDS部署范围，以及MySQL迁DynamoDB和DAX的模型及缓存限制。
+
+### Q538
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：全球视频服务已使用CloudFront；需按国家分阶段发布，发布国家之外的观众不得观看。
+
+**必要判断**
+
+- j1（显式）：比较CloudFront geographic restrictions allow list、新URL配signed URL/cookies、内容加密、新URL配限时signed URL，在按国家禁止访问方面的能力；区分自定义错误消息与访问控制的作用。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查CloudFront国家级限制、签名URL/cookies、限时策略及加密的授权边界和错误响应配置。
+
+### Q539
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：本地核心生产应用使用VM上的Microsoft SQL Server Standard；需借AWS改进DR，RPO≤30秒、RTO为60分钟，并尽量降低成本。
+
+**必要判断**
+
+- j1（显式）：比较SQL Server Enterprise Always On跨本地/AWS active-active、RDS for SQL Server warm standby配DMS CDC、Elastic Disaster Recovery磁盘复制pilot light、每夜第三方备份至S3的RPO/RTO及持续成本。〔S, O1, O2, O3, O4〕
+- j2（显式）：判断各方案覆盖数据库还是完整应用/VM恢复，及版本升级、复制、启动和切换环节对60分钟应用恢复目标的影响。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各DR方式的复制粒度、SQL Server版本/许可依赖、恢复流程和成本构成，并核对所需RPO/RTO能力。
+
+### Q540
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：现有本地服务器使用Oracle处理和存储客户信息。
+- c2〔S〕：迁入AWS数据库服务后要求更高可用性及更好应用性能。
+- c3〔S〕：需要从主数据库卸载报表负载。
+- c4〔S〕：目标是最高运维效率。
+- c5〔O1〕：候选用DMS在多个区域创建RDS实例，报表指向独立实例。
+- c6〔O2〕：候选使用Single-AZ RDS Oracle，并将报表指向与主实例同一可用区的只读副本。
+- c7〔O3〕：候选使用RDS Multi-AZ集群部署Oracle，报表使用集群读取实例。
+- c8〔O4〕：候选使用RDS Multi-AZ实例部署创建Aurora，报表使用读取实例。
+
+**必要判断**
+
+- j1（显式）：如何判断候选数据库引擎、部署类型和读取实例组合是否成立并满足可用性要求？〔S, O2, O3, O4〕
+- j2（显式）：如何判断独立实例或读取副本能否卸载报表，并兼顾主库性能及数据同步需求？〔S, O1, O2, O3, O4〕
+- j3（显式）：如何比较跨区域DMS方案与各托管部署方案的迁移、同步及持续运维工作？〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- RDS Oracle及Aurora分别支持哪些Multi-AZ部署和读取拓扑，备用实例与可服务报表的读取实例有何区别？
+- DMS能否承担选项描述的实例创建与跨区域同步工作，各方案还需哪些资源配置和迁移步骤？
+
+**源异常／歧义**
+
+- 选项将Oracle、Aurora、Multi-AZ集群部署及Multi-AZ实例部署交叉组合；这些组合及术语是否成立会影响比较，需先查证。
+
+### Q541
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：AWS web应用访问不可预测且可能长时间空闲；仅已付订阅费客户可登录和使用，选三步且成本最低。
+
+**必要判断**
+
+- j1（显式）：比较API Gateway REST调用接Lambda读取DynamoDB，与ECS/ALB读取RDS且又将API调用送Lambda的计算/数据链路及空闲成本。〔S, O1, O2〕
+- j2（显式）：区分Cognito user pool与identity pool在用户认证中的职责，并判断认证如何衔接已付订阅客户的使用授权。〔S, O3, O4〕
+- j3（显式）：比较Amplify托管HTML/CSS/JS并集成CloudFront，与S3 static web hosting托管PHP/CSS/JS加CloudFront的前端运行条件及成本，形成三步完整组合。〔S, O1, O2, O3, O4, O5, O6〕
+
+**待官方核验**
+
+- 待查各托管方式的空闲计费、Cognito认证/授权边界、前端语言支持，以及API Gateway与计算后端的集成方式。
+
+**源异常／歧义**
+
+- O2先描述ECS/ALB与RDS，随后将API调用发送至未定义的Lambda，后端链路表述不完整。
+
+### Q542
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：媒体流和文件均存S3并由CloudFront分发；仅premium客户可访问，且包含电影租赁、音乐下载等特定用途的按需内容。
+
+**必要判断**
+
+- j1（显式）：比较向premium客户提供S3 signed cookies与CloudFront signed URLs的签发对象、访问范围及按需内容授权适配性。〔S, O1, O2〕
+- j2（显式）：区分OAC控制源站访问、field-level encryption与客户级内容授权，判断其能否单独满足premium客户限制。〔S, O3, O4〕
+
+**待官方核验**
+
+- 待查S3/CloudFront签名访问机制、OAC作用范围及field-level encryption能力和限制。
+
+### Q543
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：多个AWS账号各自计费；已购买Savings Plan但大量EC2下线，需将其折扣用于其他账号，选两步。
+
+**必要判断**
+
+- j1（显式）：比较在新payer account或已有EC2及Savings Plan账号创建Organizations并邀请其他账号，判断组织、管理账号及现有计划的衔接要求。〔S, O4, O5〕
+- j2（显式）：比较由management account或购买账号开启billing preferences discount sharing，以及使用AWS RAM共享Savings Plan，判断与组织步骤配套的跨账号折扣机制。〔S, O1, O2, O3, O4, O5〕
+
+**待官方核验**
+
+- 待查Savings Plans在Organizations合并账单中的共享范围、配置权限、现有计划归属及AWS RAM适用性。
+
+### Q544
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：公开REST API使用Regional API Gateway，custom domain与Route 53 alias关联；发布新版本需尽量减少客户影响及数据丢失。
+
+**必要判断**
+
+- j1（显式）：比较canary按比例导流、验证后提升production，与新endpoint/custom domain后切换Route 53 alias的发布过程和客户影响。〔S, O1, O4〕
+- j2（显式）：比较OpenAPI YAML以merge更新、OpenAPI JSON以overwrite更新并直接部署production，对现有API定义保留及数据丢失风险的影响，并与渐进发布方案比较。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查API Gateway canary部署/提升、OpenAPI import-to-update merge/overwrite语义及custom domain和DNS切换行为。
+
+### Q545
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：主网站DNS在Route 53且域名指向ALB；主站不可用时转至备用静态错误页，改动和基础设施开销最少。
+
+**必要判断**
+
+- j1（显式）：比较latency routing、active-passive failover、active-active配健康检查、multivalue answer，对仅在ALB故障时转备用页的路由语义。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较S3静态错误页与EC2托管错误页所需资源，并判断其与Route 53健康检查及主备端点的完整配置和改动量。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各Route 53策略的故障切换行为、ALB健康判断及S3静态网站备用端点配置要求。
+
+### Q546
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：需取消物理备份磁带以简化本地备份基础设施并降低成本，同时保留现有备份应用和工作流投资。
+
+**必要判断**
+
+- j1（显式）：比较Storage Gateway的NFS与iSCSI-VTL接口，以及EFS的NFS与iSCSI接口提议，对现有磁带备份应用/工作流兼容性、物理磁带替代及维护成本的适配性。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查Storage Gateway各接口和虚拟磁带工作流，以及EFS协议支持、备份应用集成和成本差异。
+
+### Q547
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：多地点传感器发送高容量流数据；AWS平台需可扩展、近实时采集与处理，并存入S3供未来报告，运维开销最少。
+
+**必要判断**
+
+- j1（显式）：比较Amazon Kinesis Data Firehose、AWS Glue、Lambda和AWS DMS的流数据接入、处理及S3交付链路，判断吞吐扩展、近实时性和运维负担。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各服务的流数据来源、处理/缓冲、S3目的地、扩展方式及所需配套资源。
+
+### Q548
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：财务、数据分析、开发部门分别使用独立AWS账号；因成本和安全需控制每账号可使用的服务，运维开销最少。
+
+**必要判断**
+
+- j1（显式）：比较Systems Manager templates、Organizations按部门OU附加SCP、CloudFormation仅部署允许服务、Service Catalog产品清单，对账号级服务使用限制的覆盖及管理负担。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查SCP的服务权限约束、OU继承，以及模板部署和Service Catalog对其他服务使用路径的控制边界。
+
+### Q549
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：电商多层应用的ALB和web层在public subnets，EC2 MySQL集群在private subnets；数据库需从第三方互联网服务取得商品目录和价格，最大化安全且不增加运维开销。
+
+**必要判断**
+
+- j1（显式）：比较NAT instance、公有子网NAT gateway配私有子网路由、internet gateway直连路由、virtual private gateway路由，对数据库出站访问、网络暴露及运维责任的适配性。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各网关的互联网出站条件、子网路由要求、入站暴露边界及自管/托管运维差异。
+
+### Q550
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Lambda环境变量由AWS KMS keys加密；需建立解密及使用变量的权限，选两步。
+
+**必要判断**
+
+- j1（显式）：判断KMS操作权限应如何关联Lambda execution role、resource policy或function policy，区分运行身份与函数资源授权。〔S, O1, O2, O3〕
+- j2（显式）：判断KMS key policy中允许execution role或Lambda resource policy的提议，与Lambda侧权限如何组合成完整解密授权链。〔S, O1, O2, O3, O4, O5〕
+
+**待官方核验**
+
+- 待查Lambda环境变量解密所需KMS操作、执行角色权限及key policy主体和授权关系。
+
+### Q551
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：金融报告平均50 KB，存S3；生成后首周频繁访问、保留数年，必须6小时内取回，成本最低。
+
+**必要判断**
+
+- j1（显式）：比较S3 Standard存储后7天转S3 Glacier、Standard-IA或Glacier Deep Archive，以及Intelligent-Tiering转Standard-IA/Glacier的提议，对访问阶段、取回时限和长期成本的适配性。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：核对50 KB小对象的生命周期转层资格、最小计费大小、最短存储期及监控/元数据费用，避免仅按容量单价比较。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各转层机制、7天转换限制、50 KB对象规则、归档取回等级与6小时约束及相关费用。
+
+### Q552
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：需优化EC2成本，同时每2–3个月变更instance type和family。
+
+**必要判断**
+
+- j1（显式）：比较3年Partial Upfront Reserved Instances、1年No Upfront Compute Savings Plan、1年All Upfront Reserved Instances、1年All Upfront EC2 Instance Savings Plan的类型/家族变更灵活性、期限及付款承诺。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各折扣计划的instance type/family适用范围、Reserved Instances类别及期限和付款方式对成本的影响。
+
+### Q553
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：需检查us-east-1和us-west-2的S3 buckets并发现PII，运维开销最少。
+
+**必要判断**
+
+- j1（显式）：比较各Region配置Macie分析job、全Region Security Hub加Config rule、Inspector及GuardDuty，对S3内容PII发现、Region覆盖及配置负担的适配性。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各安全服务的S3内容分类能力、Region作用域及跨Region配置/聚合方式。
+
+### Q554
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：本地SAP应用及其SQL Server数据库均迁至AWS；数据库负载要求高，性能数据显示应用和数据库都具有高内存利用率。
+
+**必要判断**
+
+- j1（显式）：依据两个层面的内存需求，比较application用compute optimized或HPC optimized配memory optimized数据库、两者均storage optimized、两者均memory optimized的实例家族组合。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各EC2实例家族的资源侧重及SAP应用、SQL Server工作负载适配条件。
+
+### Q555
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：VPC含公有及私有子网，并跨多个可用区。
+- c2〔S〕：应用EC2实例位于私有子网，并使用SQS队列。
+- c3〔S〕：要求安全建立EC2与SQS队列之间的连接。
+- c4〔O1〕：候选在私有子网配置SQS接口端点，端点安全组入站允许应用EC2流量。
+- c5〔O2〕：候选在公有子网配置SQS接口端点，并附加允许私有子网EC2访问的端点策略。
+- c6〔O3〕：候选在公有子网配置SQS接口端点，并向端点附加仅允许指定端点请求的SQS访问策略。
+- c7〔O4〕：候选组合SQS网关端点、私有子网内NAT网关及允许访问队列的EC2 IAM角色。
+
+**必要判断**
+
+- j1（显式）：如何判断SQS端点类型及其子网、可用区部署能否为私有子网EC2建立连接？〔S, O1, O2, O3, O4〕
+- j2（显式）：如何区分端点安全组、端点策略、SQS访问策略与EC2 IAM角色的控制层次及附加位置？〔S, O1, O2, O3, O4〕
+- j3（先修候选，待核验）：如何判断候选连接路径所需的路由、名称解析和NAT配置，与端点访问控制怎样衔接？〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- SQS支持哪些VPC端点类型，接口端点放在公有或私有子网时有哪些实际连通性和多可用区要求？
+- 各类安全组和策略应附加到哪些资源，端点来源限制、IAM授权、DNS及路由分别需要哪些配置？
+
+### Q556
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：CloudFormation部署三层应用，web/application层在EC2，DynamoDB数据库层不公开访问；application需存取用户数据，模板不得暴露API credentials。
+
+**必要判断**
+
+- j1（显式）：比较只读IAM role与含DynamoDB读写权限的role，并判断role、EC2 instance profile及application instances的关联是否完整满足存取需求。〔S, O1, O2〕
+- j2（显式）：比较模板参数输入既有IAM user的access/secret keys，与模板创建IAM user后以GetAtt取keys并经user data传递，对凭证暴露约束及运行授权的影响。〔S, O3, O4〕
+
+**待官方核验**
+
+- 待查EC2 role/profile授权和CloudFormation关联方式、DynamoDB读写权限，以及参数、GetAtt和user data传递长期凭证的限制。
+
+### Q557
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：大量半结构化分析数据存S3；需用并行处理加速，并使用Amazon Redshift数据库内的信息丰富数据。
+
+**必要判断**
+
+- j1（显式）：比较Athena、EMR和Glue对S3半结构化数据并行处理的适配性。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较Athena处理加Glue丰富、EMR同时处理和关联Redshift、EMR加Kinesis Data Streams将S3数据移入Redshift、Glue加Lake Formation丰富的完整数据链路与跨服务职责。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各处理引擎的S3/Redshift连接、数据关联方式、Kinesis Data Streams搬移链路及Lake Formation作用边界。
+
+### Q558
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：同账号us-west-2内两个VPC需互通，每月约500 GB传输，成本最低。
+
+**必要判断**
+
+- j1（显式）：比较Transit Gateway、VPC间Site-to-Site VPN、VPC peering及标为1 GB的Direct Connect连接，并覆盖双方路由表配置、连接可行性和500 GB/月下的总成本。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各连接方式对同Region双VPC的拓扑支持、路由条件、固定费用及数据处理/传输计费。
+
+**源异常／歧义**
+
+- O4将Direct Connect连接规格写为1 GB，未明确是否指带宽及其时间单位。
+
+### Q559
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：多产品线应用使用EC2、ALB等资源，跨同一Organizations的多个账号和Region；各团队已打标签，需在合并账单中细分产品线成本，选两步。
+
+**必要判断**
+
+- j1（显式）：区分AWS generated与user-defined tags，并比较在Billing console或Resource Groups console选择标签，对产品线成本归集的适配性。〔S, O1, O2, O3〕
+- j2（显式）：判断所选标签应由各成员账号还是Organizations management account激活，并与标签选择步骤组成跨账号成本分配流程。〔S, O1, O2, O3, O4, O5〕
+
+**待官方核验**
+
+- 待查cost allocation tags的类型、启用入口、管理账号权限及跨账号/Region账单适用范围。
+
+### Q560
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Organizations多账号已按OU组织；需识别OU hierarchy的任何变化并通知运维团队，运维开销最少。
+
+**必要判断**
+
+- j1（显式）：比较Control Tower建账号配account drift notifications或Config aggregated rules、Service Catalog建账号配CloudTrail organization trail、CloudFormation建账号配stack drift detection，对OU层级变化的检测范围及引入开销。〔S, O1, O2, O3, O4〕
+- j2（显式）：判断各检测方案如何触发运维通知，区分直接漂移通知与还需配置日志分析、规则或通知链路的方案。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各漂移/审计机制对OU层级变更的覆盖、检测触发方式、通知能力及既有组织接入要求。
+
+### Q561
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：网站每天数百万请求且持续增长；需降低从DynamoDB读取商品详情的延迟以改善响应时间，运维开销最少。
+
+**必要判断**
+
+- j1（显式）：比较全部读请求经DAX、ElastiCache for Redis或Memcached的缓存集成方式与维护负担。〔S, O1, O2, O3〕
+- j2（显式）：比较DynamoDB Streams配Lambda读取表并填充ElastiCache后转发全部读请求，与直接缓存方案的数据流和新增运维环节。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查DAX和ElastiCache的DynamoDB客户端集成、读缓存行为，以及Streams/Lambda填充缓存所需逻辑与资源。
+
+### Q562
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：调用从VPC内的EC2实例发往DynamoDB。
+- c2〔S〕：调用流量不得经过互联网，要求选择两个步骤。
+- c3〔O1〕：候选创建指向端点的路由表条目。
+- c4〔O2〕：候选创建DynamoDB网关端点。
+- c5〔O3〕：候选创建EC2接口端点。
+- c6〔O4〕：候选在VPC每个子网为端点创建弹性网卡。
+- c7〔O5〕：候选在端点安全组添加访问规则。
+
+**必要判断**
+
+- j1（显式）：如何判断端点的服务目标及类型是否与EC2调用DynamoDB且不经过互联网的要求匹配？〔S, O2, O3〕
+- j2（显式）：如何判断端点需要怎样的路由表配置，才能让实例调用进入预期路径？〔S, O1, O2, O3〕
+- j3（显式）：如何区分网关端点与接口端点对网卡、子网及安全组配置的要求，并确定两个步骤的组合？〔S, O1, O2, O3, O4, O5〕
+
+**待官方核验**
+
+- DynamoDB端点支持哪些类型和流量路径，其路由表关联及路由条目的管理方式是什么？
+- 不同端点类型是否需要网卡、安全组及逐子网配置，EC2接口端点所访问的服务范围是什么？
+
+### Q563
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：应用同时运行于Amazon EKS和本地Kubernetes集群；需集中查看所有集群及workloads，运维开销最少。
+
+**必要判断**
+
+- j1（显式）：比较CloudWatch Container Insights收集分组、EKS Connector注册连接、Systems Manager收集查看、EKS Anywhere作为主集群用原生Kubernetes命令查看其他集群，对混合集群及workloads集中可见性的覆盖和管理负担。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各服务的本地/EKS集群接入条件、中央视图范围、workload可见性及安装维护要求。
+
+### Q564
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：电商应用需保存敏感客户信息并支持网站购买交易；敏感数据即使面对数据库管理员也必须受保护。
+
+**必要判断**
+
+- j1（显式）：比较EBS、RDS for MySQL、S3、FSx for Windows Server作为敏感交易数据存储的适配性及应用访问方式。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较EBS encryption加IAM instance role、RDS配KMS client-side encryption、S3 KMS server-side encryption加bucket policy、FSx挂载加Windows权限，对数据库管理员可见明文的保护边界。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查客户端/服务端/卷加密的解密位置、密钥权限与管理员访问边界，以及各存储对交易应用的支持。
+
+### Q565
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：本地MySQL事务数据库迁AWS后，须保持现有应用兼容，并在需求增加时自动扩展。
+
+**必要判断**
+
+- j1（显式）：比较native MySQL tools迁RDS for MySQL、mysqldump迁Redshift、DMS迁Aurora或DynamoDB的迁移可行性及事务应用兼容性。〔S, O1, O2, O3, O4〕
+- j2（显式）：区分RDS elastic storage scaling、Redshift Auto Scaling、Aurora Auto Scaling、DynamoDB Auto Scaling policy的扩展对象及其与需求增长的匹配。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查迁移工具与目标引擎支持、MySQL兼容及事务语义，并核对各Auto Scaling机制的扩展维度与限制。
+
+**源异常／歧义**
+
+- 题干未明确自动扩展指计算、读副本、存储还是读写吞吐，影响不同扩展机制的比较。
+
+### Q566
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：同一VPC内多个Linux EC2跨两个AZ；应用使用层级目录，需快速、并发读写共享存储。
+
+**必要判断**
+
+- j1（显式）：比较S3 bucket授权所有实例、各实例挂载EFS、io2 EBS文件系统附加所有实例、每实例独立EBS并同步，对层级文件语义、跨AZ共享和并发读写的适配性。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各存储的文件接口、跨AZ访问、EBS多实例附加限制及独立卷同步的并发一致性条件。
+
+### Q567
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：传感器经HTTP向数据库提交数据，累计楼内各商业租户每小时能耗；尽量使用托管服务，未来以独立组件增加功能，运维开销最少。
+
+**必要判断**
+
+- j1（显式）：比较API Gateway/Lambda接收处理后存DynamoDB或EC2 SQL Server Express，与ELB/EC2 Auto Scaling接收处理后存S3或EFS，对HTTP接入、租户用量累计和数据存储的完整适配性。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较上述端到端组合的托管程度、独立组件扩展能力与持续运维负担。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各组合的HTTP集成、数据累计支持、组件扩展方式及EC2数据库/服务维护责任。
+
+### Q568
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：工程图纸web应用所有组件部署在AWS；需存储petabytes数据并通过缓存缩短用户等待加载时间。
+
+**必要判断**
+
+- j1（显式）：比较S3、S3 Glacier、EBS volumes和Storage Gateway的容量扩展、图纸在线读取及部署适配性。〔S, O1, O2, O3, O4〕
+- j2（显式）：判断S3+CloudFront、S3 Glacier+ElastiCache、EBS+CloudFront、Storage Gateway+ElastiCache的存储到缓存衔接及降低图纸加载等待的能力。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各存储的访问/容量限制、CloudFront源站支持及ElastiCache缓存图纸所需的应用集成。
+
+### Q569
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：EventBridge规则目标为第三方API
+- c2〔S〕：第三方API未收到任何入站流量
+- c3〔S〕：需同时判断规则条件是否满足及目标是否被调用
+- c4〔O1〕：O1查看CloudWatch中AWS/Events命名空间的指标
+- c5〔O2〕：O2查看SQS死信队列中的事件
+- c6〔O3〕：O3查看CloudWatch Logs中的事件
+- c7〔O4〕：O4查看CloudTrail中的EventBridge事件记录
+
+**必要判断**
+
+- j1（显式）：如何分别观察规则匹配与目标调用，避免仅凭第三方API无流量推断故障环节？〔S, O1〕
+- j2（显式）：如何判断指标、死信队列、日志及审计记录分别能提供哪些规则匹配和目标调用证据？〔S, O1, O2, O3, O4〕
+- j3（先修候选，待核验）：如何区分未匹配、已尝试调用、调用失败与目标成功接收，并检查观测配置前提？〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- AWS/Events下哪些指标及维度表示规则匹配、目标调用和失败，其统计口径及可见条件是什么？
+- EventBridge的死信队列、CloudWatch Logs及CloudTrail各自记录什么，是否需额外配置，能否覆盖未匹配及目标调用各阶段？
+
+### Q570
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：EC2位于us-east-1两个AZ；通常最多两台，每周五晚固定大负载时需扩至六台，运维开销最少。
+
+**必要判断**
+
+- j1（显式）：比较EventBridge reminder、Auto Scaling scheduled action、manual scaling及automatic scaling，对每周固定时间从通常最多两台扩至六台的容量控制及操作负担。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查Auto Scaling定时动作的重复计划、容量参数与跨AZ部署，以及提醒、手动和自动伸缩的执行机制差异。
+
+### Q571
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：需创建REST API；API endpoints强制TLSv1.3，且TLS证书必须由指定公共第三方CA签名。
+
+**必要判断**
+
+- j1（显式）：比较API Gateway HTTP API custom domain与Lambda function URL，对TLSv1.3及指定第三方证书配置的支持。〔S, O1, O2, O3, O4〕
+- j2（显式）：区分本地取得第三方CA签名证书后导入ACM，与在ACM创建第三方CA签名证书及再次导入的提议，并判断证书签发、导入和端点绑定的完整流程。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查两类端点的TLS版本策略、自定义证书能力，以及ACM第三方证书签发/导入与绑定限制。
+
+### Q572
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：AWS应用负载不稳定，经Direct Connect访问本地MySQL-compatible数据库；数据库持续至少使用2 GiB内存。
+- c2〔S〕：迁至托管AWS服务，需自动扩展应对突增且管理开销最少。
+
+**必要判断**
+
+- j1（显式）：比较默认读写容量DynamoDB、最低1 ACU的Aurora、最低1 ACU的Aurora Serverless v2、2 GiB内存RDS for MySQL，对MySQL兼容及托管目标的适配性。〔S, O1, O2, O3, O4〕
+- j2（显式）：判断各选项的自动扩展维度与配置，核对1 ACU和2 GiB内存需求的对应关系，以及突增响应和管理负担。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查Aurora与Serverless v2的容量配置、ACU资源含义、RDS/DynamoDB扩展方式及MySQL兼容限制。
+
+### Q573
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：使用Lambda事件驱动模型，函数运行Java 11。
+- c2〔S〕：应用没有严格延迟要求。
+- c3〔S〕：要求减少扩容时的冷启动及异常高延迟。
+- c4〔S〕：目标是最具成本效益。
+- c5〔O1〕：候选配置预置并发。
+- c6〔O2〕：候选增加函数超时时间。
+- c7〔O3〕：候选增加函数内存。
+- c8〔O4〕：候选配置SnapStart。
+
+**必要判断**
+
+- j1（显式）：如何判断预置并发与SnapStart在Java 11函数扩容时对启动及尾部延迟的适用性？〔S, O1, O4〕
+- j2（显式）：如何区分增加超时和内存对初始化耗时、执行耗时及冷启动问题的影响？〔S, O2, O3〕
+- j3（显式）：在没有严格延迟要求的前提下，如何比较各方案减少冷启动的成本效益？〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- Java 11函数使用预置并发或SnapStart有哪些运行时、发布和兼容限制，分别如何影响扩容启动延迟？
+- 各候选配置的计费方式及对初始化、执行和超时行为的影响是什么？
+
+### Q574
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：跟踪股市趋势的应用当前使用RDS for MySQL，每周末仅运行2小时，需最低数据库运行成本。
+
+**必要判断**
+
+- j1（显式）：比较迁至Aurora Serverless v2 MySQL、Aurora MySQL、EC2自建MySQL并购买instance reservation、ECS MySQL容器tasks的兼容性和每周2小时运行模式下总成本。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：核对各方案空闲时容量/计费、启停或暂停条件、数据持久化与预留承诺，避免仅比较活跃2小时的费用。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各方案活跃与空闲计费、容量下限、暂停/启动及持久存储要求，并核对EC2预留费用。
+
+### Q575
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：应用部署于单Region内ALB后的EKS；数据库须使用PostgreSQL engine、数据高可用并增加读取容量，运维效率最高。
+
+**必要判断**
+
+- j1（显式）：判断DynamoDB global tables与PostgreSQL engine要求的匹配，并比较RDS Multi-AZ deployments、Multi-AZ DB cluster、cross-Region read replicas的部署范围。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较各RDS方案的可读节点/端点、高可用恢复及副本管理，判断整个方案能否同时满足读取扩容与运维效率目标。〔S, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查PostgreSQL各RDS部署的standby可读性、故障切换、跨Region副本和维护差异，以及引擎兼容边界。
+
+### Q576
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：RESTful serverless web应用使用API Gateway和Lambda；用户地理分散，需降低API请求延迟。
+
+**必要判断**
+
+- j1（显式）：比较Private endpoint、Regional endpoint、Interface VPC endpoint及Edge-optimized endpoint的访问路径、API Gateway适用性及分布式用户延迟表现。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各endpoint类型的网络可达范围、边缘接入机制，以及Interface VPC endpoint与API endpoint类型的关系。
+
+### Q577
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：网站内容页由CloudFront分发；客户访问需使用TLS证书，并自动创建和续期证书，运维效率最高。
+
+**必要判断**
+
+- j1（显式）：区分CloudFront security policy、OAC与ACM在证书创建及网站TLS接入中的职责，判断配置链路是否完整。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较ACM DNS validation与email validation对首次签发、自动续期及持续人工操作的要求。〔S, O3, O4〕
+
+**待官方核验**
+
+- 待查CloudFront证书接入要求、security policy/OAC作用，以及ACM两种验证方式的自动续期条件。
+
+### Q578
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：serverless应用以DynamoDB为数据库，用户大增；需缓存数据库请求并将响应从毫秒降至微秒，运维开销最少。
+
+**必要判断**
+
+- j1（显式）：比较DAX、ElastiCache for Redis及迁移至Redshift或RDS，对DynamoDB请求缓存、微秒级响应目标、应用改造和运维负担的适配性。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查DAX/Redis的DynamoDB缓存集成与延迟适用条件，以及Redshift/RDS迁移方案对请求语义和缓存目标的影响。
+
+### Q579
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：应用使用Amazon RDS for PostgreSQL，仅工作日营业时间有流量；需优化成本并减少运维。
+
+**必要判断**
+
+- j1（显式）：比较Instance Scheduler on AWS定时启停、关闭自动备份并每周手动快照、自定义AWS Lambda按最低CPU利用率启停、All Upfront Reserved DB Instances对使用时段、成本与运维目标的适配性。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查RDS for PostgreSQL启停及调度限制、备份调整影响、预留计费方式与各方案维护需求。
+
+### Q580
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：本地应用使用直连存储且对延迟敏感；以lift and shift迁至AWS，不改变架构，要求最具成本效益。
+
+**必要判断**
+
+- j1（显式）：比较EC2搭配EBS GP2或GP3，与EC2 Auto Scaling group搭配FSx for Lustre或FSx for OpenZFS，在存储访问方式、延迟、架构改动及总体成本上的差异。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各存储类型的接口、延迟与性能计费，以及Auto Scaling部署对原架构和成本的影响。
+
+### Q581
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：应用为运行于EC2的有状态生产应用
+- c2〔S〕：任何时候必须至少有两个EC2实例运行
+- c3〔S〕：要求高可用和容错，且已创建Auto Scaling组
+- c4〔O1〕：O1最小容量2，两个AZ各部署1个按需实例
+- c5〔O2〕：O2最小容量4，两个AZ各部署2个按需实例
+- c6〔O3〕：O3最小容量2，在同一AZ部署4个Spot实例
+- c7〔O4〕：O4最小容量4，一个AZ部署2个按需实例，另一个AZ部署2个Spot实例
+
+**必要判断**
+
+- j1（显式）：如何按AZ故障后的剩余实例数量，判断各容量与分布方案能否持续满足至少两个运行实例？〔S, O1, O2, O3, O4〕
+- j2（显式）：如何区分Auto Scaling最小容量、实际部署数量与故障后恢复过程对连续运行要求的影响？〔S, O1, O2, O3, O4〕
+- j3（显式）：如何判断按需与Spot实例组合的中断风险能否满足生产应用的高可用及容错目标？〔S, O1, O2, O3, O4〕
+- j4（先修候选，待核验）：有状态应用在跨AZ运行及实例替换时，需要哪些状态保存和恢复条件才能维持可用？〔S〕
+
+**待官方核验**
+
+- Auto Scaling最小容量、跨AZ分布及故障替换的语义是什么，对持续可用实例数有哪些边界？
+- 按需和Spot实例的中断及容量保障规则是什么，有状态工作负载替换和跨AZ运行需要怎样管理状态？
+
+**源异常／歧义**
+
+- 题干未明确容错需覆盖的故障范围，也未说明有状态数据的存放与恢复方式，不能仅由实例数量补全这些条件。
+
+### Q582
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Route 53管理DNS；网站同时位于靠近us-west-1的本地数据中心和eu-central-1，需尽量缩短加载时间。
+
+**必要判断**
+
+- j1（显式）：比较geolocation按地理位置分流、simple按邻近位置分流的提议、latency关联us-west-1及weighted均分两个站点，对最低加载时间目标的适配性；判断混合站点的记录与Region关联要求。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查四类Route 53策略的决策依据、本地端点的latency记录配置，以及O3仅说明关联us-west-1时的配置完整性。
+
+### Q583
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：物理磁带含5 PB归档数据，合规要求再保存10年；需6个月内迁至AWS，本地互联网上行为1 Gbps，要求最具成本效益。
+
+**必要判断**
+
+- j1（先修候选，待核验）：评估5 PB经1 Gbps上行在6个月内迁移的可行性，并纳入磁带读取、暂存、设备周转与长期存储成本。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较本地读带→NFS→DataSync→S3 Glacier Flexible Retrieval、备份软件直写S3 Glacier Deep Archive、多台带Tape Gateway的Snowball→虚拟磁带→寄送→生命周期转Deep Archive、本地Tape Gateway经备份软件写云端虚拟磁带的完整链路。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各链路的磁带接入、传输吞吐、Snowball与Tape Gateway组合及生命周期支持、10年归档计费与保留要求。
+
+### Q584
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：EC2工作负载并行处理大量数据；网络架构须可配置，使不同节点组不共享底层硬件。
+
+**必要判断**
+
+- j1（显式）：比较spread placement group、分AWS账户、dedicated tenancy与shared tenancy，对节点组底层硬件隔离的控制粒度和适用范围。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各方案对实例、节点组及底层硬件的隔离保证与部署限制。
+
+**源异常／歧义**
+
+- 题干未定义节点组及底层硬件的隔离粒度，需区分组间隔离与单实例分散。
+
+### Q585
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：DR策略须在故障转移AWS Region满足所需Amazon EC2容量。
+
+**必要判断**
+
+- j1（显式）：比较故障转移Region内On-Demand Instances、EC2 Savings Plan、regional Reserved Instances与Capacity Reservation，区分容量保障、购买承诺与计费优惠。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查四种购买或预留方式的容量保证、Region/AZ作用范围及使用条件。
+
+### Q586
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：AWS Organizations现有5个OU对应5项业务；R&D分拆后需独立organization，已创建新的独立management account，需确定其下一步操作。
+
+**必要判断**
+
+- j1（显式）：判断现有R&D账户迁移的组织成员资格与顺序，比较同时加入两个organization、退出旧组织后邀请、创建新账户并迁资源，以及迁入R&D账户同时让新management account加入旧组织。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查账户退出与接受邀请的前提、单账户组织成员限制、management account角色限制及跨账户资源迁移需求。
+
+### Q587
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：采集不同Web应用的客户活动供分析和预测；流量不可预测且可能突增，需与其他Web应用集成并包含授权步骤。
+
+**必要判断**
+
+- j1（显式）：比较GWLB→ECS container instance→EFS、API Gateway→Kinesis Data Streams→S3、API Gateway→Kinesis Data Firehose→S3的接入、突发承载与数据落地衔接。〔S, O1, O2, O3, O4〕
+- j2（显式）：区分GWLB直接授权、普通Lambda处理授权及API Gateway Lambda authorizer的调用位置、集成方式和完整性。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各入口与后端的支持关系、Streams或Firehose写入S3所需环节，以及三种授权提议的能力与扩展限制。
+
+### Q588
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：为运行Microsoft SQL Server Enterprise Edition的Amazon RDS DB instances设计DR；RPO与RTO均为24小时，要求最具成本效益。
+
+**必要判断**
+
+- j1（显式）：比较跨Region只读副本并提升、AWS DMS跨Region复制、每24小时跨Region复制原生备份到S3、每24小时复制自动快照，在引擎支持、恢复流程、RPO/RTO及成本上的差异。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查该RDS引擎与版本的副本、DMS、原生备份和自动快照跨Region能力，以及备份频率、传输和恢复时间对24小时目标的影响。
+
+### Q589
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Web应用运行于EC2 Auto Scaling group，前置ALB且启用sticky sessions；当前会话状态在Web服务器，要求高可用并避免服务器故障导致会话丢失。
+
+**必要判断**
+
+- j1（显式）：比较将应用会话迁至ElastiCache for Memcached单实例、ElastiCache for Redis、Storage Gateway cached volume或Amazon RDS的适用性，判断状态外置、故障存续与高可用配置需求。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各后端的会话访问方式、复制与恢复能力，以及选项给定部署是否足以满足会话保留和高可用。
+
+### Q590
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：MySQL已从本地迁至RDS for MySQL，实例按平均日常负载定容；每月报表查询导致数据库变慢，需运行报表同时保持日常负载性能。
+
+**必要判断**
+
+- j1（显式）：比较将报表查询导向只读副本、备份恢复的新DB实例、S3导出后用Athena查询，以及扩大原DB实例；评估报表隔离、数据同步或刷新与日常性能影响。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查四种方案的数据获取与查询流程、主库负载影响、数据时效和所需应用改动。
+
+### Q591
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Amazon EKS容器应用包含客户管理及下单微服务；需将入站请求路由到对应微服务，要求最具成本效益。
+
+**必要判断**
+
+- j1（显式）：比较AWS Load Balancer Controller配置NLB或ALB、Lambda连接EKS、API Gateway连接EKS的微服务请求路由能力、集成链路与成本。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各方案的路由层级、匹配规则、EKS目标集成、所需额外组件及计费差异。
+
+### Q592
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：公司出售受版权保护图片的访问权
+- c2〔S〕：全球客户需快速访问图片
+- c3〔S〕：必须拒绝来自指定国家的用户访问
+- c4〔S〕：需尽可能降低成本
+- c5〔O1〕：O1采用S3存储、MFA及公开桶访问，并向客户提供桶链接
+- c6〔O2〕：O2采用S3，为每个客户创建IAM用户并加入获准访问的组
+- c7〔O3〕：O3在服务国家部署ALB后的EC2存图，并提供各国ALB链接
+- c8〔O4〕：O4采用S3存储、CloudFront地理限制及每客户签名URL
+
+**必要判断**
+
+- j1（显式）：如何区分付费客户访问授权、MFA、公开访问、IAM身份及签名URL的访问控制边界？〔S, O1, O2, O4〕
+- j2（显式）：如何判断地理限制与仅在特定国家部署资源能否实现按访问者国家拒绝访问？〔S, O3, O4〕
+- j3（显式）：如何同时比较全球图片访问速度、存储分发架构和客户访问管理成本？〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- S3公开访问、MFA及IAM用户组分别控制哪些访问操作，CloudFront签名URL与源站访问控制需要怎样衔接？
+- CloudFront地理限制与签名URL如何共同生效，资源部署国家与访问者国家限制有何区别，各架构的主要成本和全球分发边界是什么？
+
+### Q593
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：设计高可用ElastiCache for Redis；本地及AWS Region内故障不得造成性能下降或数据丢失，并要求节点级与Region级高可用。
+
+**必要判断**
+
+- j1（显式）：比较Multi-AZ replication groups且每shard多节点、多节点shards启用AOF、Multi-AZ cluster且replication group有多于1个read replica、多节点shards启用Auto Scaling，对故障隔离、数据保留与故障后性能的作用。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查Redis拓扑、shards与replicas关系、Multi-AZ故障转移、AOF支持及Auto Scaling边界，并区分节点、AZ和整个Region故障的保障范围。
+
+**源异常／歧义**
+
+- Region内故障与Region级高可用的表述范围不明，未说明是否要求承受整个Region失效。
+
+### Q594
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：迁移应用计划使用EC2 On-Demand Instances；测试发现启动及加载内存至可用状态耗时长，需缩短下一阶段测试的应用启动时间。
+
+**必要判断**
+
+- j1（显式）：比较至少2台On-Demand并启用Auto Scaling、Spot扩容、On-Demand启用hibernation并配置Auto Scaling warm pools、On-Demand配Capacity Reservations并启动额外实例，对应用初始化及内存加载耗时的改善路径。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查hibernation与warm pools的组合、状态恢复和限制，以及增加实例、Spot或容量预留对启动过程的作用。
+
+### Q595
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：应用运行于EC2 Auto Scaling groups；一周内随机日期发生流量突增，需维持性能并达到最高成本效益。
+
+**必要判断**
+
+- j1（显式）：比较manual、predictive、dynamic与scheduled scaling应对随机突发的触发依据、响应方式、容量利用与成本。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各扩缩策略对可预测模式、实时指标、预设时间及人工介入的依赖与响应限制。
+
+### Q596
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：电商PostgreSQL运行于EC2；每月促销使用量上升并出现数据库连接问题，后续促销流量不可预测且影响销售预测；需维持性能并最具成本效益地解决问题。
+
+**必要判断**
+
+- j1（显式）：比较迁至Aurora Serverless v2、对EC2上的PostgreSQL启用auto scaling、迁至更大规格RDS for PostgreSQL、迁至Redshift，对不可预测数据库负载、连接问题、应用兼容性与成本的适配。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各方案的PostgreSQL工作负载支持、容量与连接扩展机制、迁移要求及突发和低负载计费差异。
+
+### Q597
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：内部serverless应用使用API Gateway与Lambda；员工每天开始使用时延迟高，需降低延迟。
+
+**必要判断**
+
+- j1（先修候选，待核验）：区分每日首次使用时的初始化、限流与执行资源因素，确定各提议针对的延迟来源。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较提高API Gateway throttling limit、上班前scheduled scaling增加Lambda provisioned concurrency、每日开始时以CloudWatch alarm触发Lambda、增加Lambda内存的时机与效果边界。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各方案对初始化与执行延迟的作用、预置并发调度条件，以及CloudWatch alarm按日触发提议的配置要求。
+
+### Q598
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：本地设备生成.csv并支持写入SMB文件共享；在AWS分析，分析师需全天周期性用SQL查询，要求最具成本效益，选择3项组成方案。
+
+**必要判断**
+
+- j1（显式）：比较本地Storage Gateway的S3 File Gateway与FSx File Gateway模式，判断SMB接入、数据目标及与后续S3分析链路的衔接。〔S, O1, O2〕
+- j2（显式）：判断Glue crawler基于S3数据建表的角色，比较EMR cluster配EMRFS、Redshift cluster与Athena的SQL查询及分析师访问方式，并组合3项满足周期性查询与成本目标。〔S, O3, O4, O5, O6〕
+
+**待官方核验**
+
+- 待查两种Gateway的SMB及后端支持、Glue目录衔接，以及EMR、Redshift、Athena查询S3 .csv的配置与周期性使用成本。
+
+### Q599
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：支付处理应用拟使用 ECS 集群和 RDS 数据库实例。
+- c2〔S〕：因合规要求，应用运行在公司本地数据中心。
+- c3〔S〕：方案拟采用 Outposts。
+- c4〔S〕：要求识别公司运维团队负责的三项活动。
+- c5〔O1〕：候选责任包括为机架提供有韧性的供电和网络连接。
+- c6〔O2〕：候选责任包括管理虚拟化管理程序、存储系统及机架上运行的 AWS 服务。
+- c7〔O3〕：候选责任包括数据中心环境的物理安全与访问控制。
+- c8〔O4〕：候选责任包括机架内部电源、服务器及网络设备等基础设施的可用性。
+- c9〔O5〕：候选责任包括 Outposts 组件的物理维护。
+- c10〔O6〕：候选责任包括为 ECS 集群提供额外容量以应对服务器故障和维护事件。
+
+**必要判断**
+
+- j1（显式）：如何判断本地部署 Outposts 时，场地供电、网络、物理安全与机架内部基础设施的责任边界？〔S, O1, O3, O4〕
+- j2（显式）：如何区分虚拟化、存储、托管服务管理与组件物理维护分别由谁负责？〔S, O2, O5〕
+- j3（显式）：如何判断应对 ECS 服务器故障和维护所需的额外容量由谁规划和提供？〔S, O6〕
+
+**待官方核验**
+
+- Outposts 的责任划分如何分别覆盖客户场地保障、机架内部可用性、组件维护及软件服务管理？
+- 在 Outposts 上运行 ECS 时，故障与维护期间的应用容量保障有哪些客户责任及服务边界？
+
+### Q600
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：将基于TCP的应用迁入公司VPC
+- c2〔S〕：现有入口通过本地硬件设备在非标准TCP端口公开访问
+- c3〔S〕：新AWS公网入口需保持低延迟及最高每秒300万请求的同等性能
+- c4〔O1〕：NLB方案在应用所需TCP端口提供公网访问
+- c5〔O2〕：ALB方案提出在应用所需TCP端口提供公网访问
+- c6〔O3〕：CloudFront方案提出监听所需TCP端口，并以ALB为源站
+- c7〔O4〕：API Gateway方案提出配置所需TCP端口，并由预置并发Lambda处理请求
+
+**必要判断**
+
+- j1（显式）：如何判断各入口方案对原始TCP、非标准端口及公网访问的协议和端口适配性？〔S, O1, O2, O3, O4〕
+- j2（显式）：如何评估各方案及其组合能否承载每秒最高300万请求并保持低延迟？〔S, O1, O2, O3, O4〕
+- j3（先修候选，待核验）：如何把TCP应用的请求速率要求转换为连接、流量和后端处理容量的验证指标？〔S〕
+
+**待官方核验**
+
+- NLB、ALB、CloudFront及API Gateway分别支持哪些监听协议和端口，选项中的转发链路有哪些限制？
+- 这些入口及Lambda预置并发的吞吐、扩展、配额和延迟边界是什么，应以哪些指标验证所述TCP负载？
+
+### Q601
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：关键数据库从RDS for PostgreSQL迁至Aurora PostgreSQL；需尽量减少停机和数据丢失，并使运维开销最低。
+
+**必要判断**
+
+- j1（显式）：比较RDS快照填充Aurora cluster、创建Aurora read replica后提升、从S3导入、pg_dump备份后恢复的迁移链路，评估增量同步、切换、停机、数据丢失与运维差异。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查RDS PostgreSQL至Aurora PostgreSQL各迁移方式的兼容条件、复制与提升流程、导入恢复限制及切换要求。
+
+### Q602
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：基础设施含数百台使用EBS存储的EC2；灾后必须可恢复每台实例，要求投入最少。
+
+**必要判断**
+
+- j1（显式）：比较EBS快照配CloudFormation重建、快照配Elastic Beanstalk环境及卷挂载、AWS Backup统一计划配API/CLI批量恢复、自定义两组Lambda执行快照/AMI复制及恢复挂卷的完整性、规模化恢复与维护投入。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各链路保留和恢复EC2配置与EBS数据的范围、批量恢复能力，以及模板、AMI复制和卷关联所需步骤。
+
+### Q603
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：S3保存由日志、媒体、销售交易及IoT传感器数据组成的半结构化数据集；需serverless、大规模按需并行处理数千项，要求运维效率最高。
+
+**必要判断**
+
+- j1（显式）：比较Step Functions Map的Inline与Distributed模式、AWS Glue、多个Lambda函数，在S3数据集接入、数千项并行、任务协调及运维效率上的差异。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查Map两种模式的并发、输入与执行限制，以及Glue和多Lambda方案达到目标规模所需的编排与管理。
+
+### Q604
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：一次性将10 PB数据在6周内迁至S3；数据中心互联网总上行500 Mbps且与其他应用共享，此任务最多可用80%。
+
+**必要判断**
+
+- j1（先修候选，待核验）：依据10 PB、6周及500 Mbps的80%带宽预算，评估在线迁移时间下限与多设备离线搬迁所需周转。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较DataSync迁移并自动校验、rsync直传S3、AWS CLI多进程复制、多台Snowball拷贝后寄送导入S3的传输路径和期限适配；自动校验仅属O1提议。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各工具的S3接入与吞吐边界，以及Snowball容量、并行设备、拷贝、运输和导入时间条件。
+
+### Q605
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：本地有多台iSCSI网络存储服务器；迁云以减少服务器数量和依赖，频繁访问数据须低延迟，基础设施改动最少。
+
+**必要判断**
+
+- j1（显式）：比较S3 File Gateway、EBS配S3备份、Storage Gateway volume gateway的stored volumes与cached volumes，判断协议衔接、主数据与本地缓存位置、热数据延迟及本地容量依赖。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各方案的iSCSI或文件接口、本地存储需求、读写数据路径及迁移改动。
+
+### Q606
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：业务用户向S3上传对象；要求最大化持久性，任意时刻及任意时长均可随时访问；前30天频繁访问，之后访问概率显著降低，要求最具成本效益。
+
+**必要判断**
+
+- j1（显式）：比较S3 Standard在30天后生命周期转S3 Glacier、Standard-IA或One Zone-IA，以及Intelligent-Tiering在30天后转Standard-IA；评估即时访问、持久性、存储与读取费用的整体适配。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查相关存储类别的持久性与AZ范围、取回方式、最短存储及计费限制、生命周期转换支持；澄清O1中S3 Glacier所指类别。
+
+**源异常／歧义**
+
+- O1仅写S3 Glacier，未细分具体归档存储类别。
+
+### Q607
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：两层应用已迁AWS；数据层为Multi-AZ RDS for Oracle，使用12 TB General Purpose SSD EBS；文档以blob存库，平均6 MB，增长造成性能下降和存储成本上升；需改善数据库性能、高可用且有韧性，并最具成本效益。
+
+**必要判断**
+
+- j1（显式）：比较缩小DB实例并扩至24 TiB Magnetic、增大DB实例并扩至24 Ti且转Provisioned IOPS、文档移S3而元数据留原库、用DMS将Oracle迁至DynamoDB的性能、成本、可用性及迁移适配。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查RDS存储调整限制、S3文档与数据库元数据衔接，以及DynamoDB条目大小、blob表示和DMS目标迁移限制。
+
+**源异常／歧义**
+
+- O2容量写为24 Ti并与后句粘连，单位或文本残缺。
+
+### Q608
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：全球超过20,000家门店经公网访问EC2后端服务，入口为ALB，协议HTTPS、端口443；各门店登记本地ISP分配的IP，需仅允许这些已登记IP访问应用端点。
+
+**必要判断**
+
+- j1（显式）：比较ALB关联WAF web ACL并维护IP规则、Firewall Manager管理防火墙规则、DynamoDB存IP并由ALB上Lambda授权函数校验、ALB公网接口所在子网NACL逐IP入站规则；评估执行位置、白名单维护及规模限制。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查ALB相关WAF、Firewall Manager、Lambda授权集成能力，以及IP集合、NACL规则配额和超过20,000门店的更新管理。
+
+**源异常／歧义**
+
+- O2中AL与后续句子粘连，管理对象及规则作用对象名称残缺。
+
+### Q609
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：数据分析平台使用Lake Formation。
+- c2〔S〕：平台摄取来自S3、RDS等不同来源的数据。
+- c3〔S〕：需要阻止访问包含敏感信息的部分数据。
+- c4〔S〕：目标是最低运维开销。
+- c5〔O1〕：候选创建具有Lake Formation表访问权限的IAM角色。
+- c6〔O2〕：候选使用数据过滤器实现行级和单元格级安全。
+- c7〔O3〕：候选用Lambda在数据摄取前删除敏感信息。
+- c8〔O4〕：候选用Lambda定期查询并删除Lake Formation表中的敏感信息。
+
+**必要判断**
+
+- j1（显式）：如何判断表访问角色与行级、单元格级过滤能否满足部分敏感数据的访问隔离要求？〔S, O1, O2〕
+- j2（显式）：如何区分访问过滤、摄取前删除和定期删除对数据可用性及敏感信息暴露时段的影响？〔S, O2, O3, O4〕
+- j3（显式）：如何比较多来源数据下托管权限过滤与自定义清理逻辑的配置及维护开销？〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- Lake Formation数据过滤器支持哪些行级、列级或单元格级控制，适用的表、查询引擎及权限前提是什么？
+- 摄取前或摄取后通过Lambda清理数据需要哪些底层数据修改及流程集成，能否满足持续访问限制？
+
+### Q610
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：VPC内EC2向S3装载源数据供后续处理；合规禁止数据经公共互联网传输，本地服务器还需消费EC2应用输出。
+
+**必要判断**
+
+- j1（显式）：同时评估EC2↔S3与本地↔VPC两段链路：EC2 interface endpoint配Site-to-Site VPN、S3 gateway endpoint配Direct Connect、Transit Gateway连接S3配VPN、经NAT gateway的代理EC2取S3数据并供应用。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查端点服务对象、S3私网路由、Transit Gateway接入方式，以及VPN、Direct Connect、NAT路径是否涉及公共互联网。
+
+### Q611
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：EC2应用通过REST接口近实时接收第三方数据，处理并存储供分析；数据突增时计算容量达上限、无法处理全部请求，第三方频繁收到503 Service Unavailable，需更可扩展的设计。
+
+**必要判断**
+
+- j1（显式）：比较Kinesis Data Streams接入配Lambda处理、现有应用前置API Gateway并对供应商设置usage plan quota、SNS接入配ALB后EC2 Auto Scaling、应用容器化至ECS EC2 launch type配Auto Scaling；评估接入衔接、突发承接、处理扩展与请求失败。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各设计的REST接入要求、缓冲与消费机制、近实时处理、限流行为和计算扩展边界。
+
+### Q612
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：应用运行于私有子网EC2，需处理S3桶中敏感信息，连接S3不得使用互联网。
+
+**必要判断**
+
+- j1（显式）：比较internet gateway、VPN connection、NAT gateway与VPC endpoint的S3访问路径；分别评估更新桶策略允许相应来源及应用改用该路径的配置有效性。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查四种路径的互联网依赖、私有子网路由与S3桶策略可用来源条件，以及VPC endpoint接入要求。
+
+### Q613
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：EKS容器应用将敏感信息存于Kubernetes secrets对象；需确保信息加密且运维开销最低。
+
+**必要判断**
+
+- j1（显式）：比较应用调用KMS加密、EKS集群启用KMS secrets encryption、Lambda调用KMS加密、改用Systems Manager Parameter Store配KMS的加密覆盖、数据访问衔接与维护需求。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查EKS secrets加密配置与适用条件、KMS权限和密钥管理，以及应用、Lambda或Parameter Store方案所需改动。
+
+### Q614
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：新多层Web应用的Web层和应用层均为EC2 Auto Scaling groups，数据存于RDS；应用服务器必须仅允许Web服务器访问。
+
+**必要判断**
+
+- j1（显式）：比较PrivateLink配NACL、VPC endpoint配security group、NLB应用层Auto Scaling target group配NACL、ALB应用层Auto Scaling target group配security group；判断入口、动态成员目标关联及仅Web层可访问的控制衔接。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查PrivateLink、VPC endpoint及两类负载均衡器的部署前提、Auto Scaling目标注册，以及NACL与security group的来源限制方式。
+
+### Q615
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：关键客户应用采用EKS微服务架构；需在集中位置收集、聚合并汇总应用metrics与logs。
+
+**必要判断**
+
+- j1（显式）：比较EKS运行CloudWatch agent并用CloudWatch查看、运行App Mesh并用其控制台查看、CloudTrail data events配OpenSearch查询、EKS配置CloudWatch Container Insights并用CloudWatch查看，对指标与日志全链路收集及汇总的覆盖。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各工具的数据类型、EKS采集配置、聚合汇总与展示能力，以及选项所述控制台和查询集成。
+
+### Q616
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：产品运行于NLB后Auto Scaling group，对象存S3；近期遭恶意攻击，需持续监测AWS账户、工作负载及S3访问模式中的恶意活动，报告可疑活动并在dashboard展示。
+
+**必要判断**
+
+- j1（显式）：比较Macie→AWS Config、Inspector→CloudTrail、GuardDuty→Security Hub、AWS Config→EventBridge四条监测与报告链路，评估威胁覆盖、持续性、发现传递及dashboard展示。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各服务监测对象和发现类型、S3访问模式覆盖、所提上下游集成及集中dashboard能力。
+
+### Q617
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：迁移本地NFS文件服务器的200 GB数据，不中断现有服务；AWS多个资源需通过NFS访问，要求最具成本效益，选择2项。
+
+**必要判断**
+
+- j1（显式）：比较FSx for Lustre、EFS与S3作为目标的NFS及多资源共享适配性和成本。〔S, O1, O2, O3〕
+- j2（显式）：比较操作系统命令手动推送与本地DataSync agent配迁移任务，在不中断现有服务、同步迁移及目标衔接上的差异，并组合2项。〔S, O1, O2, O3, O4, O5〕
+
+**待官方核验**
+
+- 待查目标服务的NFS与共享支持、200 GB使用成本，以及手动复制和DataSync的在线同步、源端影响与切换要求。
+
+### Q618
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：us-east-1的EC2需挂载FSx for Windows File Server SMB共享；计划维护或意外中断RPO为5分钟，文件系统需复制至us-west-2，复制数据5年内任何用户均不得删除。
+
+**必要判断**
+
+- j1（显式）：比较us-east-1 Single-AZ 2与Multi-AZ部署对维护及中断RPO的作用，并判断每日AWS Backup及跨Region复制与5分钟RPO的适用范围。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较us-west-2目标vault启用Vault Lock compliance或governance mode、最短保留5年的删除约束，保留四个选项的部署类型与锁定模式组合差异。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查FSx部署类型的故障恢复与RPO、每日跨Region备份复制时效，以及Vault Lock两种模式的权限例外、锁定生效与5年保留限制。
+
+**源异常／歧义**
+
+- 5分钟RPO是否也约束us-west-2副本未明确；全部选项均采用每日跨Region备份，需明确本地故障恢复与异地副本的目标范围。
+
+### Q619
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：通过AWS Organizations为开发者提供独立账户并维持标准安全控制；开发者有各自账户root权限，新账户强制CloudTrail配置不得被修改。
+
+**必要判断**
+
+- j1（显式）：比较禁止修改CloudTrail的IAM policy附到root、开发者账户内创建organization trail、禁止修改的SCP附到开发者账户、CloudTrail service-linked role按management account ARN限制修改，判断root约束、组织权限及配置防篡改范围。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查root可受何种策略约束、organization trail创建权限及保护范围、SCP应用方式，以及service-linked role和条件策略的作用边界。
+
+### Q620
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：拟部署AWS关键业务应用，存储需持久且性能稳定、低延迟。
+
+**必要判断**
+
+- j1（显式）：比较instance store volume、ElastiCache for Memcached cluster、Provisioned IOPS SSD EBS volume及Throughput Optimized HDD EBS volume，在持久性、稳定延迟与性能特征上的适配。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查四类存储的故障后数据存续、持久性边界、延迟与IOPS或吞吐保障条件。
+
+### Q621
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：照片存于us-west-1的S3桶；所有新照片须在us-east-1保有副本，要求运维投入最少。
+
+**必要判断**
+
+- j1（显式）：比较us-east-1第二桶配S3 Cross-Region Replication、原桶CORS AllowedOrigin指定us-east-1、跨多个AZ的第二桶配Lifecycle保存照片、原桶创建及更新事件触发Lambda复制，对新对象跨Region复制及维护量的适配。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查CRR前提与新对象覆盖、CORS及Lifecycle作用范围、桶的Region/AZ配置，以及S3事件配Lambda复制的支持与运维需求。
+
+### Q622
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：订阅者Web应用由静态单页和持久数据库组成；上午4小时有数百万用户，其余时间仅数千；schema需快速演进，要求最大可扩展性，选择2项。
+
+**必要判断**
+
+- j1（显式）：比较DynamoDB on-demand、Aurora serverless DB engine mode、DynamoDB auto scaling在持久存储、schema演进及高低峰扩展上的差异。〔S, O1, O2, O3〕
+- j2（显式）：比较S3静态内容配CloudFront origin，与EC2 Auto Scaling fleet定期从EFS刷新静态内容的扩展路径；与数据库方案组合2项满足整体目标。〔S, O1, O2, O3, O4, O5〕
+
+**待官方核验**
+
+- 待查三种数据库模式的schema约束、容量扩展响应与限制，以及静态内容两种分发架构的扩展和内容更新机制。
+
+### Q623
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：第三方服务商通过API Gateway访问REST APIs；需防SQL injection及cross-site scripting，要求运维效率最高。
+
+**必要判断**
+
+- j1（显式）：比较直接配置AWS Shield或AWS WAF，以及API Gateway前置CloudFront后配置Shield或WAF，对两类攻击的防护覆盖、关联位置及额外运维需求。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查Shield与WAF的攻击防护范围、API Gateway和CloudFront关联条件，以及所需规则与分发配置。
+
+### Q624
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：1,500名用户通过企业网络Active Directory用户组管理本地资源权限；访问AWS不得另维护身份，且必须保留本地访问。
+
+**必要判断**
+
+- j1（显式）：比较逐人IAM user配策略、Cognito配Active Directory user pool及roles、cross-account roles映射AD组、SAML 2.0 federation配roles和AD组映射，判断身份复用、认证与AWS授权衔接及管理规模。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查Cognito所提AD user pool形式、跨账户角色与身份联合的前提、SAML和AD组到角色的映射及本地身份保留方式。
+
+### Q625
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：网站位于多个ALB后，内容在世界各地具有不同分发权；必须按用户提供正确内容且不违反地域分发权。
+
+**必要判断**
+
+- j1（显式）：比较CloudFront配WAF、ALB配WAF、Route 53 geolocation与geoproximity routing，在地域识别、访问限制、正确内容路由及多个ALB衔接上的差异。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各方案的地理判定依据、内容分流或阻断能力，以及geolocation与geoproximity的匹配和边界行为。
+
+### Q626
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：本地数据增长超出容量，需迁至S3，并在传输后自动验证数据完整性。
+
+**必要判断**
+
+- j1（显式）：比较Snowball Edge配置在线传S3、本地DataSync agent在线传S3、本地S3 File Gateway在线传S3、在本地配置S3 Transfer Acceleration accelerator的提议，判断部署方式、迁移路径及传后自动完整性验证。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查四种服务的组件部署位置、在线传输支持及自动传后验证能力和配置。
+
+### Q627
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：迁移2台DNS服务器至AWS，合计约200个zones、日均100万请求；需最大化可用性并最小化服务器管理运维。
+
+**必要判断**
+
+- j1（显式）：比较Route 53创建200个hosted zones并导入zone files、单台大型EC2导入并配CloudWatch告警、AWS SMS迁移原服务器并告警、跨2个AZ的EC2 Auto Scaling group导入并按CPU扩缩；后者desired=1、maximum=3，需评估实际可用性与管理投入。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查DNS zone导入和托管能力、各部署的故障恢复与告警边界、Auto Scaling容量和CPU指标适配，以及迁移服务适用条件。
+
+### Q628
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：应用跨AWS Organizations内多个账户运行。
+- c2〔S〕：应用向跨区域的多个S3桶执行分段上传。
+- c3〔S〕：需要为成本合规报告未完成的分段上传。
+- c4〔S〕：目标是最低运维开销。
+- c5〔O1〕：候选使用AWS Config规则报告未完成分段上传对象数量。
+- c6〔O2〕：候选创建SCP报告该数量。
+- c7〔O3〕：候选配置S3 Storage Lens报告该数量。
+- c8〔O4〕：候选创建S3多区域访问点报告该数量。
+
+**必要判断**
+
+- j1（显式）：如何判断候选机制能否生成未完成分段上传数量的成本合规报告？〔S, O1, O2, O3, O4〕
+- j2（显式）：如何判断报告能否覆盖组织内多个账户、多个区域及多个桶？〔S, O1, O2, O3, O4〕
+- j3（显式）：如何比较各报告方案的配置、汇总和持续维护开销？〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 各候选机制是否提供所述未完成分段上传数量指标，其统计口径与跨账户、跨区域汇总范围是什么？
+- 组织级报告需要哪些权限、配置及持续维护步骤？
+
+### Q629
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：生产RDS for MySQL因安全合规需升级版本；含关键数据，需快速升级并测试功能，不丢失任何数据且运维开销最低。
+
+**必要判断**
+
+- j1（显式）：比较手动快照后升级、原生备份恢复到升级版本、DMS复制到升级版本、RDS Blue/Green Deployments部署并测试变更，对升级验证、持续写入同步、切换与零数据丢失目标的适配。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各方案的MySQL版本兼容、测试隔离、复制及切换条件、数据丢失风险与运维步骤。
+
+### Q630
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：数据处理任务每日运行1次，最长2小时；中断后必须从头重跑，要求最具成本效益的运行方案。
+
+**必要判断**
+
+- j1（显式）：比较EC2 Reserved Instance上本地脚本配cron、EventBridge scheduled event触发Lambda、触发ECS Fargate task或ECS on EC2 task，评估2小时运行支持、中断与重跑、调度及低频任务总体成本。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各执行环境的时长和资源限制、调度集成、任务中断语义，以及常驻承诺与按次运行计费差异。
+
+### Q631
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：社交平台需在AWS存储用户资料、关系和互动；应用须监测数据库任何变化、分析实体关系并推荐用户内容，要求运维开销最低。
+
+**必要判断**
+
+- j1（显式）：比较Neptune与QLDB的数据模型对关系分析及推荐的适配，并分别评估与Kinesis Data Streams或Neptune Streams组成的四种变更处理链路、覆盖与运维需求。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查两类数据库的关系查询能力、变更捕获接口，以及Kinesis Data Streams和Neptune Streams与各源数据库的集成支持及额外处理组件。
+
+### Q632
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：新应用保存大量数据，每小时分析，多个AZ的多台EC2 Linux实例会修改数据；未来6个月存储需求持续增长。
+
+**必要判断**
+
+- j1（显式）：比较S3 Glacier配vault policy、EBS volume挂载多实例、EFS挂载多实例、共享Provisioned IOPS EBS volume，对跨AZ共享修改、每小时访问、Linux挂载与容量增长的支持。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各存储的访问和取回方式、AZ范围、多实例挂载及写入协调限制，以及持续扩容机制。
+
+### Q633
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：应用数据存于RDS for PostgreSQL Multi-AZ DB instance；流量增长造成性能问题，已确定数据库查询为主要原因，需改善应用性能。
+
+**必要判断**
+
+- j1（显式）：比较Multi-AZ standby承担读流量、DB实例配置Transfer Acceleration、创建read replica承担读流量、应用与RDS之间加入Kinesis Data Firehose以增加请求并发，判断查询卸载和集成适配。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查该Multi-AZ DB instance的standby读取限制、read replica能力与应用路由要求，以及Transfer Acceleration和Firehose所提用途的支持范围。
+
+### Q634
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：每天采集10 GB机器遥测数据，存于源数据账户S3桶；多家咨询机构的分析师需要只读访问，须从源账户共享并最大化安全性与运维效率。
+
+**必要判断**
+
+- j1（显式）：比较S3 global tables向各机构复制、短时公开桶且仅通知机构、向机构自有账户配置S3跨账户访问、源账户为每位分析师建IAM user并授桶权限，评估只读范围、身份与数据隔离及多机构管理成本。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查所提S3复制形式、公开访问边界、跨账户授权机制与最小只读权限，以及逐人IAM身份的维护要求。
+
+### Q635
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：主Region的FSx for NetApp ONTAP供EC2通过CIFS、NFS访问；需在次Region灾备，副本保持相同协议，运维开销最低。
+
+**必要判断**
+
+- j1（显式）：比较Lambda复制至S3并跨Region复制、AWS Backup跨Region复制后恢复FSx for ONTAP、次Region部署FSx for ONTAP并用SnapMirror复制的灾备流程、协议可用性及运维负担。〔S, O1, O2, O3〕
+- j2（显式）：评估迁移至Amazon EFS并复制到次Region，是否仍满足CIFS和NFS访问及灾备目标。〔S, O4〕
+
+**待官方核验**
+
+- 查官方资料确认各方案跨Region复制/恢复能力、目标端CIFS与NFS支持及所需管理步骤。
+
+### Q636
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：事件应用使用Lambda；S3新增文件产生事件，现有事件目标为SNS，需可扩展地处理事件。
+
+**必要判断**
+
+- j1（显式）：比较SNS订阅接入ECS、EKS预处理后调用Lambda，与SNS→SQS→Lambda的处理链路及扩展方式。〔S, O1, O2, O3〕
+- j2（显式）：评估SNS发送至AWS SMS、Lambda轮询SMS事件的集成提议，是否可承担该事件处理链路。〔S, O4〕
+
+**待官方核验**
+
+- 查官方资料确认SNS订阅目标、SQS触发Lambda及ECS/EKS、AWS SMS与Lambda事件衔接能力和扩展限制。
+
+**源异常／歧义**
+
+- O3先写Amazon SQS，后写“SOS queue”，队列名称存在拼写不一致。
+
+### Q637
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：新服务位于API Gateway后；请求不可预测，可从0骤增至超过500次/秒；持久数据当前小于1 GB、未来增长未知，只需简单键值查询；选择两项服务组合。
+
+**必要判断**
+
+- j1（显式）：比较AWS Fargate、Lambda、EC2 Auto Scaling作为API Gateway后计算层时，对突发请求与不可预测负载的适配。〔S, O1, O2, O4〕
+- j2（显式）：比较DynamoDB与MySQL-compatible Aurora作为持久层，对键值查询、未知数据增长及所选计算层的适配，形成两项服务组合。〔S, O3, O5〕
+
+**待官方核验**
+
+- 查官方资料确认候选计算服务的突发扩展机制、API Gateway集成，以及两类数据库的键值访问和扩展能力。
+
+### Q638
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：研究数据需收集并存储于S3、在AWS处理，再分享给全球员工；要求安全且运维开销最低。
+
+**必要判断**
+
+- j1（显式）：比较Lambda生成S3 presigned URL与逐员工创建IAM用户/策略并使用控制台，在数据收集分享、授权安全和身份管理方面的适配。〔S, O1, O2〕
+- j2（显式）：比较S3 File Gateway上传/下载共享挂载，与Transfer Family SFTP、自定义身份提供方及Secrets Manager凭据组合的安全访问流程和运维负担。〔S, O3, O4〕
+
+**待官方核验**
+
+- 查官方资料确认presigned URL的操作范围和授权限制、IAM管理要求，以及File Gateway和Transfer Family身份集成与客户端要求。
+
+### Q639
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：家具库存应用部署于VPC内跨多个AZ的EC2集群，位于ALB后；流量偏向单个实例并使部分请求延迟，需消除此问题。
+
+**必要判断**
+
+- j1（显式）：比较禁用ALB sticky sessions、改用NLB、增加每个AZ的EC2数量、调整目标组健康检查频率，对流量偏斜及延迟成因的针对性。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 查官方资料确认ALB会话保持与目标选择、健康检查及容量变化对请求分配的影响，并比较NLB行为。
+
+### Q640
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Lambda需从S3下载并解密使用AWS KMS keys加密的文件；确保权限配置正确，选择两项操作。
+
+**必要判断**
+
+- j1（显式）：区分kms:decrypt放在Lambda resource policy、附给函数的IAM policy、附给函数的execution role中的授权主体与附加位置。〔S, O1, O4, O5〕
+- j2（显式）：判断KMS key policy应如何授权调用方，比较授权Lambda IAM role与授权Lambda resource policy，并与函数侧授权组成两项操作。〔S, O2, O3〕
+
+**待官方核验**
+
+- 查官方资料确认Lambda执行身份、resource policy与IAM policy的职责，以及KMS key policy和kms:decrypt权限的协作要求。
+
+### Q641
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：在AWS Organizations管理账户设计架构，查询所有成员账户的Cost and Usage Reports；每月一次并提供详细账单分析，要求最可扩展且成本效益最高。
+
+**必要判断**
+
+- j1（显式）：比较在管理账户或成员账户启用报告，以及报告交付至S3或Kinesis的组织级覆盖和接入方式。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较Kinesis→EMR、S3→Athena、S3→Redshift、Kinesis→QuickSight四种分析组合，对每月详细查询的扩展性和总成本。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 查官方资料确认组织级报告范围、可用交付目标、候选分析服务接入路径与低频查询计费。
+
+### Q642
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：游戏应用运行于EC2 Auto Scaling group，使用UDP传输，需随流量增减自动扩缩。
+
+**必要判断**
+
+- j1（显式）：比较将NLB或ALB接入Auto Scaling group、Route 53 weighted routing、NAT instance端口转发，对UDP流量分发与动态实例增减的支持。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 查官方资料确认各入口的UDP支持、Auto Scaling目标注册/移除方式，以及DNS权重和NAT转发的管理要求。
+
+### Q643
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：多个品牌网站各自产生每天数十GB日志；开发者需连续数月、每周一次按需跨站分析流量模式，使用标准SQL；要求可扩展且成本效益最高。
+
+**必要判断**
+
+- j1（显式）：比较S3＋Athena、RDS＋数据库客户端、OpenSearch Service存储分析、EMR存储＋开源SQL框架，在多站日志规模、标准SQL和低频按需分析下的适配及成本。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 查官方资料确认候选方案的SQL支持、日志保留与扩展方式，以及持续资源费用和按需查询费用。
+
+### Q644
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：国际网站使用example.com及country1.example.com、country2.example.com等国家子域；工作负载位于ALB后，需加密网站传输数据；选择两步组合。
+
+**必要判断**
+
+- j1（显式）：比较ACM public/private证书、apex example.com与*.example.com通配证书，以及仅为apex申请公私证书的域名覆盖和客户端信任适配。〔S, O1, O2, O3〕
+- j2（显式）：比较直接添加DNS记录验证域名，与先邮件验证再切换DNS验证的流程，并与证书选择组成两步方案。〔S, O4, O5〕
+
+**待官方核验**
+
+- 查官方资料确认ALB证书使用、apex与通配证书覆盖范围、public/private信任差异，以及ACM验证方式切换限制。
+
+### Q645
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：法规要求密钥保留在AWS外的本地key manager；需用外部密钥管理加解密，兼容多个厂商的外部key manager，运维开销最低。
+
+**必要判断**
+
+- j1（显式）：比较CloudHSM key store、KMS external key store＋外部key manager、默认KMS managed key store、CloudHSM支持的custom key store，对密钥驻留、厂商兼容及运维目标的适配。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 查官方资料确认各key store类型、密钥材料及密码操作所在位置、外部厂商接口与部署管理要求。
+
+### Q646
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：HPC运行于数百台EC2，需同时并行访问共享文件系统以分布式处理大型数据集，访问延迟在1 ms以内；完成后工程师还需手工后处理数据集。
+
+**必要判断**
+
+- j1（显式）：比较EFS共享访问、挂载S3作为共享文件系统、FSx for Lustre关联S3，以及通过AWS RAM共享并挂载S3，对并行处理与延迟的适配。〔S, O1, O2, O3, O4〕
+- j2（显式）：评估各存储路径如何衔接工程师后处理，特别是FSx for Lustre与S3关联后的数据可访问性和同步要求。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 查官方资料确认共享文件语义、并发与延迟能力、S3挂载及RAM共享边界，以及Lustre与S3的数据衔接。
+
+### Q647
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：VoIP游戏应用面向全球，需高可用及跨AWS Region自动故障转移；尽量降低用户延迟，且不依赖用户设备的IP地址缓存。
+
+**必要判断**
+
+- j1（显式）：比较Global Accelerator＋health checks、Route 53 geolocation routing、CloudFront多origin、ALB path-based routing，在全球VoIP流量、跨Region故障转移、低延迟和客户端IP缓存依赖方面的适配。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 查官方资料确认各方案协议范围、全球入口及故障切换机制，以及DNS/IP缓存对切换与延迟的影响。
+
+### Q648
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：天气预报公司已有本地HPC，拟扩展云端能力；处理数百GB数据，要求亚毫秒延迟、高可用和大量持续吞吐，数千计算实例同时访问处理完整数据集。
+
+**必要判断**
+
+- j1（显式）：比较FSx for Lustre scratch与persistent file systems，在高可用、亚毫秒延迟及数千实例持续并发吞吐下的适配。〔S, O1, O2〕
+- j2（显式）：比较EFS Bursting Throughput与Provisioned Throughput，并与Lustre方案对照其持续吞吐、延迟和并发访问能力。〔S, O3, O4, O1, O2〕
+
+**待官方核验**
+
+- 查官方资料确认Lustre部署类型的可用性与性能，以及EFS两种吞吐模式的持续负载、延迟和并发限制。
+
+### Q649
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：PostgreSQL拟迁移至RDS for PostgreSQL；每日峰值不超过15,000 IOPS，需独立于存储容量配置IOPS，成本效益最高；题干称现有本地数据库使用高IOPS EBS。
+
+**必要判断**
+
+- j1（显式）：比较gp2、io1、gp3配置15,000 IOPS与magnetic volume追求最大IOPS，对RDS for PostgreSQL的可用性、IOPS/容量解耦和成本的适配。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 查官方资料确认RDS for PostgreSQL各存储类型的IOPS配置范围、容量依赖及相关价格条件。
+
+**源异常／歧义**
+
+- 题干同时描述数据库位于本地并使用Amazon EBS，现有部署位置与存储描述存在不一致。
+
+### Q650
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：本地Microsoft SQL Server Enterprise同时承担在线事务与生产库分析报表；迁移AWS并尽量采用托管服务，要求运维开销最低。
+
+**必要判断**
+
+- j1（显式）：比较RDS for Microsoft SQL Server＋read replicas与EC2 SQL Server＋Always On read replicas，对事务、报表分流及运维目标的适配。〔S, O1, O2〕
+- j2（显式）：比较改用DynamoDB＋所谓on-demand replicas、Aurora MySQL＋read replicas的引擎迁移、应用兼容和报表承载要求。〔S, O3, O4〕
+
+**待官方核验**
+
+- 查官方资料确认SQL Server版本及副本报表支持、DynamoDB所述副本机制，以及跨引擎迁移改造与管理要求。
+
+### Q651
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：大量S3图片前180天需随时可用且已选S3 Standard；随后180天低频访问；360天后归档但请求即取；5年后仅审计员可访问且12小时内取回；全程不能丢失，Lifecycle成本效益最高。
+
+**必要判断**
+
+- j1（显式）：比较180天转One Zone-IA或Standard-IA，对低频成本与不可丢失要求的适配。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较360天转Glacier Instant Retrieval或Flexible Retrieval，再于5年转Deep Archive的完整生命周期，对即时读取、审计12小时恢复、访问限制和成本的覆盖。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 查官方资料确认各存储类可用性/持久性、读取与恢复时间、生命周期转换费用和最短存储期限，并区分生命周期与访问授权职责。
+
+### Q652
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：关键大型数据作业每天运行6小时，运行中不能丢失任何数据；设计EMR集群，要求成本效益最高。
+
+**必要判断**
+
+- j1（显式）：比较long-running与transient集群生命周期，对每日6小时作业及成本的适配。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较primary/core采用On-Demand、task采用Spot，与仅primary采用On-Demand而core/task采用Spot的节点组合；结合生命周期评估数据安全与成本。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 查官方资料确认EMR各节点职责、Spot中断对数据与作业的影响，以及transient/long-running集群的存储和计费行为。
+
+### Q653
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：RDS数据库保存用户到成本中心的映射
+- c2〔S〕：账户属于Organizations组织，仅针对其中指定账户
+- c3〔S〕：必须为该账户创建的所有资源标记创建者对应的成本中心ID
+- c4〔O1〕：SCP方案将账户移至新OU，并提出创建前要求所有现有资源已有正确标签
+- c5〔O2〕：事件方案由CloudTrail事件触发EventBridge规则调用Lambda
+- c6〔O2〕：事件方案查询RDS中的对应成本中心后标记资源
+- c7〔O3〕：CloudFormation方案部署查询RDS及打标签的Lambda，并提出定时调用栈
+- c8〔O4〕：默认值方案在缺少标签时由事件触发Lambda填入默认值
+- c9〔O4〕：默认值方案仅在资源缺少成本中心标签时触发
+
+**必要判断**
+
+- j1（显式）：如何从指定账户的资源创建事件识别创建者，并查询RDS取得对应成本中心ID？〔S, O2〕
+- j2（显式）：如何判断SCP约束、事件触发标记与定时调用栈各自能否完成所需自动标记流程？〔S, O1, O2, O3〕
+- j3（显式）：如何区分填入默认标签与按创建者映射赋值，并判断方案对所有新建资源的覆盖范围？〔S, O2, O4〕
+
+**待官方核验**
+
+- CloudTrail资源创建事件提供哪些身份及资源标识，EventBridge和Lambda如何据此查询RDS并标记，哪些资源或创建操作存在覆盖限制？
+- SCP对标签的约束能力与自动赋值能力有何边界，EventBridge能以何种方式触发CloudFormation及栈内Lambda？
+
+**源异常／歧义**
+
+- O1同时使用“all existing resources”和“before the resources are created”，资源存在状态与时间关系不清。
+
+### Q654
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：现有单台EC2运行Apache静态内容、PHP应用及用于用户会话的本地Redis；需重构为高可用且采用AWS托管方案。
+
+**必要判断**
+
+- j1（显式）：比较Elastic Beanstalk单EC2公共子网/公共IP、Lambda承载静态与PHP＋API Gateway REST/CORS＋ElastiCache、保留EC2后端＋S3前端＋Multi-AZ且cluster mode Redis的完整链路与高可用覆盖。〔S, O1, O2, O3〕
+- j2（显式）：评估CloudFront→S3静态内容、ALB→ECS Fargate PHP、跨AZ ElastiCache Redis组合，如何衔接内容交付、应用及共享会话，并与其他方案比较。〔S, O4, O1, O2, O3〕
+
+**待官方核验**
+
+- 查官方资料确认候选托管方案的PHP运行、静态内容及API衔接、Redis会话与跨AZ可用性，以及各方案保留的单点。
+
+### Q655
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：EC2 Auto Scaling group已有target group，应用依赖sticky sessions；需公网endpoint，同时在该endpoint配置WAF与会话保持；选择两步。
+
+**必要判断**
+
+- j1（显式）：比较公网NLB、Gateway Load Balancer、公网ALB接入原target group，与新增target group及为EC2分配Elastic IP的方案，对公网入口、会话保持和WAF适配。〔S, O1, O2, O3, O4〕
+- j2（显式）：判断AWS WAF web ACL与所选endpoint的关联方式，并形成同时覆盖公网、sticky sessions与WAF的两步组合。〔S, O5, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 查官方资料确认各负载均衡器公网与sticky sessions支持、WAF可关联资源，以及target group和Elastic IP的作用范围。
+
+### Q656
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：历史事件图片网站需按事件年份搜索和查看；每张图片平均每年仅请求1–2次；存储和交付方案需高可用且成本效益最高。
+
+**必要判断**
+
+- j1（显式）：比较EBS＋EC2 web server、EFS＋EC2 web server、S3 Standard静态网站直接交付、S3 Standard-IA静态网站直接交付，对低频访问、高可用与总成本的适配。〔S, O1, O2, O3, O4〕
+- j2（显式）：审视按事件年份搜索及查看所需的应用/元数据访问环节，区分存储交付方案能够覆盖和仍需补充的部分。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 查官方资料确认各存储的可用性、低频存储/读取计费、S3静态网站交付条件，以及按年份检索的能力边界。
+
+### Q657
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Organizations多账户供不同业务单元使用，全球办公室CIDR需增删并更新全组织security groups；需集中管理、减少行政开销且成本效益最高。
+
+**必要判断**
+
+- j1（显式）：比较仅在管理账户创建security groups，与customer managed prefix list＋AWS RAM组织共享＋各security group引用，对跨账户CIDR集中更新的覆盖。〔S, O1, O2〕
+- j2（显式）：比较AWS managed prefix list＋Security Hub policy＋Lambda更新，与中央security groups＋Firewall Manager common security group policy/primary groups的控制范围、维护及费用。〔S, O3, O4〕
+
+**待官方核验**
+
+- 查官方资料确认prefix list可编辑性、RAM组织共享和security group引用，及Security Hub、Firewall Manager跨账户执行能力与收费。
+
+### Q658
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：本地NAS为延迟敏感HPC提供共享文件；计算和存储均迁移AWS，文件系统必须同时提供NFS与SMB；选择两项组成最低延迟方案。
+
+**必要判断**
+
+- j1（显式）：比较compute optimized EC2置于cluster placement group或partition placement group，对HPC通信延迟的影响。〔S, O1, O2〕
+- j2（显式）：比较FSx for Lustre、FSx for OpenZFS、FSx for NetApp ONTAP的NFS/SMB多协议与延迟适配，并与实例放置形成两项组合。〔S, O3, O4, O5〕
+
+**待官方核验**
+
+- 查官方资料确认两类placement group的网络特性，以及候选FSx文件系统的NFS/SMB协议、部署与延迟条件。
+
+### Q659
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：数据中心搬迁，需在2周内安全传输50 TB到AWS；现有Site-to-Site VPN利用率90%。
+
+**必要判断**
+
+- j1（显式）：比较DataSync＋VPC endpoint、Direct Connect、Snowball Edge Storage Optimized、Storage Gateway，在安全、剩余网络容量、部署/运输耗时及50 TB两周期限方面的可行性。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 查官方资料确认各方案传输路径、安全机制、网络依赖与交付准备时间，识别评估期限所需的带宽及物流条件。
+
+### Q660
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：应用使用EC2 On-Demand Auto Scaling group；每天固定时刻进入高峰，开始时性能慢，2–3小时后恢复；需从高峰开始即正常运行。
+
+**必要判断**
+
+- j1（显式）：比较ALB分流、按内存利用率动态扩容、按CPU利用率动态扩容、在高峰前scheduled scaling，对固定高峰开始时容量就绪的适配。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 查官方资料确认Auto Scaling动态/计划策略的触发和启动时序、内存指标接入要求及ALB对容量问题的作用范围。
+
+### Q661
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：AWS应用连接RDS，在周末及年度高峰扩展；需更有效支持应用连接下的数据库扩展，运维开销最低。
+
+**必要判断**
+
+- j1（显式）：比较DynamoDB连接池/target group并切换endpoint、RDS Proxy target group并切换endpoint、EC2自建代理、Lambda连接池/target group四种连接路径的适配与运维负担。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：区分连接池/代理可缓解的连接扩张问题与数据库计算、存储或读写容量扩展，界定题目所需扩展范围。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 查官方资料确认RDS Proxy target group及连接池机制，其他候选连接方式的有效性、应用改动和数据库容量边界。
+
+**源异常／歧义**
+
+- 题干未区分数据库容量扩展与连接规模扩展，选项主要围绕连接池和代理。
+
+### Q662
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Cost Explorer显示EBS存储和snapshot费用逐月增加，但未每月新增EBS容量；需优化当前存储月费，运维开销最低。
+
+**必要判断**
+
+- j1（显式）：比较CloudWatch Logs或自定义脚本监控空间、再用EBS Elastic Volumes缩小卷的提议，对成本问题的适用性与管理负担。〔S, O1, O2〕
+- j2（显式）：比较仅清理过期/未用snapshots，与清理非必要snapshots并用Data Lifecycle Manager按公司策略持续管理，对费用增长及后续运维的覆盖。〔S, O3, O4〕
+
+**待官方核验**
+
+- 查官方资料确认EBS容量调整方向、利用率监控来源、snapshot计费与删除影响，以及Data Lifecycle Manager策略能力。
+
+### Q663
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：应用由ECS cluster、存放资产的S3 bucket、包含敏感数据的RDS for MySQL组成；需确保只有该ECS cluster可访问数据库与S3数据。
+
+**必要判断**
+
+- j1（显式）：比较customer managed或AWS managed KMS key加密两类存储、key policy授权ECS task execution role、bucket policy指定该role，对“仅ECS可访问”的授权覆盖。〔S, O1, O2〕
+- j2（显式）：比较bucket policy限task execution role＋RDS VPC endpoint/按ECS子网限制security group，与RDS端同配置＋S3 VPC endpoint/bucket policy限endpoint，对数据库数据路径和ECS身份隔离的覆盖。〔S, O3, O4〕
+- j3（先修候选，待核验）：辨别ECS task role与task execution role，以及密钥权限、网络来源和数据访问身份分别能限定到何种主体。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 查官方资料确认ECS角色职责、KMS和bucket policy授权、RDS endpoint适用平面、security group来源规则与S3 endpoint限制边界。
+
+### Q664
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：本地web应用每月两次高峰延迟，问题开始时CPU立即升至正常值10倍；迁移AWS并用Elastic Beanstalk部署，需改善延迟且随需求自动扩容。
+
+**必要判断**
+
+- j1（显式）：比较burstable performance instances的unlimited mode与compute optimized instances，对突增CPU负载及延迟的适配。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较按requests、schedule、predictive metrics扩展Elastic Beanstalk环境，结合实例类型评估对需求突增的响应。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 查官方资料确认实例CPU突发机制、Elastic Beanstalk可用扩展指标/策略及预测或计划扩展的前提。
+
+### Q665
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：公司面向全球客户，需用自动化保护系统和网络基础设施；安全团队必须能够跟踪并审计全部增量基础设施变更。
+
+**必要判断**
+
+- j1（显式）：比较AWS Organizations与CloudFormation承担基础设施自动化设置时的职责及安全配置覆盖。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较AWS Config与Service Catalog的变更跟踪、历史及审计能力，并与部署服务组成完整方案。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 查官方资料确认Organizations/CloudFormation的自动化边界，以及Config/Service Catalog对资源增量变更记录和审计的覆盖。
+
+### Q666
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：初创公司在单台EC2运行低流量网站，含无状态Python应用及MySQL；需迁移为高可用架构，不能修改应用代码；选择两项。
+
+**必要判断**
+
+- j1（显式）：比较RDS for MySQL Multi-AZ、DynamoDB＋auto scaling、DataSync同步多台EC2数据库数据，对数据库高可用及不改代码的适配。〔S, O2, O3, O4〕
+- j2（显式）：比较每个AZ配置internet gateway与ALB＋跨两个AZ的EC2 Auto Scaling group，对网站入口及无状态应用高可用的作用，并与数据库方案组合。〔S, O1, O5〕
+
+**待官方核验**
+
+- 查官方资料确认MySQL迁移兼容与Multi-AZ机制、DynamoDB/DataSync适用边界，以及internet gateway作用范围和ALB/Auto Scaling跨AZ部署。
+
+### Q667
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：多年迁移期间，需从公司AWS Region及本地安全访问S3，数据不得经过互联网；已有Region与本地之间的Direct Connect。
+
+**必要判断**
+
+- j1（显式）：比较S3 gateway endpoints、Transit Gateway中的gateway提议、S3 interface endpoints、KMS key，对Region内和经Direct Connect的本地两类访问路径及无互联网要求的覆盖。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 查官方资料确认S3两类endpoint的本地可达性、Direct Connect路由/DNS条件、Transit Gateway连接能力及KMS加密与网络路径的职责。
+
+### Q668
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Organizations新组织含多个开发账户，成员通过IAM Identity Center登录；创建资源时必须带预定义application name标签，且标签值获批准时才允许创建。
+
+**必要判断**
+
+- j1（显式）：比较IAM group conditional Allow要求标签、cross-account role Deny任何带该标签的资源、Resource Groups验证标签、Organizations tag policy列出允许名称，对创建前强制合法标签值的覆盖。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：区分标签存在性、标签值合规、创建权限阻断与事后验证，并评估IAM Identity Center身份及多账户适用范围。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 查官方资料确认tag policy强制范围与缺失标签处理、IAM条件及Identity Center权限承载方式、Resource Groups验证边界。
+
+### Q669
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：RDS for PostgreSQL需安全管理master user密码，每30天轮换，运维开销最低。
+
+**必要判断**
+
+- j1（显式）：比较EventBridge定时调用自定义Lambda、AWS CLI modify-db-instance、Secrets Manager集成、Systems Manager Parameter Store集成，对安全存储、30天自动轮换及运维负担的覆盖。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 查官方资料确认RDS for PostgreSQL master密码托管和轮换集成、30天配置方式，以及CLI/自定义方案的额外管理步骤。
+
+### Q670
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：DynamoDB仅用于该应用测试，每周一次、每次4小时；测试期间每秒读写操作数已知，需优化表成本。
+
+**必要判断**
+
+- j1（显式）：比较on-demand并调整读写capacity units、provisioned并调整读写capacity units，以及1年或3年reserved capacity，对已知短时负载与其余空闲时间的计费适配。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 查官方资料确认两种capacity mode的可配置项、空闲期费用及调整规则，以及reserved capacity承诺和折扣适用条件。
+
+### Q671
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：EC2应用定期财务评估发现异常支出；需监测成本并在异常时通知责任人，以防止异常支出。
+
+**必要判断**
+
+- j1（显式）：比较AWS Budgets zero spend template、Cost Anomaly Detection monitor、Pricing Calculator估算、CloudWatch成本监控，对现有运行负载的异常识别与责任人通知的覆盖。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 查官方资料确认各工具的实际费用监测、异常判断、通知配置及处理时效，区分估算、阈值告警和异常检测。
+
+**源异常／歧义**
+
+- “防止异常支出”与后文监测通知的范围不完全明确，未说明是否还需自动阻断支出。
+
+### Q672
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：营销活动产生大量新clickstream数据进入S3；需快速分析，再判断是否进入后续数据流水线，运维开销最低。
+
+**必要判断**
+
+- j1（显式）：比较Spark catalog外部表＋Glue jobs、Glue crawler＋Athena、Hive metastore外部表＋EMR Spark jobs、Glue crawler＋Kinesis Data Analytics SQL，对S3新数据快速查询、目录准备及运维的适配。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 查官方资料确认候选查询服务读取S3 clickstream和元数据目录的方式、批处理/流处理边界及运行管理要求。
+
+### Q673
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：本地SMB file server存放大文件，创建后前7天频繁访问；7天后仍须可访问，最长取回时间24小时。
+
+**必要判断**
+
+- j1（显式）：比较DataSync仅复制超过7天数据、S3 File Gateway＋7天转Glacier Deep Archive、FSx File Gateway＋S3 Lifecycle转换、每用户直接访问S3＋7天转Glacier Flexible Retrieval的完整存储路径。〔S, O1, O2, O3, O4〕
+- j2（显式）：评估各路径对前7天SMB频繁访问、后续文件定位/恢复及24小时取回上限的覆盖，区分复制、网关和归档策略职责。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 查官方资料确认DataSync和两类File Gateway后端/SMB能力、Lifecycle适用存储，以及Deep Archive/Flexible Retrieval恢复时间与访问流程。
+
+### Q674
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：EC2 Auto Scaling web应用使用RDS for PostgreSQL；流量增长时应用变慢，数据库承受重读负载；选择两项改善性能。
+
+**必要判断**
+
+- j1（显式）：比较开启DB instance auto scaling、read replica并将读取导向副本、Multi-AZ DB instance并将读取导向standby，对读扩展的适配。〔S, O1, O2, O3〕
+- j2（显式）：比较ElastiCache缓存查询结果与将EC2限制在数据库同AZ，对数据库读压力、延迟及应用接入改动的作用，并形成两项组合。〔S, O4, O5〕
+
+**待官方核验**
+
+- 查官方资料确认RDS PostgreSQL实例扩展选项、read replica与Multi-AZ standby读取能力，以及缓存和同AZ放置的性能作用。
+
+### Q675
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：EC2/EBS应用为合规每天对每个卷创建一次snapshot；需防止误删snapshots，不得改变storage administrator用户的管理权限，行政工作量最低。
+
+**必要判断**
+
+- j1（显式）：比较新建可删snapshot的IAM role并由新EC2 CLI操作、对管理员附加Deny删除策略，对误删防护及保持原管理权限的适配。〔S, O1, O2〕
+- j2（显式）：比较snapshot标签＋Recycle Bin retention rules与锁定EBS snapshots，对误删防护/恢复、权限保持和日常管理的覆盖。〔S, O3, O4〕
+
+**待官方核验**
+
+- 查官方资料确认IAM授权影响、Recycle Bin保留恢复机制、EBS Snapshot Lock可用配置及其删除防护与管理要求。
+
+### Q676
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：VPC内应用包含NLB、自动扩缩组、EC2实例及数据库。
+- c2〔S〕：需要近实时捕获VPC网络接口的双向流量信息。
+- c3〔S〕：信息须发送到OpenSearch Service进行分析。
+- c4〔O1〕：候选链路为VPC Flow Logs到CloudWatch Logs，再经Kinesis Data Streams到OpenSearch。
+- c5〔O2〕：候选链路为VPC Flow Logs到CloudWatch Logs，再经Kinesis Data Firehose到OpenSearch。
+- c6〔O3〕：候选链路为VPC Flow Logs到CloudTrail trail，再经Kinesis Data Streams到OpenSearch。
+- c7〔O4〕：候选链路为VPC Flow Logs到CloudTrail trail，再经Kinesis Data Firehose到OpenSearch。
+
+**必要判断**
+
+- j1（显式）：如何判断网络接口双向流量信息应由何种日志机制采集，并区分日志组与trail的用途？〔S, O1, O2, O3, O4〕
+- j2（显式）：如何判断从采集目标经流式服务到OpenSearch的每一段集成是否成立，还需要哪些衔接组件？〔S, O1, O2, O3, O4〕
+- j3（显式）：如何比较候选链路的采集聚合、传输和交付延迟是否符合近实时分析目标？〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- VPC Flow Logs支持哪些采集范围与日志目的地，CloudWatch Logs和CloudTrail trail分别能否承担选项中的角色？
+- CloudWatch Logs经Data Streams或Data Firehose交付到OpenSearch分别需要哪些订阅、消费或转换配置，各段延迟边界是什么？
+
+### Q677
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：生产EKS使用On-Demand managed node groups；需独立开发EKS集群，低频用于应用韧性测试，全部节点必须由EKS管理，成本效益最高。
+
+**必要判断**
+
+- j1（显式）：比较纯Spot managed node group、分别使用On-Demand和Spot的两个managed node groups、纯On-Demand managed node group，对低频开发及韧性测试成本的适配。〔S, O1, O2, O4〕
+- j2（显式）：评估自建Spot Auto Scaling group、launch configuration及user data加入EKS的方案，是否符合全部节点由EKS管理，并与managed node groups比较。〔S, O3〕
+
+**待官方核验**
+
+- 查官方资料确认EKS managed/self-managed节点责任范围、Spot容量与中断处理，以及候选节点组合的计费。
+
+### Q678
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：S3存放敏感数据；需以最少工作量完全控制用户创建、轮换和禁用加密密钥的能力，覆盖需加密的数据。
+
+**必要判断**
+
+- j1（显式）：比较默认SSE-S3、customer managed KMS key＋SSE-KMS、AWS managed KMS key＋SSE-KMS，在密钥创建、轮换、禁用及用户授权控制上的差异。〔S, O1, O2, O3〕
+- j2（显式）：评估下载S3对象至EC2、以customer managed keys加密再上传的流程，对控制目标、数据覆盖及操作负担的适配。〔S, O4〕
+
+**待官方核验**
+
+- 查官方资料确认各密钥归属类型的生命周期和权限控制能力、S3加密集成，以及EC2侧加密流程的管理要求。
+
+### Q679
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：本地VM备份方案将备份导出为S3对象；必须保留30天，并在30天后自动删除；选择三步组合。
+
+**必要判断**
+
+- j1（显式）：比较启用S3 Object Lock、启用versioning、配置默认30天retention、以Lifecycle保护30天、由备份方案标记30天retention，对强制保留的作用及依赖。〔S, O1, O2, O3, O4, O6〕
+- j2（显式）：评估Lifecycle在30天后expire对象与保留控制的衔接，明确对对象版本及实际删除的覆盖，形成三步组合。〔S, O5, O1, O2, O3, O4, O6〕
+
+**待官方核验**
+
+- 查官方资料确认Object Lock、versioning、默认retention的依赖，标签与Lifecycle的能力边界，以及到期删除的版本处理和执行时序。
+
+### Q680
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：源S3持续新增文件，需持续复制到EFS和另一S3；仅源文件变化时才覆盖副本，运维开销最低。
+
+**必要判断**
+
+- j1（显式）：比较DataSync为两类目标配置locations/tasks并采用“仅变化数据”或“全部数据”transfer mode，对新增、变化检测、覆盖条件及持续执行的适配。〔S, O1, O3〕
+- j2（显式）：比较S3创建/变更通知→挂载EFS的Lambda→双目标复制，与同VPC EC2挂载EFS并定时脚本同步变化对象，对持续性、变更覆盖和运维负担的适配。〔S, O2, O4〕
+
+**待官方核验**
+
+- 查官方资料确认DataSync源/目标、任务关系、执行触发与transfer/overwrite选项，以及S3事件、Lambda EFS挂载和双目标复制限制。
+
+### Q681
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：EC2使用EBS存储，全部数据必须用AWS KMS静态加密；公司需控制密钥轮换，运维开销最低。
+
+**必要判断**
+
+- j1（显式）：比较customer managed key、AWS managed key并配置自动轮换、导入key material的external KMS key、AWS owned key，对EBS加密、轮换控制和运维目标的适配。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 查官方资料确认EBS支持的KMS密钥类型、各类型轮换控制与导入材料管理要求，以及全部数据加密的配置范围。
+
+### Q682
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：需强制EC2数据静态加密，自动识别不合规资源并据发现执行合规策略，行政开销最低。
+
+**必要判断**
+
+- j1（显式）：比较IAM仅允许创建加密EBS＋Config/Systems Manager检测修复，与KMS访问管理＋Lambda/EventBridge检测修复，对预防、发现和执行闭环的覆盖。〔S, O1, O2〕
+- j2（显式）：评估Macie或Amazon Inspector检测未加密EBS，再以Systems Manager Automation加密现有和新卷的能力及管理负担。〔S, O3, O4〕
+
+**待官方核验**
+
+- 查官方资料确认候选检测服务的EBS覆盖、IAM/KMS控制边界、Config/Systems Manager自动修复及现有卷加密所需流程。
+
+### Q683
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：本地多层应用含单节点MySQL和多节点web tier；迁移AWS时尽量少改应用，迁移后提升整体韧性；选择两项。
+
+**必要判断**
+
+- j1（显式）：比较web tier迁移至ALB后EC2 Auto Scaling group或Lambda，对应用改动与整体韧性目标的适配。〔S, O1, O4〕
+- j2（显式）：比较数据库迁移至NLB后EC2 Auto Scaling group、RDS Multi-AZ、DynamoDB，对MySQL兼容、数据层韧性及改动量的影响，并与web层形成两项组合。〔S, O2, O3, O5〕
+
+**待官方核验**
+
+- 查官方资料确认各web部署方式的迁移要求、MySQL在EC2与RDS Multi-AZ的容错机制，以及DynamoDB改造边界。
+
+### Q684
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：本地web应用拟迁移AWS，公司靠近eu-central-1；法规禁止部分应用部署在eu-central-1，仍需实现个位数毫秒延迟。
+
+**必要判断**
+
+- j1（显式）：比较在eu-central-1部署后将VPC延伸至CloudFront edge location或regional edge cache，与将VPC延伸至Local Zone或Wavelength Zone并部署应用，对部署位置合规和延迟的适配。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：界定法规约束针对物理位置还是Region归属，并识别Local Zones/Wavelength所需地域、网络接入及服务可用性条件。〔S, O2, O4〕
+
+**待官方核验**
+
+- 查官方资料确认CloudFront节点是否支持所述VPC延伸/应用部署、Local Zones与Wavelength的Region关系及个位数毫秒接入条件。
+
+**源异常／歧义**
+
+- 法规仅写禁止在eu-central-1启动部分应用，未说明是否允许依附该Region但位于其他物理位置的Zone。
+
+### Q685
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：电商流量不可预测；Lambda直接访问私有RDS for PostgreSQL，需保持可预测数据库性能，避免Lambda产生过多连接压垮数据库。
+
+**必要判断**
+
+- j1（显式）：比较RDS custom endpoint与RDS proxy endpoint，对连接数量管理和数据库性能稳定的作用。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较Lambda部署于VPC内外时访问私有RDS及所选endpoint的网络可达性，与endpoint类型形成完整组合。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 查官方资料确认RDS PostgreSQL候选endpoint类型、RDS Proxy连接管理机制，以及Lambda访问私有数据库/代理的VPC网络条件。
+
+### Q686
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：多个本地地点存放应用测试数据，需连接同一AWS Region的VPCs；未来一年账户及VPC数量增长，需简化新增连接、支持扩展且行政开销最低。
+
+**必要判断**
+
+- j1（显式）：比较VPC peering＋本地VPN、EC2自建VPN汇聚、Transit Gateway＋VPC/VPN attachments、Direct Connect至中央VPC再peering，对多地点、多账户/VPC增长下的连通与管理的适配。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：评估各拓扑的路由传递、跨账户接入和新增连接管理方式，识别集中连接是否能覆盖所有本地与VPC路径。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 查官方资料确认peering传递性、Transit Gateway多账户及VPN接入、Direct Connect经中央VPC的路由边界和自建VPN维护要求。
+
+### Q687
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：用S3中的历史值预测每月制造资源需求；公司无ML经验，要求托管训练和预测；选两步组合。
+
+**必要判断**
+
+- j1（显式）：比较SageMaker模型训练、部署与推理端点和Amazon Forecast predictor训练，判断哪些步骤符合无ML经验及托管预测需求。〔S, O1, O2, O5〕
+- j2（显式）：判断Lambda function URL分别调用SageMaker endpoints或Forecast predictor的预测链路如何与训练步骤配对，形成完整两步方案。〔S, O1, O2, O3, O4, O5〕
+
+**待官方核验**
+
+- 待查两种服务的历史数据导入、托管训练、部署及预测调用要求，以及Lambda集成方式。
+
+**源异常／歧义**
+
+- O5将服务名写为Amazon Forsecast，与O4的Amazon Forecast拼写不同。
+
+### Q688
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Organizations多账户已配置IAM Identity Center和Control Tower；开发、管理员团队权限不同，需覆盖现有及新入职用户，以最低运维开销统一管理。
+
+**必要判断**
+
+- j1（显式）：比较按账户建用户、集中用户分组、组级自定义策略、逐用户AWS managed IAM policies与permission sets的跨账户授权方式。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较组与账户及permission sets关联、逐用户授权和账户内追加权限，对团队隔离及新用户入职维护开销的影响。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查IAM Identity Center用户、组、permission sets与账户的授权关系，以及IAM策略可配置位置。
+
+**源异常／歧义**
+
+- 题干称权限供多个IAM users使用，选项采用IAM Identity Center用户；需明确身份对象含义。
+
+### Q689
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：标准化EBS卷加密策略，并尽量降低加密检查的运行成本及配置工作。
+
+**必要判断**
+
+- j1（显式）：比较EventBridge定时Lambda与Fargate执行Describe类API、IAM强制标签加Cost Explorer及手工加密、AWS Config加密评估和标记方案的检查有效性与成本、配置开销。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查EBS加密状态检查接口、AWS Config规则能力，以及标签和Cost Explorer能否支撑所述检查流程与相关费用。
+
+### Q690
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：定期将GB级文件从本地数据中心上传S3，再由EC2 Spot实例集群下载并转码；需扩展上传及下载吞吐量，选两项。
+
+**必要判断**
+
+- j1（显式）：比较S3 access point、多桶上传、multipart uploads及随机对象前缀对本地到S3上传吞吐量的作用与适用条件。〔S, O1, O2, O3, O5〕
+- j2（显式）：判断并行获取多个byte-ranges及其他候选措施如何组合，覆盖S3到EC2下载和本地上传两个方向的吞吐目标。〔S, O1, O2, O3, O4, O5〕
+
+**待官方核验**
+
+- 待查S3大对象分段上传、并行范围读取及access point、多桶、键前缀的吞吐能力差异。
+
+### Q691
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Web应用运行于跨多个AZ的EC2 Auto Scaling group；共享内容频繁更新，要求变更后立即返回新内容的强一致性；选两项。
+
+**必要判断**
+
+- j1（显式）：比较Volume Gateway iSCSI块存储、EFS、共享EBS和DataSync主机间持续同步，判断跨AZ、动态实例共享访问及更新可见性能否满足要求。〔S, O1, O2, O3, O4〕
+- j2（显式）：判断S3存内容、Cache-Control=no-cache与CloudFront交付组合的更新可见性，及其能否与挂载式共享存储候选共同满足选二要求。〔S, O2, O5〕
+
+**待官方核验**
+
+- 待查候选存储的跨AZ共享及一致性限制、DataSync同步语义，以及S3与CloudFront缓存重验证行为。
+
+### Q692
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：应用使用ALB部署于三个AWS Regions，由Route 53跨Region分流，目标为最高性能体验。
+
+**必要判断**
+
+- j1（显式）：比较A记录配latency或geolocation、CNAME配failover或geoproximity，判断记录类型与ALB目标的衔接及各路由策略对跨Region性能目标的适配。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查Route 53四种策略的决策依据，以及A、CNAME指向ALB时的配置要求。
+
+### Q693
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Web应用含嵌入式NoSQL数据库，EC2 Auto Scaling group当前位于单AZ、前置ALB；流量增长后要求应用高可用、数据库最终一致，且运维开销最低。
+
+**必要判断**
+
+- j1（显式）：比较将ALB替换为NLB与将Auto Scaling group扩展至三个AZ，对应用高可用及现有架构的影响。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较保留嵌入式NoSQL及其复制服务，与通过AWS DMS迁至DynamoDB的最终一致性、迁移适配及运维开销，并评估完整组合。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查负载均衡与跨AZ部署的可用性差异、DynamoDB一致性配置及DMS对源数据库的迁移支持条件。
+
+### Q694
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：购物应用目录每月变更一次，需随流量扩展并尽量降低延迟；购物车数据须高可用且始终保留，用户断线重连后会话数据仍可用。
+
+**必要判断**
+
+- j1（显式）：比较ALB sticky sessions加Aurora目录、ElastiCache for Redis或OpenSearch缓存DynamoDB目录及会话购物车、单EC2加EBS及自动快照的完整方案。〔S, O1, O2, O3, O4〕
+- j2（显式）：区分会话亲和、目录缓存、购物车状态存储与快照恢复，判断各方案能否同时满足重连保留、高可用、低延迟和扩展需求。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查候选方案的会话持久性、故障恢复、缓存与数据库衔接及扩展限制，尤其购物车始终保留所需配置。
+
+### Q695
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：相互调用的微服务部署于EKS，需具备可观测性以识别未来性能问题。
+
+**必要判断**
+
+- j1（显式）：比较ElastiCache减少请求、Container Insights指标加X-Ray跨微服务追踪、CloudTrail API记录加QuickSight展示、Trusted Advisor性能分析对可观测目标的覆盖。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各服务可采集的EKS指标、请求链路与API活动范围，以及识别微服务性能问题所需集成。
+
+### Q696
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：客户处理结果存S3，受严格监管和安全要求约束，必须静态加密；每个客户仅可从自己的AWS账户访问自己的数据，公司员工不得访问。
+
+**必要判断**
+
+- j1（显式）：比较每客户独立ACM证书加客户端加密，与独立KMS key加服务端加密，判断加密和客户隔离方案的适配性。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较在私有或公有证书策略、S3 bucket policy、KMS key policy中仅例外放行客户提供的IAM role，判断访问与解密控制能否阻止员工及其他客户访问。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查ACM与KMS的加密用途、各策略可控制的操作，以及客户跨账户角色访问S3与解密的授权链路。
+
+### Q697
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：VPC有两个公有和两个私有子网；安全规定所有EC2必须位于私有子网，当前Web服务器80、443端口无法被外部互联网访问。
+
+**必要判断**
+
+- j1（显式）：比较公有子网internet-facing ALB加target group及DNS、私有子网Auto Scaling group标识作DNS目标、私有子网NAT gateway加默认路由和Elastic IP、实例安全组放行HTTP/HTTPS加公网IP DNS的入站链路。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：判断候选链路所需的负载均衡子网覆盖、路由、目标连通和安全组配置，能否保持全部EC2位于私有子网。〔S, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查ALB入站转发与DNS要求、NAT gateway通信方向及子网要求、私有实例公网寻址限制。
+
+**源异常／歧义**
+
+- O2的“associated with the ALEnsure”存在文本粘连，target group关联对象与后续DNS句的边界受损。
+
+### Q698
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：应用部署在EKS与AWS Fargate环境，需多个容器共享持久数据，要求高可用、容错且运维开销最低。
+
+**必要判断**
+
+- j1（显式）：比较同AZ EBS加Multi-Attach、单EBS共享、单EFS共享，以及按AZ多个EFS加Lambda同步的持久性、共享、可用性和运维开销。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：判断各方案在EKS Fargate下通过StorageClass接入、卷配置与容器挂载的支持条件，区分选项中的worker node及AZ假设。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查EKS Fargate的EBS/EFS支持、StorageClass与卷供应方式、Multi-Attach及跨AZ共享限制。
+
+### Q699
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：本地Docker应用通过宿主机卷保存供容器使用的持久数据；迁移后要求完全托管，不管理任何服务器或存储基础设施。
+
+**必要判断**
+
+- j1（显式）：比较EKS self-managed nodes加EC2/EBS、ECS Fargate加EFS、ECS Fargate加S3挂载、ECS EC2 launch type加EFS，判断服务器和存储管理责任及持久卷适配。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各容器运行模式的管理边界，以及EFS、EBS和S3作为所述容器持久挂载的支持方式与限制。
+
+### Q700
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：面向互联网的游戏应用跨多个AWS Regions部署，通信使用TCP和UDP，要求全球用户高可用、最低延迟；选两项组合。
+
+**必要判断**
+
+- j1（显式）：比较每Region内部NLB与外部ALB对TCP、UDP及互联网入口的适配，并判断其与全球入口组合的可达性。〔S, O1, O2, O3〕
+- j2（显式）：比较Global Accelerator跨Region负载均衡入口、Route 53 geolocation与CloudFront，判断协议支持、区域流量分配和高可用低延迟目标如何由两项组合覆盖。〔S, O1, O2, O3, O4, O5〕
+
+**待官方核验**
+
+- 待查各入口及负载均衡服务的TCP/UDP支持、内部端点可达性、跨Region路由及故障处理机制。
+
+### Q701
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：城市Web应用运行于ALB后EC2，疑似随机IP来源DDoS导致间歇性能问题；要求最少配置改动，并保留攻击来源审计轨迹。
+
+**必要判断**
+
+- j1（显式）：比较ALB直接配置WAF阻止未知来源、Inspector加DRT、Shield Advanced加DRT、CloudFront以ALB为源站再加WAF的防护能力与改动量。〔S, O1, O2, O3, O4〕
+- j2（显式）：判断随机IP攻击下未知来源规则、DRT协作及日志或事件信息如何满足来源审计，而不只改善流量防护。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各服务的DDoS防护、DRT使用资格、来源可见性与审计记录，以及接入现有ALB所需配置。
+
+### Q702
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：200 TB海洋调查数据已复制到Snowball Edge Storage Optimized并正寄回AWS；AWS上油气勘探HPC集群需持续亚毫秒延迟和高吞吐访问。
+
+**必要判断**
+
+- j1（显式）：比较Snowball数据经S3接File Gateway、S3集成FSx for Lustre、S3复制到EFS，以及直接导入FSx for Lustre的端到端导入和访问链路。〔S, O1, O2, O3, O4〕
+- j2（显式）：判断各链路面向200 TB HPC数据的持续亚毫秒延迟及高吞吐适配，区分数据导入目的地与集群实际访问层。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查Snowball寄回导入目标、S3与候选文件系统的衔接方式，以及HPC访问性能条件。
+
+### Q703
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：本地数据中心NFS服务器需定期备份少量数据到S3，目标为最高成本效益。
+
+**必要判断**
+
+- j1（显式）：比较Glue复制、DataSync agent同步、AWS Transfer for SFTP同步、Direct Connect接VPC后复制到S3的NFS源接入、周期备份可行性及少量数据成本。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各方案的NFS接入、agent部署与S3传输要求，以及固定费用和按量费用。
+
+### Q704
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：EC2游戏服务器要求超低延迟，需处理每秒数百万UDP互联网请求，并尽量降低成本。
+
+**必要判断**
+
+- j1（显式）：比较ALB、Gateway Load Balancer、NLB以EC2为目标，以及跨Regions复制整组服务器再分流的UDP支持、请求规模、延迟与总成本。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各负载均衡类型的协议、目标及吞吐限制，和跨Region部署的流量分配与成本构成。
+
+### Q705
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：VPC内三层应用需从RDS for MySQL迁移至Aurora PostgreSQL cluster，并复制迁移期间的数据变更；选两步组合。
+
+**必要判断**
+
+- j1（显式）：比较DMS Schema Conversion转换数据库对象、用其创建Aurora PostgreSQL read replica，以及配置Aurora MySQL read replica的源目标适配与职责。〔S, O1, O2, O3〕
+- j2（显式）：判断DMS CDC迁移任务与schema转换如何衔接，并比较零复制延迟后提升Aurora PostgreSQL read replica的迁移路径，覆盖持续变更与最终目标引擎。〔S, O1, O2, O3, O4, O5〕
+
+**待官方核验**
+
+- 待查MySQL到Aurora PostgreSQL的schema转换、CDC源目标条件、跨引擎read replica及提升支持。
+
+### Q706
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：RDS数据库部署于多个AZ，周期脚本统计新增记录并拖慢关键应用；需以最低成本改善应用性能，同时运维开销最少。
+
+**必要判断**
+
+- j1（显式）：比较脚本选择活动连接最少实例、专用read replica查询、每日人工导出、ElastiCache缓存常用查询，对新增记录报告、应用负载、成本与运维的影响。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：明确现有RDS Multi-AZ部署形态及可读端点，判断读副本时效与脚本查询可缓存性是否影响候选方案适用。〔S, O1, O2, O4〕
+
+**待官方核验**
+
+- 待查RDS不同Multi-AZ形态的读取能力、read replica延迟及费用、ElastiCache接入和数据刷新要求。
+
+### Q707
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：互联网应用前置ALB，发现异常流量访问模式；需提升基础设施可见性以分析异常，要求最高运维效率。
+
+**必要判断**
+
+- j1（显式）：比较Athena查询CloudTrail、ALB access logs写S3后由Athena查询、逐文件逐行手查，以及专用EC2上EMR直接查询ALB的日志来源、分析能力与维护开销。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查CloudTrail与ALB access logs的记录范围、S3/Athena分析链路及EMR获取ALB日志的支持方式。
+
+### Q708
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：私有子网中的EC2必须通过NAT gateways连接公共互联网。
+
+**必要判断**
+
+- j1（显式）：比较public或private NAT gateway分别部署在实例所在私有子网、同VPC公有子网的四种组合，判断互联网出站路径能否建立。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：判断候选NAT路径所需的子网路由、Internet Gateway及公网地址配置。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查public/private NAT gateway的连接目标、部署位置及互联网出站前提。
+
+### Q709
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Organizations根层级有四个运行EC2的账户：三个非生产、一个生产；已有拒绝启动指定实例类型的SCP，需部署到非生产账户范围；选两项。
+
+**必要判断**
+
+- j1（显式）：比较SCP挂组织根、三个非生产member accounts、management account，以及新建OU后纳入生产或非生产账户的生效范围与继承，判断是否准确覆盖目标账户。〔S, O1, O2, O3, O4, O5〕
+
+**待官方核验**
+
+- 待查SCP在root、OU、member account及management account的适用与继承规则。
+
+### Q710
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：EC2网站处理S3中的机密数据，要求EC2与S3之间连接私有且安全。
+
+**必要判断**
+
+- j1（显式）：比较S3 bucket policy允许VPC endpoint访问、IAM读写策略、NAT gateway、access key ID与secret access key，区分网络私有路径与身份授权能否满足连接要求。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：判断endpoint相关bucket policy之外，建立EC2到S3私有路径所需的endpoint及路由配置。〔S, O1〕
+
+**待官方核验**
+
+- 待查S3 VPC endpoint的网络接入与bucket policy条件，以及IAM凭证、NAT对私有连接目标的作用边界。
+
+### Q711
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：电商应用使用Multi-AZ Aurora PostgreSQL cluster；促销时读写高负载导致访问超时，需提升整体扩展性和高可用，且停机最少。
+
+**必要判断**
+
+- j1（显式）：比较EventBridge加Lambda记录集群状态并增加故障转移reader、ZDR加Database Activity Streams、额外reader加RDS Proxy target group，对整体超时、扩展性、可用性及变更停机的影响。〔S, O1, O2, O3〕
+- j2（显式）：评估ElastiCache for Redis加DMS复制及write-around方案，与其他组合在读写访问路径、数据同步和维护目标上的差异；不要求每个组件单独改善全部目标。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查Aurora reader、RDS Proxy、ZDR及活动流的适用能力，以及DMS到Redis和write-around组合的支持条件与停机影响。
+
+### Q712
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Web应用通过VPN连接现有数据中心与VPC，使用Route 53 DNS；VPC访问本地服务必须使用私有DNS记录，要求最安全。
+
+**必要判断**
+
+- j1（显式）：比较Resolver outbound或inbound endpoint加规则并关联VPC、private hosted zone关联VPC、public hosted zone逐服务建记录，判断解析方向、记录来源及私有安全目标的适配。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查Route 53 Resolver端点方向、条件转发规则、VPN上的DNS连通要求及公私hosted zone的解析范围。
+
+### Q713
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：照片服务位于us-east-1，供多国用户上传和查看；单照片最多20 MB，热点持续数月或不足一周，依元数据选择展示照片，要求访问适当且最具成本效益。
+
+**必要判断**
+
+- j1（显式）：比较DynamoDB存照片加DAX、S3 Intelligent-Tiering加DynamoDB元数据及位置、S3 Standard满30天转Standard-IA加对象标签、Glacier满30天转Deep Archive加OpenSearch元数据及位置。〔S, O1, O2, O3, O4〕
+- j2（显式）：判断20 MB对象、变化不一的访问周期、照片读取时效与元数据检索需求，对存储大小限制、分层策略及总成本的影响。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查DynamoDB大小限制、DAX用途、各S3存储类的访问与计费条件，以及对象标签和数据库元数据查询能力。
+
+### Q714
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：高可用Web应用为ALB后EC2并使用CloudWatch；流量增加时部分实例未完成请求多、已处理请求数及响应时间较高，要求避免继续向过载实例分配新请求。
+
+**必要判断**
+
+- j1（显式）：比较round robin与least outstanding requests，以及RequestCountPerTarget/ActiveConnectionCount和RequestCount/TargetResponseTime两组指标，判断过载识别、指标适用性与路由决策关系。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查ALB路由算法依据、四个CloudWatch指标的资源归属与含义，以及算法是否按选项所述依赖这些指标。
+
+### Q715
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：账户用EC2、Fargate、Lambda运行多种负载，希望充分使用Compute Savings Plans，并在coverage下降时收到通知，要求最高运维效率。
+
+**必要判断**
+
+- j1（显式）：比较每日Savings Plans budget配coverage阈值和邮件、Lambda生成coverage报告加SES、每日Budgets report、Savings Plans alert subscription开启全部通知，对下降告警与运维目标的覆盖。〔S, O1, O2, O3, O4〕
+- j2（显式）：区分coverage、使用充分程度、定期报告与阈值通知，避免将一般订阅通知视作coverage下降告警。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查AWS Budgets的Savings Plans coverage预算、时间粒度和告警条件，以及报告与alert subscription通知范围。
+
+### Q716
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：实时摄取方案使用最新版本MSK，部署在VPC三个AZ的私有子网；需改为互联网公开可访问且传输加密，要求最高运维效率。
+
+**必要判断**
+
+- j1（显式）：比较现有VPC新增公有子网或新建VPC公有子网并部署MSK、启用mutual TLS的公网接入及加密能力与重建开销。〔S, O1, O2〕
+- j2（显式）：比较私有子网ALB仅允许VPC CIDR的HTTPS与私有子网NLB配置互联网HTTPS listener，判断公网可达性、Kafka协议衔接及传输加密能否成立。〔S, O3, O4〕
+
+**待官方核验**
+
+- 待查MSK公开访问的子网、安全与认证前提，以及ALB/NLB协议、listener和公网部署要求。
+
+### Q717
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：本地遗留应用从ERP接收订单文件并上传SFTP，原来每小时轮询；AWS账户已有本地网络连通，迁移后须兼容ERP、保持SFTP、安全且有韧性，并立即处理订单。
+
+**必要判断**
+
+- j1（显式）：比较Transfer Family internet-facing或internal端点、一个或两个AZ、S3或EFS存储，判断现有ERP接入、安全与韧性适配。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较S3 s3:ObjectCreated:*触发Lambda、Transfer Family managed workflow调用Lambda、EventBridge Scheduler定期检查EFS并调用Step Functions，判断完整接收处理链路与立即处理目标。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查Transfer Family端点及多AZ配置、S3/EFS集成、managed workflow与对象事件触发的处理时机和支持条件。
+
+### Q718
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：本地Apache Hadoop与Apache Spark基础设施扩展性差且管理复杂；需提升扩展性、降低运维复杂度，并保持数据处理在本地。
+
+**必要判断**
+
+- j1（显式）：比较Site-to-Site VPN访问本地HDFS后由EMR处理、DataSync接HDFS后由EMR处理、EMR on Outposts迁移应用、Snowball迁S3后由EMR处理，区分数据所在地与计算执行地点。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查EMR与Outposts的部署及Hadoop/Spark支持，以及VPN、DataSync、Snowball方案的数据与计算路径和管理责任。
+
+### Q719
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：大量本地数据迁AWS，同Region的Windows、Mac、Linux EC2需用SMB和NFS访问；部分数据常用、其余少用，要求托管方案运维开销最低。
+
+**必要判断**
+
+- j1（显式）：比较EFS Intelligent-Tiering加DataSync、FSx for ONTAP root volume配auto tiering、S3 Intelligent-Tiering加S3 File Gateway、FSx for OpenZFS的SMB/NFS及多系统访问适配。〔S, O1, O2, O3, O4〕
+- j2（显式）：判断各方案迁移路径、冷热数据分层及客户端接入维护开销，保留ONTAP root volume与auto tiering的具体配置差异。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各文件服务与File Gateway的协议、客户端和分层支持，以及迁移、卷类型和策略配置限制。
+
+### Q720
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：报告约20分钟生成；单EC2上的紧耦合单体频繁更新，新增功能增加维护难度，模块补丁导致停机，中断后报告须从头重做；需灵活、可扩展、渐进改进并减少停机。
+
+**必要判断**
+
+- j1（显式）：比较单Lambda加最大provisioned concurrency、Spot Fleet默认分配策略下微服务、ECS微服务加service auto scaling、Elastic Beanstalk单环境all-at-once部署的解耦、扩展与更新停机行为。〔S, O1, O2, O3, O4〕
+- j2（显式）：判断20分钟执行及中断需重做的工作特征，对Lambda运行限制、Spot中断风险和各方案部署连续性的约束。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查Lambda时限与provisioned concurrency边界、Spot Fleet中断及分配行为、ECS扩缩与部署、Beanstalk all-at-once停机特征。
+
+### Q721
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：现有大型Python Web应用运行于EC2，拟重构为serverless微服务；先测试每秒数百请求的一个组件，需支持Python、自动扩展、最少基础设施和运维支持。
+
+**必要判断**
+
+- j1（显式）：比较最新Amazon Linux上的Spot Fleet自动扩展、Elastic Beanstalk高可用Web环境、EKS加self-managed EC2 Auto Scaling groups、运行自定义代码的Lambda，判断Python、请求规模、serverless及管理目标的适配。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各运行平台的Python支持、自动扩展、请求容量与配额，以及服务器和基础设施管理边界。
+
+### Q722
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：本地已通过Direct Connect连接一个AWS账户；同Region有30个VPC，使用private VIF且CIDR与受控网络均不重叠；需集中管理并实现所有VPC及本地互通，运维开销最低。
+
+**必要判断**
+
+- j1（显式）：比较transit gateway加新transit VIF及路由传播、Direct Connect gateway加重建private VIF和各VPC virtual private gateway，对集中管理及VPC间、本地互通的覆盖。〔S, O1, O2〕
+- j2（显式）：比较transit VPC加Direct Connect和VPC peering、逐VPC Site-to-Site VPN且每连接两条隧道UP并启用路由传播的拓扑、传递路由和30个VPC管理开销。〔S, O3, O4〕
+
+**待官方核验**
+
+- 待查Direct Connect各VIF与gateway的关联链路、transit gateway/VPC peering的互通范围，以及VPN路由传播要求。
+
+**源异常／歧义**
+
+- O3的“transit VPConnect”“transit VPCreate”存在缺字粘连，transit VPC连接和peering拓扑表述不完整。
+
+### Q723
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：EC2应用已通过附带策略的IAM role连接RDS；需用Systems Manager补丁管理且不干扰运行中的应用。
+
+**必要判断**
+
+- j1（显式）：比较新role附AmazonSSMManagedInstanceCore并关联实例及原role、IAM user授权Systems Manager、Default Host Configuration Management、删除原role策略后换SSM策略，对管理接入与现有RDS权限的影响。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：判断Systems Manager接管及补丁执行所需的实例身份、agent与重启安排，区分保留应用权限和避免补丁期间中断。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查EC2 role关联限制、Default Host Configuration Management前提及与现有role的关系，以及补丁重启控制。
+
+### Q724
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：EKS容器已用Horizontal Pod Autoscaler，日内负载变化；节点满载后未自动扩容导致性能问题，需以最少管理开销解决。
+
+**必要判断**
+
+- j1（显式）：区分Pod与节点扩缩，比较按内存扩节点、Kubernetes Cluster Autoscaler、Lambda自动调整EKS、EC2 Auto Scaling group分配负载的触发依据、联动及管理开销。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查HPA与Cluster Autoscaler的职责、节点扩容触发及Auto Scaling group集成条件，并核对自定义内存或Lambda方案要求。
+
+### Q725
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：S3 Standard长期约300 TB，对象通常约50 GB，全球应用频繁用multipart uploads替换；对象数量和大小不变但月存储费持续增长，需降本。
+
+**必要判断**
+
+- j1（显式）：比较改用S3 Transfer Acceleration、Lifecycle删除未完成multipart uploads、S3 Inventory防止过早归档、CloudFront减少S3对象数量，判断与费用增长机制及降本目标的关系。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查multipart upload各阶段的存储计费与清理能力，以及Transfer Acceleration、Inventory、CloudFront的实际作用边界。
+
+### Q726
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：移动多人游戏需按经纬度实时跟踪玩家，位置快速读写；当前RDS PostgreSQL加read replicas在峰值无法满足读写性能，用户快速增长。
+
+**必要判断**
+
+- j1（显式）：比较快照恢复并启用Multi-AZ、迁OpenSearch加OpenSearch Dashboards、现有数据库前加DAX或ElastiCache for Redis并修改游戏，对经纬度位置更新、检索与读写性能的适配。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：判断缓存或替代存储与RDS PostgreSQL的集成支持、位置查询模型及更新同步要求。〔S, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查Redis和OpenSearch的位置读写能力、DAX可接入的数据源，以及RDS Multi-AZ与read replicas的性能职责。
+
+### Q727
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：关键DynamoDB表被管理员误删，造成重大数据损失及业务中断；需防止同类中断再次发生，运维开销最低。
+
+**必要判断**
+
+- j1（显式）：比较CloudTrail删除事件经EventBridge触发Lambda自动恢复、备份计划加人工恢复、deletion protection、point-in-time recovery，区分删除预防与事后恢复及运维要求。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查DynamoDB删除保护、备份及PITR在误删场景的作用与恢复前提，以及删除事件自动恢复链路。
+
+### Q728
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：本地数据中心存储将耗尽，需迁移存储基础设施到AWS、尽量降低带宽成本，并支持立即取回数据且无额外取回费用。
+
+**必要判断**
+
+- j1（显式）：比较Glacier Vault expedited retrieval加provisioned retrieval capacity、Storage Gateway cached volumes保留本地热点子集、stored volumes本地全量加S3异步快照、Direct Connect加本地存储与异步快照。〔S, O1, O2, O3, O4〕
+- j2（显式）：判断各方案能否缓解本地容量不足，并比较本地数据保留量、带宽、取回时效与额外取回费用，不将降带宽目标等同于所有组件降费。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查Volume Gateway两种模式的数据驻留与访问计费、Glacier取回时效及费用，以及Direct Connect相关成本。
+
+### Q729
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：三层Web应用跨多个AZ，应用层EC2位于Auto Scaling group；自动扩缩计划需分析每日及每周历史趋势，同时按预测和实时利用率变化调整资源。
+
+**必要判断**
+
+- j1（显式）：比较平均CPU step scaling、predictive scaling预测并扩缩加target tracking、按流量模式scheduled scaling、simple scaling按启动时间延长cooldown，对历史预测与实时响应的联合覆盖。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查predictive scaling历史模式与扩缩模式、其与target tracking的协作，以及step、scheduled、simple scaling和cooldown行为。
+
+### Q730
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：应用使用 EC2 和 Aurora MySQL 集群。
+- c2〔S〕：应用增长时，EC2 使用量仅小幅增加，数据库集群使用量增长更快。
+- c3〔S〕：已添加一个只读副本，但缓解仅持续短时间，负载仍继续增长。
+- c4〔S〕：引起数据库负载增长的操作全部是配送详情相关的重复读取。
+- c5〔S〕：需要减轻重复读取对数据库的影响，且最具成本效益。
+- c6〔O1〕：候选在应用与数据库之间部署 ElastiCache for Redis 集群。
+- c7〔O2〕：候选再添加一个只读副本。
+- c8〔O3〕：候选为 Aurora 只读副本配置自动扩缩容。
+- c9〔O4〕：候选将数据库集群改为多个写入实例。
+
+**必要判断**
+
+- j1（显式）：如何根据负载增长位置、重复读取特征及已有副本的短期效果，判断需要减少数据库请求还是增加处理容量？〔S〕
+- j2（显式）：如何比较应用前置缓存、增加只读副本、副本自动扩缩容和多个写入实例对该读取负载的作用与成本？〔S, O1, O2, O3, O4〕
+- j3（先修候选，待核验）：需要核实配送详情的哪些读取重复度、数据更新和新鲜度条件，才能评估缓存候选的适用性？〔S, O1〕
+
+**待官方核验**
+
+- 缓存、Aurora 只读副本及其自动扩缩容分别如何影响重复读取到达数据库的数量、容量和计费？
+- 题目所述 Aurora MySQL 部署对多个写入实例有哪些能力与限制，其与读取负载缓解有什么关系？
+- Redis 缓存接入该读取路径需要哪些应用改动，以及哪些更新、失效和一致性条件？
+
+### Q731
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：应用使用DynamoDB，许多请求未返回最新数据；用户未报告其他数据库性能问题，延迟可接受。
+
+**必要判断**
+
+- j1（显式）：比较给表加read replicas、使用GSI、请求strongly consistent reads或eventually consistent reads，判断哪些设计变化针对数据新鲜度而非现有性能。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查DynamoDB表与GSI的读取一致性选项，以及所述read replicas方案的支持和语义。
+
+### Q732
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：应用运行于EC2并使用RDS，数据库凭证已按最小权限配置；需防护SQL injection及其他Web攻击，运维开销最低。
+
+**必要判断**
+
+- j1（显式）：比较security groups加network ACLs、WAF加RDS parameter groups、Network Firewall、按功能拆数据库账户并限制权限，对Web请求攻击检测、防护位置与运维目标的覆盖。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：判断WAF或网络防火墙接入现有EC2应用所需的入口或流量路径，以及RDS参数配置在完整防护方案中的职责。〔S, O2, O3〕
+
+**待官方核验**
+
+- 待查各控制层对SQL injection和Web攻击的能力、WAF可关联入口、Network Firewall流量检查条件及RDS参数边界。
+
+### Q733
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Organizations多账户应用均使用Aurora PostgreSQL；需防范恶意活动并识别异常失败及未完成登录尝试，要求最高运维效率。
+
+**必要判断**
+
+- j1（显式）：比较组织root挂SCP识别登录失败、成员账户启用GuardDuty RDS Protection、Aurora general logs经CloudWatch Logs汇总S3、CloudTrail数据库事件汇总S3，对登录异常检测与跨账户管理的覆盖。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查RDS Protection的Aurora PostgreSQL登录检测与Organizations管理能力，以及SCP、general logs、CloudTrail记录范围和后续分析要求。
+
+### Q734
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：公司本地经Direct Connect连接us-east-1 VPC；被收购公司本地经Direct Connect连接eu-west-2的多个VPC，VPC CIDR不重叠；需两Region及数据中心互通、可扩展且降低运维。
+
+**必要判断**
+
+- j1（显式）：比较跨Region VPC peering、从us-east-1 Direct Connect建private VIF到eu-west-2 VPC、EC2全网状VPN appliances加VPN CloudHub、现有Direct Connect接gateway并由各Region virtual private gateways路由的完整互通范围。〔S, O1, O2, O3, O4〕
+- j2（显式）：判断VPC间、跨Region及两个数据中心间各段流量的路由衔接、传递能力和扩展维护开销，明确现有两条Direct Connect如何纳入方案。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查VPC peering、Direct Connect gateway/private VIF及VPN CloudHub的跨Region和传递路由限制与关联条件。
+
+### Q735
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：移动游戏将分数流送至后端处理并发布排行榜；需承受大流量峰值、按接收顺序处理、将结果存入高可用数据库，并尽量减少管理开销。
+
+**必要判断**
+
+- j1（显式）：比较Kinesis Data Streams加Lambda或EC2 Auto Scaling消费者、SNS加Lambda、SQS加EC2 Auto Scaling，对峰值吸收、接收顺序和处理运维的影响。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较各完整链路搭配DynamoDB、Redshift、EC2自建SQL、RDS Multi-AZ存储结果的高可用与管理责任，并核对顺序在采集到处理间是否保留。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查Kinesis、SNS和SQS的顺序保证及消费者并发条件，以及各数据库部署的高可用和运维要求。
+
+**源异常／歧义**
+
+- 题干未说明顺序要求是全局还是按玩家或分区；O4也未注明SQS队列类型，可能影响顺序判断。
+
+### Q736
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：多AWS账户应用及各自S3日志均在us-west-2；需用单一S3 bucket集中分析，日志不得离开us-west-2，运维开销最少且成本效益最高。
+
+**必要判断**
+
+- j1（显式）：比较Lifecycle从一个应用桶复制、Same-Region Replication汇总、每日脚本以PutObject复制各桶全部内容、各账户s3:ObjectCreated:*触发Lambda复制，对多账户覆盖、Region限制、增量处理、成本和运维的影响。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：判断集中桶跨账户写入、复制及既有日志纳入所需配置，区分持续新日志与历史对象覆盖。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查S3 Lifecycle与Same-Region Replication能力、跨账户权限及历史对象处理，以及脚本和Lambda复制费用。
+
+### Q737
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：全球点播培训视频及授权开发者上传当前使用us-east-2 S3；已新增eu-west-2、ap-southeast-1桶，需复制数据并降低这两Region附近上传及播放延迟，应用改动最少；选两步组合。
+
+**必要判断**
+
+- j1（显式）：比较us-east-2分别单向复制到两个新Region、经eu-west-2链式单向复制、三Region桶双向复制，判断新增上传位置与数据分布要求如何衔接。〔S, O1, O2, O3〕
+- j2（显式）：比较S3 Multi-Region Access Point ARN仅用于播放且不改上传，与同时用于播放和上传，判断其与复制拓扑组合对双向延迟和应用改动量的覆盖。〔S, O1, O2, O3, O4, O5〕
+
+**待官方核验**
+
+- 待查Multi-Region Access Point读写路由及应用接入要求、跨Region单向/双向及链式复制规则和对象传播行为。
+
+### Q738
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：全球移动用户按主题查看本地新闻，并上传照片和视频。
+- c2〔S〕：内容发布后最初几分钟访问频繁，迅速被新内容替代后消失；90%内容在上传所在AWS Region内消费。
+- c3〔S〕：优化用户体验，目标是内容上传延迟最低。
+
+**必要判断**
+
+- j1（显式）：比较CloudFront上传至S3、S3 Transfer Acceleration、最近Region的EC2接收后复制至S3、最近Region的S3配合多个CloudFront distributions的上传路径。〔S, O1, O2, O3, O4〕
+- j2（显式）：判断Region邻近性、90%区域内消费及内容短热度对上传延迟方案的影响，区分上传与分发收益。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 核对各上传路径的支持方式、Region选择及加速适用条件，比较端到端上传延迟因素。
+
+### Q739
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：serverless架构使用API Gateway REST API和Lambda；消息需发送给多个目标Lambda，并过滤为各函数所需消息。
+- c2〔S〕：整体运维开销最低。
+
+**必要判断**
+
+- j1（显式）：比较API Gateway经SNS→多个SQS→Lambda轮询、EventBridge→Lambda、Amazon MSK→Lambda及直接多个SQS→Lambda轮询的扇出与过滤实现。〔S, O1, O2, O3, O4〕
+- j2（显式）：评估各组合的API集成、过滤配置、消息消费机制及整体运维开销。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 核对REST API集成、消息过滤与多Lambda投递支持，以及SNS/SQS、EventBridge、MSK的消费和管理差异。
+
+### Q740
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：数百万归档文件已迁入S3；使用customer-provided key加密全部归档数据，覆盖现有未加密对象和未来对象。
+
+**必要判断**
+
+- j1（显式）：比较S3 Inventory、S3 Storage Lens与S3 usage report识别未加密数据的粒度及生成对象清单的适用性。〔S, O1, O2, O3, O4〕
+- j2（显式）：判断SSE-C与SSE-KMS的密钥语义，以及S3 Batch Operations、AWS Batch和S3默认加密各自能否组成覆盖存量与新增对象的方案；包含仅配置默认加密的差异。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 核对加密状态报告、批量重加密、默认加密对SSE-C/SSE-KMS的支持及customer-provided key要求。
+
+### Q741
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：现有域名DNS提供商故障导致AWS网站中断；需快速迁移至AWS上更具韧性的托管DNS服务。
+
+**必要判断**
+
+- j1（显式）：比较Route 53 public/private hosted zone导入原zone file，与Simple AD配合AWS Directory Service for Microsoft Active Directory zone transfer的域名托管适用性。〔S, O1, O2, O3〕
+- j2（显式）：判断Route 53 Resolver inbound endpoint加原提供商DNS转发，是否完成托管迁移并满足快速、托管及故障韧性目标。〔S, O4〕
+
+**待官方核验**
+
+- 核对各DNS组件的解析范围、zone导入或传输支持及迁移后对原提供商的依赖。
+
+### Q742
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：AWS应用连接RDS；需管理应用配置，安全存取数据库及其他服务凭证，管理开销最低。
+
+**必要判断**
+
+- j1（显式）：比较AppConfig+Secrets Manager、Lambda+Systems Manager Parameter Store、S3加密配置文件+独立凭证文件、AppConfig+RDS凭证存储四种组合的配置管理、安全存取和整体管理负担。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 核对各服务的配置与凭证管理支持、保护机制及需自行实现的管理工作。
+
+### Q743
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：应用与RDS MySQL DB instance通信时，全部应用数据必须传输加密；现已启用AWS KMS静态加密，但未启用传输加密。
+
+**必要判断**
+
+- j1（显式）：比较所有数据库连接使用自签名证书或AWS提供的root certificates，能否满足传输加密要求及证书信任需求。〔S, O2, O4〕
+- j2（显式）：区分启用IAM database authentication与快照恢复到启用加密的新实例，对传输加密目标的作用范围。〔S, O1, O3〕
+
+**待官方核验**
+
+- 核对RDS MySQL连接加密及证书配置要求，并区分身份认证、传输加密和静态加密。
+
+### Q744
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：新Web服务部署在ELB后方的EC2；许多客户端只能访问其防火墙已授权的IP地址。
+
+**必要判断**
+
+- j1（显式）：比较NLB关联Elastic IP、ALB关联Elastic IP、Route 53 A record指向Elastic IP、负载均衡器前置公网IP的EC2代理，能否提供适合客户端IP授权的稳定入口并接通服务。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 核对ELB类型的IP与Elastic IP支持、DNS记录和代理方案的入口地址及流量衔接条件。
+
+### Q745
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：AWS账号刚创建，默认设置未改动；需保护root user安全。
+
+**必要判断**
+
+- j1（显式）：比较日常管理改用IAM users并禁用root、改用IAM users并为root启用MFA、生成root access key用于日常管理、向资深架构师提供root凭证并日常使用的安全性及可行性。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 核对root user保护建议、可禁用范围、MFA与access key风险及日常管理身份的使用边界。
+
+### Q746
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：EC2工作负载近实时处理流数据，网络架构需使节点间延迟尽可能低；选择两个网络方案组成组合。
+
+**必要判断**
+
+- j1（显式）：比较每实例enhanced networking、跨账号分组、cluster placement group、每实例多个ENI及EBS-optimized实例类型对节点间网络延迟的作用，判断所需两项组合。〔S, O1, O2, O3, O4, O5〕
+
+**待官方核验**
+
+- 核对各机制影响的网络、部署或存储维度，以及低延迟组合的支持条件。
+
+### Q747
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：关闭两个数据中心并迁移超过100 TB；多厂商SMB文件存储包含数百万小文件、复杂目录及深层子目录，主要为非结构化数据。
+- c2〔S〕：迁移后不修改应用的数据访问方式，整体运维开销最低。
+
+**必要判断**
+
+- j1（显式）：比较S3、FSx for Lustre、FSx for Windows File Server及Storage Gateway volume gateway对SMB访问、目录结构和应用兼容性的适用性。〔S, O1, O2, O3, O4〕
+- j2（显式）：评估Direct Connect→S3、DataSync→两种FSx、Direct Connect→volume gateway的完整迁移流程，对大规模小文件及关闭数据中心的支持和运维负担。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 核对源端SMB、目标协议和目录语义、迁移工具端点及网关部署依赖。
+
+### Q748
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Organizations管理多个应用账号，已设专用监控成员账号；需用CloudWatch跨账号查询并可视化可观测性数据。
+
+**必要判断**
+
+- j1（显式）：比较CloudWatch cross-account observability配合各账号部署监控账号提供的CloudFormation template，与在Organizations root OU设置SCP的跨账号共享方式。〔S, O1, O2〕
+- j2（显式）：判断监控账号新建IAM user、在各账号创建普通或cross-account IAM policies并附加给该用户的授权与数据访问衔接是否完整。〔S, O3, O4〕
+
+**待官方核验**
+
+- 核对CloudWatch跨账号共享配置、SCP授权边界及跨账号IAM policy附加和访问规则。
+
+### Q749
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：公开销售网站采用CloudFront→ALB→EC2 Auto Scaling group；已有AWS WAF防SQL injection，需阻止日志中发现的外部恶意IP访问网站。
+
+**必要判断**
+
+- j1（显式）：比较WAF IP match阻断、所谓CloudFront distribution的network ACL、后端EC2所在网络的network ACL及EC2 security group deny规则的适用性。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：辨明经CloudFront和ALB转发后各控制点可匹配的客户端IP，以及规则关联位置和允许/拒绝语义。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 核对各控制点的IP匹配、关联范围和拒绝规则支持，以及代理链中的源IP处理。
+
+### Q750
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Organizations含10个AWS账号，需为数千员工提供账号访问，并使用现有IdP进行AWS身份认证。
+
+**必要判断**
+
+- j1（显式）：比较各账号IAM users连接IdP并联合认证、root users同步IdP邮箱密码、IAM Identity Center连接IdP并预置users/groups、AWS RAM共享账号访问的身份与多账号授权模型。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 核对既有IdP集成、用户组预置和跨账号访问支持，以及IAM、root和RAM的适用边界。
+
+### Q751
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：指定五名员工需拥有该AWS账号内全部服务及资源的完整访问权；已分别创建IAM user及一个IAM user group。
+
+**必要判断**
+
+- j1（显式）：比较AdministratorAccess与SystemAdministrator权限范围，以及identity-based/resource-based policy附加到IAM user group的适用性；判断五名用户加入组后的授权是否完整。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 核对两种policy的权限内容、policy类型与IAM user group附加及权限继承规则。
+
+### Q752
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：现有多层支付应用基于VM，各层经第三方中间件异步通信并保证exactly-once delivery。
+- c2〔S〕：新方案仍须保证应用消息exactly-once delivery，整体基础设施管理最少；选择两个动作组成组合。
+
+**必要判断**
+
+- j1（显式）：比较Lambda、EC2、EKS容器计算层与SNS、SQS FIFO层间消息组件的组合，评估整体管理负担和exactly-once要求。〔S, O1, O2, O3, O4, O5〕
+- j2（先修候选，待核验）：界定候选消息机制的去重与投递保证边界，以及与计算层消费、重试衔接后的端到端语义。〔S, O1, O2, O3, O4, O5〕
+
+**待官方核验**
+
+- 核对SNS、SQS FIFO及候选计算集成的投递、去重和重试限制，比较基础设施管理责任。
+
+### Q753
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：本地文件系统每天通过SFTP接收报表，每晚批处理分析；需迁往AWS，保持高可用和韧性，并尽量减少运维工作。
+
+**必要判断**
+
+- j1（显式）：比较AWS Transfer for SFTP与自建Linux EC2 SFTP，配合EFS、EBS或S3的接收与存储链路对高可用、韧性和运维的影响。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较scheduled scaling policy运行夜间EC2批处理、ASG minimum/desired均为1，以及修改应用从S3拉取文件的执行与恢复差异。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 核对Transfer存储集成、EFS/EBS/S3可用性与实例替换后的数据衔接，以及定时批处理部署要求。
+
+### Q754
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：全球用户访问多Region EC2上的HTTP应用；需提高可用性与性能、防御影响可用性/安全或消耗过多资源的常见Web攻击，并提供静态IP。
+
+**必要判断**
+
+- j1（显式）：比较各Region采用NLB或ALB并关联WAF，或将WAF关联CloudFront的HTTP防护及组件兼容性。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较Global Accelerator注册区域负载均衡器，与CloudFront origin经Route 53 latency-based routing访问区域负载均衡器的完整链路，评估静态IP、可用性与性能目标。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 核对WAF关联对象、Global Accelerator endpoint和静态IP支持，以及CloudFront/Route 53路由组合的限制。
+
+### Q755
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Aurora MySQL含多个read replicas和跨AZ的多个DB instances；用户遇到too many connections错误。
+- c2〔S〕：read replica提升为primary writer时，failover时间需减少20%。
+
+**必要判断**
+
+- j1（显式）：比较Aurora前置RDS Proxy、改用RDS Multi-AZ cluster、DynamoDB+DAX读取连接、Redshift relocation，对连接问题和指定failover时间目标的适用性。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：区分数据库角色切换时间与客户端连接恢复时间，明确20%改善所对应的衡量范围。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 核对各候选的连接管理、故障切换或relocation机制，以及20%改善目标的适用前提。
+
+### Q756
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：S3文本文件包含客户聊天内容、日期时间及客户PII
+- c2〔S〕：外部服务商为质量控制随机抽取会话，范围必须覆盖最新会话
+- c3〔S〕：不得向外部服务商共享客户PII
+- c4〔S〕：方案需随会话数量增长扩展，并使运维开销最少
+- c5〔S〕：要求运维开销最少
+- c6〔O1〕：O1让外部服务商通过Object Lambda接入点访问，Lambda在读取时脱敏
+- c7〔O2〕：O2由EC2定期批处理所有新文件，脱敏后写入另一个S3桶供访问
+- c8〔O3〕：O3由EC2 Web应用列出文件、脱敏并提供脱敏版本下载
+- c9〔O4〕：O4在S3新文件写入时由Lambda提取非PII数据，写入DynamoDB供外部访问
+
+**必要判断**
+
+- j1（显式）：如何判断读取时脱敏、定期批处理、Web应用及事件提取方案能否阻止外部服务商接触PII？〔S, O1, O2, O3, O4〕
+- j2（显式）：如何判断各方案的访问接口和处理时机能否支持随机抽样，并覆盖最新会话？〔S, O1, O2, O3, O4〕
+- j3（显式）：如何比较各方案随会话量增长的扩展方式，以及批处理、应用服务器和派生存储的运维开销？〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- S3 Object Lambda接入点的可用条件、读取转换、外部访问授权及伸缩限制是什么，如何确保访问路径只返回脱敏结果？
+- S3事件到Lambda及DynamoDB的处理链路有哪些交付、延迟和访问查询限制，各方案如何保证最新会话可抽样且不泄露原始PII？
+
+**源异常／歧义**
+
+- O2与O3的原始选项标签均为B，保留原状并按O2、O3区分。
+
+### Q757
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：遗留系统运行在单个EC2，代码不能修改且不能在多个实例上运行；需提高韧性并缩短恢复时间。
+
+**必要判断**
+
+- j1（显式）：比较termination protection、所谓EC2 Multi-AZ deployment、CloudWatch alarm触发实例恢复，以及两块EBS采用RAID冗余，对单实例系统故障恢复的适用性。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 核对各机制覆盖的误终止、实例或底层故障、AZ故障和存储故障范围，以及自动恢复条件。
+
+### Q758
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：容器化应用部署至VPC的三个AZ，需跨AZ高可用、最少应用修改及最低运维开销。
+
+**必要判断**
+
+- j1（显式）：比较ECS Service Auto Scaling target tracking、minimum=3及按AZ spread，与EKS self-managed nodes配Application Auto Scaling target tracking、minimum=3的容量与分布保障。〔S, O1, O2〕
+- j2（显式）：评估三台EC2 Reserved Instances配spread placement group和ASG target tracking、minimum=3，以及VPC Lambda配Application Auto Scaling、minimum=3，对容器兼容、三AZ高可用及整体运维的适用性。〔S, O3, O4〕
+
+**待官方核验**
+
+- 核对各扩缩容集成、minimum容量语义、AZ放置约束及容器运行与基础设施管理要求。
+
+### Q759
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：电影存于S3，每部为单个1–10 GB视频文件；购买后5分钟内必须可提供流媒体内容。
+- c2〔S〕：少于20年的电影需求高于超过20年的电影；需按需求尽量降低托管成本。
+
+**必要判断**
+
+- j1（显式）：比较S3 Lifecycle按需求下降转Infrequent Access、较新Standard+较旧Standard-IA并standard retrieval、较新Intelligent-Tiering+较旧Glacier Flexible Retrieval并expedited retrieval、较新Standard+较旧Glacier Flexible Retrieval并bulk retrieval的整体成本与可用时限。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：判断1–10 GB单文件的检索准备时间与流媒体可开始提供时间如何衔接，避免仅依据检索档位名称判断5分钟目标。〔S, O2, O3, O4〕
+
+**待官方核验**
+
+- 核对候选存储层及检索方式的访问延迟、文件大小限制、费用和生命周期条件。
+
+**源异常／歧义**
+
+- O1仅称Infrequent Access tier，未明确具体存储类或分层机制。
+
+### Q760
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：供应商以Docker container image交付应用，需50 GB临时文件空间；基础设施必须serverless且运维开销最低。
+
+**必要判断**
+
+- j1（显式）：比较Lambda容器镜像挂载超过50 GB的S3或EBS，与ECS Fargate task definition挂载EFS并创建service，以及ECS EC2 launch type配超过50 GB EBS的运行与存储组合。〔S, O1, O2, O3, O4〕
+- j2（显式）：评估各组合是否同时满足容器运行、50 GB临时文件访问、serverless及整体最低运维目标。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 核对Lambda与ECS各launch type的镜像、卷挂载、容量及基础设施管理限制。
+
+### Q761
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：需使用本地LDAP目录认证AWS Management Console用户；该目录不兼容SAML。
+
+**必要判断**
+
+- j1（显式）：比较IAM Identity Center连接LDAP、将使用AWS credentials的IAM policy集成LDAP、随LDAP凭证更新轮换IAM credentials，以及本地custom identity broker调用STS获取短期凭证的认证路径。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：辨明LDAP认证结果到AWS临时身份及Console会话的转换链路，判断非SAML条件下候选方案是否完整。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 核对目录兼容协议、STS与Console联合访问流程，以及policy和凭证同步方案的适用边界。
+
+### Q762
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：账号内多个AMI用于启动EC2，包含关键数据与配置；需快速高效恢复误删AMI，运维开销最低。
+
+**必要判断**
+
+- j1（显式）：比较AMI的EBS snapshots存另一账号、定期跨账号复制AMI、Recycle Bin retention rule，以及AMI上传启用Cross-Region Replication的S3 bucket的保护与恢复流程。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 核对AMI与底层快照的删除/恢复关系、Recycle Bin保护范围、跨账号复制及S3方案支持与管理负担。
+
+### Q763
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：150 TB本地归档图像需在下个月内迁至AWS；可用于迁移的上传带宽最高100 Mbps，且仅夜间可用。
+- c2〔S〕：满足截止日期的前提下成本效益最高。
+
+**必要判断**
+
+- j1（显式）：比较Snowmobile、多个Snowball devices、S3 Transfer Acceleration安全上传，以及S3 VPC endpoint配VPN上传的容量、完成周期和整体成本。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：估算150 TB在100 Mbps且仅夜间传输的时限约束，并计入离线设备准备、装载、运输和导入时间。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 核对设备容量与交付周期、在线传输路径及加速限制、VPN/endpoint衔接和相关计费。
+
+### Q764
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：本地三层应用的Web层和应用层运行于第三方VM，数据库为MySQL；迁至AWS时架构改动尽可能少。
+- c2〔S〕：数据库必须支持恢复到指定时间点，整体运维开销最低。
+
+**必要判断**
+
+- j1（显式）：比较Web/应用层均在private subnets、Web public而应用private、两层均public，以及数据库private/public的部署组合对三层连接、暴露范围和架构改动的影响。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较RDS for MySQL与Aurora MySQL的兼容性、指定时间点恢复及整体运维负担，并结合各选项子网布局评估。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 核对RDS/Aurora MySQL迁移和时间点恢复条件，以及各子网布局所需连接与入口配置。
+
+### Q765
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：合作公司需轮询开发团队账号内的SQS queue，同时不放弃其自身账号权限。
+
+**必要判断**
+
+- j1（显式）：比较instance profile、IAM policy、SQS access policy和SNS access policy的跨账号队列授权方式，判断是否支持合作方保持自身身份权限并轮询。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：区分资源侧授权、调用者身份侧权限及切换身份的关系，明确跨账号SQS访问链路。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 核对SQS跨账号轮询的policy类型、principal与权限组合，以及instance profile和SNS policy适用范围。
+
+### Q766
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：开发者在办公室及远程办公，需安全SSH访问最新版Amazon Linux EC2；方案须使用AWS服务且成本效益最高。
+- c2〔S〕：EC2位于VPC private subnet，经public subnet中的NAT gateway访问互联网。
+
+**必要判断**
+
+- j1（显式）：比较同private subnet bastion+ec2:CreateVpnConnection+EC2 Instance Connect、办公室Site-to-Site VPN加远程另建VPN、public subnet bastion配来源限制与SSH keys的访问路径及成本。〔S, O1, O2, O3〕
+- j2（显式）：评估实例角色附加AmazonSSMManagedInstanceCore并使用Session Manager的权限、网络和访问方式，判断是否满足题干SSH要求及最低成本目标。〔S, O4〕
+
+**待官方核验**
+
+- 核对各连接方式的网络可达性、IAM/agent要求、SSH支持及bastion、VPN、Session Manager成本。
+
+### Q767
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：制药研发数据近几个月指数增长，全部位于本地存储阵列；研究人员常用子集需立即可用且延迟最低，全集无需每日访问。
+- c2〔S〕：需降低持续资本支出。
+
+**必要判断**
+
+- j1（显式）：比较cron定时DataSync持续迁往S3、Storage Gateway file gateway以S3为目标、volume gateway cached volumes以S3为目标，以及Site-to-Site VPN连接EFS的存储方案。〔S, O1, O2, O3, O4〕
+- j2（显式）：判断各方案对常用子集即时低延迟访问、全集云端存储及本地容量投入的平衡，区分定期迁移、文件访问和缓存卷机制。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 核对网关缓存与访问协议、DataSync同步行为、EFS跨VPN访问及本地存储需求。
+
+### Q768
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：关键业务应用运行于EC2，数据存于DynamoDB；必须恢复到过去24小时内任意时间点，运维开销最低。
+
+**必要判断**
+
+- j1（显式）：比较DynamoDB point-in-time recovery、AWS Backup、Lambda每小时on-demand backup，以及DynamoDB Streams记录24小时变更并复制到S3的恢复粒度、完整恢复流程和运维负担。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 核对任意时间点恢复支持、备份粒度、Streams保留及变更重放所需工作。
+
+### Q769
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：文件上传到S3后提取元数据，处理耗时少于5秒；上传量从每小时几个文件到数百并发不等，需成本有效的架构。
+
+**必要判断**
+
+- j1（显式）：比较CloudTrail记录S3 API+AppSync处理、S3 object-created event→Lambda、Kinesis Data Streams→S3并调用Lambda、SNS处理上传文件并调用Lambda的触发与计算链路。〔S, O1, O2, O3, O4〕
+- j2（显式）：评估各链路能否完成上传后短时处理，并适应低频至数百并发的变化及整体成本目标。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 核对S3上传事件与候选服务集成、处理职责、并发扩展和低频计费差异。
+
+### Q770
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：应用使用EC2及事件驱动Lambda；生产持续使用，客户跨时区；独立账号的非生产环境仅工作日办公时间使用，周末不用。
+- c2〔S〕：优化应用AWS运行成本，选择成本效益最高的方案。
+
+**必要判断**
+
+- j1（显式）：比较生产On-Demand+非生产仅周末Dedicated Hosts、两环境Reserved Instances且闲时关闭非生产、生产Compute Savings Plans+非生产On-Demand且闲时关闭、生产Dedicated Hosts+非生产EC2 Instance Savings Plans的整体成本。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：区分持续与间歇使用的承诺利用率、停机后的费用，以及跨账号和EC2/Lambda用量对折扣范围的影响。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 核对各购买模式的承诺、停机计费、服务覆盖与跨账号折扣条件。
+
+### Q771
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：源为本地Oracle关系数据库，目标为Aurora PostgreSQL以供分析
+- c2〔S〕：已有Site-to-Site VPN连接本地网络与AWS
+- c3〔S〕：必须捕获迁移期间源数据库发生的变化
+- c4〔O1〕：O1使用SCT转换模式，再运行DMS全量加载任务
+- c5〔O2〕：O2使用DataSync迁至S3，再通过aws_s3扩展导入目标库
+- c6〔O3〕：O3使用SCT转换模式，再由DMS迁移已有数据并复制持续变化
+- c7〔O4〕：O4使用Snowball迁至S3，再通过aws_s3扩展导入目标库
+
+**必要判断**
+
+- j1（显式）：Oracle到Aurora PostgreSQL的异构迁移需要区分哪些模式转换与数据搬迁工作？〔S, O1, O2, O3, O4〕
+- j2（显式）：如何判断全量加载、持续变更复制和经S3导入能否覆盖已有数据及迁移期间的源库变化？〔S, O1, O2, O3, O4〕
+- j3（显式）：如何判断已有VPN下各迁移链路的源端支持、目标导入和变更捕获衔接条件？〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- SCT与DMS针对Oracle到Aurora PostgreSQL分别支持哪些转换、全量和持续变更功能，源库日志及网络连接需要满足什么条件？
+- DataSync、Snowball及Aurora PostgreSQL的aws_s3扩展支持哪些源数据形式和导入流程，能否及如何衔接迁移期间的数据库变化？
+
+### Q772
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Docker容器应用需在AWS托管服务运行，按各容器服务需求独立扩缩容，且不增加运维开销或待管理基础设施；选择两个方案。
+
+**必要判断**
+
+- j1（显式）：比较ECS/Fargate、EKS/Fargate、API Gateway→Lambda运行容器、ECS/EC2 worker nodes及EKS/EC2 worker nodes的运行模型、单服务扩缩容和基础设施责任。〔S, O1, O2, O3, O4, O5〕
+
+**待官方核验**
+
+- 核对容器镜像与运行模型兼容性、服务级扩缩容支持，以及Fargate、Lambda和EC2 worker nodes的管理边界。
+
+### Q773
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：季节促销电商网站运行在跨多个AZ的EC2上；需应对突发流量增长，成本效益最高。
+
+**必要判断**
+
+- j1（显式）：比较按峰值建ASG后停止一半并再用其扩容、ASG minimum预置到无需扩容、CloudFront+ElastiCache缓存动态内容并在缓存填充后缩容，以及随流量扩容并用launch template启动预配置AMI的策略。〔S, O1, O2, O3, O4〕
+- j2（显式）：评估各策略的突发容量准备、实例启动或复用流程、缓存与源站衔接及闲置成本。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 核对ASG停止实例与扩容行为、launch template/AMI启动路径，以及候选缓存组合的origin和容量要求。
+
+### Q774
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：合规政策禁止security group包含允许0.0.0.0/0 SSH的规则；需自动检测违规并通知，尽快实施且运维开销最低。
+
+**必要判断**
+
+- j1（显式）：比较自编Lambda监控并通知、restricted-ssh AWS Config managed rule+SNS通知、授予全局开放security group/network ACL权限的角色并在被assume时通知，以及SCP限制非管理员改规则并通过工单通知的检测覆盖和实施负担。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 核对restricted-ssh检测范围与通知集成，以及角色使用通知和SCP限制能否对应实际违规事件。
+
+### Q775
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：微服务运行于Lambda和EKS，分别由不同团队支持；将从单账号拆分至各团队独立AWS账号。
+- c2〔S〕：需跨服务HTTPS通信，端口443，并提供service registry用于service discovery；管理开销最低。
+
+**必要判断**
+
+- j1（显式）：比较inspection VPC+Network Firewall+transit gateway、VPC Lattice service network配HTTPS listeners/targets及VPC关联、各微服务NLB HTTPS listener+PrivateLink endpoint service/interface endpoints、VPC peering+prefix lists/routes/security groups的完整跨账号通信链路。〔S, O1, O2, O3, O4〕
+- j2（显式）：判断各链路对Lambda/EKS目标、HTTPS 443、service registry/discovery及整体管理开销的满足程度，区分网络互通与服务发现。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 核对跨账号关联、计算目标、listener协议、服务注册发现及各组合的配置责任。
+
+**源异常／歧义**
+
+- 题干开头孤立出现“Use Amazon EKS with Amazon EC2 worker nodes”式方案句，与后续问题衔接不明，是否为既有部署限制存在歧义。
+
+### Q776
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：手游主要从RDS读取元数据；用户增长后加载变慢，指标表明仅扩展数据库无效。
+- c2〔S〕：需考察同时具备snapshots、replication及sub-millisecond响应的方案。
+
+**必要判断**
+
+- j1（显式）：比较迁往Aurora+Aurora Replicas、DynamoDB+global tables，以及RDS前加ElastiCache for Redis或Memcached，对元数据读取性能及三项能力要求的满足程度。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 核对各候选的快照、复制和响应延迟支持范围，以及数据库迁移或缓存接入要求。
+
+### Q777
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Organizations多账号环境中，security OU需向development OU共享批准的AMI；AMI基于AWS KMS加密快照创建，选择两个动作。
+
+**必要判断**
+
+- j1（显式）：比较AMI launch permission使用development OU ARN、Organizations root ARN或development account ARN的授权范围与格式。〔S, O1, O2, O4〕
+- j2（显式）：判断AMI启动权限与加密快照KMS使用权限的组合；比较更新现有key policy允许development OU使用，与重建KMS key并允许Organizations root ARN使用。〔S, O1, O2, O3, O4, O5〕
+
+**待官方核验**
+
+- 核对AMI共享支持的principal格式、OU/root范围，以及加密快照跨账号使用的KMS policy条件和重建key影响。
+
+### Q778
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：全球80个办公室各有1 PB数据，互联网带宽各为1–2 Gbps；需一次性迁往S3，4周内完成，成本效益最高。
+
+**必要判断**
+
+- j1（显式）：比较每办公室新建10 Gbps Direct Connect、多个Snowball Edge storage-optimized devices、Snowmobile及Storage Gateway Volume Gateway的分布式迁移可行性和总成本。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：结合每站1 PB、现有1–2 Gbps和4周窗口，评估并行吞吐、专线开通或设备交付/装载/运输/导入周期。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 核对各迁移机制的容量、全球地点适用性、部署交付周期及一次性迁移费用。
+
+### Q779
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：EC2应用需读取EFS参考数据集，但不能修改或删除；必须使用IAM访问控制限制写入。
+
+**必要判断**
+
+- j1（显式）：比较EC2只读挂载、EFS resource policy对实例IAM roles拒绝elasticfilesystem:ClientWrite、所谓EFS identity policy拒绝该action，以及每应用EFS access point配POSIX根目录只读权限的控制层与覆盖范围。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：明确EFS挂载身份如何与EC2角色及IAM policy衔接，并区分IAM限制、挂载选项和POSIX权限。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 核对ClientWrite权限语义、EFS policy类型、IAM认证挂载条件及access point/POSIX权限作用。
+
+### Q780
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：外部供应商用其自有AWS账号中的自动化工具执行工作，目前无公司账号IAM访问；需以最安全方式授予公司账号所需权限。
+
+**必要判断**
+
+- j1（显式）：比较公司账号role委派给供应商IAM role、公司IAM user使用复杂密码、公司IAM group加入供应商账号IAM user，以及公司IAM user配置允许供应商账号的permission boundary；各方案均附加所需权限policy。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：区分跨账号信任、权限授予、permission boundary与长期凭证，判断自动化工具的身份使用链路和权限范围。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 核对跨账号role信任与调用流程、group成员限制、permission boundary语义及自动化凭证方式。
+
+### Q781
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：实验工作负载有云支出预算；CFO需按部门追责费用，并在支出达到预算60%时收到通知。
+
+**必要判断**
+
+- j1（显式）：比较cost allocation tags标记owner与Cost Explorer forecasts确定owner，能否建立部门费用归属。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较AWS Budgets usage budgets、Cost Anomaly Detection及Trusted Advisor的AWS Support API，能否按支出预算60%发送通知；保留题干“达到”与选项“超过”、支出与usage度量的差别。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 核对费用归属机制、预算类型与阈值度量，以及各通知服务对固定支出百分比的支持。
+
+### Q782
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：内部Web应用仅允许公司办公室访问，但需从互联网下载安全补丁；已建VPC及连接办公室的Site-to-Site VPN，需安全架构。
+
+**必要判断**
+
+- j1（显式）：比较public/private EC2、public/internal ALB及ALB security group入站来源为0.0.0.0/0或办公室CIDR、出站目标为办公室CIDR或0.0.0.0/0的组合，判断办公室专属入口。〔S, O1, O2, O3, O4〕
+- j2（显式）：判断internet gateway与部署于public/private subnets的NAT gateways如何衔接补丁下载，比较无NAT选项的路径完整性及与VPN入站隔离的关系。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 核对ALB可达范围、security group方向、VPN路由及NAT/internet gateway对互联网出站的部署条件。
+
+### Q783
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：会计记录现存于EC2自定义应用；需迁至AWS托管服务维护应用数据，运维支持最少，提供不可变且可加密验证的数据变更日志，成本效益最高。
+
+**必要判断**
+
+- j1（显式）：比较复制记录到Redshift cluster、Neptune cluster、Timestream database或QLDB ledger，对数据维护、不可变变更日志、cryptographic verification及整体运维成本的适用性。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 核对各候选的数据变更历史、不可变性、加密验证机制和托管计费条件。
+
+### Q784
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：多源营销数据上传S3后由数据准备作业聚合报表；作业需定期间隔并行执行，后续部分作业需按特定顺序执行。
+- c2〔S〕：需消除自行管理作业错误处理、重试逻辑和状态的运维负担。
+
+**必要判断**
+
+- j1（显式）：比较上传即触发Lambda并定期调用其他Lambda、Athena+EventBridge Scheduler、Glue DataBrew+Step Functions state machine，以及Data Pipeline每天午夜一次的处理与编排组合。〔S, O1, O2, O3, O4〕
+- j2（显式）：判断各组合能否同时表达定期并行和后续顺序依赖，并承担错误处理、重试与状态管理；核对候选中未明确的调度衔接。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 核对候选服务的调度集成、并行/顺序依赖及托管错误、重试和状态能力。
+
+### Q785
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：支付应用由多个Lambda组成，运行在跨多个AZ的private subnets，每天处理数百万笔交易；不得重复处理付款。
+
+**必要判断**
+
+- j1（显式）：比较取出到期付款后经S3+event notification、SQS queue轮询、SQS FIFO queue轮询、DynamoDB+Streams触发另一Lambda的支付处理链路及去重边界。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：区分消息去重与付款业务幂等，判断触发重试、重复投递及处理后确认环节是否仍可能重复执行付款，并考察日交易量限制。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 核对各Lambda事件源的投递、重试和去重语义、吞吐限制及端到端重复付款防护边界。
+
+### Q786
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：本地数据中心无法及时扩展以满足业务；需收集本地服务器及工作负载的使用与配置数据，规划迁移AWS。
+
+**必要判断**
+
+- j1（显式）：比较Migration Hub设置home Region后使用Systems Manager或Application Discovery Service采集，与SCT创建相关templates后使用Trusted Advisor或DMS采集的工作流及数据覆盖。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 核对home Region配置、各工具的本地发现与使用/配置采集支持，以及数据汇聚衔接。
+
+### Q787
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Organizations已启用all features；所有现有及新增账号的全部API calls和logins都须审计。
+- c2〔S〕：需知晓任一账号不符合FSBP标准；采用托管方案以避免额外工作、尽量降低成本，运维开销最低。
+
+**必要判断**
+
+- j1（显式）：比较在Organizations management account或专用member account部署Control Tower并启用Security Hub与Account Factory的部署位置、现有/新增账号覆盖及审计流程。〔S, O1, O2〕
+- j2（显式）：比较AMS Accelerate构建MALZ后通过RFC自助配置GuardDuty或Security Hub，与Control Tower组合对FSBP不合规识别、全面审计及整体成本/运维的适用性。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 核对Control Tower和AMS部署及账号纳管条件、审计范围、GuardDuty/Security Hub的FSBP支持与费用管理责任。
+
+### Q788
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：S3中已有10 TB Apache Parquet日志，偶尔需用SQL分析；成本效益最高。
+
+**必要判断**
+
+- j1（显式）：比较DMS迁入Aurora MySQL再查询、Redshift cluster+Spectrum直接查询S3、Glue crawler管理table metadata+Athena直接查询，以及EMR cluster+Spark SQL直接查询的格式支持、数据搬迁和元数据衔接。〔S, O1, O2, O3, O4〕
+- j2（显式）：评估10 TB数据偶发SQL查询下，各方案的常驻资源、扫描/计算及迁移成本。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 核对Parquet/S3查询与迁移支持、catalog要求及各候选的集群和按查询计费差异。
+
+### Q789
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Organizations中已启用Control Tower；需阻止CloudFormation部署包含inline policy或statement中含“*”的IAM资源，并禁止部署带public IP的EC2。
+
+**必要判断**
+
+- j1（显式）：比较Control Tower proactive与detective controls，判断能否在部署前阻断两类资源，并核对选项“inline policies with elevated access或*”与题干限制范围是否一致。〔S, O1, O2〕
+- j2（显式）：比较AWS Config规则触发所谓Systems Manager Session Manager automation删除不合规资源，以及SCP按EC2/IAM条件阻断actions，判断部署前约束、资源属性覆盖与跨服务衔接。〔S, O3, O4〕
+
+**待官方核验**
+
+- 核对各控制机制的执行时点、CloudFormation覆盖、IAM policy/public IP检查范围、SCP条件及自动化服务集成。
+
+**源异常／歧义**
+
+- 题干未说明statement中“*”所在字段；题干对inline policy的禁令与O1/O2限定elevated access的表述范围存在差异。
+
+### Q790
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Web应用位于单个公有子网的单台Amazon EC2，流量增长后容量不足；不得重写应用，需高可用和可扩展，选择两项组合。
+
+**必要判断**
+
+- j1（显式）：比较升级compute optimized或memory optimized单实例，与私有子网跨AZ的EC2 Auto Scaling在容量扩展及高可用上的适用性。〔S, O1, O2, O4〕
+- j2（显式）：判断公有子网中的NAT gateway或Application Load Balancer能否承担Web入口及流量分发，并与实例部署方案组成完整访问路径。〔S, O2, O3, O5〕
+
+**待官方核验**
+
+- 待查实例纵向扩容、跨AZ Auto Scaling及NAT gateway/ALB的职责和网络衔接限制。
+
+### Q791
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：AWS Lambda使用环境变量；需避免开发人员看到变量明文。
+
+**必要判断**
+
+- j1（显式）：比较迁移Amazon EC2、SSL与AWS CloudHSM组合、ACM证书及AWS KMS key与Lambda encryption helpers组合，能否控制开发人员对环境变量明文的可见性。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：区分变量加密与开发人员解密权限，明确运行时使用变量所需的权限边界。〔S, O4〕
+
+**待官方核验**
+
+- 待查Lambda环境变量加密、encryption helpers和解密权限机制，以及CloudHSM、ACM、SSL方案的适用范围。
+
+### Q792
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：多层服务运行于Amazon VPC；向数百万用户提供RESTful APIs，访问前必须认证，运维效率最高。
+
+**必要判断**
+
+- j1（显式）：比较Cognito user pool＋API Gateway REST API/Cognito authorizer、identity pool＋HTTP API/Cognito authorizer、Lambda认证＋REST API/Lambda authorizer及IAM user＋HTTP API/IAM authorizer的认证链路、规模和运维负担。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：区分RESTful接口需求与API Gateway REST API产品类型，避免未经题干要求排除HTTP API。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各API类型支持的authorizer、Cognito两类pool的身份职责及大规模用户认证限制。
+
+### Q793
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：移动应用敏感数据须静态加密，已使用AWS KMS；需防止KMS key意外删除，并在用户尝试删除时通过Amazon SNS邮件通知管理员，运维开销最低。
+
+**必要判断**
+
+- j1（显式）：比较EventBridge触发AWS Config、定制Lambda或Systems Manager Automation runbook取消删除的链路，判断事件触发、取消时机及防误删能力。〔S, O1, O2, O3〕
+- j2（显式）：比较EventBridge发布SNS与CloudTrail→CloudWatch Logs metric filter/alarm→SNS的通知链路，判断仅告警方案能否同时满足防删除及最低运维目标。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查选项所称DeleteKey的实际事件/API名称、KMS删除及取消流程，以及EventBridge目标、CloudWatch告警和SNS邮件衔接能力。
+
+### Q794
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：全球热门移动应用使用自定义程序分析用量；每月最后一周生成多份报告，每份少于10分钟，其余时间很少运行；请求后尽快生成，成本效益最高。
+
+**必要判断**
+
+- j1（显式）：比较EventBridge按请求触发Lambda、按请求调度Amazon ECS，以及按请求启动且月末一周持续运行的EC2 On-Demand/Spot方案，权衡运行时限、启动等待、Spot中断及空闲成本。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查Lambda执行时限、EventBridge与各计算服务的触发方式，以及启动延迟、计费和Spot中断对报告完成时间的影响。
+
+### Q795
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：在AWS设计紧耦合HPC环境，需优化网络和存储；选择两项组合。
+
+**必要判断**
+
+- j1（显式）：判断Global Accelerator custom routing、CloudFront HTTP/HTTPS viewer policy及EC2 Elastic Fabric Adapter对紧耦合HPC网络目标的适用性。〔S, O1, O3, O4〕
+- j2（显式）：判断FSx for Lustre scratch storage及Elastic Beanstalk环境管理对HPC存储和整体方案的适用性，并形成覆盖网络与存储的两项组合。〔S, O2, O5〕
+
+**待官方核验**
+
+- 待查各方案的HPC适用范围、EFA部署限制及FSx for Lustre scratch的性能与持久性特点。
+
+### Q796
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Web应用需阻止含不需要内容的照片上传；方案不得训练ML模型。
+
+**必要判断**
+
+- j1（显式）：比较SageMaker Autopilot模型与实时endpoint、Lambda＋Rekognition＋function URL、CloudFront function＋Comprehend及Lambda＋Rekognition Video＋function URL，判断照片审核、无需训练及上传拦截链路的适配性。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各服务的输入媒体与内容审核能力、训练要求，以及function URL/CloudFront function调用链能否支持上传时判断。
+
+### Q797
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：关键电商平台运行于AWS，流量及交易量高；root user已配置MFA，需在MFA设备丢失后仍能访问root账户。
+
+**必要判断**
+
+- j1（显式）：比较root账户绑定多个MFA设备、预建备用administrator账户，以及失去root访问后新建administrator或给其他IAM user附加administrator policy，能否保障root账户访问。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：区分管理员权限与root身份访问，并检查设备丢失后执行补救动作所依赖的既有访问权限。〔S, O1, O3, O4〕
+
+**待官方核验**
+
+- 待查root多MFA设备支持与登录机制，以及IAM administrator权限和root账户访问的边界。
+
+### Q798
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：用户创建并上传视频获得积分，以唯一ID向合作方验证兑换资格；每次发积分需向合作方HTTP endpoint通知用户ID。每天有数百家供应商希望加入，需快速、可扩展接入且实现工作最少。
+
+**必要判断**
+
+- j1（显式）：比较Timestream伙伴列表＋Lambda逐个发送、SNS topic订阅与发布、Step Functions每伙伴task及Kinesis producer/consumer＋伙伴列表方案的HTTP扇出、伙伴增添流程和实现负担。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查SNS HTTP订阅与发布机制，以及各方案在动态伙伴接入、扇出规模和自定义代码方面的限制。
+
+### Q799
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：从S3文本食谱提取食材名，供Web应用查询DynamoDB计算营养分；应用可处理非食物记录及错误，公司无ML开发人员，成本效益最高。
+
+**必要判断**
+
+- j1（显式）：比较PutObject经S3 Event Notifications或EventBridge触发Lambda后，使用Comprehend、Forecast或SageMaker提取并写入DynamoDB的能力、ML专业要求和成本。〔S, O1, O2, O4〕
+- j2（显式）：评估Polly生成音频回存S3、SNS发送URL并由员工听取计算及录入食材的链路，能否满足提取与成本目标。〔S, O3〕
+
+**待官方核验**
+
+- 待查PutObject事件集成、各分析服务对食材文本提取的适用性、训练/endpoint要求及人工音频流程成本。
+
+### Q800
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Lambda 函数将在主 AWS 账户的 VPC 中运行。
+- c2〔S〕：该函数需要访问次 AWS 账户中的 EFS 文件。
+- c3〔S〕：文件不断增加时，方案必须随需求扩展。
+- c4〔S〕：目标是最具成本效益。
+- c5〔O1〕：候选在主账户新建 EFS，并用 DataSync 复制原 EFS 内容。
+- c6〔O2〕：候选在两个账户的 VPC 之间建立对等连接。
+- c7〔O3〕：候选在次账户创建挂载文件系统的第二个 Lambda，并由主账户函数调用。
+- c8〔O4〕：候选将文件系统内容移入 Lambda 层。
+- c9〔O4〕：层候选的授权对象写为公司的次账户。
+
+**必要判断**
+
+- j1（显式）：如何判断主账户 VPC 中的 Lambda 访问次账户 EFS 所需的网络连通与访问授权条件？〔S, O2〕
+- j2（显式）：如何比较直接跨账户访问、复制文件系统和跨账户调用第二个函数的成本、文件可见性及扩展路径？〔S, O1, O2, O3〕
+- j3（显式）：如何判断将持续增长的文件移入 Lambda 层是否符合访问需求，并核对其共享授权方向？〔S, O4〕
+
+**待官方核验**
+
+- Lambda 跨账户挂载 EFS 时，对 VPC 对等连接、挂载目标、路由、安全组及文件系统授权分别有哪些要求？
+- 复制 EFS、跨账户调用 Lambda 与直接访问 EFS 在增量文件可见性、扩展限制及计费维度上如何比较？
+- Lambda 层的容量、更新分发和跨账户共享限制是什么，授权对象应如何与调用方账户对应？
+
+### Q801
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：高度敏感金融数据存入Amazon S3；传输中与静态均须加密，密钥必须在AWS Cloud之外管理。
+
+**必要判断**
+
+- j1（显式）：比较KMS customer managed key、KMS AWS managed key、默认SSE及数据中心预先加密后上传的方案，分别判断传输/静态保护及密钥管理位置是否满足要求。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各S3加密方案的保护阶段、密钥管理边界，以及数据中心加密到S3存储的端到端要求。
+
+### Q802
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：AWS支付应用接收移动设备通知，进一步处理前须基本校验；后端长时间运行且需调整compute和memory，不希望管理基础设施，运维开销最低。
+
+**必要判断**
+
+- j1（显式）：比较SQS＋EventBridge rule、API Gateway＋Step Functions及API Gateway＋Lambda的接入、基本校验与后端交接能力。〔S, O1, O2, O3, O4〕
+- j2（显式）：将前端链路与EKS Anywhere standalone cluster、EKS self-managed nodes、EC2 Spot Fleet default allocation strategy或ECS Fargate后端配对，评估长任务、资源调整及基础设施运维负担。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查接入/校验集成限制，以及各后端的运行时长、资源配置、节点管理和Spot中断特征。
+
+### Q803
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：用户登录的地理位置、IP或设备不一致时必须触发双因素认证；身份方案需扩展至数百万用户。
+
+**必要判断**
+
+- j1（显式）：比较Cognito user pools风险自适应认证＋MFA、Cognito identity pools＋MFA、IAM users＋AllowManageOwnUserMFA policy及IAM Identity Center permission sets要求MFA，判断风险触发能力、身份适用范围与规模。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各服务的风险信号、条件式MFA与用户规模支持，以及选项所称IAM action和permission set配置的有效性。
+
+### Q804
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：每天将S3 data lake数据转换后加载到具备MPP能力的数据仓库；分析师须用SQL创建和训练ML模型，尽可能使用serverless AWS服务。
+
+**必要判断**
+
+- j1（显式）：比较每日EMR→Redshift/Redshift ML、EMR→Aurora Serverless/Aurora ML、Glue→Redshift Serverless/Redshift ML及Glue→Athena tables/Athena ML的完整链路，判断MPP、SQL建模训练与serverless覆盖。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各转换与目标服务的serverless部署、MPP定位、每日加载集成，以及选项所称ML功能的SQL创建/训练能力。
+
+### Q805
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：容器现运行于本地数据中心Kubernetes；希望使用Amazon EKS及其他AWS managed services，合规要求数据留在该数据中心，不得存于任何远端站点或云。
+
+**必要判断**
+
+- j1（显式）：比较在本地部署Local Zones、Snowmobile、Outposts rack及Snowball Edge Storage Optimized node的可部署性、EKS与其他托管服务支持，以及数据驻留边界。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各基础设施的部署位置、服务可用范围及本地与远端的数据流，核对严格本地驻留约束。
+
+### Q806
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：数据采集和处理工作负载使用本地NFS存储，扩展不及业务增长；需将现有数据存储迁往AWS，成本效益最高。
+
+**必要判断**
+
+- j1（显式）：比较Volume Gateway或S3 File Gateway配合S3 Lifecycle，与EFS Standard-IA或One Zone-IA配合低频访问生命周期策略，判断NFS访问衔接、扩展能力、存储分层成本及AZ部署差异。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各网关协议和数据存储位置、S3/EFS生命周期限制，以及Standard-IA与One Zone-IA的费用和可用性差异。
+
+### Q807
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：营销期间高并发Lambda处理队列中持续增长的消息，代码CPU密集；需降低计算成本并维持客户服务延迟。
+
+**必要判断**
+
+- j1（显式）：比较reserved与provisioned concurrency，分别配合减少memory或按AWS Compute Optimizer建议增加memory，评估吞吐、冷启动/排队、执行时长及总计算成本。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查两类并发的容量与计费机制、Lambda memory和CPU配置关系，以及Compute Optimizer建议适用条件；按整体成本与延迟评估组合。
+
+### Q808
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：工作负载运行于Amazon ECS；task definition使用的现有容器镜像和新建镜像均需扫描CVEs，工作负载改动最少。
+
+**必要判断**
+
+- j1（显式）：比较ECR private repository basic scan on push、S3＋Macie与ObjectCreated:Put、迁移EKS＋ECR enhanced scan on push，以及versioned S3＋ObjectCreated:*→Lambda→Inspector的镜像扫描覆盖与改动量。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查ECR basic/enhanced扫描对象、push filters及现有镜像处理方式，和Macie/Inspector对S3容器镜像的扫描集成能力。
+
+### Q809
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：AWS Batch执行日终销售处理；job成功后须以serverless方案调用第三方HTTP reporting API，使用username/password认证。
+
+**必要判断**
+
+- j1（显式）：比较EventBridge rule匹配SUCCEEDED并调用带凭证的API destination、Scheduler匹配事件并调用Lambda，以及Batch主动发布至API Gateway后用HTTP proxy或Lambda proxy调用第三方的触发与认证链路。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查Batch成功事件投递、EventBridge rule/Scheduler边界、API destination认证和API Gateway两类proxy的配置要求。
+
+**源异常／歧义**
+
+- O2前半使用EventBridge Scheduler，后半却将Lambda设为EventBridge rule target，触发资源表述不一致。
+
+### Q810
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：需读取供应商自有AWS账户内RDS for MySQL数据；公司VPC没有internet gateway、Direct Connect或Site-to-Site VPN连接。
+
+**必要判断**
+
+- j1（显式）：比较Hosted Connection Direct Connect Program＋VPC peering、client VPN＋VPC peering、供应商NLB置于RDS前方＋PrivateLink及Transit Gateway＋VPC peering的跨账户数据库访问链路与前提。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：检查NLB到RDS的目标配置、地址变化及双方网络权限等衔接条件，避免仅凭服务名称认定链路可用。〔S, O3〕
+
+**待官方核验**
+
+- 待查各跨VPC连接方式的网络依赖、账户支持，以及NLB/PrivateLink访问RDS的目标与路由限制。
+
+### Q811
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：以Amazon Managed Grafana可视化Amazon RDS数据源；连接须安全且不得经互联网暴露数据。
+
+**必要判断**
+
+- j1（显式）：比较workspace有无VPC连接、RDS public/private endpoint的组合，以及无VPC workspace＋PrivateLink方案，判断数据库查询的数据路径与互联网暴露。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查Managed Grafana VPC连接机制、RDS私有数据源访问，以及PrivateLink endpoint是否承担选项所述Grafana到RDS连接。
+
+**源异常／歧义**
+
+- O3在“without a VPCreate”处发生文本拼接，workspace的VPC描述不完整。
+
+### Q812
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：S3 data lake接收多源Apache Parquet；需过滤异常、规范日期时间并聚合，结果写回供分析师访问的S3 buckets。
+- c2〔S〕：需预构建、无代码转换方案，提供data lineage与data profiling，并能向全公司员工分享转换步骤。
+
+**必要判断**
+
+- j1（显式）：比较Glue Studio visual canvas/Glue jobs、EMR Serverless/jobs、Glue DataBrew/recipes及Athena tables/SQL分享方式，判断转换链路、无代码、lineage、profiling和复用分享能力。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各工具对Parquet与S3输出的支持、预建转换及lineage/profiling范围，和jobs、recipes、SQL的分享机制。
+
+### Q813
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：公开Web应用由ALB后多个独立target groups中的EC2承载；工程师需通过Route 53 hosted zone的开发站点访问指定开发实例，实例替换后仍须自动路由到开发实例。
+
+**必要判断**
+
+- j1（显式）：比较开发域名A record指向ALB并转发至专用开发target group、直接指向实例public IP、ALB重定向至该IP，以及所有实例共用target group的方案，判断定向访问和实例替换适应性。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：明确DNS记录类型、ALB按开发域名匹配及替换实例注册到目标组的必要衔接，区分forward与redirect。〔S, O1, O3, O4〕
+
+**待官方核验**
+
+- 待查Route 53指向ALB的A记录配置、ALB listener的forward/redirect能力与目标组成员更新条件。
+
+### Q814
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：本地Kubernetes容器应用通过AMQP与消息队列通信；数据中心扩展不足，需迁至AWS，运维开销最低。
+
+**必要判断**
+
+- j1（显式）：比较ECS＋SQS、EKS＋Amazon MQ、高可用EC2＋Amazon MQ及Lambda＋SQS，判断Kubernetes应用迁移、AMQP兼容与整体运维负担。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查SQS与Amazon MQ的协议支持，以及ECS/EKS/EC2/Lambda对现有容器部署的适配和管理边界。
+
+### Q815
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：全球游戏平台运行于多个AWS Regions的NLB后EC2，NLB可经互联网向targets路由；需减少全球客户端到端加载时间，改善游戏体验。
+
+**必要判断**
+
+- j1（显式）：比较各Region以ALB替换NLB、Route 53等权路由至各NLB、在主要客群所在其他Regions增加NLB/EC2，以及Global Accelerator standard accelerator接入现有NLB的端到端延迟影响。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查负载均衡类型、等权DNS、增加Regions与Global Accelerator endpoint的数据路径和延迟优化机制。
+
+### Q816
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：本地SFTP金融文件收集迁至AWS，已开发S3 API上传应用；部分供应商旧应用不支持S3 API且须继续SFTP，需托管服务且运维开销最低。
+
+**必要判断**
+
+- j1（显式）：比较DMS复制至S3并向供应商提供实例凭证、Transfer Family endpoint、自管EC2 SFTP server及S3 File Gateway SMB share的协议延续、S3衔接与运维负担。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各服务的SFTP/SMB支持、上传目标及DMS凭证访问方式，核对托管边界。
+
+### Q817
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：营销团队需从过去5年的PDF新闻提取内容与情感洞察，用于即将举行的综合体育赛事活动；必须使用Amazon Textract，运维开销最低。
+
+**必要判断**
+
+- j1（显式）：比较Textract输出交给Athena分析后存S3、存DynamoDB后用SageMaker建情感模型、交给Comprehend分析后存S3，以及存S3后用QuickSight可视化分析的内容/情感能力与运维负担。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查Textract输出与各后续服务的衔接、内容和情感分析范围，以及自建模型的开发管理要求。
+
+### Q818
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：应用在多个AZ中的EC2实例上运行
+- c2〔S〕：需摄取第三方应用的实时数据
+- c3〔S〕：摄取后的原始数据必须写入S3桶
+- c4〔O1〕：O1以Kinesis数据流摄取，再由Firehose消费并投递S3
+- c5〔O2〕：O2提出DMS以EC2复制实例为源端点，向S3执行全量加持续变更迁移
+- c6〔O2〕：O2设置迁移已有数据并复制持续变化
+- c7〔O3〕：O3在EC2上配置DataSync代理和任务，将数据传至S3
+- c8〔O4〕：O4引入Direct Connect连接，并由Firehose接收应用直接PUT后投递S3
+
+**必要判断**
+
+- j1（显式）：如何区分实时应用事件摄取、数据库变更迁移和文件传输对第三方数据源的适配条件？〔S, O1, O2, O3, O4〕
+- j2（显式）：如何判断Kinesis到Firehose、应用直接PUT到Firehose等链路能否将原始数据持续投递S3？〔S, O1, O4〕
+- j3（显式）：如何判断多AZ应用下的数据源端点、网络连接和摄取服务之间是否存在必要且可用的衔接？〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- Kinesis数据流及Firehose支持哪些生产者、源类型和S3投递方式，缓冲、延迟及原始数据保留行为是什么？
+- DMS源端点与复制实例的角色、DataSync支持的数据源及代理配置条件分别是什么？
+- Direct Connect在第三方应用实时摄取链路中需要哪些网络端点和连接条件，与应用直接PUT有什么依赖关系？
+
+**源异常／歧义**
+
+- O2使用“replication instances of the EC2 instances”作为源端点描述，未说明实际源数据库或端点类型。
+- 题干未给出“real-time”的延迟上限，也未说明第三方应用的数据接口类型。
+
+### Q819
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：应用接收多源数据，当前最大700 KB；随数据源增加，数据量与单份大小均持续增长；以DynamoDB为主数据库，处理大数据的运维效率最高。
+
+**必要判断**
+
+- j1（显式）：比较Lambda将超限数据分流DocumentDB、S3存对象并在DynamoDB保存URL、同partition key拆项后单次BatchWriteItem，以及Lambda gzip压缩后写入DynamoDB，判断大小适应性与运维负担。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：检查拆分后的重组和写入批次约束、压缩效果的不确定性，以及外置对象与数据库引用的一致性需求。〔S, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查DynamoDB item和BatchWriteItem限制、gzip后大小约束及S3引用式存储的读写衔接。
+
+### Q820
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：旧应用从本地迁至AWS，含数百个cron jobs，每个运行1–20分钟，全天按不同周期执行；需最少重构地调度运行，并支持未来事件触发。
+
+**必要判断**
+
+- j1（显式）：比较容器化后由EventBridge Scheduler周期触发Lambda或Fargate、AWS Batch on ECS scheduling policy，以及Step Functions Wait＋RunTask/Fargate，判断周期调度、1–20分钟任务及未来事件触发支持。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：区分日历/周期调度、队列调度策略和工作流等待，评估数百任务迁移所需改造。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各执行服务时限、Scheduler目标与事件衔接、Batch scheduling policy职责及Step Functions Wait/RunTask限制。
+
+### Q821
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：需将Salesforce现有数据及持续变更加载至Amazon Redshift分析；数据不得经过公共互联网，开发工作最少。
+
+**必要判断**
+
+- j1（显式）：比较VPN＋Glue DataBrew、Direct Connect＋Glue DataBrew、PrivateLink＋AppFlow及VPC peering＋AppFlow，判断Salesforce私有连接、全量与持续变更传输到Redshift的完整链路和开发量。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查Salesforce连接方式、AppFlow/DataBrew的数据源与目标支持，以及初始加载和持续变更的私有传输条件。
+
+### Q822
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：应用已迁至跨AZ Auto Scaling group中的EC2 Linux；文件在EFS Standard-IA，应用自行索引且索引存RDS；允许修改应用和服务，需以最高成本效益优化存储成本。
+
+**必要判断**
+
+- j1（显式）：比较复制文件到S3 Intelligent-Tiering并改用S3 API、FSx for Windows File Server/CIFS、FSx for OpenZFS/新mount point，以及S3 Glacier Flexible Retrieval/standard retrievals，判断访问兼容、检索行为与总体存储成本。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：结合现有RDS文件索引，判断文件系统到对象存储改造的必要范围，并核对跨AZ实例访问及归档恢复的应用衔接。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各存储的Linux访问协议、跨AZ访问、分层与检索费用/时延，以及Intelligent-Tiering配置方式。
+
+### Q823
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：手术机器人使用传感器、摄像头及AI；需AWS Cloud中的public load balancer与后端通信，按query strings路由到不同target groups，流量须加密。
+
+**必要判断**
+
+- j1（显式）：比较NLB＋ACM证书/query parameter routing、GWLB＋IAM导入证书/HTTP path routing、ALB＋ACM证书/query parameter routing及NLB＋IAM导入证书/query parameter routing，判断路由条件与加密配置。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各load balancer支持的监听协议、query/path路由、target groups及ACM/IAM证书附加方式；核对加密链路覆盖。
+
+### Q824
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：应用与MySQL数据库同在单台EC2；流量增长，需整体高可用且自动扩展。
+
+**必要判断**
+
+- j1（显式）：比较ALB后EC2使用Auto Scaling group或仅配置target group，并分别组合Redshift所谓MySQL-compatible多节点、RDS for MySQL多实例cluster、Aurora Serverless MySQL或ElastiCache Redis所谓MySQL connector，判断应用和数据库的适配及整体可用性与扩展。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查target group与Auto Scaling职责、各数据库方案的MySQL兼容性及高可用/自动扩展能力；不预设选项所称节点或connector成立。
+
+### Q825
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：迁移数据至S3 bucket，须在bucket内静态加密，密钥每年自动轮换，运维开销最低。
+
+**必要判断**
+
+- j1（显式）：比较SSE-S3内建轮换、KMS customer managed key启用自动轮换并设为bucket默认加密、同类key每年手动轮换，以及客户材料先加密后导入无材料KMS key并启用自动轮换，判断年度自动化及迁移加密链路。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查SSE-S3轮换时间、KMS自动轮换周期与材料来源限制，以及S3默认加密和导入材料的使用条件。
+
+### Q826
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：应用从公司自管本地Microsoft AD迁至多个AWS账户，账户由Organizations集中管理；需跨所有账户SSO，同时继续在本地AD管理用户与组。
+
+**必要判断**
+
+- j1（显式）：比较新建Directory Service Enterprise Edition AD作为Identity Center来源、Identity Center通过Directory Service与本地AD建立two-way forest trust、仅Directory Service two-way trust，以及EC2自建IdP接入Identity Center，判断本地身份延续与组织级SSO链路。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查Identity Center身份源、Organizations多账户接入、Directory Service信任方向及自建IdP集成前提。
+
+### Q827
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：计划部署Aurora PostgreSQL Serverless v2 cluster，预计流量大；需随应用负载增长优化存储性能，成本效益最高。
+
+**必要判断**
+
+- j1（显式）：比较Aurora Standard、Provisioned IOPS、General Purpose及Aurora I/O-Optimized，判断是否为该cluster可用配置，以及存储性能与成本在增长负载下的差异。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：区分应用流量与实际存储I/O负载，识别成本比较需要的I/O量及计费条件。〔S, O1, O4〕
+
+**待官方核验**
+
+- 待查Aurora PostgreSQL Serverless v2存储配置兼容性、性能差异及I/O相关计费边界。
+
+### Q828
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：金融公司安全控制按NIST及PCI DSS设计；第三方审计需证明控制已实施且正常运行，须监控同一Organizations组织内数百账户的当前控制状态。
+
+**必要判断**
+
+- j1（显式）：比较Inspector或GuardDuty delegated administrator覆盖成员账户、CloudTrail organization trail＋compliance account，以及Security Hub delegated administrator启用全部成员账户，判断各选项所称NIST/PCI DSS standards和跨账户控制状态证据能力。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各服务的标准支持、组织级委派与成员覆盖、控制评估及审计证据范围，不预设选项声称的standards功能存在。
+
+### Q829
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：S3 data lake含海量数据，由多个团队及数百应用随机访问；需降低存储成本并使频繁访问对象立即可用，运维效率最高。
+
+**必要判断**
+
+- j1（显式）：比较Lifecycle转Intelligent-Tiering、Glacier＋S3 Select、storage class analysis指导Lifecycle转Standard-IA，以及Standard-IA对象被访问后由Lambda转Standard，判断随机访问适应、即时可用及运维成本。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各存储层访问/恢复行为、S3 Select适用范围、analysis与Lifecycle关系，以及访问触发Lambda转换的实现条件和费用。
+
+### Q830
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：数据集5 TB，含100万用户profiles及1000万connections，用户间为多对多关系；需高效查找最多5层的共同连接。
+
+**必要判断**
+
+- j1（显式）：比较S3＋Athena SQL JOIN、Neptune edges/vertices查询、S3＋QuickSight可视化及RDS多表SQL JOIN，判断多对多关系建模、最多5层遍历和共同连接查询的性能适配。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各方案的图遍历/多层JOIN与可视化边界，以及给定数据规模下的查询性能影响。
+
+### Q831
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：需在本地环境与AWS之间快速建立安全连接；流量少、不需高带宽，成本效益最高。
+
+**必要判断**
+
+- j1（显式）：比较Client VPN、Direct Connect、EC2 bastion host及Site-to-Site VPN的连接范围、安全机制、开通时间与小流量成本。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：区分单个客户端接入、主机跳转和本地网络到AWS的连接，核对方案服务的通信主体。〔S, O1, O3, O4〕
+
+**待官方核验**
+
+- 待查各连接方式的部署前提、网络覆盖、安全性及低带宽场景费用。
+
+### Q832
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：本地SFTP方案迁至AWS，借助S3扩展并优化成本；员工继续用本地Microsoft AD凭证，保留现有认证及文件访问机制，运维开销最低。
+
+**必要判断**
+
+- j1（显式）：比较S3 File Gateway/SMB＋现有AD、EC2 SFTP Auto Scaling且60% CPU扩容，以及两种Transfer Family SFTP＋Directory Service方案，判断SFTP保留、AD认证、S3衔接及运维量。〔S, O1, O2, O3, O4〕
+- j2（显式）：区分明确经AD Connector连接本地AD与仅称Directory Service连接现有AD的配置，核对身份提供者和目录连接的完整性。〔S, O3, O4〕
+
+**待官方核验**
+
+- 待查Transfer Family的Directory Service身份源及AD Connector兼容性、本地AD接入方式，并核对SMB与SFTP机制差异。
+
+### Q833
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：事件驱动订单系统中，每个独立校验步骤由幂等Lambda执行；每函数只能获得所需订单事件子集，组件需松耦合以适应未来变化。
+
+**必要判断**
+
+- j1（显式）：比较每步骤SQS＋集中Lambda转换发布、SNS订阅＋message body filtering、EventBridge每步骤rule＋input transformer，以及单SQS＋转换Lambda多线程同步调用，判断字段最小化和松耦合。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：区分按内容选择消息与裁剪/转换消息字段，并评估集中分发器对新增独立步骤的耦合。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查SNS body filtering与EventBridge input transformer的输出边界，以及SQS/Lambda和同步多线程分发的集成及耦合特征。
+
+### Q834
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：三层应用迁至AWS，必须使用MySQL；过去工作时间用户运行多种实时报告，导致新建记录性能差，需改善该性能。
+
+**必要判断**
+
+- j1（显式）：比较DynamoDB provisioned capacity＋重构报告、计算资源超过本地的compute optimized EC2数据库、Aurora MySQL Multi-AZ＋多个read replicas/reader endpoint，以及Aurora Multi-AZ所谓backup instance报告endpoint，判断MySQL需求和报告/写入竞争的处理。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查Aurora reader endpoint、read replicas与备用实例的查询角色及实时性边界，并比较单机扩容与报告负载分离。
+
+### Q835
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：安全本地网络经Direct Connect扩展至AWS，网络无直接互联网访问；本地应用需使用S3 bucket，成本效益最高。
+
+**必要判断**
+
+- j1（显式）：比较Direct Connect public VIF、VPC＋NAT gateway、VPC＋S3 interface endpoint，以及所谓本地网络与Direct Connect之间VPC peering的S3访问路径、前提和成本。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：区分AWS公有服务地址与直接互联网访问，核对public VIF和interface endpoint各自的路由及可达性要求。〔S, O1, O3〕
+
+**待官方核验**
+
+- 待查Direct Connect访问S3的VIF/endpoint选择、NAT与peering可行性，以及各路径新增资源和数据费用。
+
+### Q836
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：无数据库网站由单Region的EC2 Auto Scaling group承载，现已部署第二Region；需为增长及灾备向两Region分流，并排除网站不健康的Region。
+
+**必要判断**
+
+- j1（显式）：比较Route 53 simple与multivalue answer routing的跨Region分流及健康筛选；比较单Region ALB target group以两Region EC2 instance IDs或IP addresses注册目标的可行性。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查两类Route 53 policy的健康检查和响应行为，以及ALB按instance ID/IP注册跨Region目标的地址与部署限制。
+
+### Q837
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：应用运行于EBS支持的EC2，使用最新Amazon Linux；员工存取≥25 GB文件时出现可用性问题，文件须供多个EC2跨多个AZ访问，且无需在实例间传文件。
+
+**必要判断**
+
+- j1（显式）：比较迁移S3并让员工直接访问、从EBS snapshot创建并跨实例挂载volume、所有实例挂载EFS，以及AMI启动使用instance store的新实例，判断大文件共享、跨AZ可用与访问方式变化。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查S3/EFS访问语义、大文件支持、EBS snapshot/volume挂载范围及AMI/instance store的数据共享与持久性限制。
+
+### Q838
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：高度敏感应用运行于EC2并使用RDS；合规要求所有PII静态加密，基础设施改动最少。
+
+**必要判断**
+
+- j1（显式）：比较ACM证书加密数据库volume、CloudHSM生成密钥加密数据库volume、所谓SSL＋KMS加密数据库volume，以及KMS支持的EBS与RDS加密，判断EC2/RDS全部PII存储覆盖和改动量。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：区分传输加密与静态卷加密，并识别现有存储启用加密所需迁移或替换步骤。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查ACM/SSL/CloudHSM/KMS的加密职责、EBS和RDS现有数据加密流程及基础设施变更范围。
+
+### Q839
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Lambda位于VPC私有子网，默认经EC2 NAT instance访问互联网；处理后向S3写对象，NAT网络饱和导致间歇超时；需访问S3且不经过互联网。
+
+**必要判断**
+
+- j1（显式）：比较改用managed NAT gateway、升级network optimized NAT instance、S3 gateway endpoint并更新子网route tables，以及在Lambda子网配置Transit Gateway attachments，判断绕开饱和路径及非互联网S3访问。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查S3 gateway endpoint路由集成、NAT两类扩容路径与Transit Gateway的职责及目标可达条件。
+
+### Q840
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：全球记者用手机软件通过RTMP向AWS广播系统发送直播；需支持最高质量流并加速回到广播系统的TCP连接。
+
+**必要判断**
+
+- j1（显式）：比较CloudFront、Global Accelerator、Client VPN及EC2＋Elastic IP对全球RTMP上行直播和TCP连接加速的适用性。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各方案支持的协议、上行/分发方向、接入路径与TCP加速机制，以及后端endpoint要求。
+
+### Q841
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：自管数据库使用EC2/EBS，共350 TB，日变更率5%；每日EBS snapshots现保留1个月，新规要求月度snapshots保留7年，需数据可用、管理工作最少且成本效益最高。
+
+**必要判断**
+
+- j1（显式）：比较“日备standard tier保留1个月、月备复制S3 Glacier Deep Archive”的组合、保留现策略并将月备转EBS Snapshots Archive保留7年，以及月备standard tier增量保留7年的生命周期、恢复可用性和成本。〔S, O1, O2, O3〕
+- j2（显式）：评估日备留standard tier、每月用EBS direct APIs获取全部volumes快照并存S3 Infrequent Access 7年的可行性与管理量；结合350 TB及5%日变更比较增量和归档存储口径。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查EBS快照分层、增量/归档计费、恢复时间、7年保留自动化，以及快照复制到S3和EBS direct APIs的实际能力边界。
+
+### Q842
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：多个EC2实例将持久数据存于Amazon EFS；需用AWS托管方案复制到另一Region，并使成本最低。
+
+**必要判断**
+
+- j1（显式）：比较EFS-to-EFS backup与AWS Backup每日备份、跨Region复制并关联EFS资源的托管程度、目标数据形态和成本。〔S, O1, O4〕
+- j2（显式）：比较每夜脚本复制至S3再用S3 Cross-Region Replication，与跨Region VPC peering加每夜rsync的适用性、维护和成本。〔S, O2, O3〕
+
+**待官方核验**
+
+- 待查各方案的EFS跨Region支持、备份与文件复制差异、托管边界及相关费用。
+
+### Q843
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：本地电商Web应用和Microsoft SQL数据库迁至AWS；促销期间客户量高，整体需高可用、可扩展且管理开销最少。
+
+**必要判断**
+
+- j1（显式）：比较ALB后固定2实例跨2个AZ、固定3实例跨3个AZ与跨2个AZ的Auto Scaling group，判断其对峰值伸缩和可用性的贡献。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较RDS for Microsoft SQL Server跨2个AZ的read replicas、RDS Multi-AZ、跨2个Region的EC2数据库复制及跨3个AZ的3台EC2数据库，评估与Web层组合后的目标达成和管理负担。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查SQL Server相关RDS部署、read replicas与Multi-AZ的支持条件和职责，以及自管数据库复制与伸缩的运维差异。
+
+### Q844
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：本地应用每日生成数百文件，存于SMB共享且需与应用服务器保持低延迟；已有AWS VPN，要求所有生成文件复制到AWS，团队无暇改代码迁移应用。
+
+**必要判断**
+
+- j1（显式）：比较Amazon EFS、Amazon FSx for Windows File Server、AWS Snowball与AWS Storage Gateway，判断何者能衔接现有SMB、本地低延迟访问及持续复制需求而无需迁移应用。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各服务的SMB兼容、本地部署或缓存、经VPN访问及持续向AWS复制文件的能力和限制。
+
+### Q845
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：15名员工的入职日期存于DynamoDB；每人工作周年当天需收到邮件，目标为最高运维效率。
+
+**必要判断**
+
+- j1（显式）：比较EC2上每日cron脚本与每日调度Lambda扫描DynamoDB的运行和维护方式。〔S, O1, O2, O3, O4〕
+- j2（显式）：区分SNS与SQS在按员工匹配周年日期并发送邮件流程中的职责，评估与上述执行方式的完整组合。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查Lambda每日调度、DynamoDB扫描及SNS/SQS邮件投递能力与所需配置。
+
+### Q846
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：应用为ELB后Auto Scaling group中的EC2；历史可预测每年节假日流量峰值，需提前扩容以尽量降低用户性能影响。
+
+**必要判断**
+
+- j1（显式）：比较峰值前循环scheduled action、峰值期间调整最小/最大实例数、CPU超过90%的CloudWatch告警扩容，以及autoscaling:EC2_INSTANCE_LAUNCH事件的SNS通知，判断何种机制能主动增加容量。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查Auto Scaling定时动作、容量上下限、指标触发扩容和启动事件通知各自的触发时机与容量影响。
+
+### Q847
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：数据层使用Amazon RDS for PostgreSQL，需实施数据库密码轮换且运维开销最少。
+
+**必要判断**
+
+- j1（显式）：比较Secrets Manager自动轮换、Systems Manager Parameter Store所提自动轮换或自编Lambda轮换，以及KMS密钥自动轮换，区分数据库密码与加密密钥的轮换对象和维护责任。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查RDS for PostgreSQL密码轮换集成、Parameter Store轮换能力及KMS密钥轮换与数据库凭证更新的关系。
+
+### Q848
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Oracle Database Enterprise Edition应用及数据库需迁至AWS，可用BYOL；第三方数据库功能需要特权访问，目标为最具成本效益的迁移。
+
+**必要判断**
+
+- j1（显式）：比较原生工具迁至RDS for Oracle并以Lambda替代第三方功能，与迁至RDS Custom for Oracle并定制数据库设置，评估特权访问、功能保留及BYOL成本。〔S, O1, O2〕
+- j2（显式）：比较DMS迁至DynamoDB并定制设置，以及迁至RDS for PostgreSQL并改写应用去除第三方依赖的兼容性、迁移范围和总成本。〔S, O3, O4〕
+
+**待官方核验**
+
+- 待查各目标的Oracle兼容性、特权与定制边界、BYOL适用性，以及原生工具、DMS和功能替代的迁移限制。
+
+### Q849
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：国际大学的EC2、RDS、DynamoDB均在AWS；现有大量自定义备份脚本，需用AWS原生选项集中管理并尽可能自动备份。
+
+**必要判断**
+
+- j1（显式）：比较AWS Backup统一配置监控、AWS Config所提定时快照生命周期、Systems Manager State Manager管理备份任务，以及第三方软件加Storage Gateway tape gateway虚拟磁带库的覆盖范围与自动化程度。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各方案对EC2、RDS、DynamoDB备份的原生支持、集中调度监控及需额外编排的边界。
+
+### Q850
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：需建立IT基础设施地图，识别有安全风险的资源并执行策略；安全团队要能查询地图并快速识别风险，且运维开销最少。
+
+**必要判断**
+
+- j1（显式）：比较RDS加SQL、Neptune加SPARQL、Redshift加SQL与DynamoDB加PartiQL对基础设施资源关系建模、风险查询及策略执行衔接的适用性和运维负担。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各数据库的数据模型、查询语言支持、关系查询能力及与风险识别和策略执行流程的服务边界。
+
+### Q851
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：为全球开发者分别提供容量受限的托管PostgreSQL开发数据库
+- c2〔S〕：数据库负载低，仅在开发者工作时需要
+- c3〔S〕：要求成本效益最高
+- c4〔O1〕：独立Aurora实例方案按工作日结束关闭、下一工作日开始启动
+- c5〔O2〕：Service Catalog方案强制Aurora实例大小限制，并允许按需启动产品
+- c6〔O3〕：Serverless方案在Aurora Serverless集群中通过产品按默认容量设置创建数据库
+- c7〔O4〕：Trusted Advisor方案识别空闲RDS数据库后终止
+
+**必要判断**
+
+- j1（显式）：如何判断各方案能否分别提供托管PostgreSQL开发数据库，并约束数据库大小？〔S, O1, O2, O3, O4〕
+- j2（显式）：面对全球开发者不同工作时间，如何比较定时启停、按需创建、Serverless容量管理与终止空闲数据库的成本？〔S, O1, O2, O3, O4〕
+- j3（显式）：如何判断实例、集群内数据库及产品默认容量之间的隔离、大小限制与非工作时资源保留行为？〔S, O2, O3, O4〕
+
+**待官方核验**
+
+- 相关Aurora部署类型和Serverless版本的PostgreSQL支持、默认容量、暂停或缩容行为、启停限制及计费规则是什么？
+- Service Catalog能约束哪些实例或数据库参数，Trusted Advisor识别空闲RDS的条件及终止后的数据处理要求是什么？
+
+**源异常／歧义**
+
+- 未指定Aurora Serverless版本及“default capacity settings”的具体值，涉及空闲行为和成本的判断需保留该不确定性。
+- “limited size”没有给出数值，也未明确限制的是存储、计算容量还是单个数据库大小。
+
+### Q852
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：CMS在ALB后跨多个AZ的EC2 Auto Scaling group运行；用户持续增改文件、博客及网站资产，所有实例需以最小延迟共享最新内容。
+
+**必要判断**
+
+- j1（显式）：比较共享EFS并由各实例挂载引用，与S3下载至各实例EBS且每小时sync，在持续更新及跨AZ伸缩时的内容一致性和延迟。〔S, O2, O3〕
+- j2（显式）：判断通过user data及生命周期策略从最新实例复制并让ALB限定修改位置，以及新实例从EBS快照恢复为第二卷，能否覆盖运行中所有实例的后续更新。〔S, O1, O4〕
+
+**待官方核验**
+
+- 待查EFS共享访问、S3 sync周期、启动复制与EBS快照的数据更新语义，以及ALB对内容修改路由的可配置边界。
+
+### Q853
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：VPC内Web应用由ALB后多个EC2及RDS for MySQL组成，已部署AWS WAF；需自动检测并响应AWS环境中的可疑或异常行为。
+
+**必要判断**
+
+- j1（显式）：比较GuardDuty、Firewall Manager、Inspector与Macie作为所需威胁检测来源的适用范围。〔S, O1, O2, O3, O4〕
+- j2（显式）：评估GuardDuty或Firewall Manager findings经EventBridge过滤、Lambda修改WAF规则或web ACL的响应链；与Inspector/Macie所提直接更新WAF并辅以VPC network ACL的方案比较。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各服务检测对象、findings事件集成、WAF自动更新路径及network ACL的防护职责。
+
+### Q854
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：CloudFormation模板部署一组EC2及Aurora DB cluster；实例需安全认证数据库，不维护静态数据库凭证，且运维工作最少。
+
+**必要判断**
+
+- j1（显式）：比较CloudFormation参数传递用户名密码、Parameter Store检索凭证与IAM database authentication，判断凭证生命周期及静态凭证要求。〔S, O1, O2, O3, O4〕
+- j2（显式）：区分IAM认证中数据库用户、EC2关联IAM role与所提关联同名IAM user的权限和身份衔接方式。〔S, O3, O4〕
+
+**待官方核验**
+
+- 待查Aurora IAM数据库认证条件、数据库用户映射、EC2身份关联及凭证获取与维护要求。
+
+### Q855
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：CloudFront distribution需使用非默认域名及SSL/TLS证书，部署证书不能产生额外费用。
+
+**必要判断**
+
+- j1（显式）：比较ACM签发的public/private证书，以及us-east-1/us-west-1申请Region的组合，判断自定义域名兼容、部署位置和费用。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查CloudFront自定义域名证书的类型、ACM Region要求及公有/私有证书收费边界。
+
+### Q856
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：运营数据存于S3；外部顾问为年度审计仅需访问其中一份年报，访问期7天，目标为最高运维效率。
+
+**必要判断**
+
+- j1（显式）：比较新建公共静态网站桶并迁移运营数据、整桶公开7天后撤销、仅授权报告的IAM user并交付密钥后7天撤销，以及报告presigned URL，判断对象范围、到期控制及维护工作。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查S3对象级授权、presigned URL有效期与签名凭证限制，以及公开访问和IAM密钥撤销的控制范围。
+
+### Q857
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：HPC运行于EC2，节点间紧耦合通信需低网络延迟和高网络吞吐。
+
+**必要判断**
+
+- j1（显式）：比较cluster placement group、Dedicated Instance tenancy、Spot Instances及On-Demand Capacity Reservation对节点放置、网络性能、隔离、购买与容量保障的作用。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各EC2机制对紧耦合节点网络性能的直接影响和使用限制。
+
+### Q858
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：主、次数据中心相距500英里（804.7 km），已有高速光纤互联；关键工作负载需连接AWS VPC，要求高可用、安全且韧性最大。
+
+**必要判断**
+
+- j1（显式）：比较Direct Connect拓扑的故障域：仅主中心2条连接至2个location/2台设备；两中心各1条至同一location/同一设备或2台设备；两中心各2条至2个location/2台设备。〔S, O1, O2, O3, O4〕
+- j2（显式）：评估各拓扑面对数据中心、连接、Direct Connect location及终端设备故障时的持续连接能力，并明确其对安全连接要求的覆盖。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查Direct Connect最大韧性拓扑、端到端故障域及安全连接机制的适用边界。
+
+### Q859
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Organizations成员账户运行多台高利用率RDS for Oracle On-Demand实例；财务可访问管理及成员账户，需用Trusted Advisor优化成本，选择两步组合。
+
+**必要判断**
+
+- j1（显式）：判断应从管理账户还是运行数据库的成员账户获取适用Trusted Advisor建议，区分检查与组织汇总的作用范围。〔S, O1, O2〕
+- j2（显式）：比较Amazon RDS Reserved Instance Optimization、Amazon RDS Idle DB Instances与compute optimization加Compute Optimizer复核，对高利用率Oracle On-Demand成本的相关性，并与账户选择组合。〔S, O3, O4, O5〕
+
+**待官方核验**
+
+- 待查Trusted Advisor检查的账户范围、RDS预留与闲置优化适用条件，以及Compute Optimizer的相关资源覆盖。
+
+### Q860
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：EC2位于VPC跨多个AZ的私有子网，频繁读取S3内含机密信息的大文件；需优化网络架构以最小化数据传输成本。
+
+**必要判断**
+
+- j1（显式）：比较S3 gateway endpoint加私有子网路由、S3 PrivateLink interface endpoint及其所提路由配置的访问路径和成本。〔S, O1, O3〕
+- j2（显式）：比较单个公共子网NAT gateway与每AZ一个、私有子网默认路由指向同AZ NAT的方案，评估大文件访问和跨AZ传输费用。〔S, O2, O4〕
+
+**待官方核验**
+
+- 待查S3两类endpoint的路由或DNS配置、私网访问边界，以及endpoint、NAT和跨AZ数据传输计费。
+
+**源异常／歧义**
+
+- O3的“VPIn”处文本粘连，VPC位置与后续句子分界受损。
+
+### Q861
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：本地MySQL需迁至AWS；面向客户的应用定期导入数据，产生大量写操作，担忧流量导致应用性能问题。
+
+**必要判断**
+
+- j1（显式）：比较RDS for MySQL配Provisioned IOPS SSD并用CloudWatch监测写入、按需调整IOPS，与General Purpose SSD加ElastiCache并改为查询缓存，判断对导入写负载的针对性。〔S, O1, O2〕
+- j2（显式）：比较内存优化DocumentDB配CloudWatch监测和实例类别调整，以及EFS General Purpose配IOPS监测及所提Provisioned Throughput切换，评估MySQL迁移兼容和性能控制对象。〔S, O3, O4〕
+
+**待官方核验**
+
+- 待查RDS存储IOPS调节、ElastiCache读写作用、DocumentDB兼容范围，以及EFS性能模式与吞吐模式的区别。
+
+### Q862
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：AWS内应用生成敏感归档文件，已有S3桶；重构存储时需加密文件，并确保第三方在文件加密并发送至AWS前不能访问数据。
+
+**必要判断**
+
+- j1（显式）：比较客户端与服务端加密发生的位置和时序，以及S3 managed encryption key与KMS存储密钥的管理边界。〔S, O1, O2, O3, O4〕
+- j2（显式）：核对“桶配置客户端加密”、SSE-KMS、所称双层SSE-KMS及应用侧KMS密钥客户端加密的配置主体、加密层次和入S3流程。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查S3各加密模式的实际执行位置、配置方式、密钥来源及双层加密正式名称与限制。
+
+**源异常／歧义**
+
+- 应用已在AWS运行，但要求在“发送至AWS前”加密；发送边界指AWS整体还是S3未明确。
+
+### Q863
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：RDS当前采用默认备份设置；合规要求每日备份并保留30天，目标为最少运维开销。
+
+**必要判断**
+
+- j1（显式）：比较直接将RDS自动备份保留期改为30天、通过Systems Manager Maintenance Windows修改保留期、Lambda每日快照，以及AWS CLI每日手动快照再改保留期，判断频率、保留管理和自动化边界。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查RDS默认备份频率与保留期、30天设置支持，以及自动备份保留设置对手动快照的作用范围。
+
+### Q864
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：应用使用Aurora DB cluster；峰值多用户读取时写查询性能下降，需以最低合理成本提高应用扩展能力、满足峰值需求。
+
+**必要判断**
+
+- j1（显式）：比较集群内Aurora read replica并将只读查询导向replica endpoint、写入导向cluster endpoint，与第二Aurora集群加复制任务及Redshift复制分流读取的完整路径、扩展和成本。〔S, O1, O3, O4〕
+- j2（显式）：判断在Aurora前部署DAX、仅缓存读取而直接写Aurora的兼容性及其对读写竞争的作用。〔S, O2〕
+
+**待官方核验**
+
+- 待查Aurora读副本及端点职责、跨集群和Redshift数据同步、DAX支持的数据源与各方案费用。
+
+### Q865
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：AWS近实时流应用在摄取数据时执行耗时30分钟的作业；大量流入数据经常导致高延迟，需可扩展、serverless方案改善性能，选择两步组合。
+
+**必要判断**
+
+- j1（显式）：比较Kinesis Data Firehose与AWS DMS作为此流数据摄取层的适用性及下游处理衔接。〔S, O1, O3〕
+- j2（显式）：比较Lambda加Step Functions、EC2 Auto Scaling group与ECS加Fargate对30分钟作业、serverless约束和突增数据处理的适用性，并评估摄取与处理组合的延迟。〔S, O2, O4, O5〕
+
+**待官方核验**
+
+- 待查摄取服务的数据源和交付模式、各处理服务的运行时限、编排拆分条件、弹性及端到端集成。
+
+### Q866
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：VPC内多个EC2运行Web应用，需向S3桶写入敏感数据，数据不得经公共互联网传送。
+
+**必要判断**
+
+- j1（显式）：比较S3 gateway VPC endpoint加路由、内部NLB以S3桶为target、所提把S3桶部署进VPC并添加路由，以及VPC至S3 regional endpoint的Direct Connect，判断可部署性和数据路径。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查S3私网访问机制、endpoint路由、NLB目标类型、S3资源网络位置及Direct Connect连接边界。
+
+**源异常／歧义**
+
+- O3的“VPCreate”处文本粘连，VPC与后续路由句子的分界受损。
+
+### Q867
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：生产负载运行于EC2并使用EBS；需分析现有卷成本、提出优化建议，且建议包含预计每月节省金额。
+
+**必要判断**
+
+- j1（显式）：比较Inspector、Systems Manager、CloudWatch指标报告与Compute Optimizer能否提供EBS专属优化建议及预计月度节省，而不仅是原始指标或其他类型报告。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各服务的EBS推荐覆盖、所需利用率数据、成本估算字段及生成条件。
+
+### Q869
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：AWS电商订单应用需每单恰好处理一次，并在不可预测流量突增时不影响客户体验。
+
+**必要判断**
+
+- j1（显式）：比较SQS FIFO加Lambda、SNS standard topic加应用通知目标、AppFlow加Lambda，以及X-Ray跟踪后从CloudWatch拉取订单的交付、缓冲、伸缩与处理衔接。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：区分消息去重、投递与业务处理“恰好一次”的边界；判断重试、重复调用和业务幂等是否需要额外机制。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各服务的订单数据通路、投递与重试语义、FIFO去重范围及Lambda消费后的业务幂等要求。
+
+### Q870
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Development账户需向Production账户推送代码；alpha阶段仅2名高级开发者可访问Production，beta阶段需扩大给更多开发者测试。
+
+**必要判断**
+
+- j1（显式）：比较在两个账户分别分配policy、在Development或Production创建可assume的IAM role，以及Production IAM group作为trust policy principal，判断跨账户身份、信任和权限的配置方向。〔S, O1, O2, O3, O4〕
+- j2（显式）：判断跨账户授权如何先限定2名开发者、再扩展访问人群，并保留推送代码和测试所需权限。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查跨账户AssumeRole的信任与身份策略配合、role所属账户及IAM group能否作为信任主体。
+
+### Q871
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Web应用需限制内容访问，使用AWS认证授权；架构须serverless、登录低延迟、可集成应用并全球提供内容，用户基数当前小但预计增长。
+
+**必要判断**
+
+- j1（显式）：比较Cognito与Directory Service for Microsoft Active Directory的认证方式，以及Lambda与Lambda@Edge的授权执行位置、serverless适用性和登录延迟。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较CloudFront、ALB、S3 Transfer Acceleration与Elastic Beanstalk的全球内容交付职责，评估与各认证授权组件组合后的完整访问控制和扩展能力。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查认证服务及边缘授权集成、各交付组件的功能边界、全球覆盖和serverless限制。
+
+### Q872
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：开发、预发布、生产使用多个AWS账户，成员常启动利用率不足的大型EC2；需阻止所有账户启动大型实例，运维开销最少。
+
+**必要判断**
+
+- j1（显式）：比较对所有用户应用IAM deny policy、每账户创建deny role并让开发者组访问、AWS RAM所提限制资源，以及Organizations默认策略配SCP并应用到账户的预防范围和维护负担。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查EC2实例类型条件限制、IAM role与用户策略覆盖、SCP生效范围及RAM的资源共享与权限边界。
+
+### Q873
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：数百台本地VM已迁至EC2，包含多版本Windows Server及多种Linux；需自动化操作系统清单与更新，并为每月审查提供逐实例常见漏洞摘要。
+
+**必要判断**
+
+- j1（显式）：比较Systems Manager Patch Manager与AWS Config所提补丁安装能力，判断异构操作系统的清单、更新及管理前提。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较Security Hub、Inspector、Shield Advanced与GuardDuty对逐实例漏洞摘要及月度报告的覆盖，并与操作系统管理方案配合。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查操作系统支持矩阵、清单和补丁功能归属、漏洞检测覆盖，以及月度报告是否需额外调度或导出。
+
+### Q874
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：应用由ELB后EC2 Auto Scaling group及DynamoDB组成；DR要求另一Region可提供应用，且停机时间最短。
+
+**必要判断**
+
+- j1（显式）：比较DR Region预建Auto Scaling group/ELB与故障时用CloudFormation创建计算层；同时比较DynamoDB global table与故障时新建表对数据可用和恢复时间的影响。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较DNS failover与CloudWatch告警评估10分钟后调用Lambda更新Route 53的切换链，综合资源准备和数据复制评估停机时间。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查global table复制、跨Region资源预置或重建时延、DNS故障转移及告警/Lambda更新Route 53的切换条件。
+
+### Q875
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：私有子网EC2应用需存取S3桶；法规禁止数据经过公共互联网，目标为最具成本效益。
+
+**必要判断**
+
+- j1（显式）：比较NAT gateway、Storage Gateway、S3 interface endpoint与S3 gateway endpoint的访问路径、部署需求及费用，判断对私网存取要求的覆盖。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各方案到S3的数据路径、endpoint配置范围及NAT、网关和endpoint相关计费。
+
+### Q876
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：EC2应用当前仅在单个AZ，通过OSI传输层访问；需以最具成本效益的两步组合实现高可用。
+
+**必要判断**
+
+- j1（显式）：比较单独NLB与TCP用NLB并另为HTTP/HTTPS配置ALB，对传输层协议、冗余组件及成本的适用性。〔S, O2, O3〕
+- j2（显式）：比较新建其他AZ实例并用Route 53分流、跨多个AZ的Auto Scaling group加应用健康检查，以及CloudWatch重启进入stopped状态的实例，评估与负载均衡配合的故障恢复和成本。〔S, O1, O4, O5〕
+
+**待官方核验**
+
+- 待查NLB/ALB协议支持、跨AZ伸缩与应用健康检查、Route 53流量控制及CloudWatch实例状态和动作限制。
+
+### Q877
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：S3静态网站需增加动态服务端联系表单，收集姓名、邮箱、电话、留言；每月访问少于100次，提交后需邮件通知公司，目标成本最低。
+
+**必要判断**
+
+- j1（显式）：比较API Gateway加两个Lambda分别返回表单、提交至SNS，与ECS托管表单加SES及第三方邮件提供商的动态处理、邮件链路和低流量成本。〔S, O1, O2〕
+- j2（显式）：评估Amplify Hosting加服务端脚本及SQS所提通知，以及迁至Windows Server EC2/IIS加客户端脚本及WorkMail，对服务端处理、邮件投递和迁移成本的覆盖。〔S, O3, O4〕
+
+**待官方核验**
+
+- 待查各托管方案动态执行能力、API/Lambda集成及SNS、SES、SQS、WorkMail的邮件通知边界与低用量费用。
+
+### Q878
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Organizations为业务单元设专用账户；重要通知曾仅送达root邮箱而非账户负责人，今后需按billing、operations、security类别通知不同员工，且安全性最高。
+
+**必要判断**
+
+- j1（显式）：比较所有账户共用一个可由账户负责人访问的邮箱、各业务单元独立管理员分发列表、各单元某个人的公司邮箱，以及指向中央邮箱的root邮件别名，判断账户归属、访问和人员变动风险。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较按业务单元分别配置三类alternate contacts分发列表，与全公司每类一个分发列表，判断通知分类、责任人覆盖及账户级配置衔接。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查AWS账户root邮箱要求、公司邮箱及别名管理建议、alternate contacts类别与通知路由范围。
+
+### Q879
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：电商EC2处理购买并写入Aurora PostgreSQL；峰值出现应用超时，需通过两项操作组合扩展以满足峰值，且成本最优。
+
+**必要判断**
+
+- j1（显式）：比较SQS缓冲购买请求并由新EC2 Auto Scaling group消费，与新EC2 Auto Scaling group重试购买并经RDS Proxy连接数据库；评估组合中的请求解耦、重试及数据库连接压力。〔S, O1, O3〕
+- j2（显式）：比较Aurora前置ElastiCache、Lambda持续重试购买，以及API Gateway REST API usage plan，对购买处理扩展、超时和成本的作用及与其他措施的配合。〔S, O2, O4, O5〕
+
+**待官方核验**
+
+- 待查SQS消费与伸缩、RDS Proxy连接管理、缓存适用请求、Lambda重试时限及API Gateway usage plan控制范围。
+
+**源异常／歧义**
+
+- O4将购买称为“ticket purchases”，与题干一般电商购买措辞不一致；O5的“AP!”存在字符异常。
+
+### Q880
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Organizations下30个账户运行150个应用；管理账户新建Cost and Usage Report，送至S3后复制到数据收集账户桶；领导需自定义仪表盘，展示本月月初起每日NAT gateway成本。
+
+**必要判断**
+
+- j1（显式）：比较QuickSight与CloudWatch作为共享仪表盘和表格可视化层，以及Athena与DataSync作为新报告查询环节，判断跨账户S3报告到每日NAT费用展示的组合路径。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查CUR时间粒度和新报告历史覆盖、S3跨账户查询权限、Athena/DataSync职责及两类仪表盘的数据源集成。
+
+### Q881
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：高流量S3静态网站经CloudFront发布，当前default TTL为0秒；需缓存提升性能，部署后旧内容不得持续超过几分钟，选择两种方法。
+
+**必要判断**
+
+- j1（显式）：比较CloudFront default TTL设2分钟、S3桶所提default TTL设2分钟，以及对象Cache-Control private，对边缘缓存和过期控制的配置层次与效果。〔S, O1, O2, O3〕
+- j2（显式）：比较Lambda@Edge在viewer response添加Expires，与S3对象Cache-Control max-age为24小时并在部署时对变更文件执行CloudFront invalidation，判断与其他方法组合后的缓存和旧内容时限。〔S, O4, O5〕
+
+**待官方核验**
+
+- 待查CloudFront TTL与源站缓存头优先级、private语义、viewer response修改头的缓存影响，以及invalidation传播时限。
+
+### Q882
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：应用使用私有子网EC2及需直接联网访问这些实例的Lambda；运行1年，期间Lambda数量增加，需最小化全部应用资源的总体成本。
+
+**必要判断**
+
+- j1（显式）：比较EC2 Instance Savings Plan与Compute Savings Plan对EC2和增长中的Lambda用量覆盖及1年承诺的总体成本适用性。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较Lambda连接EC2所在私有子网、连接同VPC新公共子网或保留于Lambda service VPC，对直接访问私有EC2的网络可达性及相关成本。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查两类Savings Plans服务覆盖和承诺条件，以及Lambda VPC连接、子网路由与私有EC2访问要求。
+
+### Q883
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Control Tower多账户策略为每位开发者分配独立账户；需实施控制限制其AWS资源费用，且运维开销最少。
+
+**必要判断**
+
+- j1（显式）：比较AWS Budgets按账户预算、实际及预测告警和达到预算后对开发者role施加DenyAll，与Cost Explorer日报加Cost Anomaly Detection，判断主动限制和费用可见性的差异。〔S, O2, O3〕
+- j2（显式）：比较CostCenter=开发者姓名标签、required-tags Config rule及Lambda终止无标签资源，与Service Catalog限定可选资源成本范围并由各账户Lambda每日下班停机、上班恢复的控制范围和运维负担。〔S, O1, O4〕
+
+**待官方核验**
+
+- 待查Budgets actions触发和权限效果、Cost Explorer报告能力、标签规则及Service Catalog限制边界、定时停启适用资源。
+
+### Q884
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：三层Web架构为公网ALB、私有子网EC2 Web层、私有EC2业务逻辑层及私有EC2 Microsoft SQL Server层；安全优先，需选择3项安全组配置。
+
+**必要判断**
+
+- j1（显式）：判断ALB安全组至Web层HTTPS入站、Web层安全组至应用层HTTPS入站、应用层安全组至数据库层Microsoft SQL Server入站的来源引用与分层通信需求。〔S, O1, O3, O5〕
+- j2（显式）：评估Web层向0.0.0.0/0开放HTTPS出站，以及数据库层或应用层向Web安全组开放HTTPS和Microsoft SQL Server出站的必要性、方向及安全范围。〔S, O2, O4, O6〕
+
+**待官方核验**
+
+- 待查安全组状态性、组引用、入出站方向及HTTPS和Microsoft SQL Server跨层通信的最小权限配置。
+
+### Q885
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：新版生产负载使用EC2、Lambda、Fargate、SageMaker，当前用量稳定；需成本优化，以最少Savings Plans覆盖最多服务，选择两项。
+
+**必要判断**
+
+- j1（显式）：比较EC2 Instance Savings Plan、Compute Savings Plan与SageMaker Savings Plan的服务覆盖及组合互补性；核对选项分别将EC2与SageMaker、EC2与Fargate、EC2/Lambda与SageMaker、EC2/Lambda/Fargate归入同一计划的主张。〔S, O1, O2, O3, O4, O5〕
+
+**待官方核验**
+
+- 待查三类Savings Plans的服务与用量覆盖边界及组合计费规则。
+
+### Q886
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：现有应用连接Microsoft SQL Server；需迁至Aurora PostgreSQL并尽量少改应用代码，选择两步组合。
+
+**必要判断**
+
+- j1（显式）：比较Babelfish运行现有SQL、SCT或DMS所提应用SQL改写，以及RDS Proxy连接方式，对SQL兼容和应用代码改动的作用。〔S, O1, O2, O4, O5〕
+- j2（显式）：判断SCT加DMS迁移数据库schema及数据的分工，并评估与SQL兼容方案组合后的完整迁移路径。〔S, O2, O3〕
+
+**待官方核验**
+
+- 待查Babelfish的SQL Server兼容及启用限制、SCT/DMS的schema、数据和应用SQL处理边界，以及RDS Proxy职责。
+
+### Q887
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：应用将rehost至EC2并附加EBS；所有新建EBS卷必须默认加密，且必须阻止创建未加密卷。
+
+**必要判断**
+
+- j1（显式）：比较EC2账户属性默认加密、Config encrypted-volumes加默认KMS key、Systems Manager复制为加密卷并重挂，以及客户管理KMS key加Migration Hub配置，区分创建时预防、检测、事后修复和迁移期配置。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查EBS默认加密设置的生效范围及禁用或绕过边界、Config规则作用，以及Systems Manager和Migration Hub相关加密配置能力。
+
+### Q888
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：电商网站需收集用户clickstream并实时分析；日内流量波动，方案需可扩展并适应不同流量。
+
+**必要判断**
+
+- j1（显式）：比较Kinesis Data Streams on-demand加Lambda、Kinesis Data Firehose加Glue、Kinesis Video Streams加Glue，以及Managed Service for Apache Flink（原Kinesis Data Analytics）摄取加Lambda处理的职责、实时性和弹性。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各服务适用数据类型、摄取与处理边界、on-demand伸缩，以及Lambda/Glue/Flink的流处理集成和延迟限制。
+
+### Q889
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：全球AWS应用在多个Region的多个S3桶存储分析敏感数据，每日写入数百万对象；需识别所有未启用versioning的桶。
+
+**必要判断**
+
+- j1（显式）：比较CloudTrail事件加所提规则、S3 Storage Lens、IAM Access Analyzer for S3及S3 Multi-Region Access Point，判断跨Region完整枚举桶版本控制状态的能力。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各服务对versioning状态指标或配置的覆盖、跨Region汇总及现有桶识别能力。
+
+### Q890
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：大量不可重建文件每个约5 MB，现存S3 Standard；至少保存4年才可删除，始终需立即访问，创建后前30天频繁访问、之后很少访问，目标成本最低。
+
+**必要判断**
+
+- j1（显式）：比较第30天转S3 Glacier Instant Retrieval、S3 One Zone-IA或S3 Standard-IA，对不可重建数据、立即访问及后续长期低频访问的适用性和费用。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较创建满4年删除与满4年继续转S3 Glacier Flexible Retrieval的生命周期终点，评估保留要求、访问时延及累计成本。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各存储类的访问时延、AZ故障承受范围、最短计费与检索费用，以及5 MB对象的生命周期转换和长期成本。
+
+### Q891
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：关键存储应用使用两个AWS Region的S3；需将远程用户数据送至最近桶且避开公共网络拥塞，并以最少S3管理工作实现故障转移。
+
+**必要判断**
+
+- j1（显式）：比较应用自行选择最近regional endpoint的active-active、Multi-Region Access Points的active-passive且每Region一个global endpoint，以及active-active单一global endpoint的路由、网络路径与故障转移管理。〔S, O1, O2, O4〕
+- j2（显式）：区分所提S3 cross-account replication与Cross-Region Replication对两Region桶同步的适用性，并评估复制与入口路由、故障转移的衔接。〔S, O3, O4〕
+
+**待官方核验**
+
+- 待查Multi-Region Access Points端点结构、就近路由和故障转移控制、骨干网络路径，以及跨账户和跨Region复制边界。
+
+### Q892
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：本地数据中心迁至AWS，多个遗留应用各由独立虚拟服务器承载，不可修改应用设计；迁移后运行于EC2，需可靠且容错。
+
+**必要判断**
+
+- j1（显式）：比较每应用AMI加min=1/max=1的Auto Scaling group及ALB，与AMI启动2台分置不同AZ的EC2加NLB，判断单实例假设、自动替换、并行运行兼容和故障恢复差异。〔S, O1, O3〕
+- j2（显式）：比较AWS Backup每小时备份、所提另一个AZ的S3存储及从最近备份恢复，与Refactor Spaces拆分功能并迁至ECS/Fargate，评估容错、恢复方式和不可改设计及EC2约束。〔S, O2, O4〕
+
+**待官方核验**
+
+- 待查固定单实例Auto Scaling恢复、ALB/NLB健康检查、AMI多实例运行前提、AWS Backup存储位置与恢复，以及Refactor Spaces职责。
+
+**源异常／歧义**
+
+- 题干同时描述从本地迁移及各虚拟服务器“当前”已是独立EC2，迁移时点不清；O4使用“AWS Mitigation Hub Refactor Spaces”名称，需确认原意。
+
+### Q893
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：每个工作负载需独立AWS账户隔离；需集中管理网络组件，创建账户时自动施加安全guardrails，且运维开销最少。
+
+**必要判断**
+
+- j1（显式）：比较Control Tower与Organizations部署账户时的自动安全控制、账户生命周期及额外配置负担。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较网络账户持有含公私子网VPC并通过AWS RAM共享子网，与每工作负载账户自建VPC、经transit gateway attachment路由至inspection VPC，对集中网络管理、隔离和整体运维的作用。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查Control Tower与Organizations账户及guardrails能力、RAM子网共享权限边界，以及transit gateway和inspection VPC的管理职责。
+
+### Q894
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：静态网站现运行于ALB后的Amazon EC2，流量增长，需最小化网站托管成本。
+
+**必要判断**
+
+- j1（显式）：比较S3配CloudFront或ElastiCache，以及AWS Amplify配ALB或EC2缓存的静态托管方案，判断服务衔接、流量增长适应性与整体托管成本。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查各托管与缓存组合的集成方式、适用范围及费用差异。
+
+### Q895
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：AWS上的媒体应用需要共享存储，支持SMB客户端访问，且管理开销最少。
+
+**必要判断**
+
+- j1（显式）：比较Storage Gateway Volume Gateway文件共享、Tape Gateway配S3、自建EC2 Windows文件共享与FSx for Windows File Server的SMB访问路径及管理责任。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查各Gateway类型的协议与存储接口，以及自建Windows共享和FSx的运维边界。
+
+### Q896
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：生产应用使用us-east-1的Aurora MySQL，DR Region为us-west-1；RPO 5分钟、RTO 20分钟，最小化配置变化并追求最高运维效率。
+
+**必要判断**
+
+- j1（显式）：比较跨Region Aurora只读副本、Aurora global database配managed failover、新集群配Cross-Region Replication及AWS DMS同步的复制、恢复与配置流程；纳入O1副本与生产writer规格相近的安排。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查各跨Region方案的支持条件、复制延迟、故障切换步骤和RPO/RTO适配性。
+
+### Q897
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：关键分析作业每周须在工作周第一天之前运行。
+- c2〔S〕：分析至少需要1小时。
+- c3〔S〕：作业有状态且不能容忍中断。
+- c4〔O1〕：候选把作业容器化，由EventBridge Scheduler定时启动ECS上的Fargate任务。
+- c5〔O2〕：候选用EventBridge定时规则调用Lambda执行作业。
+- c6〔O3〕：候选使用运行Amazon Linux的EC2 Spot自动扩缩组，并以crontab调度。
+- c7〔O4〕：候选使用DataSync任务执行作业，并以cron表达式调度。
+
+**必要判断**
+
+- j1（显式）：如何判断各执行环境能否运行至少1小时的有状态分析，并满足不能容忍中断的约束？〔S, O1, O2, O3, O4〕
+- j2（显式）：如何判断各定时机制与执行资源的衔接能否满足每周运行时点？〔S, O1, O2, O3, O4〕
+- j3（先修候选，待核验）：如何区分通用分析计算、数据传输任务与可能被回收的计算容量在此作业中的适用边界？〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- Fargate、Lambda、EC2 Spot及DataSync对执行时长、任意分析逻辑和运行中断分别有哪些能力与限制？
+- 所列调度方式如何启动目标任务，时区、启动失败及重复触发行为对每周作业有哪些影响？
+
+### Q898
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：集中收集AWS工作负载安全数据，用于全公司安全评估和改进工作负载保护，开发工作量最少。
+
+**必要判断**
+
+- j1（显式）：比较Lake Formation数据湖配Glue crawlers、Lambda收集.csv到S3、Amazon Security Lake配S3及AWS DMS加载到RDS的安全数据采集与集中分析链路及开发负担。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查各方案的数据接入、存储、格式处理职责及原生安全数据集成范围。
+
+### Q899
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：先迁移5个本地应用，各自维持隔离网络部署；所有应用需互通并访问共享服务VPC，后续扩展到100多个应用，管理开销最少。
+
+**必要判断**
+
+- j1（显式）：比较软件VPN、VPC peering、AWS Direct Connect与transit gateway连接应用VPC和共享服务VPC的拓扑与路由，判断应用间互通、隔离部署及规模扩展的管理成本。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：辨别各连接方式的传递路由能力和连接范围，检查经共享服务VPC转发或集中网关转发所需的双向路由。〔O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查连接边界、传递性、VPC关联及路由配置要求，并比较100多个应用时的扩展开销。
+
+### Q900
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：现有本地容器应用需采用Amazon ECS统一支持本地、混合及云端扩展；新容器必须在AWS Cloud运行，并为HTTP流量使用负载均衡器；选择两项。
+
+**必要判断**
+
+- j1（显式）：比较云端Fargate或EC2与本地ECS Anywhere external、Fargate及所称Anywhere Fargate组合的部署适用性。〔S, O1, O4, O5〕
+- j2（显式）：比较云端ECS服务使用ALB或NLB处理HTTP的适配性，并与容器部署方案组成两项完整方案。〔S, O2, O3, O1, O4, O5〕
+
+**待官方核验**
+
+- 官方待查ECS各launch type的运行位置、ECS Anywhere支持范围及ALB/NLB与云端ECS的HTTP集成。
+
+### Q901
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：迁移源是本地SQL Server实例上的关系数据库
+- c2〔S〕：数据库包含敏感且关键的数据
+- c3〔S〕：迁往云端需提高安全性并减少数据库运维开销
+- c4〔O1〕：EC2方案使用KMS的AWS托管密钥加密
+- c5〔O2〕：RDS方案采用SQL Server Multi-AZ实例和KMS的AWS托管密钥加密
+- c6〔O3〕：S3方案迁移数据至桶，并提出通过Macie确保数据安全
+- c7〔O4〕：DynamoDB方案迁移至表，并提出通过CloudWatch Logs确保数据安全
+
+**必要判断**
+
+- j1（显式）：如何比较EC2自管数据库与Multi-AZ RDS部署在安全、可用性及运维责任上的差异？〔S, O1, O2〕
+- j2（显式）：如何区分加密、敏感数据发现和日志记录在数据库安全要求中的作用及覆盖范围？〔S, O1, O2, O3, O4〕
+- j3（先修候选，待核验）：迁移SQL Server关系数据库时，如何判断对象存储或不同数据模型是否需要额外的应用和数据改造？〔S, O3, O4〕
+
+**待官方核验**
+
+- EC2与RDS for SQL Server对KMS的AWS托管密钥加密分别有哪些支持条件，Multi-AZ部署承担哪些可用性和运维工作？
+- Macie与CloudWatch Logs分别提供哪些安全能力，其保护边界与SQL Server数据迁至S3或DynamoDB的改造要求是什么？
+
+### Q902
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：应用迁移至AWS，需提高当前可用性，并在架构中使用AWS WAF。
+
+**必要判断**
+
+- j1（显式）：比较跨两个AZ的Auto Scaling group、跨两个AZ的固定两台EC2及cluster placement group配ALB的可用性与恢复方式。〔S, O1, O2, O3, O4〕
+- j2（显式）：判断WAF关联ALB、placement group或Auto Scaling group的支持边界，并检查ALB与实例或Auto Scaling group的目标衔接。〔O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查WAF支持的关联资源、ALB目标注册方式及各部署方式的可用性差异。
+
+**源异常／歧义**
+
+- 未说明当前可用性基线、自动恢复或弹性要求，可能不足以唯一比较O1与O3。
+
+### Q903
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：多个应用访问同一S3数据湖bucket，各有唯一prefix；需将每个应用限制到自身prefix，并细粒度控制其中对象，运维开销最少。
+
+**必要判断**
+
+- j1（显式）：比较每应用S3 access point及策略、S3 Batch Operations批量设置对象ACL、按prefix复制到独立bucket，以及复制后再配access point的授权粒度与持续运维开销。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查access point策略、对象ACL与复制规则的权限边界及对新增对象和应用的管理要求。
+
+### Q904
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：图片上传S3，现每晚由EC2 Spot Fleet处理当日图片；每张处理2分钟、需512 MB内存，改为上传时处理，成本效益最高。
+
+**必要判断**
+
+- j1（显式）：比较S3 Event Notifications经SQS交给Lambda或EC2 Reserved Instance，以及经SNS交给ECS container instance或Elastic Beanstalk的触发、消费链路与成本。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：检查处理时长和内存对计算方式的适配性，以及各消费者接收SQS消息或订阅SNS的实际集成要求。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查S3事件目的地、SNS/SQS消费者集成、Lambda运行限制及各计算方案计费方式。
+
+### Q905
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：混合应用包含跨多个AWS Region的EC2有状态TCP工作负载及本地无状态UDP工作负载；需改善整体可用性和性能，选择两项。
+
+**必要判断**
+
+- j1（显式）：比较Global Accelerator以负载均衡器为端点，与CloudFront结合Route 53 latency-based routing指向负载均衡器的跨Region访问方案。〔S, O1, O2〕
+- j2（显式）：比较每Region分别为EC2和本地端点配置ALB/ALB、NLB/NLB或NLB/ALB，判断TCP、UDP、有状态连接及本地目标集成，并与入口方案组成两项组合。〔S, O1, O2, O3, O4, O5〕
+
+**待官方核验**
+
+- 官方待查全球入口的协议和端点支持、ALB/NLB协议及本地目标支持、连接保持和健康路由机制。
+
+### Q906
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：自管Microsoft SQL Server运行于EC2和EBS，每日创建EBS快照；清理过期快照的脚本曾误删全部快照，需防止数据丢失且不能无限保留，开发工作量最少。
+
+**必要判断**
+
+- j1（显式）：比较IAM禁止删除、每日完成后跨Region复制、对全部快照应用Recycle Bin 7天保留规则，以及复制至S3 Standard-IA的误删防护、有限保留和开发负担。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查快照删除授权、Recycle Bin恢复与到期行为、跨Region副本保护及快照向S3 Standard-IA复制的支持方式。
+
+### Q907
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：测试环境使用CloudFormation stack，模板位于阻止公共访问的S3 bucket；需按特定用户创建请求授予CloudFormation模板访问权，并遵循安全最佳实践。
+
+**必要判断**
+
+- j1（显式）：比较S3 gateway VPC endpoint配对象URL、API Gateway REST API代理S3、对象presigned URL及临时公开对象的模板访问链路、授权范围与暴露风险。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查CloudFormation模板URL支持、S3私有对象的请求授权和presigned URL限制，以及VPC endpoint/API Gateway的访问边界。
+
+### Q908
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：AWS Organizations中的应用由外部工程师运维；工程师需AWS Management Console及私有子网中Amazon Linux EC2的操作系统访问，要求最安全。
+
+**必要判断**
+
+- j1（显式）：比较IAM Identity Center集中控制台访问与各账户本地IAM用户凭据，辨别Session Manager在控制台身份和操作系统授权中的职责。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较SSM Agent加必要instance profile及Session Manager、按工程师源IP开放SSH加个人密钥，以及公共子网bastion加受限SSH的私网访问链路与安全管理。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查Identity Center跨账户访问、Session Manager身份授权与私网连接前提，以及SSH/bastion的网络和凭据管理要求。
+
+### Q909
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：应用使用us-east-1的RDS for PostgreSQL，ML年度营收预测依赖同库近实时报告；营业时间数据库变慢，需以最高成本效益改善数据库性能。
+
+**必要判断**
+
+- j1（显式）：比较将报告查询转到跨Region read replica、Multi-AZ DB instance standby、AWS DMS逻辑复制的新数据库或us-east-1 read replica的查询承载、数据时效与成本。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查各复制目标的可读性、复制延迟、跨Region费用及DMS部署管理成本。
+
+### Q910
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：公网多层Web应用运行于EC2、数据库为RDS；预计节假日周末销售大增，需以不超过2分钟的粒度分析应用性能。
+
+**必要判断**
+
+- j1（显式）：比较EC2 detailed monitoring加CloudWatch metrics，与CloudWatch logs到Redshift/QuickSight、Lambda提取EC2日志后使用metrics、EC2日志经S3到Redshift/QuickSight的采样粒度和分析链路。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查EC2监控指标周期、日志与指标衔接，以及各日志分析链路能否提供不超过2分钟的性能分析粒度。
+
+### Q911
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：用户每天约上传150张照片至S3
+- c2〔S〕：每张新照片都需生成缩略图并写入第二个S3桶
+- c3〔S〕：要求成本效益最高
+- c4〔O1〕：EMR方案每分钟运行脚本，集群长期运行
+- c5〔O2〕：EC2方案每分钟运行脚本，内存优化实例始终开启
+- c6〔O1〕：两个定时方案扫描缺少缩略图的照片
+- c7〔O3〕：S3事件通知方案在每次上传新照片时调用Lambda
+- c8〔O4〕：Storage Lens方案提出在每次上传时调用Lambda
+- c9〔O4〕：两个Lambda方案均要求生成缩略图并写入第二个桶
+
+**必要判断**
+
+- j1（显式）：如何判断定时扫描与逐次上传触发能否覆盖每张新照片，并完成跨桶缩略图写入？〔S, O1, O2, O3, O4〕
+- j2（显式）：如何比较每天约150张照片时，常驻EMR、常驻EC2与按事件调用Lambda的成本？〔S, O1, O2, O3, O4〕
+- j3（显式）：需要区分S3事件通知与Storage Lens分别能否提供选项所述的上传触发机制？〔O3, O4〕
+
+**待官方核验**
+
+- S3事件通知与Storage Lens各自支持哪些事件及Lambda集成，生成结果写入另一个桶需要哪些权限？
+- 这些定时常驻与事件驱动方案的计费维度是什么，在给定低上传量下应如何比较？
+
+### Q912
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：S3 bucket多个prefix中有数百万个S3 Glacier Deep Archive对象；需删除超过3年的数据，排除已识别的保留子集，方案必须serverless。
+
+**必要判断**
+
+- j1（显式）：比较S3 Inventory加EC2 CLI删除、AWS Batch删除、Glue crawler生成旧对象manifest后脚本删除，以及Inventory配S3 Batch Operations调用Lambda筛选删除的规模、年龄筛选、保留排除与serverless适配。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查Deep Archive对象清单与删除接口、Inventory字段、Batch Operations/Lambda集成和运行限制，以及AWS Batch/Glue方案的执行资源要求。
+
+### Q913
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：多个Lambda函数从同一S3 bucket读取敏感数据处理；仅授权函数可访问，必须遵循最小权限。
+
+**必要判断**
+
+- j1（显式）：比较共享IAM role授予全部函数完整bucket权限、各函数独立execution role、按VPC endpoint IP授权，以及按function ARN编写bucket policy的身份区分和权限粒度。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：明确Lambda访问S3时的请求身份，以及bucket policy可用于区分函数、execution role和VPC endpoint的授权条件。〔O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查Lambda执行身份、S3策略principal与condition支持，以及共享和独立role的权限隔离方式。
+
+### Q914
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：非生产应用由各业务单元的多个微服务组成，单一开发团队维护；现有静态Web前端、Java后端逻辑及EC2自管MySQL，需安全且全球可用，运维开销最少。
+
+**必要判断**
+
+- j1（显式）：比较CloudFront配Amplify、CloudFront配S3及仅S3前端；比较Lambda微服务经API Gateway、NLB target group或ALB target group接入的全球访问、安全与集成要求。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较MySQL迁往EC2 Reserved Instance或RDS for MySQL的管理责任，并结合前后端重构判断整套方案的运维开销。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查静态托管和全球分发安全配置、Lambda入口及target类型支持、Java迁移要求和MySQL托管运维边界。
+
+### Q915
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：全球游戏用户需要近实时玩家评价和排名、快速数据访问；应用重启时数据仍须持久保存在磁盘，运维开销最少。
+
+**必要判断**
+
+- j1（显式）：比较CloudFront配S3、多个Region的EC2配Route 53 geolocation，以及ElastiCache for Redis或Memcached的近实时排名访问、磁盘持久化及运维责任。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：区分应用重启时的数据保留与存储服务自身重启或故障恢复，并核对geolocation指向最近EC2的路由表述。〔S, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查Redis/Memcached的排名数据结构与持久化配置、S3访问模式及Route 53 geolocation路由语义。
+
+### Q916
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：应用存储和处理多个客户的敏感金融数据；合规要求每客户数据分别静态加密，使用安全集中密钥管理及AWS KMS，运维开销最少。
+
+**必要判断**
+
+- j1（显式）：比较每客户唯一密钥存S3并启用服务端加密、自建硬件安全设备保存客户密钥并集成KMS、全应用单一KMS key，以及每客户独立KMS key配细粒度访问和日志的隔离与管理方式。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查各密钥存储与KMS集成方式、每客户加密隔离、访问审计能力及运维责任。
+
+### Q917
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：弹性Web订单应用需自动应对Web流量与使用量增长，不影响客户体验且不丢失订单。
+
+**必要判断**
+
+- j1（显式）：比较NAT gateway配EC2 Auto Scaling/Lambda、NLB转ALB配Redshift Multi-AZ、GWLB配ECS/DynamoDB，以及ALB配EC2 Auto Scaling/SQS/RDS Multi-AZ的端到端订单链路。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：区分流量入口、弹性处理、未处理订单缓冲与已处理订单持久化的职责，判断各选项指定服务能否衔接并避免过载丢单。〔O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查各入口服务的适用流量、未处理订单捕获存储能力，以及队列、计算和Multi-AZ数据库的可靠性衔接。
+
+### Q918
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：DataSync迁移数百万本地文件至S3，平均10 KB；迁移后首年访问1或2次且须立即可用，1年后至少归档7年，成本效益最高。
+
+**必要判断**
+
+- j1（显式）：比较先打包为大对象与直接迁移小文件的访问及计费影响，并检查DataSync目标storage class配置。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较首年Glacier Instant Retrieval后转Deep Archive、首年Standard-IA后转Instant Retrieval、首年Instant Retrieval后转Flexible Retrieval，以及首年Standard-IA后转Deep Archive的即时访问、1年转换和7年保留成本。〔O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查DataSync存储类支持、小对象最低计费及元数据费用、归档取回方式与生命周期转换和保留配置。
+
+### Q919
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Oracle从本地lift and shift到内存优化EC2 Linux，使用1 TB、64,000 IOPS的Provisioned IOPS SSD io1 EBS卷，迁移后存储性能下降，需改善存储性能。
+
+**必要判断**
+
+- j1（显式）：比较增加io1卷并用OS命令组成LVM stripe、将单卷提高到超过64,000 IOPS、扩容至2 TB，以及仅改为存储优化EC2而保持卷不变的性能影响。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：区分单卷IOPS/吞吐、实例EBS带宽和多卷条带化的瓶颈，并检查卷大小、预置IOPS及实例类型的限制关系。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查io1容量与IOPS上限、实例EBS性能限制及LVM stripe扩展效果和前提。
+
+### Q920
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：EC2单体Web应用迁往serverless微服务，需事件驱动、松耦合及pub/sub模式，成本效益最高。
+
+**必要判断**
+
+- j1（显式）：比较API Gateway REST API→Lambda→SQS、多订阅者读取，与REST或HTTP API→Lambda→SNS、多订阅者接收，以及WebSocket API→Kinesis Data Streams enhanced fan-out的发布订阅语义与集成。〔S, O1, O2, O3, O4〕
+- j2（显式）：在满足同一pub/sub需求的前提下比较REST API、HTTP API及WebSocket/Kinesis enhanced fan-out的功能需求和整体费用。〔O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查SQS与SNS的多消费者分发差异、API Gateway服务集成及各API和Kinesis消费模式计费。
+
+### Q921
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：紧耦合单体应用迁至EC2和RDS，现有设计只能运行于单台EC2；高峰EC2 CPU高且RDS读性能下降，需降低高CPU利用率并改善读请求性能。
+
+**必要判断**
+
+- j1（显式）：比较提高EC2 CPU并将Auto Scaling group min/max均设为1，与min 1/max 2的扩展方式对单实例设计约束及CPU目标的适配。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较RDS read replica仅承担读、将全部读写转向replica及提高RDS CPU的读性能方案，并与EC2调整组合评估。〔O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查RDS副本读写边界、读流量切换要求及纵向扩容影响，并核对Auto Scaling容量设置与单实例约束。
+
+### Q922
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：开发团队需访问公司AWS资源；必须维持高安全性，防止未授权访问敏感数据。
+
+**必要判断**
+
+- j1（显式）：比较团队共享IAM用户凭据、为开发者配置最小权限细粒度IAM role、仅通过access keys调用API，以及Cognito user pool授权AWS资源的身份隔离、授权范围和访问管理。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查IAM role的人员使用方式、access keys权限边界及Cognito user pool与AWS资源授权的衔接要求。
+
+### Q923
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：单台EC2托管单体Web应用，特定时段性能差且CloudWatch显示CPU 100%；需解决性能并提高可用性，成本效益最高，选择两项。
+
+**必要判断**
+
+- j1（显式）：比较Compute Optimizer建议用于纵向或横向扩展的作用，与从Web服务器创建AMI并用于launch template的部署准备作用。〔S, O1, O2, O4〕
+- j2（显式）：判断Auto Scaling group配ALB所称纵向或横向扩展的能力，组合两项步骤覆盖部署、CPU压力和可用性，并比较成本。〔S, O1, O2, O3, O4, O5〕
+
+**待官方核验**
+
+- 官方待查Compute Optimizer建议范围、AMI/launch template与Auto Scaling集成，以及ALB和Auto Scaling的扩展机制。
+
+### Q924
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：全部业务应用在AWS，Organizations管理多个账户；需审查授予IAM用户的全部权限，识别超出所需权限的用户，管理开销最少。
+
+**必要判断**
+
+- j1（显式）：比较Network Access Analyzer、用户创建或修改资源时触发CloudWatch alarm、IAM Access Analyzer及Amazon Inspector对跨账户IAM权限审查与过度授权识别的覆盖范围。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查各工具的分析对象、Organizations集成及所授权限与实际所需或使用权限的比较能力和配置前提。
+
+### Q925
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：监管合规要求S3 bucket中的敏感文档在固定期限内不得删除或修改。
+
+**必要判断**
+
+- j1（显式）：比较S3 Object Lock governance与compliance模式、versioning配到期删除生命周期，以及生命周期转Glacier Flexible Retrieval对固定期防删除、防修改的约束及可绕过性。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查Object Lock模式、保留期及绕过权限，以及versioning和存储类转换对对象版本修改删除的保护边界。
+
+### Q926
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：资源密集型客户Web应用运行于ECS on Fargate，需24小时/天、7天/周可用并高度可用，预期短时流量突发，成本效益最高。
+
+**必要判断**
+
+- j1（显式）：比较Fargate承载稳态/Fargate Spot承载突发与反向分配的容量、可中断性及整体高可用和成本适配。〔S, O2, O3〕
+- j2（显式）：比较仅Fargate capacity provider配第三方负载测试和所称CloudWatch rightsizing，与配Compute Optimizer rightsizing的资源优化能力，并与混合容量方案比较整体成本。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查Fargate/Spot容量提供策略、中断及容量限制、CloudWatch与Compute Optimizer的任务规格优化能力。
+
+### Q927
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：应用运行于ALB后的EC2，DNS使用Route 53；需带主动介入服务的托管DDoS检测方案。
+
+**必要判断**
+
+- j1（显式）：比较AWS Config managed rule、ALB关联WAF web ACL、ALB日志存S3后由GuardDuty检测并自动防护，以及Shield Advanced配Route 53 hosted zones和ALB受保护资源的DDoS能力与主动介入范围。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查各服务的DDoS检测防护职责、日志来源、主动介入资格与配置条件及受保护资源范围。
+
+### Q928
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：VPC中的视频流Web应用通过NLB处理实时数据TCP流量；已有未授权访问尝试，需以最小架构变化阻止未授权访问。
+
+**必要判断**
+
+- j1（显式）：比较NLB直接配置WAF、重建附带security group的NLB仅允许可信IP、并行新增带严格IP allow list的NLB，以及Shield Advanced的访问控制作用与架构改动。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：检查现有NLB的security group创建和后续关联限制，以及并行NLB方案是否仍留下原有未受限入口。〔O2, O3〕
+
+**待官方核验**
+
+- 官方待查NLB安全组与WAF集成限制、IP过滤配置及Shield Advanced的DDoS保护和访问授权边界。
+
+### Q929
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Lambda向使用KMS customer managed keys加密的SNS topic发布含PHI的通知，需具备安全发布所需权限；选择三项。
+
+**必要判断**
+
+- j1（显式）：判断SNS topic resource policy、Lambda function ARN与execution role在发布授权中的主体和权限关系，比较API Gateway HTTP API加resource policy的额外访问链路。〔S, O1, O4, O5, O6〕
+- j2（显式）：判断KMS key resource policy与Lambda execution role所需KMS权限的配合，并审视改用所称SSE-KMS替代customer managed keys的表述，组合三项完整授权措施。〔S, O2, O3, O6, O1, O4, O5〕
+
+**待官方核验**
+
+- 官方待查加密SNS发布的IAM、topic policy和key policy授权主体及操作，以及API Gateway HTTP API资源策略和密钥类型关系。
+
+**源异常／歧义**
+
+- O2将SSE-KMS与customer managed keys表述为替代关系，二者分类关系需澄清。
+
+### Q930
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：现有员工门户用于登录查看工资，新系统上传报销扫描件、提取文本并关联员工报销ID；门户要求100% uptime，提取程序日内低频按需运行。
+- c2〔S〕：新系统需可扩展、成本有效，门户变化最小且不改代码，实施工作量最少。
+
+**必要判断**
+
+- j1（显式）：比较门户使用On-Demand或Spot的EC2 Auto Scaling、门户与提取程序共用Savings Plan/Auto Scaling，以及门户改为S3加API Gateway/Lambda的持续可用性、扩展和改造要求。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较上传触发Lambda、启动Spot提取实例、提取与门户共组运行及上传API触发Lambda的既有程序兼容性、按需成本和实施工作量。〔O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查既有提取程序在Lambda上的打包与运行限制、上传触发集成、Spot中断影响及各方案的可用性保证范围。
+
+**源异常／歧义**
+
+- 100% uptime未给出衡量窗口或容错范围；提取程序运行条件缺失，影响“不改代码”方案的可判定性。
+
+### Q931
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：us-east-1多账户环境中，生产账户SNS topic发布性能指标；重大指标消息须调用管理员账户Lambda，后者用于日志处理分析；选择两项。
+
+**必要判断**
+
+- j1（显式）：判断跨账户SNS→Lambda所需Lambda resource policy、topic订阅权限和订阅建立关系，辨别O3所称允许Lambda订阅的授权主体。〔S, O1, O3〕
+- j2（显式）：比较管理员账户SQS缓冲后触发Lambda、生产账户EventBridge捕获SNS通知后跨账户转发，以及生产S3配管理员Athena分析能否覆盖消息驱动调用，并评估两项组合的完整性。〔S, O1, O2, O3, O4, O5〕
+
+**待官方核验**
+
+- 官方待查跨账户SNS订阅和Lambda调用策略、SQS事件源集成、SNS到EventBridge的事件接入与跨账户目标限制。
+
+### Q932
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：应用从本地迁至EKS，合规要求VPC中的pods使用自定义subnet，并能在其VPC内安全通信。
+
+**必要判断**
+
+- j1（显式）：比较Transit Gateway直接管理pod subnet、Direct Connect连接本地IP与pods、VPC CNI定义pod自定义subnet，以及network policy结合pod anti-affinity限制节点放置的地址分配、部署与安全通信职责。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查VPC CNI custom networking配置及安全控制，并区分网络策略、调度约束、Transit Gateway和Direct Connect的作用范围。
+
+### Q933
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：电商全部数据存于AWS全托管的单个RDS for MySQL DB instance，需降低单点故障风险，实施工作量最少。
+
+**必要判断**
+
+- j1（显式）：比较在下次maintenance window将现有RDS改为Multi-AZ、DMS异构迁移至所称DynamoDB Multi-AZ、新建Multi-AZ RDS并从最近快照手动恢复，以及DB instance置于min 3的EC2 Auto Scaling配Route 53 simple routing的改造与故障恢复方式。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查RDS单实例转Multi-AZ流程、快照恢复与数据切换、DMS异构迁移要求及RDS与EC2 Auto Scaling的资源管理边界。
+
+### Q934
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：将本地多个Windows SMB和Linux NFS文件服务器整合到AWS；需托管存储同时支持NFS/SMB、跨协议共享，并具备AZ级冗余。
+
+**必要判断**
+
+- j1（显式）：比较FSx for NetApp ONTAP multiprotocol、自建两台EC2分别提供SMB/NFS、ONTAP提供SMB加FSx for Lustre提供NFS，以及S3经S3 File Gateway的协议、同数据共享、托管程度与AZ冗余。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查各服务的NFS/SMB支持、跨协议访问同一数据及权限映射、Multi-AZ配置与gateway冗余要求。
+
+### Q935
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：关键Web应用与MySQL现同处公共子网单台EC2，DNS在Route 53；需改为可扩展、高可用并降低MySQL读延迟，选择两项。
+
+**必要判断**
+
+- j1（显式）：比较第二Region EC2配Route 53 failover、多个AZ私有EC2 Auto Scaling配ALB，以及所称跨多个Region的Auto Scaling和ALB target group的应用层扩展与故障切换。〔S, O1, O2, O4〕
+- j2（显式）：比较Aurora MySQL primary与reader分布于不同AZ，以及Aurora配跨Region read replicas对高可用和读延迟的作用，与应用层措施组成两项方案。〔S, O1, O2, O3, O4, O5〕
+
+**待官方核验**
+
+- 官方待查Auto Scaling/ALB的Region和AZ范围、Route 53 failover条件及Aurora各副本部署的读访问和故障切换特性。
+
+### Q936
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：数千个Lambda函数共用敏感信息，需安全存储并自动轮换，运维开销最少，选择两项。
+
+**必要判断**
+
+- j1（显式）：比较Secrets Manager与Systems Manager Parameter Store的安全存储、自动轮换及规模化管理要求。〔S, O3, O4〕
+- j2（显式）：比较通过Lambda layer复用取密逻辑、Lambda@Edge创建HTTP安全头并获取/创建敏感信息，以及所称专用吞吐Lambda consumer读取后创建环境变量的分发方式，组合存储和读取方案并检查轮换后的值更新。〔S, O1, O2, O3, O4, O5〕
+
+**待官方核验**
+
+- 官方待查两类存储的轮换支持、Lambda layer与执行代码的衔接，以及Lambda@Edge、consumer和环境变量的适用范围及更新行为。
+
+### Q937
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：内部应用运行于Auto Scaling group中的计算优化EC2并使用EBS；需识别EC2、Auto Scaling group及EBS的成本优化机会，运维效率最高。
+
+**必要判断**
+
+- j1（显式）：比较Cost and Usage Report、CloudWatch billing alerts、Compute Optimizer统一分析，以及Compute Optimizer分析EC2并用报告分析其余资源的建议能力、三类资源覆盖与人工工作量。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查各工具提供费用记录、告警或优化建议的边界，以及Compute Optimizer对EC2、Auto Scaling和EBS的覆盖及数据前提。
+
+### Q938
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：媒体存储运行于同一VPC内跨多个AZ的多台EC2；需所有实例高性能共享数据，并倾向数据仅留在VPC内。
+
+**必要判断**
+
+- j1（显式）：比较各实例调用S3 API、将S3挂载为volume、所有实例挂载同一EBS卷，以及共同挂载EFS的共享语义、跨AZ能力、性能与私有访问路径。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查S3挂载及私有访问方式、EBS共享和AZ限制、EFS跨AZ挂载与VPC数据路径。
+
+### Q939
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：RDS for MySQL为年终报告增加read replica；年终时副本及primary CPU均60%，结束后副本恒25%、primary恒60%；需rightsize并保留未来增长性能。
+
+**必要判断**
+
+- j1（显式）：比较删除副本且primary不变、缩小副本且primary不变、增大副本并缩小primary，以及删除副本并增大primary，对读负载去向、CPU余量和未来增长空间的影响。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：评估仅凭CPU利用率判断规格调整的证据边界，避免直接将副本和primary利用率相加或假定读流量会自动迁移。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查RDS副本规格调整、删除后的读流量切换要求，以及rightsize应参考的CPU外资源和负载指标。
+
+### Q940
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：数据库迁至RDS for PostgreSQL，应用迁至EC2；需以最高成本效益优化长期运行工作负载成本。
+
+**必要判断**
+
+- j1（显式）：比较RDS On-Demand配1年Compute Savings Plan No Upfront、RDS Reserved Instances配1年EC2 Instance Savings Plan的No Upfront或Partial Upfront，以及两者3年All Upfront的总成本和承诺差异。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：区分RDS与EC2的折扣适用范围，并评估期限、付款方式和EC2计划灵活性对长期稳定使用假设的影响。〔O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查RDS Reserved Instances和两类Savings Plans的覆盖、1年/3年及各付款方式定价与承诺限制。
+
+### Q941
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：EKS中的Kubernetes service accounts必须通过IRSA安全、细粒度访问特定AWS资源，选择两项。
+
+**必要判断**
+
+- j1（显式）：判断带必要权限的IAM role、service account的role ARN annotation及OIDC trust relationship如何组成IRSA授权链。〔S, O4, O5〕
+- j2（显式）：比较将策略附到EKS node role、通过network policies限制AWS服务，以及修改cluster IAM role并映射Kubernetes roles的权限作用域与service account隔离，确定两项组合所需步骤。〔S, O1, O2, O3, O4, O5〕
+
+**待官方核验**
+
+- 官方待查IRSA的OIDC provider、trust policy和annotation要求，以及node/cluster角色、Kubernetes角色和网络策略的边界。
+
+### Q942
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：机密数据定期上传S3分析；对象必须静态加密，密钥每年自动轮换且可用CloudTrail跟踪轮换，密钥成本最小。
+
+**必要判断**
+
+- j1（显式）：比较SSE-C、SSE-S3、SSE-KMS及明确使用customer managed KMS keys的密钥管理、年度自动轮换、CloudTrail可见性与密钥费用。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：区分加密方式与密钥所有权类别，明确O3未指定KMS key类别时与O4的范围关系。〔O3, O4〕
+
+**待官方核验**
+
+- 官方待查不同S3加密及KMS key类别的轮换周期、CloudTrail事件、可配置性和密钥收费。
+
+**源异常／歧义**
+
+- O3仅写SSE-KMS，未限定AWS managed或customer managed key，与O4存在范围重叠。
+
+### Q943
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：多个应用在过去3个月迁至AWS，需按应用查看费用明细并定期接收报告，成本效益最高。
+
+**必要判断**
+
+- j1（显式）：比较Budgets导出过去3个月.csv、Cost and Usage Reports加载RDS后SQL查询、资源标记cost=应用名并激活cost allocation tags后用Cost Explorer，以及标记后下载过去3个月账单的应用归集和报告成本。〔S, O1, O2, O3, O4〕
+- j2（显式）：检查各方案是否覆盖定期接收报告，而非仅手工查询下载；区分应用标签新增后的费用归集与过去3个月数据的可用范围。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查标签激活和历史费用覆盖、Budgets/Cost Explorer/CUR的应用维度及定期报告交付方式和费用。
+
+### Q944
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：电商Web应用拟部署于EC2、关系数据库使用RDS、静态资源存S3；需稳健、弹性的架构以持续服务客户。
+
+**必要判断**
+
+- j1（显式）：比较EC2/RDS同一AZ配S3 versioning、跨多个AZ的EC2 Auto Scaling配RDS Multi-AZ和CloudFront、EC2与RDS各置单独AZ且EC2提供静态资源，以及Lambda/Aurora Serverless v2/EFS One Zone-IA的整体故障域和服务连续性。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：区分组件分布于不同AZ与同类组件具有跨AZ冗余，并判断版本控制、全球分发及单AZ存储各自覆盖的风险。〔O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查各计算、数据库和静态资源组合的扩展、AZ故障恢复及数据持久性边界。
+
+### Q945
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Organizations管理多个AWS账户中的内部应用；网络账户里的安全设备必须检查跨账户应用之间的交互流量。
+
+**必要判断**
+
+- j1（显式）：比较网络账户NLB配应用账户interface VPC endpoint、应用账户ALB直连安全设备、网络账户GWLB配应用账户GWLB endpoint，以及interface VPC endpoint直接连接设备的跨账户流量检查链路。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：检查端点类型、endpoint service、路由插入和安全设备转发的衔接，判断双向应用交互是否实际经过检查。〔O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查NLB/ALB/GWLB的设备集成和协议、PrivateLink及GWLB endpoint类型与跨账户路由要求。
+
+### Q946
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：生产Aurora MySQL cluster有6个Aurora Replicas；某部门近实时报告需自动分配至其中3个，这3个计算和内存规格不同于其余节点。
+
+**必要判断**
+
+- j1（显式）：比较custom endpoint、创建3节点cluster clone后用reader endpoint、使用所选3节点的instance endpoints，以及原集群reader endpoint，对指定副本子集、自动分配和近实时数据访问的适配性。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：区分端点对连接与查询的分配粒度，以及独立clone与原生产集群副本的数据时效关系。〔O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 官方待查Aurora各endpoint的成员选择和负载分配行为、异规格副本支持及cluster clone的数据同步边界。
+
+### Q947
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：将本地服务器上的Node.js函数迁至AWS Lambda、PostgreSQL迁至Amazon RDS for PostgreSQL；现有凭证嵌于环境变量连接串，需安全管理且运维开销最低。
+
+**必要判断**
+
+- j1（显式）：比较Parameter Store、Secrets Manager、加密Lambda环境变量配合自定义轮换函数、AWS KMS key存储凭证的方案，判断凭证读取及每30天轮换的实现、轮换对象和运维差异。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各服务的凭证存储与读取接口、RDS凭证轮换集成、30天调度及KMS key轮换与数据库凭证轮换的区别。
+
+### Q948
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：用AWS DMS将本地Oracle现有数据及持续变更复制到Amazon RDS for Oracle；每日复制量变化，仅分配复制所需容量。
+
+**必要判断**
+
+- j1（显式）：比较DMS Multi-AZ、DMS Serverless replication task、EC2 Auto Scaling调整DMS实例、ECS on Fargate提供复制容量，判断各自与全量加持续复制、按需容量匹配的关系。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查DMS复制模式、Serverless容量调整及Oracle端点支持，Multi-AZ作用，以及EC2 Auto Scaling、ECS/Fargate与DMS容量的集成边界。
+
+### Q949
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：多层Web应用的内部服务部署在EC2，需安全、私密地访问AWS上第三方SaaS API，并尽量减少公网暴露。
+
+**必要判断**
+
+- j1（显式）：比较Site-to-Site VPN、Transit Gateway及PrivateLink的连接与路由方案，判断满足私有SaaS访问所需的提供方配合和连接条件。〔S, O1, O2, O4〕
+- j2（显式）：辨别O3所述PrivateLink仅允许VPC出站与O4私有连接方案的关系；O3残缺部分需补全后再判断连接发起限制。〔O3, O4〕
+
+**待官方核验**
+
+- 待查各连接方式的SaaS接入条件、公网路径及PrivateLink连接发起和流量方向限制。
+
+**源异常／歧义**
+
+- O3在“without enabling the third-party SaaS provider to establish”处中断，未给出禁止提供方建立什么连接。
+
+### Q950
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：连接企业本地网络与VPC供本地访问AWS资源；两端所有流量需在network layer和session layer加密，并限制双方非必要访问。
+
+**必要判断**
+
+- j1（显式）：比较Direct Connect、Site-to-Site VPN、Transit Gateway与仅限制控制台来源IP及IAM职责权限，判断连接能力和两层加密要求如何对应。〔S, O1, O2, O3, O4〕
+- j2（显式）：区分路由表引导或限制流量、security groups/network ACLs仅允许必要流量、IAM访问控制的职责，判断各方案组合能否避免不受限互访。〔O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查连接服务的加密层次与附加配置、路由表及security groups/network ACLs的控制边界，并对照session layer加密要求。
+
+### Q951
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：自定义应用用嵌入凭证访问RDS for MySQL DB cluster；已创建应用用户凭证，需以最少编程工作提升安全性。
+
+**必要判断**
+
+- j1（显式）：比较AWS KMS存储并轮换key、加密本地存储配合cron、Secrets Manager配合Lambda轮换、Parameter Store调度数据库凭证轮换，判断应用读取改造、凭证轮换与编程工作差异。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各存储与读取方式、RDS for MySQL凭证轮换集成，以及key轮换、cron和所提服务调度的能力边界。
+
+### Q952
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：迁至serverless方案，用SQL分析S3内现有及新增数据；数据须静态加密并复制到另一AWS Region，运维开销最低。
+
+**必要判断**
+
+- j1（显式）：比较新建bucket后加载数据与在现有bucket配置CRR，结合SSE-S3或SSE-KMS multi-Region keys及Athena或RDS查询，判断端到端满足需求的组合与运维差异。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：检查CRR启用前已有对象与随后新增对象是否需要不同复制步骤，以及加密对象复制所需的密钥和权限配置。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查CRR对既有对象和加密对象的处理、multi-Region keys要求，以及Athena/RDS读取S3并提供serverless SQL分析的条件。
+
+### Q953
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：数千用户的Web应用每次用8–10张上传图片生成AI图片；普通用户每6小时可下载一次，高级用户可随时下载；上传图片每年用于训练两次，存储需最具成本效益。
+
+**必要判断**
+
+- j1（显式）：比较上传图片存入S3 Glacier Deep Archive或S3 One Zone-IA时，对生成阶段、每年两次训练及总体成本的适配。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较生成图片按高级用户S3 Standard、普通用户S3 Standard-IA分层，与全部存入S3 Glacier Flexible Retrieval的访问、恢复及费用差异。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查候选存储类别的访问与恢复时延、恢复操作、最短存储期、取回费用和AZ冗余差异。
+
+**源异常／歧义**
+
+- 普通用户“每6小时可下载一次”描述下载频率，未明确单次下载可接受的等待时间；不能直接视为6小时恢复时限。
+
+### Q954
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：ML模型为独立微服务，启动从S3取约1 GB模型数据并加载到内存；数百用户通过异步API提交单个或批量请求。
+- c2〔S〕：使用不规律：部分模型数天或数周无请求，部分一次收到数千请求，需适配空闲和突发处理。
+
+**必要判断**
+
+- j1（显式）：比较API经NLB调用Lambda、经ALB调用ECS、经SQS触发Lambda或由ECS读取的链路，判断异步缓冲、模型启动和突发处理适配。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较按负载均衡流量扩缩Lambda或ECS实例、按SQS队列大小增加Lambda vCPUs、按队列大小扩缩ECS集群容量及服务数量的机制和闲置开销。〔O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查NLB/ALB目标集成、SQS消费机制、Lambda资源与扩缩边界，以及ECS集群容量和服务扩缩的联动配置。
+
+### Q955
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Web应用使用ALB后EC2 Auto Scaling group及Aurora MySQL DB cluster；需DR，恢复时间最多30分钟，主基础设施健康时DR无需承载客户。
+
+**必要判断**
+
+- j1（显式）：比较第二Region预部署ALB与低容量或零desired capacity的Auto Scaling group、跨Region扩展同一组，以及用AWS Backup重建基础设施的可行性和恢复步骤。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较Aurora global database与AWS Backup恢复数据库，结合Route 53 active-passive或active-active，判断整体是否可在30分钟内恢复且无需平时承载客户。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查Auto Scaling group的Region边界、AWS Backup基础设施与数据库恢复范围、Aurora跨Region恢复流程及Route 53切换条件。
+
+### Q956
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：数据处理应用迁至AWS；多个短时批处理作业不可中断，完成后生成的数据访问30天、保留2年，整体运行成本尽量低。
+
+**必要判断**
+
+- j1（显式）：比较EC2 Spot与On-Demand运行不可中断短作业的适配及成本。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较初始S3 Standard或Glacier Instant Retrieval，30天后转Glacier Instant Retrieval、Flexible Retrieval或Deep Archive并在2年后删除的生命周期组合与总体费用。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查实例中断特性及计费，候选S3类别的访问、最短存储期、转换和到期删除规则及费用。
+
+### Q957
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：混合网络连接AWS与本地数据中心工作负载，通信要求single-digit latencies；现用Transit Gateway连接多个VPC，需最具成本效益的两步组合。
+
+**必要判断**
+
+- j1（显式）：比较逐VPC Site-to-Site VPN、VPN关联Transit Gateway、VPN连接Direct Connect gateway，与Direct Connect连接及transit VIF、Direct Connect gateway关联Transit Gateway的组合，判断链路衔接、时延和总体成本。〔S, O1, O2, O3, O4, O5〕
+
+**待官方核验**
+
+- 待查VPN、Direct Connect gateway、transit VIF和Transit Gateway的合法连接关系、时延影响及多VPC接入计费。
+
+**源异常／歧义**
+
+- single-digit latencies未给出时间单位或测量口径。
+
+### Q958
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：全球电商关键工作负载使用RDS for PostgreSQL Multi-AZ DB instance；数据库故障切换造成应用超时，需有韧性的方案缩短切换时间。
+
+**必要判断**
+
+- j1（显式）：比较为实例配置RDS Proxy、read replica分担读流量、Performance Insights监测CPU、定期自动快照并跨Region复制，判断对故障切换时间及应用超时的作用与适配。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各方案对RDS PostgreSQL Multi-AZ切换、连接恢复、读流量分担、诊断与灾备的能力边界。
+
+### Q959
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：开发AWS账户内多个RDS DB instance均带开发资源标签；需按计划仅在工作时间运行，运维开销最低。
+
+**必要判断**
+
+- j1（显式）：比较CloudWatch alarm或Trusted Advisor报告识别实例后由Lambda启停、Systems Manager State Manager associations启停、EventBridge rule调用Lambda启停，判断按标签选取与工作时间调度的完整性和维护量。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各机制的定时与标签筛选能力、RDS启停支持及自动重启限制，以及所需Lambda或association配置。
+
+### Q960
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：多年区域调查数据存于某AWS Region的S3 bucket；已授权新地理区域营销公司的AWS账户访问，需最小化对方请求数据时的数据传输成本。
+
+**必要判断**
+
+- j1（显式）：比较Requester Pays、CRR至营销公司bucket、Resource Access Manager共享、S3 Intelligent-Tiering配合同步至对方bucket，区分费用承担、访问授权、存储分层及数据副本对总体传输费用的影响。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查Requester Pays费用归属、跨Region复制与读取费用、RAM共享范围，以及Intelligent-Tiering和同步的费用边界。
+
+**源异常／歧义**
+
+- 未明确要最小化数据持有公司的账单，还是双方合计的数据传输费用。
+
+### Q961
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：公网电商网站链路为Global Accelerator→ALB→Auto Scaling group；已遭DDoS，需以最少实施工作缓解未来攻击。
+
+**必要判断**
+
+- j1（显式）：比较在Global Accelerator或ALB关联AWS WAF rate-based web ACL、Lambda读取ALB指标后更新VPC network ACL、在Global Accelerator前加CloudFront，判断服务衔接、防护覆盖及实施量。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查WAF可关联资源与rate-based规则范围、CloudFront与Global Accelerator连接条件，以及指标驱动network ACL方案的配置需求。
+
+### Q962
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：DynamoDB保存设备数据并支撑客户网站显示近期活动，读写均为provisioned throughput；需每日计算设备性能指标，对预置读写容量影响最小。
+
+**必要判断**
+
+- j1（显式）：比较定期Athena SQL配DynamoDB connector、Glue job配DynamoDB export connector、Redshift COPY、EMR job配Hive external table的数据获取和计算路径，判断对在线表读写容量的影响。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各连接器与导出方式的容量消耗、前置条件、数据时点，以及Redshift COPY和Hive访问DynamoDB的支持范围。
+
+### Q963
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：新无状态应用已有AMI和launch template；需按待处理作业数量增减EC2并行处理，组件松耦合且作业持久保存。
+
+**必要判断**
+
+- j1（显式）：比较SNS topic与SQS queue传递或保存作业的机制，以及Auto Scaling group按CPU、网络使用量、SQS条目数或SNS发布消息数扩缩的匹配性，判断持久积压与并行处理如何衔接。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查SNS/SQS的持久化与消费语义，以及各扩缩指标与待处理作业量的关系和配置条件。
+
+### Q964
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：全球电商公司当前采用单体架构，产品数据持续增长。
+- c2〔S〕：方案必须可扩展，并采用模块化服务架构。
+- c3〔S〕：必须保留结构化数据库模式。
+- c4〔S〕：需要存储产品数据和产品图片。
+- c5〔S〕：目标是运维开销最少。
+- c6〔O1〕：候选使用自动扩缩组中的 EC2 部署容器应用。
+- c7〔O1〕：该 EC2 候选通过 ALB 分发网页流量。
+- c8〔O1〕：该 EC2 候选使用 RDS 实例同时保存产品数据和图片。
+- c9〔O2〕：候选使用 Lambda 管理现有单体应用。
+- c10〔O2〕：该 Lambda 候选使用 DynamoDB 同时保存产品数据和图片。
+- c11〔O2〕：该 Lambda 候选使用 SNS 实现函数间事件驱动通信。
+- c12〔O3〕：候选使用基于 EC2 部署的 EKS 运行容器应用。
+- c13〔O3〕：该 EKS 候选使用 Aurora 集群保存产品数据。
+- c14〔O3〕：该 EKS 候选使用 Step Functions 管理工作流。
+- c15〔O3〕：该 EKS 候选将产品图片存入 S3 Glacier Deep Archive。
+- c16〔O4〕：候选使用 ECS 与 Fargate 部署容器应用。
+- c17〔O4〕：该 ECS 候选使用多可用区部署的 RDS 保存产品数据。
+- c18〔O4〕：该 ECS 候选将产品图片存入 S3 桶。
+
+**必要判断**
+
+- j1（显式）：如何判断各计算与通信组合是否支持从现有单体应用形成可扩展的模块化服务架构？〔S, O1, O2, O3, O4〕
+- j2（显式）：如何判断产品数据存储候选能否保留现有结构化数据库模式，并支持数据量增长？〔S, O1, O2, O3, O4〕
+- j3（显式）：如何根据产品图片的使用需求，比较数据库、S3 桶和归档存储候选的适用条件？〔S, O1, O2, O3, O4〕
+- j4（显式）：如何综合比较计算部署、数据库、图片存储和服务衔接所需的运维工作？〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 各计算部署方式在扩缩容、基础设施管理及服务通信方面承担哪些运维责任，使用容器或函数本身是否足以满足模块化要求？
+- RDS、Aurora 与 DynamoDB 对现有结构化模式及访问方式的兼容条件有哪些？
+- 数据库、S3 桶与 Glacier Deep Archive 保存产品图片时，访问方式、取回时间及运维要求有哪些差异？
+
+**源异常／歧义**
+
+- 题干未给出产品图片的访问频率或取回时限，不能把具体图片访问要求当作显式条件。
+
+### Q965
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：本地应用迁至AWS，敏感数据将存入S3；必须在将数据存入S3之前完成加密。
+
+**必要判断**
+
+- j1（显式）：比较client-side encryption配customer managed keys或Amazon S3 managed keys，与SSE-KMS、SSE-C，判断加密发生位置、时间及密钥管理组合是否满足写入前加密。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查客户端与服务端加密的执行边界、支持的密钥来源，以及SSE-C与client-side encryption的区别。
+
+### Q966
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：多个团队共享EMR cluster；每队大数据工作负载只能访问自身所需AWS服务，且不得访问底层EC2的IMDSv2。
+
+**必要判断**
+
+- j1（显式）：比较interface VPC endpoints提交工作负载、EMR runtime roles、各团队所需权限的EC2 IAM instance profile，以及EnableApplicationScopedIAMRole=false的EMR security configuration，判断按工作负载隔离权限与限制IMDSv2访问的组合要求。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查EMR runtime roles与security configuration设置、实例角色及IMDSv2隔离行为，并区分VPC endpoints的网络作用与授权作用。
+
+### Q967
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：注册表单应用采用Web服务器层和worker层；提交后需快速处理，每张表单恰好处理一次且不丢数据。
+
+**必要判断**
+
+- j1（显式）：比较两层间SQS FIFO、SQS standard、API Gateway HTTP API、同步Step Functions workflow的存储转发、处理时延、重复处理及数据保留能力。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：明确消息去重或投递语义与业务表单恰好处理一次的边界，检查消费失败、重试和提交结果确认是否还需应用配合。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各方案的持久性、去重窗口、重试和确认语义，以及同步工作流与HTTP API的存储转发限制。
+
+### Q968
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：金融公司本地搜索应用收集多个生产者的流数据，实时更新搜索和可视化；迁至AWS时需AWS原生方案。
+
+**必要判断**
+
+- j1（显式）：比较EC2→S3→Athena/Managed Grafana、EMR→Redshift→Redshift Spectrum/QuickSight、EKS→DynamoDB→CloudWatch，以及Kinesis Data Streams→OpenSearch Service→OpenSearch搜索/QuickSight的端到端流摄取、处理、存储、实时搜索和可视化衔接。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各链路的流处理与实时搜索能力、数据导入和查询集成，以及可视化服务的数据源支持。
+
+### Q969
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：本地Linux上的ASP.NET应用资源密集且直接服务客户；需现代化至.NET、容器运行并按CloudWatch指标扩缩，减少维护且运维开销最低。
+
+**必要判断**
+
+- j1（显式）：比较App2Container容器化后经CloudFormation部署ECS on Fargate或EC2，与App Runner容器化并部署ECS on Fargate或EKS on EC2的职责、平台支持和部署链路。〔S, O1, O2, O3, O4〕
+- j2（显式）：判断候选方案如何完成.NET现代化、CloudWatch指标扩缩及底层计算维护，比较资源密集应用的整体运维负担。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查App2Container与App Runner的源平台、容器化和部署范围，及ECS/Fargate、ECS/EC2、EKS/EC2的扩缩与维护边界。
+
+### Q970
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：AWS内部Web应用需从AWS托管服务安全存取多个员工用户名和密码，运维开销最低。
+
+**必要判断**
+
+- j1（显式）：比较Parameter Store与Secrets Manager存储凭证，结合CloudFormation及BatchGetSecretValue API、是否额外使用AWS Batch，判断批量读取接口归属、组件衔接和必要维护量。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查BatchGetSecretValue支持的服务和调用条件，以及CloudFormation、AWS Batch在所提凭证存取流程中的职责。
+
+### Q971
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：公司位于ap-northeast-1，数千台Outposts servers部署于全球远程地点，定期下载含100个文件的软件新版本；需降低全量部署延迟且运维开销最低。
+
+**必要判断**
+
+- j1（显式）：比较ap-northeast-1 S3配CloudFront签名URL、同方案使用CachingDisabled、增加us-east-1复制bucket作备用origin，以及S3 Transfer Acceleration endpoint下载，判断全球分发时延与运维差异。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查CloudFront部署范围、缓存策略与双origin行为、签名URL，以及Transfer Acceleration下载路径和跨Region复制的作用及配置需求。
+
+### Q972
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：本地Microsoft Windows Server股票交易应用迁至AWS；需跨多个AZ高可用、低延迟访问block storage，并使实施工作最少。
+
+**必要判断**
+
+- j1（显式）：比较跨两AZ Windows Server cluster配FSx for Windows File Server共享存储或gp3 EBS应用级复制，与两AZ active/standby配FSx for NetApp ONTAP Multi-AZ经iSCSI或io2 EBS级复制，判断块访问、故障切换和实施量。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查候选FSx协议与Multi-AZ访问能力、Windows集群要求、EBS跨AZ复制机制，以及应用级复制和active/standby切换配置。
+
+### Q973
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：internet-facing ALB接收公网HTTPS；仅以HTTPS 443向EC2 Web服务器转发，并以HTTPS 8443健康检查；需选择三项ALB security group配置。
+
+**必要判断**
+
+- j1（显式）：辨别公网0.0.0.0/0到ALB的443入站、ALB到Web实例443出站、8443健康检查出站，与实例到ALB相应端口入站及面向0.0.0.0/0的443出站之间的方向和目标范围差异，判断三项组合。〔S, O1, O2, O3, O4, O5, O6〕
+
+**待官方核验**
+
+- 待查ALB security group的监听、目标转发和健康检查规则，以及状态跟踪对返回流量规则的影响。
+
+### Q974
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：用户上传照片存入eu-west-1的S3 bucket；需通过CloudFront及自定义域名上传，选择两项配置。
+
+**必要判断**
+
+- j1（显式）：比较CloudFront使用us-east-1或eu-west-1 ACM public certificate的配置要求。〔S, O1, O2〕
+- j2（显式）：比较S3允许CloudFront上传时采用OAC、Transfer Acceleration或S3 website endpoint的授权与origin组合要求。〔S, O3, O4, O5〕
+- j3（先修候选，待核验）：检查CloudFront到S3上传链路所需HTTP methods、请求签名及bucket权限配置。〔S, O3, O4, O5〕
+
+**待官方核验**
+
+- 待查CloudFront证书Region限制、OAC写入授权、上传方法支持，以及website endpoint和Transfer Acceleration与该链路的兼容性。
+
+### Q975
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：传感器持续产生温度读数，现有流程聚合为较大的Parquet文件。
+- c2〔S〕：文件先使用CSE-KMS客户端加密，再写入S3。
+- c3〔S〕：S3按每个日历日设置独立前缀。
+- c4〔S〕：偶尔运行SQL，计算指定日历日的采样移动平均。
+- c5〔S〕：目标是最具成本效益。
+- c6〔O1〕：候选让Athena读取加密文件并直接查询S3数据。
+- c7〔O2〕：候选使用S3 Select直接查询S3数据。
+- c8〔O3〕：候选让Redshift读取加密文件，使用Spectrum及查询编辑器v2直接查询S3数据。
+- c9〔O4〕：候选使用EMR Serverless读取加密文件，以SparkSQL直接查询S3数据。
+
+**必要判断**
+
+- j1（显式）：如何判断各查询方案能否读取现有CSE-KMS加密的Parquet文件，需要哪些解密配置？〔S, O1, O2, O3, O4〕
+- j2（显式）：如何判断查询能力能否跨相关文件计算指定日历日的采样移动平均，并利用日期前缀限定数据范围？〔S, O1, O2, O3, O4〕
+- j3（显式）：如何比较偶发查询下各方案的启动、计算和数据扫描成本？〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 各候选查询方式对Parquet及CSE-KMS客户端加密的支持范围、加密格式要求和密钥权限要求是什么？
+- 各方案对移动平均所需SQL、跨文件查询和按日期裁剪扫描范围有哪些支持与限制，其偶发查询计费方式如何比较？
+
+### Q976
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：公网应用在多个Region的多个AZ部署多台EC2，全球用户应被送往距其位置最近的实例。
+
+**必要判断**
+
+- j1（显式）：比较Route 53 geolocation、geoproximity、multivalue answer、weighted routing对最近位置目标的适配，并判断各自搭配internet-facing ALB或NLB在同Region跨AZ分流的组合。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各Route 53策略的位置判定与选择语义，以及ALB/NLB在Region内跨AZ分发的配置边界。
+
+### Q977
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：敏感金融交易应用部署在EC2，数据库为RDS for MySQL；数据须静态及传输中加密，运维开销最低。
+
+**必要判断**
+
+- j1（显式）：比较RDS使用AWS KMS managed keys与第三方应用级加密，结合ACM SSL/TLS certificates、IPsec tunnels或VPN私有连接，判断静态与传输加密的端点覆盖、可配置性及整体运维量。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查RDS MySQL静态加密及TLS证书配置、ACM适用端点，以及IPsec/VPN的加密路径和私有连接与加密的区别。
+
+### Q978
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：本地Oracle迁至RDS for Oracle；合规要求保留数据90天，并可恢复到过去最多14天内的指定时间点，运维开销最低。
+
+**必要判断**
+
+- j1（显式）：比较RDS automated backups保留90天、每日manual snapshot并删除超过90天者、所提Aurora Clone for Oracle并清理旧clone，以及AWS Backup保留90天计划，判断长期保留与14天PITR是否同时覆盖及维护量。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查RDS Oracle自动备份保留上限、快照恢复粒度、Aurora Clone引擎支持，以及AWS Backup的保留、连续备份与PITR配置。
+
+### Q979
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：新应用需关系数据库存用户数据和配置；用户稳定增长，数据库负载可变、读多写少；要求AWS托管、性能足够且最具成本效益。
+
+**必要判断**
+
+- j1（显式）：比较RDS配Provisioned IOPS SSD、Aurora Serverless按使用量扩容、DynamoDB on-demand、RDS配magnetic storage及read replicas，判断关系模型、变动读负载、性能与总体成本适配。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各数据库数据模型、容量扩缩、候选RDS存储与read replicas的支持限制和费用结构。
+
+### Q980
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：VPC内多台EC2运行应用，每位客户有专属S3 bucket；应用只能安全访问公司AWS账户所属bucket，运维开销最低。
+
+**必要判断**
+
+- j1（显式）：比较S3 gateway endpoint配IAM instance profile逐bucket授权或Deny条件，与NAT gateway配所提security group或全量bucket policies，判断账户归属限制、访问路径及持续维护量。〔S, O1, O2, O3, O4〕
+- j2（显式）：取得O3、O4缺失的condition key后，判断其作用对象、Deny语义及与公司账户bucket范围的对应关系。〔O3, O4〕
+
+**待官方核验**
+
+- 待查S3资源账户条件键及策略求值、gateway endpoint与instance profile配合、NAT gateway的security group支持；条件键原文需先补齐。
+
+**源异常／歧义**
+
+- O3、O4均在“following condition key:”后缺少条件键或策略内容，无法完整比较账户限制。
+
+### Q981
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：敏感客户数据应用使用RDS、S3及S3 Event Notifications调用Lambda；现用IAM Identity Center管理用户凭证。
+- c2〔S〕：开发、测试、运维团队需安全访问RDS和S3，保障机密性、最小权限且运维开销最低。
+
+**必要判断**
+
+- j1（显式）：比较按团队定制IAM roles/policies、Identity Center directory配groups及granular permission sets、逐人IAM users与roles及Access Analyzer定期评估、Organizations分账户配跨账户roles，判断职责授权与既有身份体系衔接及维护量。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查Identity Center permission sets与角色授权流程、RDS及S3访问权限边界、Access Analyzer评估范围，以及跨账户访问配置。
+
+### Q982
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：敏感文件存于S3，本地数据中心VM上的应用需临时、安全访问；公司现用IAM Identity Center。
+
+**必要判断**
+
+- j1（显式）：比较按本地公网IP范围的bucket policy、Roles Anywhere配AWS CLI assume role及所提Identity Center凭证流程、VM配置IAM user access keys、Secrets Manager存IAM user keys并启动读取，判断应用临时身份与安全访问的完整性。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查Roles Anywhere凭证来源、信任与CLI调用流程、其与Identity Center的关系，以及IP限制和长期access keys的授权与生命周期边界。
+
+### Q983
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：目录服务和DNS等核心网络服务位于本地，经Direct Connect连接AWS；新增AWS账户需快速、低成本、一致接入，运维开销最低。
+
+**必要判断**
+
+- j1（显式）：比较每账户新建DX、在DX VPC配置服务VPC endpoints、每账户VPN接DX VPC、跨账户Transit Gateway接入DX，判断复用现有链路、访问本地服务的路由衔接及规模化成本。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查跨账户Transit Gateway共享与DX连接所需网关/VIF、VPN转接路由，以及VPC endpoints访问本地目录和DNS服务的支持范围。
+
+### Q984
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：主公网Web应用在单Region多AZ运行，使用EC2 Auto Scaling group和ALB；需成本优化的计算方案，提升向全球数百万客户提供动态内容的能力。
+
+**必要判断**
+
+- j1（显式）：比较CloudFront以现有ALB为origin、Route 53按客户地理位置送往ALB/EC2、迁至公开S3 website、Direct Connect直达客户位置，判断动态内容、全球交付、架构衔接及总体成本。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查CloudFront动态内容与ALB origin行为、Route 53单Region路由效果、S3 website执行能力及Direct Connect连接对象。
+
+### Q985
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：AWS用户数据持续使用、工作时间达峰值，访问模式变化且部分数据数月未用；需成本有效、最高级别持久性和高可用。
+
+**必要判断**
+
+- j1（显式）：比较S3 Standard、Intelligent-Tiering、Glacier Deep Archive、One Zone-IA在变化冷热访问下的可用性、持久性、访问或恢复条件及总体费用。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各类别的AZ冗余、可用性和持久性指标、分层及恢复行为、监控费与访问费用。
+
+### Q986
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：测试应用运行于Linux EC2，挂载单个500 GB EBS gp2卷；将扩展至Auto Scaling group多实例，所有实例均需访问该数据。
+- c2〔S〕：方案需高可用、有韧性，且不显著修改应用代码。
+
+**必要判断**
+
+- j1（显式）：比较单EC2 NFS server配500 GB gp2、单AZ FSx for Windows File Server SMB、单EC2配两个250 GB Provisioned IOPS SSD EBS卷、EFS General Purpose performance mode，判断共享访问、Linux兼容、故障域及迁移改动。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查EBS共享与可用范围、NFS/SMB客户端要求、FSx单AZ和EFS部署及性能模式对共享与高可用的影响。
+
+### Q987
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：客户应用运行于两个AZ的多台EC2，终端用户通过TCP通信；需高可用、随用户增加自动扩容，选择最具成本效益的两步组合。
+
+**必要判断**
+
+- j1（显式）：比较NLB、ALB、Gateway Load Balancer的TCP应用入口适配，并比较EC2 Auto Scaling group与手动加实例，判断跨AZ分流及自动容量增长的组合与成本。〔S, O1, O2, O3, O4, O5〕
+
+**待官方核验**
+
+- 待查三类负载均衡器的协议与目标用途、跨AZ健康流量分发，以及Auto Scaling容量管理与计费。
+
+### Q988
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：AWS Organizations以OU管理账户；EC2数据敏感度标签值为sensitive或nonsensitive，IAM identities不得删除标签或无标签创建实例；选择两步组合。
+
+**必要判断**
+
+- j1（显式）：比较OU关联tag policy与SCP规范标签key及值、用tag policies或SCPs拒绝缺key创建及删除标签，以及Config rule配Lambda删除不合规资源，判断值治理、预防性禁止和事后修复的组合覆盖。〔S, O1, O2, O3, O4, O5〕
+
+**待官方核验**
+
+- 待查tag policy强制范围、SCP对创建及删标签操作的条件配置、OU继承，以及Config/Lambda检测修复的时序。
+
+### Q989
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：客户门户后端使用RDS for PostgreSQL Multi-AZ database cluster；实施30天备份保留，现有自动与手动备份中不足30天者均须保留，成本最优。
+
+**必要判断**
+
+- j1（显式）：比较直接设置RDS自动备份30天与经AWS Backup设置、手动清理旧manual backups，以及先禁用自动备份再删除旧备份并重设保留期、通过CloudFormation自动删除的方案，判断现有年轻备份保全、清理范围和成本。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查保留期调整与禁用自动备份对现有备份的影响、手动快照生命周期、AWS Backup管理范围及CloudFormation删除能力和费用。
+
+### Q990
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：旧应用从本地迁至AWS，现通过NFS存取应用数据，且不能改用其他存储通信协议。
+
+**必要判断**
+
+- j1（显式）：比较AWS DataSync、EBS、EFS、EMRFS能否作为迁移后的应用存储，并区分NFS访问接口、数据迁移功能及文件系统适用环境。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各服务的NFS支持、挂载与访问条件，以及持续应用存储和数据传输服务的职责边界。
+
+### Q991
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：数千海龟GPS tracker每5分钟检查一次，移动超过100 yards（91.4 meters）则发送新坐标；Web应用运行于单Region多AZ的三台EC2。
+- c2〔S〕：突发数据曾压垮应用，导致丢失且无法重放；需防止重现，运维开销最少。
+
+**必要判断**
+
+- j1（显式）：比较S3存储后扫描、API Gateway配Lambda并发逐项处理、SQS存储后应用轮询、DynamoDB存坐标后查询并以TTL清理已处理数据，判断持久接收、削峰、失败后重处理与维护量。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各接收与消费路径的持久性、重试和确认、积压处理、保留及清理行为，及TTL对所提处理流程的适配。
+
+### Q992
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：开发团队需要RDS Multi-AZ集群
+- c2〔S〕：本地部署的桌面客户端将该集群作为后端，要求直接连接
+- c3〔S〕：开发团队在办公室时必须能通过客户端连接
+- c4〔S〕：要求连接方式最安全
+- c5〔O1〕：O1使用两个公有子网，并通过办公室客户网关建立Site-to-Site VPN
+- c6〔O2〕：O2使用两个私有子网，并通过办公室客户网关建立Site-to-Site VPN
+- c7〔O3〕：O3将集群放入两个私有子网，仅提出安全组允许办公室IP范围
+- c8〔O4〕：O4将集群放入两个公有子网，为每位开发者建数据库用户，并提出安全组允许用户访问
+
+**必要判断**
+
+- j1（显式）：如何区分网络可达性、安全组放行和数据库用户认证，判断办公室客户端是否能直接连接集群？〔S, O1, O2, O3, O4〕
+- j2（显式）：如何比较公有及私有子网结合Site-to-Site VPN的连接路径与暴露面，满足最安全目标？〔S, O1, O2, O3, O4〕
+- j3（先修候选，待核验）：题述RDS Multi-AZ集群类型需要怎样的AZ及子网布局，选项给出的两个子网是否足以部署？〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 办公室到私有RDS集群的Site-to-Site VPN需要哪些路由、客户网关及安全组配置，公有子网和公网可访问性是什么关系？
+- RDS安全组可采用哪些来源类型，数据库用户权限与网络访问权限分别如何配置？
+- RDS Multi-AZ集群与其他Multi-AZ部署术语如何区分，题述部署类型的最低AZ和子网要求是什么？
+
+**源异常／歧义**
+
+- 题干指定“Multi-AZ cluster”，全部选项只给出两个子网且未说明AZ分布，需先澄清部署术语及拓扑前提。
+
+### Q993
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：大量数据批处理从S3输入、向另一S3 bucket输出，处理时多台EC2经网络互传数据；需降低整体数据传输成本。
+
+**必要判断**
+
+- j1（显式）：比较所有EC2置于Auto Scaling group、同Region、同AZ或多个AZ的private subnets，对实例互传及S3输入输出链路的总体传输费用影响。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查EC2同AZ、跨AZ、跨Region及EC2与S3的数据传输计费边界，并区分Auto Scaling与子网私有性是否改变费用。
+
+### Q994
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：多层Web应用的EC2应用层访问Aurora MySQL DB cluster；数据库凭证须加密且每14天轮换，运维工作最少。
+
+**必要判断**
+
+- j1（显式）：比较KMS加密Secrets Manager secret关联Aurora并设14天轮换、Parameter Store用户名String及密码SecureString配Lambda、KMS加密EFS凭证文件配挂载和权限及Lambda、KMS加密S3凭证文件配定期下载及Lambda，判断加密、数据库更新与应用凭证同步的完整性和维护量。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查Aurora与Secrets Manager轮换集成及14天周期、Parameter Store和文件方案的自定义轮换步骤、应用刷新与访问控制，并澄清O3轮换key所指对象。
+
+**源异常／歧义**
+
+- O3称在Aurora中“rotates the key”，同时写入新凭证；key指数据库凭证还是加密key不明确。
+
+### Q995
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：视频需求增长，用户每天消费视频。
+- c2〔S〕：需处理TB级视频以屏蔽其中部分内容。
+- c3〔S〕：视频处理最长可达20分钟。
+- c4〔S〕：方案须随需求扩展并具成本效益。
+- c5〔O1〕：候选使用Lambda处理、DynamoDB存元数据、S3 Intelligent-Tiering存视频。
+- c6〔O2〕：候选使用ECS与Fargate微服务处理、Aurora存元数据、S3 Intelligent-Tiering存视频。
+- c7〔O3〕：候选使用ALB后的EC2自动扩缩组处理、S3 Standard存视频，并用SQS排队解耦。
+- c8〔O4〕：候选使用EC2上的EKS容器处理、单可用区RDS存元数据、S3 Glacier Deep Archive存视频。
+
+**必要判断**
+
+- j1（显式）：如何判断候选计算平台能否承载TB级、最长20分钟的视频处理任务？〔S, O1, O2, O3, O4〕
+- j2（显式）：如何比较微服务扩展、自动扩缩及队列解耦对需求增长和长任务调度的适用性？〔S, O1, O2, O3, O4〕
+- j3（显式）：如何判断视频存储类别及元数据存储组合是否符合日常消费和处理流程的访问需要？〔S, O1, O2, O3, O4〕
+- j4（显式）：如何综合比较计算扩展、视频存取和元数据组件的整体成本效益？〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 各计算方案的执行时长、资源和大文件处理限制是什么，长任务扩缩及队列衔接需要哪些配置？
+- 所列S3存储类别的访问、恢复及计费条件是什么，各元数据与计算组合在本负载下会产生哪些成本？
+
+### Q996
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：本地Kubernetes应用因新增数百万客户而容量不足，需迁至EKS；不想管理底层计算基础设施，运维开销最低。
+
+**必要判断**
+
+- j1（显式）：比较EKS self-managed node、managed node groups、Fargate配Fargate profile、managed node groups配Karpenter的容量供给与部署流程，判断底层计算管理责任及维护量。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各EKS计算模式的基础设施管理边界、Fargate profile要求及Karpenter与managed node groups的职责关系。
+
+### Q997
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：新应用需structured database存用户资料、应用设置及交易数据；容量随应用流量扩展且提供备份，成本效益最高。
+
+**必要判断**
+
+- j1（显式）：比较EC2自管开源数据库配Spot及S3自动备份、RDS配所称on-demand capacity mode和General Purpose SSD及7天自动备份、Aurora Serverless扩容及S3自动备份、EC2自管NoSQL配Reserved Instances及直接备份至Glacier Flexible Retrieval，判断数据模型、扩缩、备份与总体成本。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查候选数据库容量模式与备份机制、RDS“on-demand capacity mode”含义、Aurora备份配置及直接备份至Glacier Flexible Retrieval的实现条件。
+
+### Q998
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：旧Web应用位于VPC public subnet的EC2，客户图片存本地挂载EBS，每晚上传S3备份；需使S3流量不使用public endpoint。
+
+**必要判断**
+
+- j1（显式）：比较S3 gateway VPC endpoint配权限及subnet路由、将bucket移入VPC以private IP访问、VPC内S3 access point并改上传入口、VPC与S3间Direct Connect，判断网络路径与所需改动。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查S3 gateway endpoint路由与endpoint使用语义、bucket网络归属、access point与私有网络路径的关系，以及Direct Connect的连接结构。
+
+### Q999
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：电商原型使用ALB、EC2 Auto Scaling group及Single-AZ RDS for MySQL；商品目录为少更新的MySQL表，搜索时数据库CPU高且网站响应慢，需提升搜索性能。
+
+**必要判断**
+
+- j1（显式）：比较目录迁Redshift并用COPY加载、ElastiCache for Redis配lazy loading缓存、数据库慢时扩EC2、RDS改Multi-AZ并由EC2限制目录查询，判断对数据库CPU瓶颈、目录新鲜度和用户搜索响应的影响。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查Redis lazy loading及缓存更新流程、Redshift查询与COPY用途、RDS Multi-AZ读写行为，以及扩应用层或限流对该瓶颈的作用。
+
+### Q1000
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：本地block storage已有5 TB数据且新增空间有限；应用仍在本地，需低延迟读取常用数据，并采用云存储，运维效率最高。
+
+**必要判断**
+
+- j1（显式）：比较S3 File Gateway经SMB存取文件、Volume Gateway cached volumes或stored volumes经iSCSI访问、Tape Gateway存虚拟磁带至S3，判断现有块访问适配、数据主存与本地缓存布局、容量压力及运维效率。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各Gateway的协议、云端与本地数据布局、缓存及存储容量要求，以及常用数据低延迟读取和扩容管理方式。
+
+### Q1001
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：订单收集与履约分别运行于EC2 Auto Scaling group；收集快、履约慢，峰值时两阶段均须充分扩缩容，且扩缩容不得丢失数据。
+
+**必要判断**
+
+- j1（显式）：判断双SQS队列、各组EC2轮询及阶段间交接能否支持独立扩缩容并防止数据丢失。〔S, O3, O4〕
+- j2（显式）：比较按各队列消息数、队列通知、各实例CPUUtilization扩缩容的适用性，并评估最低容量固定为峰值及CloudWatch告警经SNS按需创建额外Auto Scaling group的方案。〔O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查SQS消费与消息保留机制、扩缩容指标，以及CloudWatch、SNS与Auto Scaling的触发衔接能力。
+
+### Q1002
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：DynamoDB存储增长中的用户资料、成就和游戏交易；架构须稳健、持续可用、有韧性，并使成本效益最高。
+
+**必要判断**
+
+- j1（显式）：比较global tables自动多Region复制、DynamoDB Streams跨Region复制及DAX配合手动跨Region复制，在持续可用性、韧性和维护需求上的差异。〔O1, O2, O3, O4〕
+- j2（显式）：结合单Region起建后复制与多Region部署，比较on-demand、provisioned加auto scaling，以及DAX加单Region表auto scaling各组合的整体成本效益。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各复制方式的可用性与实现要求、容量模式及auto scaling的费用差异，以及DAX在这些目标中的作用。
+
+### Q1003
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：本地媒体渲染应用的数据已全部迁至S3；须低延迟访问并维持应用性能，以最高成本效益降低存储成本。
+
+**必要判断**
+
+- j1（显式）：比较Mountpoint for Amazon S3、S3 File Gateway、S3数据复制至FSx for Windows File Server后配合FSx File Gateway，以及本地文件服务器经S3 API访问的延迟与访问方式适配性。〔O1, O2, O3, O4〕
+- j2（显式）：判断各方案在满足渲染性能前提下的存储、副本、网关及本地服务器整体成本。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各访问方式的本地部署支持、缓存与文件访问限制，以及相关存储和运行费用。
+
+### Q1004
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：ERP及公共API运行于us-east-1的EC2；国际客户从其数据中心访问响应慢，须以最高成本效益改善响应时间。
+
+**必要判断**
+
+- j1（显式）：比较CloudFront配合CachingOptimized与Global Accelerator配合必要端口listeners、Region endpoint groups和API endpoint，对该API响应时间及成本的适用性。〔S, O2, O3〕
+- j2（显式）：评估每个客户数据中心建立Direct Connect public VIF并经Direct Connect gateway访问API，以及Site-to-Site VPN在Region与客户网络间建隧道的连接路径、响应时间和成本。〔O1, O4〕
+
+**待官方核验**
+
+- 待查API缓存适用条件、Global Accelerator端点配置，以及Direct Connect public VIF、gateway和VPN的连接范围与费用。
+
+### Q1005
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：网站问卷有时每小时触达数千客户；现以邮件人工审阅和判断情绪，须自动化并使最近12个月结果可用，优先最高可扩展性。
+
+**必要判断**
+
+- j1（显式）：比较API Gateway→SQS→Lambda→DynamoDB、单EC2 API写入原始与分析结果两个DynamoDB表，以及S3事件→Lambda→第二S3桶的吞吐和处理衔接；区分Lambda轮询与队列调用表述。〔O1, O2, O3, O4〕
+- j2（显式）：判断Comprehend、Rekognition和Lex分别承担问卷情绪分析的适用性。〔O1, O2, O3, O4〕
+- j3（显式）：判断DynamoDB记录TTL设为未来365天或两个S3桶对象365天后生命周期过期，能否满足最近12个月结果可用。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各情绪分析服务、SQS/Lambda和S3事件集成，以及TTL、生命周期和365天保留与12个月要求的关系。
+
+### Q1006
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：Systems Manager负责EC2日常管理与补丁；实例位于ALB的IP address type target group，新规要求补丁期间退出服务，执行时出错；须组合两项措施。
+
+**必要判断**
+
+- j1（显式）：判断IP address改为instance target type与采用AWSEC2-PatchLoadBalanacerInstance Automation document之间的兼容及配合要求，并比较现有document保持不变的提议。〔O1, O2, O3〕
+- j2（显式）：区分Maintenance Windows调度、Automation补丁流程，以及State Manager配合ALB健康检查在退出服务、补丁和流量恢复中的职责，判断哪两项能共同消除错误。〔S, O3, O4, O5〕
+
+**待官方核验**
+
+- 待查所列Automation document的准确标识、target type要求，以及Maintenance Windows、State Manager与ALB目标摘除和恢复的能力边界。
+
+### Q1007
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：多客户大量临床试验数据须从关系数据库提取，经复杂规则转换后写入S3；写入S3前须在处理处加密，全部数据使用客户专属密钥，运维工作最少。
+
+**必要判断**
+
+- j1（显式）：判断每客户独立Glue job或EMR cluster及其security configuration，能否满足处理处、写入S3前和客户专属密钥的加密要求；比较Glue配SSE-S3/CSE-KMS与EMR配CSE-Custom/SSE-KMS。〔S, O1, O2, O3, O4〕
+- j2（显式）：比较Glue job与EMR cluster在关系数据库提取、复杂转换、S3加载及按客户隔离管理中的整体运维工作。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查Glue与EMR security configuration支持的加密模式、加密执行位置、客户密钥配置及各组合运维要求。
+
+### Q1008
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：高韧性、无状态网站分析应用运行于单台EC2 On-Demand Instance；繁忙时性能下降并出现5xx，须无缝扩缩容且成本效益最高。
+
+**必要判断**
+
+- j1（显式）：比较AMI启动第二台On-Demand并用ALB或Route 53 weighted routing分流，与AMI→launch template→Auto Scaling group并配Spot Fleet和ALB，在弹性、连续性及成本上的差异。〔O1, O2, O4〕
+- j2（显式）：判断CPU利用率超过75%触发CloudWatch→Lambda停机并更改instance type，能否满足无缝扩缩容及成本目标。〔O3〕
+
+**待官方核验**
+
+- 待查ALB与DNS分流的伸缩衔接、Auto Scaling launch template与Spot Fleet的组合方式，以及停机改型的服务连续性影响。
+
+### Q1009
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：S3对象全天频繁访问
+- c2〔S〕：S3存储数据有严格加密要求，当前使用KMS加密
+- c3〔S〕：需优化对象加密成本，且不增加KMS调用
+- c4〔O1〕：O1改用S3托管密钥的服务端加密
+- c5〔O2〕：O2对新对象使用SSE-KMS及S3 Bucket Key
+- c6〔O3〕：O3使用KMS客户托管密钥进行客户端加密
+- c7〔O4〕：O4提出SSE-C，客户提供的密钥存于KMS
+
+**必要判断**
+
+- j1（显式）：如何区分SSE-S3、SSE-KMS、客户端加密与SSE-C的密钥管理责任及KMS调用路径？〔S, O1, O2, O3, O4〕
+- j2（显式）：如何判断频繁访问条件下各方案的KMS请求和加密成本变化，是否满足不增加调用的约束？〔S, O1, O2, O3, O4〕
+- j3（显式）：如何判断仅对新对象启用Bucket Key的作用范围，以及与既有对象和严格加密要求的衔接？〔S, O2〕
+
+**待官方核验**
+
+- S3 Bucket Key在SSE-KMS中的工作范围、KMS调用规则、成本影响及对新旧对象的配置限制是什么？
+- 其他加密方式的密钥来源、KMS调用和计费路径是什么，SSE-C与将密钥存入KMS的组合需要怎样衔接？
+
+**源异常／歧义**
+
+- 题干未具体说明严格加密要求是否强制继续使用KMS，也未明确“不增加调用”的比较基线或是否意指零额外调用。
+
+### Q1010
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：本地数据中心VM承载多种工作负载，容量扩展赶不上业务增长；迁移AWS时间紧，非关键工作负载采用lift-and-shift，须选择三个步骤。
+
+**必要判断**
+
+- j1（显式）：比较Application Migration Service配VM内AWS Replication Agent、AWS SCT或App2Container收集VM数据，以及AWS DMS迁移VM的适用范围与迁移策略匹配度。〔O1, O2, O5, O6〕
+- j2（显式）：判断初始复制完成后启动测试实例做验收、停止VM全部操作后启动cutover instance的阶段衔接及前置条件，形成满足时限的三步组合。〔S, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各迁移工具的对象与策略范围，以及Application Migration Service的Agent、复制、测试和cutover流程要求。
+
+### Q1011
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：应用位于private subnet，已集成Cognito user pool认证；须安全存储用户文档到S3，选择两个集成步骤。
+
+**必要判断**
+
+- j1（显式）：区分Cognito identity pool与现有user pool在登录后获取S3访问凭证或所称access tokens中的职责及衔接。〔O1, O2〕
+- j2（显式）：比较同VPC的S3 VPC endpoint、NAT gateway配仅允许Cognito发起请求的bucket policy，以及仅允许用户IP的bucket policy；判断网络路径和授权如何共同组成两步安全集成。〔S, O3, O4, O5〕
+
+**待官方核验**
+
+- 待查Cognito认证至S3授权的凭证机制、private subnet访问S3的路径，以及bucket policy可识别的身份和来源条件。
+
+### Q1012
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：三层订单应用：EC2 web tier位于ALB后，经SQS解耦EC2 processing tier，存储为DynamoDB；不可预测峰值时出现处理延迟、EC2 CPU达100%及队列积压，须改善性能。
+
+**必要判断**
+
+- j1（显式）：判断处理层scheduled scaling配CPU Utilization，与target tracking配ApproximateNumberOfMessages，在不可预测峰值下的响应方式、指标与容量关系。〔O1, O4〕
+- j2（显式）：比较DynamoDB前置ElastiCache for Redis配target utilization、web tier前置CloudFront配HTTP latency，与处理层扩容，对所述CPU饱和及SQS积压的针对性。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查scheduled scaling与target tracking的触发和指标要求、ApproximateNumberOfMessages的准确含义，以及两种缓存方案对订单处理路径的作用。
+
+**源异常／歧义**
+
+- 题干“delays and halls”中的halls含义不明；另未明确100% CPU对应哪一层EC2。
+
+### Q1013
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：生产环境现用EC2 On-Demand；周一至周六持续运行，周日仅运行12小时，不能容忍中断，须以最高成本效益优化。
+
+**必要判断**
+
+- j1（显式）：比较周日12小时采用Scheduled Reserved Instances、Convertible Reserved Instances或Spot Instances，在运行时段、不中断和成本上的适用性。〔O1, O2, O3, O4〕
+- j2（显式）：比较周一至周六持续运行部分采用Standard或Convertible Reserved Instances，并结合各周日采购方式评估整体承诺、覆盖范围和费用。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查所列采购类型的可购买性、时段和承诺限制、中断特征及计费覆盖方式。
+
+**源异常／歧义**
+
+- 题干未明确是否存在两批实例，选项则分别为周日12小时与周一至周六持续运行的实例采购。
+
+### Q1014
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：本地图像处理单体应用迁AWS，处理数千图像并产生大文件；须管理增长的作业、减少人工流程，不管理底层基础设施，运维开销最少。
+
+**必要判断**
+
+- j1（显式）：比较ECS加EC2 Spot与SQS编排、AWS Batch加Step Functions、Lambda加EC2 Spot，以及EC2组加Step Functions的作业管理、自动化和底层设施管理责任。〔O1, O2, O3, O4〕
+- j2（显式）：结合各计算与编排组合，判断EFS、S3、FSx或EBS存储处理后大文件的适配性和整体运维开销。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查各作业执行模式的基础设施管理责任、SQS与Step Functions的编排能力，以及大文件存储和计算服务衔接限制。
+
+### Q1015
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：S3静态图像网站供全球移动用户上传、查看、下载；增长导致上传和下载延迟，须改善网站性能且实施工作最少。
+
+**必要判断**
+
+- j1（显式）：比较CloudFront下载加S3 Transfer Acceleration上传，与CloudFront下载及上传、多Region S3按用户位置复制和就近下载重定向的整体效果与实施工作。〔O1, O3〕
+- j2（显式）：评估迁移到多Region适配尺寸EC2、由ALB均分流量并配Global Accelerator，以及直接为S3配置Global Accelerator endpoint的可实施性、上传下载改善与迁移工作。〔O2, O4〕
+
+**待官方核验**
+
+- 待查CloudFront上传与缓存、S3 Transfer Acceleration、多Region复制和就近路由，以及Global Accelerator端点与ALB部署范围的限制。
+
+### Q1016
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：应用位于VPC private subnet及ALB后，VPC已有NAT gateway和internet gateway；应用调用S3 API存对象，其流量不得经过互联网，须成本效益最高。
+
+**必要判断**
+
+- j1（显式）：比较S3 interface endpoint加允许出站至S3的security group，与S3 gateway endpoint加路由表更新，在私有路径、配置和费用上的差异。〔O1, O2〕
+- j2（显式）：判断bucket policy允许现有NAT Elastic IP，或在应用同subnet新建第二NAT并更新路由，是否改变流量经过互联网的路径及整体成本。〔O3, O4〕
+
+**待官方核验**
+
+- 待查S3两类endpoint的路由、安全组和收费要求，以及NAT路径与bucket来源策略的作用边界。
+
+### Q1017
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：应用部署于EC2承载的EKS；使用IAM，UI Pods只能访问DynamoDB，data services Pods只能访问S3。
+
+**必要判断**
+
+- j1（显式）：比较EC2 instance profile附两份策略加RBAC、直接给Pods附IAM policy，以及独立Kubernetes service accounts承担IAM role或使用IRSA的身份与权限隔离方式。〔O1, O2, O3, O4〕
+- j2（显式）：判断各方案能否落实UI→DynamoDB、data services→S3且不得访问另一服务；保留AmazonS3FullAccess、AmazonDynamoDBFullAccess的账户/角色关联方式及O4反向服务映射的差异。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查EKS Pods获取AWS权限的支持方式、RBAC与IAM边界、service account至IAM role的关联，以及各策略实际授权范围。
+
+### Q1018
+
+状态：未逐题复核候选；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：全球开发团队须合规安全访问AWS资源；已有本地Active Directory，Organizations管理多项目多账户，须整合现有设施实现集中身份与访问控制，运维开销最少。
+
+**必要判断**
+
+- j1（显式）：比较AWS managed Microsoft Active Directory与本地AD建立trust并按AD组分配IAM roles，以及AD Connector连接本地AD→IAM Identity Center→permission sets按组授权账户和资源的完整链路。〔O1, O3〕
+- j2（显式）：将逐开发者IAM user、按项目手动授权加MFA，以及Cognito联合本地AD并提供账户资源access tokens，与两种目录整合方案比较集中控制、访问适配性和运维开销。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查目录trust、AD Connector与IAM Identity Center集成、组及permission sets跨账户授权，以及Cognito用于开发者AWS资源访问的能力边界。
+
+### Q1019
+
+状态：需求语义复核通过；AWS事实与卡片覆盖未验证。
+
+**关键条件**
+
+- c1〔S〕：AWS应用的HTTP API在API Gateway发布关键信息，只允许公司内部网络中有限的可信IP地址访问。
+
+**必要判断**
+
+- j1（显式）：比较private integration、拒绝所有未允许IP的API resource policy、直接部署API至private subnet配network ACL，以及API Gateway附属security group入站规则，判断各自的控制对象和可信IP限制能力。〔S, O1, O2, O3, O4〕
+- j2（先修候选，待核验）：明确HTTP API指特定API Gateway API类型还是泛指HTTP接口，再判断所提访问控制机制是否适用于该类型。〔S, O1, O2, O3, O4〕
+
+**待官方核验**
+
+- 待查对应API类型对resource policy、来源IP条件、private integration及subnet、network ACL、security group控制方式的支持范围。
+
+**源异常／歧义**
+
+- “HTTP API”可能指API Gateway特定产品类型，也可能泛指HTTP接口，题干未明确。

@@ -1,0 +1,326 @@
+{
+  "status": "checkpoint_requested_before_final_N",
+  "firstRecordedUtc": "2026-11-06T10:36:41+00:00",
+  "scope": {
+    "cards": 356,
+    "questions": 1018,
+    "needs": 1697,
+    "excludedQids": [
+      868
+    ]
+  },
+  "inputManifest": "/Users/qc/.local/share/codex-workflows/recallsmith/aws-basics-bilingual-rag-release-20261028/runtime/full-card-rebuild-v2-20261102/global-card-proof-20261106/inputs/source-manifest.json",
+  "directModelCliApiCalls": 0,
+  "nativeUsage": "unknown",
+  "productionPointersModified": false,
+  "priorBudgetsUnchanged": true,
+  "requiredRules": [
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+  ],
+  "nodes": {
+    "prepare": "verified",
+    "draft_current_bodies": "371 candidate bodies,370 current Chinese FACT/teaching PASS,1 quarantined",
+    "independent_fact_and_teaching_review": "all363 provisional retained bodies PASS",
+    "full_question_visible_card_retest": "898 current originals +60 accepted corrected practices =958 unique of1018 closed;60 pending",
+    "deletion_and_merge_checks": "7_jointly_checked_omissions_applied_to_provisional_set_final_actual_use_check_pending",
+    "closeout": "pending_not_final_card_count"
+  },
+  "executionSkillPath": "/Users/qc/.codex/skills/aws-card-count-verify/SKILL.md",
+  "next_action": "Resume saved handoffs; handle Q676 specific visible compatibility gap and Q687 Autopilot ambiguity; complete remaining minimal practices and actual dependency rechecks; then actual-use/prerequisite graph, deletion checks, domain totals and independent final readback. Do not regenerate1018 needs.",
+  "updatedUtc": "2026-11-06T20:09:57.009230+00:00",
+  "pendingUserDecision": null,
+  "currentBodies": 371,
+  "quarantinedRuleIds": [
+    "GCL-020"
+  ],
+  "sourceIssuesAudit": "100 audited: initial14 resolved,67 confirmed,19 unknown; not authoritative; Glue XML negative was independently disproved and must not propagate.",
+  "authorDrafts": {
+    "new180": 180,
+    "scopeRevisions16": 16,
+    "allNativeDrafts": 196,
+    "repairFiles": [
+      "repair01.json",
+      "repair02.json",
+      "repair03.json",
+      "repair04.json",
+      "repair05.json"
+    ]
+  },
+  "activeReviewTasks": {
+    "domain_primary_audit": "q676-current01 complete; saved unmerged INSUFFICIENT_CARDS, see its handoff",
+    "open_condition_review": "corrected-variants13 final readback finishing before checkpoint; 9 eligible,687 ambiguous",
+    "supplemental09_review": "corrected-dependencies14 frozen14; stopped with handoff, no results and no new PASS"
+  },
+  "completedQuestionReviewA": {
+    "fresh253": 253,
+    "SUPPORTED": 149,
+    "CONDITIONAL": 11,
+    "INSUFFICIENT_CARDS": 93,
+    "sourceIssuesConfirmed": 0
+  },
+  "priorQuestionReuse": {
+    "eligible": 325,
+    "SUPPORTED": 241,
+    "CONDITIONAL": 54,
+    "SOURCE_ISSUE": 30
+  },
+  "skillCreation": {
+    "status": "created_structural_check_passed_and_forward_used",
+    "path": "/Users/qc/.codex/skills/aws-card-count-verify/SKILL.md",
+    "currentSha256": "e84a061a98b24c24cea65f8240bece23d91b6c6cecee79dbda10701c48e1c624",
+    "forwardEvidence": [
+      "review/questions-a/skill-forward-check.md",
+      "review/questions-a/extra33/skill-forward-check.md",
+      "review/questions-c/skill-forward-check.md"
+    ],
+    "note": "Current deletion-set and domain-rationale clarifications added after questions-c forward check; exact-version reduction forward check pending."
+  },
+  "questionFirstPass": {
+    "total": 1018,
+    "countsBeforeUnappliedRepairs": {
+      "SUPPORTED": 688,
+      "CONDITIONAL": 84,
+      "INSUFFICIENT_CARDS": 187,
+      "SOURCE_ISSUE": 51,
+      "UNKNOWN": 8
+    },
+    "bindingDiagnostics": "validation/question-status.pre-repair06.v2.json",
+    "twoStaleSupportedProofsRechecked": "review/reuse-a/anchor-locator-addendum.json",
+    "prerequisiteAndSemanticClosureNotCertifiedByTally": true
+  },
+  "stagedRepairs": {
+    "files": [
+      "drafts/repair06.json",
+      "drafts/repair07.json",
+      "drafts/repair08.json"
+    ],
+    "cards": 24,
+    "independentlyPassed": 24,
+    "awaitingReview": 0,
+    "appliedToCurrentConveniencePointers": true,
+    "doNotRunAssemblerUntilPendingReviewRead": true
+  },
+  "pending_ids": [
+    6,
+    49,
+    65,
+    82,
+    113,
+    135,
+    153,
+    157,
+    192,
+    193,
+    201,
+    235,
+    299,
+    320,
+    324,
+    331,
+    355,
+    373,
+    394,
+    424,
+    435,
+    454,
+    457,
+    483,
+    485,
+    490,
+    493,
+    500,
+    514,
+    534,
+    537,
+    551,
+    565,
+    572,
+    583,
+    589,
+    590,
+    593,
+    604,
+    664,
+    676,
+    687,
+    693,
+    717,
+    759,
+    767,
+    776,
+    781,
+    783,
+    784,
+    810,
+    851,
+    859,
+    890,
+    940,
+    956,
+    992,
+    995,
+    998,
+    1003
+  ],
+  "pendingIdsScope": "60 unique questions not yet closed by a current original proof or eligible minimally corrected practice; not 60 missing cards",
+  "current_artifacts": {
+    "cards": "deliverables/cards.current.json",
+    "visibleKnowledge": "deliverables/visible-knowledge-current.json",
+    "cardReview": "validation/current-card-review-index.json",
+    "questionFirstPassDiagnostic": "validation/question-status.pre-repair06.v2.json",
+    "gapA": "review/gap-a/results.json",
+    "newerGapB": "review/gap-b/",
+    "reduction": "review/reduction-a/",
+    "currentQuestionProofIndex": "validation/current-question-proof-index.json",
+    "currentCorrectedVariantIndex": "validation/current-corrected-variant-index.json",
+    "provisionalCore": "deliverables/core-visible-knowledge.provisional.json",
+    "statusSnapshot": "validation/status-snapshot-20261107.json"
+  },
+  "previousRunStateSnapshot": "/Users/qc/.local/share/codex-workflows/recallsmith/aws-basics-bilingual-rag-release-20261028/runtime/full-card-rebuild-v2-20261102/global-card-proof-20261106/validation/run-history/b150074b4bfc0f9e522ddf9b7d8b66f5d062fcb90790f1d239742cf739cb416f.json",
+  "acceptedKnowledgeScope": {
+    "policy": "current_AWS",
+    "userDecision": "按现行 AWS：官方确认过时的题保留原文、纠错与考点去向，优先用当前有效知识覆盖",
+    "acceptedAtUtc": "2026-11-06T13:01:09.356242+00:00",
+    "sourceQuestionsPreserved": true,
+    "confirmedObsoleteOnlyMayUseCorrectionDisposition": true,
+    "notAnExemptionForUnconfirmedSourceProblems": true
+  },
+  "acceptedSourceCorrectionPolicy": {
+    "policy": "minimal_corrected_variants_for_independently_confirmed_original_errors",
+    "userDecision": "按最小纠错版验收（推荐）",
+    "acceptedAtUtc": "2026-11-06T13:54:56.978807+00:00",
+    "prerequisites": [
+      "complete original and all options retained",
+      "independent confirmation of original error with relevant official evidence",
+      "minimal corrected variant separately identifiable",
+      "independent visible-current-card verification of corrected variant"
+    ],
+    "neverTreatOriginalAsSupportedBecauseVariantPasses": true,
+    "unknownQuestionsNotExempted": true,
+    "examplesPreparedBeforeDecision": [
+      52,
+      324
+    ]
+  },
+  "currentCardReviewCounts": {
+    "PASS": 370,
+    "FAIL": 1
+  },
+  "supplemental01": {
+    "newMechanisms": 2,
+    "existingRevisions": 2,
+    "independentCardPasses": 4,
+    "applied": true,
+    "notFinalCoreCount": true
+  },
+  "supplemental02": {
+    "inputManifest": "review/supplemental02/input/manifest.v2.json",
+    "newMechanisms": 1,
+    "existingRevisions": 5,
+    "review": "six_PASS_plus_CA17_local_PASS",
+    "applied": true
+  },
+  "deletionReview": {
+    "lowFrequencyReviewed": 155,
+    "retained": 141,
+    "removeProposals": 7,
+    "unknownRemovability": 7,
+    "jointCurrentRetentionProof": "review/reduction-current/results.json",
+    "deletionApplied": false
+  },
+  "questionProofIndex": "validation/current-question-proof-index.json",
+  "provisionalCoreSelection": {
+    "path": "deliverables/core-selection.provisional.json",
+    "count": 363,
+    "finalCountVerified": false,
+    "note": "supplemental19 VC015 adopted; 8 omissions maintained; not final N"
+  },
+  "currentQuestionProofIndex": {
+    "path": "validation/current-question-proof-index.json",
+    "counts": {
+      "SUPPORTED": 898,
+      "SOURCE_ISSUE": 95,
+      "NEEDS_RECHECK": 25
+    },
+    "notSemanticClosure": true
+  },
+  "remaining115Review": {
+    "complete": true,
+    "SUPPORTED": 20,
+    "INSUFFICIENT_CARDS": 48,
+    "CONDITIONAL": 23,
+    "UNKNOWN": 16,
+    "SOURCE_ISSUE": 8,
+    "reports": [
+      "review/remaining-gap-current/a/results.json",
+      "review/remaining-gap-current/b/results.json"
+    ]
+  },
+  "correctedVariants01": {
+    "path": "deliverables/corrected-variants.source-errors01.json",
+    "review": "review/corrected-variants01/results.json",
+    "52": "INSUFFICIENT_CARDS_capacity_given_missing",
+    "324": "UNKNOWN_Tape_vs_Stored_competitor",
+    "originalsNotPromoted": true
+  },
+  "pendingAuthorDraftReviews": {
+    "supplemental15": 9
+  },
+  "correctedPracticeDrafts": {
+    "currentIndex": "validation/current-corrected-variant-index.json",
+    "currentCounts": {
+      "PENDING_INDEPENDENT_REVIEW": 23,
+      "ELIGIBLE": 24,
+      "NEEDS_CURRENT_DEPENDENCY_RECHECK": 9,
+      "NOT_ELIGIBLE": 3
+    },
+    "prior324CV02Minimality": "FAIL_preserved_not_finally_eligible",
+    "originalStatusesNotUpgraded": true
+  },
+  "completedUnknown02Reviews": {
+    "a": {
+      "path": "/Users/qc/.local/share/codex-workflows/recallsmith/aws-basics-bilingual-rag-release-20261028/runtime/full-card-rebuild-v2-20261102/global-card-proof-20261106/review/source-unknown02/a/results.json",
+      "sha256": "e417f29eaa40e53ca97f5f1b55960a75b259ef833511f80e5c0793e4e2904801",
+      "counts": {
+        "SUPPORTED": 3,
+        "SOURCE_ISSUE": 2,
+        "INSUFFICIENT_CARDS": 3,
+        "UNKNOWN": 2
+      }
+    },
+    "b": {
+      "path": "/Users/qc/.local/share/codex-workflows/recallsmith/aws-basics-bilingual-rag-release-20261028/runtime/full-card-rebuild-v2-20261102/global-card-proof-20261106/review/source-unknown02/b/results.json",
+      "sha256": "ca2e1fa3b675f088ac4fbbb59e8f09fd2a7f35fc2f9901b32d7a594f7c0905a5",
+      "counts": {
+        "INSUFFICIENT_CARDS": 1,
+        "SOURCE_ISSUE": 6,
+        "UNKNOWN": 1,
+        "SUPPORTED": 1
+      }
+    }
+  },
+  "currentProvisionalCoreCount": 362,
+  "currentCoreManifest": {
+    "path": "/Users/qc/.local/share/codex-workflows/recallsmith/aws-basics-bilingual-rag-release-20261028/runtime/full-card-rebuild-v2-20261102/global-card-proof-20261106/review/final-core-closure01/input/allocation.json",
+    "sha256": "455bd233293d179eb66b4cdd26ec5f83ab03024c24c2cc508ef1c6eac31d2ba8"
+  },
+  "pendingPracticeDraftReviews": {
+    "corrected-variants11": 9
+  },
+  "completedLatestPhases": {
+    "supplemental09": "9 adopted,CC10 failed candidate not adopted; VC011 new",
+    "supplemental10": "7 adopted,GSC024 failed candidate not adopted; VC012 metadata relation534 only",
+    "supplemental11": "9 adopted,XR101 failed unsupportedFirehose/OpenSearch candidate not adopted",
+    "supplemental12": "6 adopted,VC013 andVC014 new; preciseSSEC API evidence resolves doc conflict",
+    "supplemental13": "4 adopted,659CV10 current proof closed; EFS private evidence registry supplement saved",
+    "supplemental14": "6 adopted,GSC130 failed candidate not adopted; 806/827CV10 current proof closed",
+    "openCondition69": "21SUPPORTED/18SOURCE_ISSUE/19CONDITIONAL/6INSUFFICIENT/5UNKNOWN on frozen358, later overlays apply",
+    "remainingSource16": "1SUPPORTED/1CONDITIONAL/6INSUFFICIENT/8SOURCE_ISSUE on frozen359, current overlays apply"
+  },
+  "finalNVerified": false
+}

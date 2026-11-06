@@ -1,0 +1,9 @@
+{
+  "status": "PASS",
+  "matchedFiles": 4671,
+  "archiveSha256": "0395f78be1bfcc8db67acfb0e187ac146aba5d8efa62d1166b7eb7d16df7e3a2",
+  "archiveBytes": 12668336,
+  "selectionMetadataCount": 363,
+  "independentCheckpointCheck": 41,
+  "fullCardCountNotCertifiedByArchiveReadback": true
+}
