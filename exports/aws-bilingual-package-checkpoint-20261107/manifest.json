@@ -1,0 +1,23 @@
+{
+  "status": "PARTIAL_CHECKPOINT_NOT_FORMAL_PACKAGE",
+  "cards": 245,
+  "planned": 365,
+  "remaining": 120,
+  "formalBilingualPackageComplete": false,
+  "archiveSha256": "b9edfc1b51a96a1c9a34b628754f081fa7c344211746b11cfb4475b5d36d09b9",
+  "archivedExternalReferenceFiles": 665,
+  "evidenceIndexPath": "evidence-index.json",
+  "files": {
+    "cards.private.json": "da310da7d0f0ebeec00bb89624fa165c38254c7fa82181843c999e56f443ab61",
+    "cards.public.json": "df32124fcfbce50cccdbf2ba886025e45ce70857ef5c861e1e31b17c99265036",
+    "cards.json": "df32124fcfbce50cccdbf2ba886025e45ce70857ef5c861e1e31b17c99265036",
+    "WORKFLOW.md": "fb317198063a88637e59b3f25ba73ee828c13eb91a2d7fb77ecb1d3284a575cb",
+    "validation245.json": "3185db90a33a7a1bf73e76dc0483c029010a3d4afb60405de05cfacda607f78b",
+    "cards.import.json": "df32124fcfbce50cccdbf2ba886025e45ce70857ef5c861e1e31b17c99265036",
+    "progress.json": "959190a1a49f475bfe5442b85cca1fa72970f28d9ab953c5b42dcecf8478d4cc",
+    "current-review-index.json": "ff2ca4b22d6aab3a4a13adab5eddd4a0c7c2177799c809ffa4588f1e205cbba2",
+    "cards.deck.md": "4bce6d46f78988be5716a7be078418074de943250a88758be861e6e18d1cb51e",
+    "workflow-evidence.tar.gz": "b9edfc1b51a96a1c9a34b628754f081fa7c344211746b11cfb4475b5d36d09b9"
+  },
+  "createdUtc": "2026-11-07T09:22:45.246492+00:00"
+}

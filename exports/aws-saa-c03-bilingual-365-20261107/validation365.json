@@ -1,0 +1,21 @@
+{
+  "status": "PASS_ALL_365_STRUCTURE_AND_CURRENT_RECEIPTS",
+  "atUtc": "2026-11-07T09:41:15.465060+00:00",
+  "authored": 365,
+  "independentSemanticPassed": 365,
+  "planned": 365,
+  "remaining": 0,
+  "old347UidIntersection": 0,
+  "untranslatedPrerequisites": [],
+  "allAssemblyFailsClosedWithoutOverwrite": true,
+  "outputHashes": {
+    "cards.deck.md": "f60e57e89c83a04060d84304fde7c9123f77a6cb4e1b6ddf8d9ec71ce04a6c34",
+    "cards.json": "5b322f3a5e7614d0ac2e9107de578ff1a6e86c34da7c15477da5f36a3137271f",
+    "cards.public.json": "5b322f3a5e7614d0ac2e9107de578ff1a6e86c34da7c15477da5f36a3137271f",
+    "cards.import.json": "5b322f3a5e7614d0ac2e9107de578ff1a6e86c34da7c15477da5f36a3137271f",
+    "cards.private.json": "39215e3be8dc17ffe8d4ecd932d471c7f04f66e1210fca8b8d5c7ec4424ca768"
+  },
+  "formalBilingualPackageComplete": false,
+  "published": false,
+  "learnerOutcomeMeasured": false
+}

@@ -1,0 +1,57 @@
+{
+  "status": "COMPLETE_LOCAL_BILINGUAL_PACKAGE",
+  "formalBilingualPackageComplete": true,
+  "completedUtc": "2026-11-07T09:45:40.523974+00:00",
+  "finalCoreCount": 365,
+  "independentSemanticPassed": 365,
+  "remainingCards": 0,
+  "questionDisposition": {
+    "originalSupported": 899,
+    "acceptedCorrectedPracticeSupported": 115,
+    "userAcceptedExceptions": [
+      49,
+      201,
+      454,
+      783
+    ],
+    "scopeTotal": 1018,
+    "note": "1014 supported originals/practices plus 4 accepted exceptions, not 1018 original questions supported"
+  },
+  "uniquePrimaryCounts": {
+    "1": 116,
+    "2": 46,
+    "3": 159,
+    "4": 44
+  },
+  "sharedReviewCounts": {
+    "1": 159,
+    "2": 137,
+    "3": 197,
+    "4": 117
+  },
+  "finalReview": {
+    "path": "/Users/qc/.local/share/codex-workflows/recallsmith/aws-basics-bilingual-rag-release-20261028/runtime/full-card-rebuild-v2-20261102/global-card-proof-20261106/package-bilingual-20261107/review/packaging365.review.json",
+    "sha256": "364f541884019eca2ab66a7c6adaeb06c457a201c3dc6518fc30299363a7526d"
+  },
+  "mechanicalValidation": {
+    "path": "/Users/qc/.local/share/codex-workflows/recallsmith/aws-basics-bilingual-rag-release-20261028/runtime/full-card-rebuild-v2-20261102/global-card-proof-20261106/package-bilingual-20261107/validation365.json",
+    "sha256": "96e249357bb08cd83e27020a42086420de97525bc398bc09029252ea25ac514d"
+  },
+  "artifactHashes": {
+    "cards.deck.md": "f60e57e89c83a04060d84304fde7c9123f77a6cb4e1b6ddf8d9ec71ce04a6c34",
+    "cards.json": "5b322f3a5e7614d0ac2e9107de578ff1a6e86c34da7c15477da5f36a3137271f",
+    "cards.public.json": "5b322f3a5e7614d0ac2e9107de578ff1a6e86c34da7c15477da5f36a3137271f",
+    "cards.import.json": "5b322f3a5e7614d0ac2e9107de578ff1a6e86c34da7c15477da5f36a3137271f",
+    "cards.private.json": "39215e3be8dc17ffe8d4ecd932d471c7f04f66e1210fca8b8d5c7ec4424ca768",
+    "domain-index.json": "9585dda3a35650cedab865cd8c6d9406a6e4e967ee3199d517c0704f7b395fe6",
+    "current-review-index.json": "c5269a431d96370ee05c0bbdd6c91a56fe66b7ae22320b2b38c920127e3a50c6"
+  },
+  "supersedes": "Earlier assembly/current-review snapshots record formal:false before final gate; this completion receipt is authoritative.",
+  "published": false,
+  "ota": false,
+  "productionInventoryChanged": false,
+  "learnerOutcomeMeasured": false,
+  "newContentModelCliApiCalls": 0,
+  "nativeUsage": "unknown",
+  "historyReset": false
+}
