@@ -1,0 +1,34 @@
+{
+  "status": "PASS_INTEGRITY_AND_RECONCILIATION_ONLY",
+  "semanticCertificationByThisScript": false,
+  "questionCount": 10,
+  "domain1PrimaryQuestionCount": 310,
+  "remainingDomain1QuestionsNotAuditedHere": 300,
+  "domain1VisibleCards": 159,
+  "questionStatuses": {
+    "SUPPORTED": 8,
+    "PARTIAL": 2
+  },
+  "exactOriginalQuestionsMatched": 10,
+  "authorCitationCount": 41,
+  "independentCitationCount": 78,
+  "negativeControlsPassed": 3,
+  "usedCards": 20,
+  "sharedCardsUsed": [
+    "aws-rb2-20261107-pack-cc13"
+  ],
+  "global365FallbackChangesRestrictedVerdicts": false,
+  "artifactHashes": {
+    "selection.json": "c4dec939edc882a7c2b4c91fc78164d723c906a3029ab0d318472614f3cec059",
+    "questions.json": "b9cdbed271c5aba66789a6531ddfca23364404aee5b049852d8a0f8a76601d6b",
+    "cards.domain1.visible.json": "29bac697aa708060b1b5fcc748b8835367d8cfd69a8e06f34adb9a1cd8078ae8",
+    "author/results.json": "1ae4ebb9c42d6419dcd54827637a5b45ecaf6b5c567a019e675234c59bfd4b17",
+    "independent/results.json": "0b1daef1ebe00e6561c75ee443c731708b6859ff73a98c459cea508886b5c018"
+  },
+  "humanOutcomeMeasured": false,
+  "cardBodiesModified": false,
+  "globalFallbackClassification": {
+    "NAVIGATION_GAP": 0,
+    "CONTENT_BOUNDARY_NOT_FOUND": 2
+  }
+}

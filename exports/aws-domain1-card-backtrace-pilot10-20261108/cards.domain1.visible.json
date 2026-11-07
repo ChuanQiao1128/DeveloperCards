@@ -1,0 +1,1274 @@
+[
+  {
+    "stableUid": "aws-rb2-20261107-pack-ca03",
+    "topic": "Session management and private access / 会话管理与私网访问",
+    "frontEn": "An administrator needs to reach a private-subnet EC2 instance without distributing shared SSH keys or maintaining a bastion host. The SSM Agent is installed and can reach the service. What else is needed to connect to and manage the instance?",
+    "backEn": "Answer: Attach an instance role with the permissions SSM requires, then use Session Manager, with IAM controlling administrator session access.\nKey point: The SSM Agent connects to the management service and carries the session using the instance role; this path does not rely on opening SSH inbound or distributing SSH keys.",
+    "frontZh": "管理员要进入私网EC2，不想分发共享SSH密钥或维护跳板机。SSM Agent已安装且能连接服务，还应怎样让实例接入并管理？",
+    "backZh": "答：给实例关联具备SSM所需权限的实例角色，再用Session Manager并以IAM控制管理员会话访问。\n考点：SSM Agent凭实例角色连接管理服务并承载会话；这条路径不靠开放SSH入站或分发SSH密钥。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-ca08",
+    "topic": "Cross-account authorization paths / 跨账户授权路径",
+    "frontEn": "An application in an external account must access resources in your account. When the design must assume a restricted identity in your account versus preserving the caller's original identity, how do the authorization paths differ?",
+    "backEn": "Answer: To assume a target identity, create a restricted role in your account that trusts the caller; once the caller is allowed AssumeRole, it obtains temporary credentials. If the service supports resource policies (for example an SQS queue) and the caller's identity must be preserved, grant the external identity access directly in the resource policy; the caller's side must also allow the action.\nKey point: AssumeRole calls as the target role, while a resource policy grants access to the existing caller identity. Cross-account access cannot be judged by looking at only one side's Allow, and no long-term user keys need to be distributed.",
+    "frontZh": "外部账户的应用要访问本账户资源。需要代入本账户受限身份，与必须保留它原有身份时，授权路径有何不同？",
+    "backZh": "答：代入目标身份时，在本账户建受限角色并信任调用方，调用方获准AssumeRole后取得临时凭证。若服务支持资源策略（例如SQS队列）、且要保留调用方身份，可直接在资源策略授权该外部身份，调用方也须获准该操作。\n考点：AssumeRole会以目标角色身份调用；资源策略把访问权授给现有调用身份。跨账户不能只看一边的Allow，也不用为此分发目标账户长期用户密钥。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-ca09",
+    "topic": "IAM groups and managed policies / IAM组与托管策略",
+    "frontEn": "Several IAM users must share one set of staff permissions, and new hires should inherit it automatically. How should this be organized? If this group is approved to access all AWS services and resources, which managed policy should be chosen, and why?",
+    "backEn": "Answer: Attach the identity policy to an IAM group and add the users to it; use AdministratorAccess only when access to all services and resources is genuinely required.\nKey point: A group gives its members shared authorization; AdministratorAccess grants full access through Action:* and Resource:*. It is an identity policy and cannot be attached as a resource policy to user groups.",
+    "frontZh": "几名IAM用户要共享同一套人员权限，新人也能继承。怎样组织？若这组已获批准要访问全部AWS服务和资源，应选哪份托管策略，为什么？",
+    "backZh": "答：把相应身份策略附给IAM组，再加入用户；确需全部服务和资源权限时使用AdministratorAccess。\n考点：组使成员继承共同授权；AdministratorAccess以Action:*和Resource:*授予全面访问。它是身份策略，不能把资源策略附到用户组。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-ca10",
+    "topic": "Multi-account workforce access / 多账户人员访问",
+    "frontEn": "Staff must access multiple AWS accounts with team-based permissions and frequent new joiners. How do you avoid recreating users and permissions in every account?",
+    "backEn": "Answer: Manage people and team groups with IAM Identity Center; assign each group a permission set and target accounts, and connect the existing identity source.\nKey point: A permission set is a reusable permission template; Identity Center provisions the corresponding roles in target accounts, and team members use the assigned account access.",
+    "frontZh": "员工要访问多个AWS账户，团队权限不同且经常有新人加入。怎样避免在每个账户重复建用户和授权？",
+    "backZh": "答：用IAM Identity Center管理人员和团队组，为组分配permission set及目标账户，并接入既有身份源。\n考点：permission set是可复用权限模板；Identity Center在目标账户配置相应角色，团队成员使用已分配的账户访问。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-ca11",
+    "topic": "User pools vs identity pools / 用户池与身份池",
+    "frontEn": "An application with many customers needs login, and after login the client must access S3 directly with approved permissions. Can the user pool's login token be used directly as AWS access keys?",
+    "backEn": "Answer: No. The user pool handles customer sign-in; to call AWS APIs such as S3, obtain temporary AWS credentials through a Cognito identity pool, constrained by the permissions of an IAM role.\nKey point: The login token proves the user is authenticated; the identity pool exchanges an accepted signed-in identity for temporary AWS credentials, and the IAM role decides what operations are allowed on which data.",
+    "frontZh": "应用有大量客户要登录；登录后还要让客户端以获准的权限直接访问S3。用户池的登录令牌能直接当AWS访问密钥吗？",
+    "backZh": "答：不能。用户池负责客户登录；需要调用S3等AWS API时，通过Cognito身份池取得受IAM角色权限约束的临时AWS凭证。\n考点：登录令牌证明用户已验证；身份池把受认可的登录身份换成AWS临时凭证，IAM角色再决定能对哪些数据执行什么操作。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-ca18",
+    "topic": "EKS pod workload identity / EKS Pod工作负载身份",
+    "frontEn": "Different pods in the same EKS cluster need different AWS permissions according to each workload's identity. How should the permissions be bound?",
+    "backEn": "Answer: Give each workload its own Kubernetes service account and link it to its restricted IAM role through IRSA.\nKey point: The service account's OIDC identity is used to obtain temporary credentials for the corresponding IAM role, so the role's permissions take effect for that calling identity; applications do not have to share the node role as their calling identity.",
+    "frontZh": "同一EKS集群里的不同Pod，需要按各自工作负载身份授予不同的AWS权限。权限怎样绑定？",
+    "backZh": "答：为它们设置不同的Kubernetes service account，通过IRSA关联各自受限的IAM角色。\n考点：service account的OIDC身份用于取得相应IAM角色的临时凭证，角色权限随这次调用身份生效；应用不必共同使用节点角色作为调用身份。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-ca19",
+    "topic": "API entry authentication / API入口身份验证",
+    "frontEn": "A REST API must verify the caller before business processing. With Cognito login tokens, custom tokens, and IAM role temporary credentials in hand, how should each identity type be validated at the entry?",
+    "backEn": "Answer: Use a Cognito authorizer for Cognito tokens, a Lambda authorizer for custom validation, and AWS_IAM with signed requests for IAM credentials.\nKey point: The entry must validate the identity material the caller actually holds; the IAM method verifies the request signature and checks call permissions—AWS keys must not be treated as a Cognito login token.\nWatch out: An API key with a usage plan identifies customers and meters or throttles usage; it cannot replace the authentication and authorization above.",
+    "frontZh": "REST API要在业务处理前验证调用方。已有Cognito登录令牌、自定义令牌、IAM角色临时凭据，这些身份该怎样接入口验证？",
+    "backZh": "答：Cognito令牌用适用的Cognito authorizer；自定义验证用Lambda authorizer；IAM凭据用AWS_IAM并签名请求。\n考点：入口须验证调用方实际持有的身份材料；IAM方式校验请求签名并检查调用权限，不能把AWS密钥当成Cognito登录令牌。\n易错提醒：API key配合usage plan用于识别客户、计量和限流，不能代替上述身份认证与授权。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-cb04",
+    "topic": "ALB entry scope / ALB入口范围",
+    "frontEn": "EC2 backends must stay in private subnets. For an internet-facing website versus a website used only by the VPN-connected office, how should the ALB entry be chosen?",
+    "backEn": "Answer: Use an internet-facing ALB in public subnets for the internet site; use an internal ALB for the office-only site. Backend instances stay private either way.\nKey point: The ALB receives entry connections and then connects to private targets; whether the entry faces the public internet depends on the audience. VPN provides the office-to-private-network path, so the backend does not need to be exposed.",
+    "frontZh": "EC2后端必须保留在私有子网。面向互联网的网站和只供VPN办公室使用的网站，ALB入口应怎样选择？",
+    "backZh": "答：互联网网站用公网子网中的internet-facing ALB；仅办公室使用的站点用internal ALB。后端实例保持私有。\n考点：ALB接收入口连接后再连接私有目标。入口是否面向公网取决于访问者范围；VPN提供办公室到私网的路径，不必把后端公开。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-cb05",
+    "topic": "IPv4 and IPv6 egress gateways / IPv4与IPv6出站网关",
+    "frontEn": "VPC instances must initiate outbound internet access while the internet must not initiate connections to them. Which gateway handles outbound traffic for IPv4 versus IPv6?",
+    "backEn": "Answer: Use a public NAT gateway for IPv4 and an egress-only internet gateway for IPv6, with the corresponding outbound routes.\nKey point: NAT translates addresses for IPv4 egress; the egress-only gateway needs no address translation for IPv6—it lets instances initiate connections and their return traffic while blocking internet-initiated IPv6 connections. A public NAT gateway must sit in a public subnet and egress through an elastic IP and internet gateway; the private subnet's internet route points to it.",
+    "frontZh": "VPC实例要主动访问互联网，又不允许互联网主动连入。出站流量分别为IPv4与IPv6时，各用什么网关？",
+    "backZh": "答：IPv4使用公有NAT gateway；IPv6使用egress-only internet gateway，并配置相应的出站路由。\n考点：NAT为IPv4出站转换地址；egress-only网关不需要替IPv6做地址转换，允许实例发起连接及其返回流量，并阻止互联网发起IPv6连接。公有NAT须放在公有子网，借助弹性公网IP和Internet Gateway出站；私有子网的互联网路由指向它。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-cb10",
+    "topic": "WAF and HTTP entry points / WAF与HTTP入口",
+    "frontEn": "A website is served through CloudFront, an ALB, or an API Gateway REST API, and you must filter SQL injection or XSS attempts, or control access by registered client IPs. Where should this be done?",
+    "backEn": "Answer: Associate a WAF web ACL with whichever supported HTTP entry actually serves the requests, configuring content rules or IP set rules as needed.\nKey point: WAF inspects HTTP requests and applies rules; an IP set is a reusable collection of source addresses, and tens of thousands of addresses can be managed across multiple sets and rules. WAF does not associate directly with an NLB, and network port rules are not HTTP content filtering.",
+    "frontZh": "CloudFront、ALB或API Gateway REST API承载网站请求，要过滤SQL注入、XSS或按登记的客户端IP控制访问，应在哪里做？",
+    "backZh": "答：在实际承载请求的受支持HTTP入口关联WAF web ACL，配置相应内容规则或IP set规则。\n考点：WAF检查HTTP请求并执行规则；IP set是可复用的来源地址集合，上万地址可分多个集合和规则管理。WAF不直接关联NLB，网络端口规则也不等于HTTP内容过滤。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-cb12",
+    "topic": "Geo-based access filtering / 按来源国家过滤",
+    "frontEn": "To filter content access by the country located from the request source IP, where should the control be applied?",
+    "backEn": "Answer: Set country allow or deny rules at the actual entry, such as CloudFront geo restriction or a WAF geo rule in front of an ALB.\nKey point: Rules match the geolocation result of the request IP; the country where servers are deployed or signed URLs alone do not perform this source filtering. It is not absolute proof of a person's real physical location.",
+    "frontZh": "希望按请求来源IP定位到的国家过滤内容访问，应该在哪里控制？",
+    "backZh": "答：在实际入口设置国家允许或拒绝规则，例如CloudFront地域限制或ALB前的WAF地域规则。\n考点：依据请求IP的地理定位结果匹配国家规则；服务器部署国家或签名URL本身不会完成这种来源过滤。它不是对人员真实物理位置的绝对证明。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-cb13",
+    "topic": "ACM certificate Regions / ACM证书Region",
+    "frontEn": "To use an external-CA certificate for the HTTPS entry of a Regional API Gateway or CloudFront, into which Region's ACM should it be imported, and why?",
+    "backEn": "Answer: Import the certificate into ACM and bind it to the actual TLS entry: Regional API Gateway uses a certificate in the same Region as the API; the CloudFront viewer certificate is imported into us-east-1. An ALB HTTPS listener can also terminate client TLS with a certificate imported into ACM.\nKey point: The certificate follows the requirements of the entry that actually completes the TLS handshake; CloudFront's certificate Region is not determined by the Region of the S3 origin bucket.\nWatch out: The minimum TLS version is set separately by the security policy the entry supports—for example current API Gateway HTTP APIs can negotiate TLS 1.3; changing the certificate's issuing CA does not change the versions the entry allows.",
+    "frontZh": "外部CA证书要给Regional API Gateway或CloudFront的HTTPS入口使用，应导入哪个Region的ACM，为什么？",
+    "backZh": "答：将证书导入ACM并绑定实际TLS入口。Regional API Gateway用API同Region的证书；CloudFront查看者证书导入us-east-1。ALB的HTTPS监听器也可使用导入ACM的证书终止客户端TLS。\n考点：证书跟随实际完成TLS握手的入口要求；CloudFront的证书Region不由S3源桶所在Region决定。\n易错提醒：最低TLS版本另由入口支持的安全策略决定，例如现行API Gateway HTTP API可协商TLS 1.3；换证书签发CA不会改变入口允许的版本。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-cb15",
+    "topic": "Stateful SG vs NACL return traffic / 有状态安全组与NACL回程",
+    "frontEn": "A server already allows clients to send HTTPS requests from ephemeral ports. How do the security group and the NACL differ in permitting the responses, and which port should the NACL outbound rule match?",
+    "backEn": "Answer: The security group automatically allows responses of permitted connections; the NACL needs a separate outbound allow rule whose destination port matches the client's ephemeral port.\nKey point: Security groups are stateful and remember connections; NACLs check each direction. The response leaves the server's port 443 but must return to the ephemeral port the client originally chose—the destination port is not 443.\nWatch out: The ephemeral port range is determined by the requesting client; 32768–65535 is not a guarantee that applies to all clients.",
+    "frontZh": "服务器已允许客户端从临时端口发来HTTPS请求。安全组与NACL对响应的放行有何不同，NACL回程应匹配哪个端口？",
+    "backZh": "答：安全组自动允许已放行连接的响应；NACL必须另有出站允许规则，目的端口应匹配客户端的临时端口。\n考点：安全组有状态，记住连接；NACL逐方向检查。响应从服务器443端口发出，但要返回客户端当初选择的临时端口，目的端口不是443。\n易错提醒：临时端口范围由发起请求的客户端决定；32768–65535不是所有客户端都通用的保证。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-cb19",
+    "topic": "Rate-based rules / 速率限制规则",
+    "frontEn": "Source IPs of an HTTP request flood keep changing, so a fixed blacklist is hard to maintain. To rate-limit such traffic per request group, how should the rule be configured?",
+    "backEn": "Answer: Configure a WAF rate-based rule on the actual supported HTTP entry, choosing the aggregation condition, threshold, and Block action appropriate to that request group.\nKey point: The rule counts requests per aggregation group and applies the configured action to groups over the threshold; per-IP aggregation cannot guarantee stopping the overall distributed traffic when each individual IP stays under the limit.",
+    "frontZh": "HTTP请求洪泛的来源IP不断变化，固定黑名单难维护。要按请求组的速率限制此类流量，怎样配置？",
+    "backZh": "答：在实际受支持的HTTP入口配置WAF rate-based规则，选择适合该请求组的聚合条件、阈值及Block动作。\n考点：规则统计每个聚合组的请求，并对超阈值的组执行设定动作；若按单IP聚合，每个IP都未超限时，不能保证拦住整体分布式流量。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-cc01",
+    "topic": "Managed patching vs custom commands / 托管补丁与自定义命令",
+    "frontEn": "A fleet of managed EC2 instances needs patching: OS patches are supported by the managed tool; if custom third-party Linux software patches are required instead, how should the execution method be chosen?",
+    "backEn": "Answer: Use Systems Manager Patch Manager for supported patches; use Run Command to run the appropriate commands for custom installation steps.\nKey point: Patch Manager executes and tracks against the supported patch catalog; Run Command sends custom commands to instances. A maintenance window controls when work runs and does not replace the installation action.",
+    "frontZh": "一批受管EC2要安装补丁：操作系统补丁已被托管工具支持；若换成自定义第三方Linux软件补丁，执行方法应怎样选？",
+    "backZh": "答：受支持的补丁用Systems Manager Patch Manager；自定义安装步骤用Run Command执行相应命令。\n考点：Patch Manager按受支持的补丁目录执行与跟踪；Run Command把自定义命令发送到实例。维护窗口规定何时运行，不能代替安装动作。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-cc02",
+    "topic": "Vulnerabilities and threats / 漏洞与威胁检测",
+    "frontEn": "Which services find known vulnerabilities in EC2 software versus continuously detect suspicious access activity in AWS?",
+    "backEn": "Answer: Use Inspector where applicable for known software vulnerabilities; use GuardDuty for suspicious behavior and threat indicators.\nKey point: Vulnerability scans match software versions against known weaknesses. GuardDuty finds anomalous activity: with RDS Protection enabled, it can analyze successful, failed, or incomplete login patterns in supported Aurora/RDS databases. Merely storing logs does not perform detection.\nWatch out: Threat detection does not itself block logins. RDS Protection produces findings; response controls must be configured separately.",
+    "frontZh": "要找EC2软件的已知漏洞，与要持续发现AWS环境可疑访问行为，应分别选什么？",
+    "backZh": "答：已知软件漏洞用适用的Inspector；可疑行为与威胁迹象用GuardDuty。\n考点：漏洞扫描匹配软件版本的已知弱点；GuardDuty寻找异常活动。例如启用RDS Protection后，可分析受支持Aurora/RDS数据库的成功、失败或未完成登录模式，发现异常登录。单纯保存日志不等于完成检测。\n易错提醒：威胁发现不等于已经阻断登录；RDS Protection会生成发现，响应控制仍须另行配置。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-cc05",
+    "topic": "KMS key control / KMS密钥管理权",
+    "frontEn": "A service supports both AWS managed and customer managed KMS keys. How does the choice differ between needing only annual rotation and usage auditing versus creating, rotating, and disabling keys yourself?",
+    "backEn": "Answer: Use the service-supported AWS managed key when no custom control is needed; use a customer managed key to control the key lifecycle yourself.\nKey point: AWS managed keys use fixed behavior to reduce administration and fixed key-storage charges. Customer managed keys put policy and lifecycle control in the customer's hands.",
+    "frontZh": "服务同时支持AWS managed和customer managed KMS key。只要年度轮换和使用审计，与需要自行创建、轮换、禁用密钥，选择有何不同？",
+    "backZh": "答：无自定义控制需求时可用服务支持的AWS managed key；要自行控制密钥生命周期时用customer managed key。\n考点：AWS代管密钥以固定行为减少管理与固定密钥存储费用；客户管理密钥把策略和生命周期控制权交给客户。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-cc06",
+    "topic": "KMS rotation and key material / KMS轮换材料来源",
+    "frontEn": "A KMS key must rotate automatically each year. Can you import arbitrary customer key material and enable the same rotation as for an AWS-generated symmetric key?",
+    "backEn": "Answer: Choose a symmetric KMS key with AWS-generated material that supports automatic rotation, and enable the required rotation. Do not assume imported material supports the same behavior.\nKey point: Rotation requires the key-management system to generate and retain usable new material. Customer managed describes who controls a key, not its material's origin or supported rotation methods.",
+    "frontZh": "要求KMS密钥按年度自动轮换。能否随便导入一份客户密钥材料，就把它当作AWS生成的对称密钥开启相同轮换？",
+    "backZh": "答：选择AWS生成密钥材料、支持自动轮换的对称KMS key，并开启所需轮换；不能把导入材料默认视为同样支持。\n考点：轮换要由密钥管理系统生成并维护可用的新材料；“客户管理”只说明管理权，不说明材料来源与支持的轮换方式。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-cc08",
+    "topic": "Database encryption at rest / 数据库静态加密",
+    "frontEn": "RDS and Redshift data must be encrypted at rest. What can new storage use, and can adding a TLS certificate change an existing unencrypted RDS database's storage?",
+    "backEn": "Answer: Enable KMS encryption at rest for new RDS storage; Redshift also offers KMS-based server-side storage encryption. For existing unencrypted RDS, take a snapshot, copy it with encryption, restore a new encrypted DB, and arrange cutover. A TLS certificate does not encrypt storage.\nKey point: The snapshot copy creates encrypted data and the restored DB inherits encryption. Client TLS and password storage protect different boundaries; neither replaces encryption at rest. Subsequent automated backups and snapshots of an encrypted DB remain encrypted.",
+    "frontZh": "RDS和Redshift的数据都要静态加密。新建存储可用什么；若已有RDS未加密运行，能只加TLS证书改变存储吗？",
+    "backZh": "答：新RDS可启用KMS静态加密，Redshift也提供基于KMS的服务端存储加密。已有未加密RDS应制作快照、复制并加密该快照，再恢复新加密DB并安排切换；TLS证书不会加密存储。\n考点：快照复制实际产生加密数据，恢复的新库继承加密；客户端传输TLS和密码保存各保护不同边界，均不能替代静态加密。加密DB的后续自动备份和快照也保持加密。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-cc09",
+    "topic": "Encrypting new and existing EBS volumes / EBS新旧卷加密",
+    "frontEn": "All new EBS volumes in an account and Region must be encrypted automatically, and existing unencrypted volumes must also be converted. Is enabling default encryption enough, and what happens to old volumes?",
+    "backEn": "Answer: Enable EBS encryption by default for new volumes. Snapshot existing volumes, create encrypted replacement volumes from the snapshots, and arrange replacement.\nKey point: The default applies at creation and does not rewrite existing block storage. Creating an encrypted volume from a snapshot actually produces an encrypted data copy.",
+    "frontZh": "同账户同Region的新EBS卷都要自动加密，已有未加密卷也要改造。只打开默认加密够吗，旧卷应怎样处理？",
+    "backZh": "答：新卷开启EBS默认加密；旧卷先做快照，再从快照创建加密新卷并安排替换。\n考点：默认设置在创建时生效，不会直接改写已有块存储；从快照新建加密卷才实际生成加密的数据副本。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-cc10",
+    "topic": "Configuration evaluation and remediation / 配置评估与整改",
+    "frontEn": "You must continuously check actual configuration, such as EBS encryption and resource tags, and automatically correct noncompliance. Is a Config noncompliant flag enough, and how should responsibilities be split?",
+    "backEn": "Answer: Use appropriate AWS Config rules to evaluate actual configuration, and associate a Systems Manager Automation document to execute supported or custom remediation actions.\nKey point: Config determines whether resources deviate from requirements; Automation performs changes. A tag declaration or cost report cannot prove encryption, and an evaluation result does not modify a resource by itself.",
+    "frontZh": "要持续检查EBS卷是否加密、资源是否有标签等真实配置，并自动纠正不合规。只让Config把资源标红够吗，怎样分工？",
+    "backZh": "答：用AWS Config匹配的规则评估实际配置；再关联Systems Manager Automation文档，执行所需的受支持或自定义整改动作。\n考点：Config判断资源是否偏离要求；Automation实际执行修改步骤。标签声明或费用报表不能证明已经加密，评估结果也不会自己改写资源。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-cc14",
+    "topic": "S3 permanent-deletion verification / S3永久删除验证",
+    "frontEn": "S3 already retains document versions. To prevent accidental permanent deletion of versions using ordinary user credentials, is enabling MFA for user sign-in enough?",
+    "backEn": "Answer: Enable applicable S3 MFA Delete protection. It requires Versioning and is not automatically replaced by sign-in MFA.\nKey point: Sign-in verification and version-deletion verification occur on different operations. MFA Delete adds verification requirements to the relevant permanent deletions and versioning-setting operations.",
+    "frontZh": "S3已经保留文档版本，还想防止凭普通用户凭证意外永久删除版本，只给用户登录启用MFA就够吗？",
+    "backZh": "答：启用适用的S3 MFA Delete保护；它依赖Versioning，不能由登录MFA自动替代。\n考点：登录验证与版本删除验证发生在不同操作；MFA Delete为相应永久删除及版本设置操作增加验证要求。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-cc16",
+    "topic": "Restricting S3 endpoint paths / S3端点路径限制",
+    "frontEn": "EC2 must privately access S3 through a specified VPC endpoint, and requests must not bypass that entry. Is the endpoint alone enough?",
+    "backEn": "Answer: No. Establish the endpoint path and restrict allowed endpoint origins in the bucket policy.\nKey point: The endpoint supplies a private path to S3; the bucket policy checks during authorization whether the request came through the allowed entry.",
+    "frontZh": "EC2要经指定VPC端点私下访问S3，同时防止请求绕过这个入口，只有端点够吗？",
+    "backZh": "答：不够；建立所需端点路径，并在桶策略中限制允许的端点来源。\n考点：端点提供到S3的私网路径；桶策略才在授权时检查请求是否来自允许入口。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-cc18",
+    "topic": "Regional sensitive-data discovery / 分Region敏感数据发现",
+    "frontEn": "S3 object contents may contain PII, and the data spans two Regions. Is an object inventory enough, and where should content discovery run?",
+    "backEn": "Answer: Configure applicable Macie sensitive-data discovery jobs and identifiers in each Region containing the data.\nKey point: An inventory describes object attributes and API logs describe operations. Macie inspects sensitive content in supported objects. A centralized dashboard does not mean a job in one Region scanned another Region.",
+    "frontZh": "S3对象正文可能含PII，数据分布在两个Region。查对象清单够吗，应在哪里运行内容发现？",
+    "backZh": "答：在数据所在的每个Region配置适用的Macie敏感数据发现作业与识别器。\n考点：清单只描述对象属性，API日志只描述操作；Macie检查受支持对象中的敏感内容。一个Region的作业不能据集中看板就算扫描了另一个Region。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-cc19",
+    "topic": "Fine-grained data-lake access / 数据湖细粒度授权",
+    "frontEn": "In a Lake Formation-governed data lake, different teams should see different columns or rows of the same data. Should sensitive fields be deleted for everyone?",
+    "backEn": "Answer: No. Use applicable Lake Formation fine-grained permissions or data filters to provide each identity its permitted data scope.\nKey point: Users have different permissions. Query-time filtering preserves the original data while limiting each user's view; global deletion changes everyone's data.",
+    "frontZh": "Lake Formation治理的数据湖中，不同团队应看同一数据的不同列或行，应该把敏感字段给所有人都删掉吗？",
+    "backZh": "答：不应；用适用的Lake Formation细粒度授权或数据过滤，按身份提供允许的数据范围。\n考点：不同用户的权限不同，查询时的过滤保留原数据并分别限制可见范围；全局删除会改变所有人的数据。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-cc20",
+    "topic": "Time-limited direct S3 access / S3限时直传",
+    "frontEn": "How can an external user read one private S3 object for a limited time, or a browser upload directly to S3, without making the bucket public or relaying the whole file?",
+    "backEn": "Answer: An authorized application issues an S3 presigned URL limited to the object, operation, and lifetime; the client requests S3 directly.\nKey point: The URL carries the signer's authorized object, operation, and expiry and is reusable within that period. Data bypasses the application server without exposing the bucket. SigV4 allows up to seven days, but never beyond the signing credentials' lifetime; temporary credentials expiring earlier invalidate the URL earlier.",
+    "frontZh": "外部用户只需在有限时间内读取一个私有S3对象，或浏览器应直接上传到S3，怎样避免公开桶和转发整个文件？",
+    "backZh": "答：由有权限的应用签发限定对象、操作和期限的S3 presigned URL，让客户端直接请求S3。\n考点：签名把签发者可授权的特定对象、操作和期限放进URL，期限内可重复使用；数据不必经过应用服务器，也不用公开整个桶。使用SigV4签名可设置最长7天，但不能超过签发凭证自身的有效期；临时凭证先过期，URL也提前失效。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-cc21",
+    "topic": "CloudFront content signatures / CloudFront内容签名",
+    "frontEn": "Content is distributed through CloudFront to authorized customers only. Where does the signature go when the client does not support cookies versus when the URL cannot change?",
+    "backEn": "Answer: Use CloudFront signed URLs for clients without cookies; use signed cookies when the existing URL must remain unchanged and the client supports cookies.\nKey point: CloudFront validates access conditions in both cases; authorization travels in the link or cookie. An S3 presigned URL authorizes a direct S3 request and cannot replace the CloudFront entry signature.",
+    "frontZh": "内容经CloudFront分发，只给获授权客户访问。客户端不支持Cookie，与URL不可改动时，签名放在哪里？",
+    "backZh": "答：不支持Cookie的客户端使用CloudFront signed URL；不能改变现有URL但能带Cookie的客户端用signed cookies。\n考点：两种签名都由CloudFront验证内容访问条件，差别是授权信息放在链接还是Cookie。S3 presigned URL授权的是直接S3请求，不能代替CloudFront入口签名。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-cc23",
+    "topic": "CloudTrail event categories / CloudTrail事件类别",
+    "frontEn": "Which records identify who changed a security group or read or wrote an S3 object? Is a configuration snapshot sufficient?",
+    "backEn": "Answer: Use CloudTrail management events for resource-management APIs and select the relevant data events for S3 object operations.\nKey point: Events identify the caller, action, and time to trace operations or permission failures. Config describes resource-state changes and cannot alone replace attribution. Object access and resource management are different event categories.",
+    "frontZh": "要查谁改了安全组，或谁读写了S3对象，该看哪类记录？配置快照够吗？",
+    "backZh": "答：看CloudTrail：资源管理API使用相应management events；S3对象操作须选择相应data events。\n考点：事件记录带调用者、动作和时间，才能追溯操作或权限失败；Config说明资源状态如何变化，不能单独替代归因。对象读写与资源管理也不属于同一事件类别。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-cmp-m02",
+    "topic": "Choosing private S3 endpoints / S3私网端点选择",
+    "frontEn": "An application in this VPC accesses same-Region S3 or DynamoDB; an on-premises site accesses S3 over an existing dedicated connection. Both must bypass IGW and NAT. Which endpoints suit each, and why?",
+    "backEn": "Answer: Within this VPC, use the service's gateway endpoint associated with the actual callers' subnet route tables. For on-premises S3 access, use an S3 interface endpoint reachable over the dedicated connection.\nKey point: A gateway endpoint routes service traffic within its VPC without extra endpoint fees, still using public service addresses. It is not an endpoint ENI with security groups and cannot extend to on-premises clients. An interface endpoint supplies private ENIs, with security groups and charges.\nWatch out: Endpoints do not replace service authorization; instance security groups and subnet NACLs must allow traffic. The on-premises branch here covers only S3.",
+    "frontZh": "本VPC应用访问同Region的S3或DynamoDB，与机房经已有专线访问S3，都要绕过IGW和NAT。应分别选哪类端点，为什么？",
+    "backZh": "答：本VPC可用对应服务的gateway endpoint，关联实际调用子网的路由表；机房访问S3用可经专线到达的S3 interface endpoint。\n考点：gateway按本VPC路由接走服务流量，没有额外端点费，仍使用服务公有地址；它不是带安全组的端点网卡，也不能延伸给机房客户端。interface提供私有网卡入口，有安全组及相应费用。\n易错提醒：端点不代替服务授权；实例安全组和子网NACL也仍需放行。机房分支这里仅讨论S3。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-cmp-m03",
+    "topic": "Updating existing S3 objects in bulk / 批量修改历史对象",
+    "frontEn": "Millions of existing S3 objects need encryption or retention changes. Is changing the bucket's new default sufficient, and how can old objects be updated in bulk?",
+    "backEn": "Answer: No. Use manifest-driven S3 Batch Operations with an applicable operation; invoke Lambda when custom logic is required.\nKey point: Defaults affect applicable subsequent writes and do not rewrite all historical objects. Batch jobs perform supported changes on manifest entries.\nWatch out: Verify operation support: arbitrary custom deletion is not a native S3 Batch operation.",
+    "frontZh": "数百万已有S3对象要补加密或改保留属性。修改桶的新默认就够吗，怎样批量改旧对象？",
+    "backZh": "答：不够；对已有对象使用清单驱动的S3 Batch Operations及适用操作，需要自定义逻辑时调用Lambda。\n考点：默认配置影响后续适用写入，不会回写全部历史对象；批作业按清单逐个执行受支持的修改。\n易错提醒：须确认操作类型受支持，不能把任意自定义删除动作说成S3 Batch的原生操作。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-cmp-m04",
+    "topic": "Publishing and consuming PrivateLink / PrivateLink发布与消费",
+    "frontEn": "Clients inside a VPC or connected by an existing dedicated connection must call services privately. For a supported AWS service versus a vendor's custom TCP service, what do provider and consumer configure?",
+    "backEn": "Answer: For an AWS service, the customer creates its corresponding interface endpoint. For custom TCP, the vendor fronts the service with an NLB and publishes an endpoint service; the customer creates an interface endpoint to it.\nKey point: The endpoint service publishes the entry; the interface endpoint is the consumer's private ENI entry and must target the actual service. Endpoint security groups allow client connections. Supported AWS endpoint policies control authorization, not network reachability. Connections originate from consumers; providers cannot initiate reverse connections to the consumer VPC through this endpoint.\nWatch out: If NLB backend IPs change, such as after RDS failover, registered targets must be updated. Creating an endpoint once does not solve backend changes.",
+    "frontZh": "客户端在VPC内或经已有专线连入VPC，要私下调用服务。调用受支持AWS服务，与供应商自建TCP服务，发布端和消费端分别做什么？",
+    "backZh": "答：AWS服务的客户创建对应service的interface endpoint；供应商自建TCP服务，供应商先在服务前配置NLB并发布endpoint service，客户再建interface endpoint连接它。\n考点：endpoint service是发布入口，interface endpoint是消费侧私有网卡入口，须连接实际被调用的服务；端点安全组允许客户端连接。对支持端点策略的AWS服务，端点策略控制授权，不能代替网络放行。 连接由消费端发起，提供方不能通过这条PrivateLink端点新建到消费VPC的反向连接。\n易错提醒：若NLB后端IP会变，例如RDS故障切换，注册目标须同步更新；不能把创建一次端点当作已解决后端变化。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-cmp-m05",
+    "topic": "SCP attachment scope / SCP挂载范围",
+    "frontEn": "Only development member accounts must be barred from certain AWS operations, even for their administrators or root users; production must remain unaffected. Where should the restriction be attached?",
+    "backEn": "Answer: Attach an explicitly denying SCP to those development member accounts or a separate development OU (an account grouping), not the organization root shared with production.\nKey point: SCPs cap member-account permissions; local administrator Allows cannot override them. Accounts inherit their OU's SCPs, so attachment scope determines which accounts are restricted.\nWatch out: SCPs do not constrain the organization's management account; the member-root boundary does not extend to it.",
+    "frontZh": "只禁止开发成员账户执行某些AWS操作，成员管理员甚至root也不能绕过，生产账户不受影响。限制应放哪里、挂在哪个范围？",
+    "backZh": "答：用含明确Deny的SCP，挂到这些开发成员账户，或挂到独立开发OU（账户分组）；不要挂到开发、生产共同的组织根。\n考点：SCP设置成员账户权限上限，账户内管理员的Allow不能越过它；OU下账户继承SCP，因此挂载范围决定哪些成员账户受限。\n易错提醒：SCP不约束组织管理账户本身，不能把成员账户root边界泛化到管理账户。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-cmp-m06",
+    "topic": "Application roles and temporary credentials / 应用角色临时凭证",
+    "frontEn": "EC2 or Lambda code must read S3 without storing long-term access keys. How do you give the running code permissions, and why avoid saved user keys?",
+    "backEn": "Answer: Grant an IAM role the needed S3 actions and resources. Associate the role with EC2 through an instance profile, or attach a Lambda execution role.\nKey point: An instance profile passes a role to EC2; the execution role serves Lambda. Code obtains automatically refreshed temporary credentials without distributing long-term user keys; applications can have separate restricted roles.\nWatch out: A Lambda resource policy controls who invokes the function; it does not replace the execution role's permissions for code accessing other resources.",
+    "frontZh": "EC2或Lambda里的应用要读S3，不保存长期访问密钥。怎样把权限交给运行代码，为什么不直接保存用户密钥？",
+    "backZh": "答：授给具备所需S3动作和资源权限的IAM角色：EC2通过instance profile关联角色，Lambda关联执行角色。\n考点：instance profile把角色交给EC2使用；Lambda执行角色交给函数使用。代码取得可自动更新的临时凭据，不必分发长期用户密钥，不同应用可各用受限角色。\n易错提醒：Lambda函数资源策略管谁能调用函数，不能替代函数代码访问其他资源的执行角色权限。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-cmp-m07",
+    "topic": "Secret storage and rotation / 秘密存储与轮换",
+    "frontEn": "Application passwords or supported-size sensitive values must be retrieved under access control rather than hardcoded. Database passwords also need regular rotation, and the same credential must be read in multiple Regions. How should this be managed?",
+    "backEn": "Answer: Store secrets centrally in Secrets Manager for authorized runtime retrieval; configure applicable automatic database-password rotation. Replicate the primary secret for nearby reads, and rotate at the primary.\nKey point: KMS protects managed secret storage and retrieval uses controlled decryption. Database rotation must also update the actual password; the primary's new value propagates to replicas. Rotating only a KMS key does not change the database password.\nWatch out: Replicating a secret synchronizes one credential; it does not rotate passwords for several independent databases.",
+    "frontZh": "应用密码或受支持大小的敏感值不能写死在代码中，要受控取用；数据库密码还须定期轮换。同一凭据需在多Region读取，怎样管理？",
+    "backZh": "答：集中放Secrets Manager，由获授权应用运行时读取；数据库密码配置适用自动轮换。同一凭据需就近读取时复制主secret，在主secret轮换。\n考点：服务用KMS保护秘密并提供托管存储，取值时受控解密；数据库轮换还须更新实际密码，主secret的新值再传播到副本。仅换KMS key不会更换数据库密码。\n易错提醒：复制secret是在同步同一份凭据，不能据此认为多个独立数据库的密码都已被轮换。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-cmp-m08",
+    "topic": "Layers and changing secrets / Layer与动态秘密",
+    "frontEn": "Several Lambda functions share database-secret retrieval logic. Will putting the password into a layer automatically synchronize rotated values? How should sharing work?",
+    "backEn": "Answer: No. Put shared retrieval code and dependencies in the layer; keep the secret in Secrets Manager for authorized runtime reads.\nKey point: A layer is a versioned deployment archive: updates require publishing a version and updating functions. It is not an automatically changing shared file. GetSecretValue reads one secret; BatchGetSecretValue reads several. Separate code from changing values.\nWatch out: Parameter Store values require its own retrieval API; passing another service's parameter to Secrets Manager's batch API does not retrieve it.",
+    "frontZh": "多个Lambda共用读取数据库秘密的逻辑。把密码也打包进layer，能让轮换后的值自动同步吗？应怎样共享？",
+    "backZh": "答：不能。layer只打包共享取值代码和依赖；秘密集中存Secrets Manager，由获授权的函数运行时读取。\n考点：layer是版本化部署归档，更新须发布新版本并更新函数，不能当自动变化的共享文件。GetSecretValue读一份secret，BatchGetSecretValue读多份；代码与会变化的值分开。\n易错提醒：Parameter Store中的值要用其自己的取值API；把另一服务的参数交给Secrets Manager批量接口不会读到。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-cmp-m09",
+    "topic": "Requester and resource ownership / 请求者与资源归属",
+    "frontEn": "S3 policies must separately enforce 'only identities from this organization may access' and 'the application may access only this account's buckets.' Which side is checked, using which condition?",
+    "backEn": "Answer: For the first, check aws:PrincipalOrgID in the bucket policy. For the second, explicitly deny buckets owned by other accounts using s3:ResourceAccount in the application role policy.\nKey point: Principal conditions identify the requester; resource conditions identify the owner. Organization or ownership checks continue to match new members or buckets without itemized lists.\nWatch out: The role still needs an Allow for the actions; retain necessary exceptions for AWS-service-owned buckets.",
+    "frontZh": "S3策略要分别限制“只有本组织的身份能来访问”和“应用只能访问本账户的桶”。该检查请求者还是桶，用什么条件？",
+    "backZh": "答：前者在桶策略检查aws:PrincipalOrgID；后者在应用角色策略用s3:ResourceAccount，对非本账户所有的桶明确Deny。\n考点：Principal条件回答谁来访问；Resource条件回答资源归谁。检查组织或所有者关系，新增成员或新桶仍能按规则匹配，不必逐个维护清单。\n易错提醒：角色仍需相应动作的Allow；若需AWS服务托管的桶，应明确保留必要例外。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-cmp-m10",
+    "topic": "Security groups and the actual previous hop / 实际上一跳安全组",
+    "frontEn": "For connections into a tiered application, how should inbound security groups use the actual previous hop and server port? If the path becomes cross-Region private connectivity, can the remote security group still be referenced?",
+    "backEn": "Answer: At the receiver, allow only the actual previous hop and destination service port, referencing its security group where supported. Cross-Region peering or TGW peering paths do not support remote security-group references; use actual source private IPs or narrow CIDRs.\nKey point: Each new connection changes its initiator: office-to-bastion uses the office public egress, bastion-to-private-server uses the bastion private address; ALB-to-web targets references the ALB group. Group references track workload scaling without individual IP updates.\nWatch out: Use the receiver's listening port, such as SQL Server's default 1433. To restrict egress, configure the initiator toward the receiver, not just inbound on the wrong side.",
+    "frontZh": "分层应用接收连接时，如何按实际上一跳和服务端口设置入站安全组？如果连接改为跨Region私网路径，还能引用远端安全组吗？",
+    "backZh": "答：在接收端只放行实际上一跳和目标服务端口；支持引用时用上一跳的安全组。跨Region peering或TGW对等路径不支持远端安全组引用，用实际来源私有IP或收窄CIDR。\n考点：每次重新建立连接，来源随发起者改变：公司连跳板看到公司公网出口，跳板连私网看到跳板私有地址；ALB连Web目标时引用ALB安全组。安全组引用可随工作负载增减，无须逐个改IP。\n易错提醒：端口是接收端实际监听端口，如默认SQL Server 1433；需要限制出站时，在发起端指向接收端，不要只改错误一侧的入站。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-cmp-m11",
+    "topic": "Private networking and TLS / 私网与TLS边界",
+    "frontEn": "Data is encrypted at rest and requests use a private network. Does that replace TLS? For EC2 connecting to RDS MySQL, how does the client encrypt the connection and verify the database's identity?",
+    "backEn": "Answer: Enable TLS in the database client and validate the server certificate with AWS's RDS CA bundle.\nKey point: At-rest encryption protects stored data; private or dedicated networking selects the transport path. Establishing TLS protects the connection. The CA certificate enables server verification; downloading it alone does not enable TLS. S3 can reject non-SecureTransport requests to enforce HTTPS.\nWatch out: After proxy or edge TLS termination, the next hop is a separate connection. Network-layer IPsec does not automatically enable application TLS.",
+    "frontZh": "数据已静态加密、请求又走私网，能代替TLS吗？以EC2连接RDS MySQL为例，客户端怎样加密连接并验证数据库身份？",
+    "backZh": "答：仍须启用数据库客户端TLS，并使用AWS提供的RDS CA证书包验证服务端证书。\n考点：静态加密保护落盘，私网或专线规定承载路径；真正建立TLS才保护连接。CA证书供客户端核对服务器，只下载证书不会启用TLS。S3可拒绝非SecureTransport请求来强制HTTPS。\n易错提醒：代理或边缘终止TLS后，后续是另一条连接；网络层IPsec也不会自动替应用连接启用TLS。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-cmp-m16",
+    "topic": "Enforced retention and legal hold / 强制保留与法律保留",
+    "frontEn": "S3 versions or backups must resist even administrator deletion for a fixed period. If S3 instead must wait until authorized staff release retention, which controls apply? Can Versioning or Lifecycle replace them?",
+    "backEn": "Answer: Use the applicable Object Lock or Backup Vault Lock compliance mode for fixed retention; use S3 legal hold for indefinite retention until release. Versioning retains history and Lifecycle schedules cleanup; neither replaces enforced retention.\nKey point: Effective compliance retention prevents early deletion; authorized users can bypass governance. Legal hold persists until an authorized user releases it, without an invented far-future expiry.\nWatch out: S3 cleanup concerns specific protected versions. Lifecycle cannot bypass an effective lock, and retention ending does not instantly remove every version.",
+    "frontZh": "S3版本或备份在固定保留期内连管理员也不能提前删；若S3改成等获准人员解除保留才可删，应怎样选择？Versioning或Lifecycle能替代吗？",
+    "backZh": "答：固定期用对应Object Lock或Backup Vault Lock的compliance模式；S3无限期等待解除用legal hold。Versioning留历史，Lifecycle安排清理，不能替代强制保留。\n考点：已生效的compliance保留约束提前删除；governance可被有权者绕过。legal hold不设猜测的超长到期日，持续到获准用户解除。\n易错提醒：S3清理须考虑受保护的具体版本；Lifecycle不会越过有效锁，保留结束也不等于所有版本立即消失。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-cmp-m20",
+    "topic": "Client-side encryption before storage / 存储前客户端加密",
+    "frontEn": "Sensitive data must already be ciphertext under the customer's own key before reaching S3 or a database. Does SSE-C qualify? How can EMR ETL output meet this requirement?",
+    "backEn": "Answer: No. Encrypt in the application with an accessible customer key before sending data to storage. On EMR with EMRFS support, CSE-Custom with a custom key provider can encrypt output before upload.\nKey point: The deciding condition is whether data is encrypted before storage receives it. SSE-C uses a customer-supplied key on each request but S3 still encrypts after receipt. Client-side encryption delivers ciphertext to storage.\nWatch out: Glue job-bookmark encryption protects progress bookmarks; it does not prove ETL output was encrypted before upload.",
+    "frontZh": "敏感数据交给S3或数据库前就必须用客户自己的密钥成为密文。SSE-C符合吗？EMR的ETL输出可怎样落实这一要求？",
+    "backZh": "答：SSE-C不符合：应用应先用可调用的客户密钥完成客户端加密，再交给存储。使用支持EMRFS的EMR时，可用CSE-Custom及客户自定义key provider加密输出后上传。\n考点：决定条件是存储收到数据前是否已成为密文。SSE-C虽由客户逐请求提供key，仍是S3收到数据后加密；客户端加密才把密文交给存储。\n易错提醒：Glue job bookmark加密保护的是任务进度书签，不能据此认为ETL输出已在上传前加密。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-cmp-m22",
+    "topic": "Shield protection at the actual entry / Shield保护真实入口",
+    "frontEn": "A public application needs Shield Advanced DDoS mitigation and expert collaboration. Traffic enters through Global Accelerator or directly through EC2/NLB. Which resources should be registered for protection?",
+    "backEn": "Answer: Register a standard Global Accelerator directly. For EC2 or NLB, protect supported associated resources such as Elastic IPs rather than always specifying a backend instance ID. Work with the Shield Response Team as needed.\nKey point: Mitigation must target a supported actual public entry. Shield Advanced detects and mitigates DDoS; a vulnerability or threat finding alone does not block attacks.\nWatch out: An event's top-source summary is not a full forensic log. HTTP attribution also needs entry access logs, and application-layer analysis uses WAF logs.",
+    "frontZh": "公网应用需要Shield Advanced增强DDoS缓解及专家协作。流量先进入Global Accelerator，或直接进入EC2/NLB时，应把哪种资源登记保护？",
+    "backZh": "答：标准Global Accelerator直接登记加速器；EC2或NLB按其关联Elastic IP等受支持资源配置保护，不能一律填后端实例ID。按需要与Shield Response Team协作。\n考点：缓解要作用在受支持的真实公网入口；Shield Advanced检测并缓解DDoS，漏洞或威胁发现报告本身不会拦下攻击。\n易错提醒：事件主要来源汇总不是完整取证日志；HTTP请求溯源还需入口访问日志，应用层判断看WAF日志。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-cmp-m25",
+    "topic": "Connecting to private databases / 私有数据库连接",
+    "frontEn": "Lambda or Managed Grafana is authorized to read private RDS. Are IAM permissions or an RDS interface endpoint sufficient? What should it connect to?",
+    "backEn": "Answer: No. Configure VPC connectivity for the function or workspace, choose subnets with a path to the target, allow the actual security groups, and connect to the database's own private endpoint and port.\nKey point: IAM controls permitted actions; VPC connectivity provides the network path. An RDS interface endpoint serves management APIs such as creation or modification, not MySQL or other SQL connections. Lambda can also reach an on-premises database over existing private routes.\nWatch out: Grafana need not make RDS public. Database login authorization is still required after networking works.",
+    "frontZh": "Lambda或Managed Grafana有访问权限，要读取私有RDS。仅有IAM权限或创建RDS interface endpoint就够吗，应连接哪里？",
+    "backZh": "答：不够。为函数或工作区配置VPC连接，选有目标私网路径的子网并放行实际安全组，连接数据库自己的私有endpoint和端口。\n考点：IAM决定允许做什么，VPC连接提供网络路径；RDS interface endpoint用于创建、修改等管理API，不承载MySQL等数据库SQL连接。Lambda也可沿已有私网路线到本地数据库。\n易错提醒：Grafana不需为此把RDS公开；网络连通后仍须满足数据库实际登录授权。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-fh01",
+    "topic": "Log subscriptions and OpenSearch / 日志订阅与OpenSearch",
+    "frontEn": "VPC Flow Logs are in a CloudWatch Logs log group and must reach OpenSearch Service near real time. Can Firehose deliver the subscribed log-group records directly to OpenSearch, and what should be chosen?",
+    "backEn": "Answer: No. CloudWatch Logs subscriptions combine multiple log events into one record; Firehose does not support directly delivering that input to OpenSearch Service. Use a supported path with an actual consumer, such as a subscription to Kinesis Data Streams and a Lambda consumer that decodes records and writes to OpenSearch.\nKey point: Subscriptions forward packed records, not individual events. The OpenSearch destination requires one indexable log per record, so this input/destination combination is unsupported. On the KDS path, the consumer decodes and performs writes.\nWatch out: General Firehose support for an OpenSearch destination does not imply support for CloudWatch Logs multi-event input. Receiving subscriptions and supporting a destination do not ensure the two compose.",
+    "frontZh": "VPC Flow Logs已写入CloudWatch Logs日志组，要近实时送到OpenSearch Service分析。有人提议直接经Kinesis Data Firehose把日志组记录送到OpenSearch。这条直接路径可行吗，应选什么？",
+    "backZh": "答：不可行。CloudWatch Logs订阅记录把多条日志事件合并成一条记录，Firehose不支持把这种CloudWatch Logs输入直接交付到OpenSearch Service目的地；应选带实际消费者处理记录的受支持路径，如订阅到Kinesis Data Streams，由Lambda消费者解码并写入OpenSearch。\n考点：订阅过滤器转发的是打包记录而非单条日志：CloudWatch把多条日志事件合成一条记录，OpenSearch目的地要求一条记录对应一条可索引日志，所以这个输入/目的地组合不被支持。KDS路径由消费者解码并负责写入，因此成立。\n易错提醒：“Firehose支持OpenSearch目的地”只说目的地通用受支持，不能推出CloudWatch Logs这种多事件打包输入也能直送；不要因为Firehose能接订阅、也能连OpenSearch就默认两段可拼。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-na03",
+    "topic": "Connection and HTTP logs / 连接与HTTP日志",
+    "frontEn": "Which logs show connections to an ENI and port versus HTTP request paths and responses at an ALB?",
+    "backEn": "Answer: Use VPC Flow Logs for network-connection metadata and ALB access logs for HTTP requests. ALB logs can go to S3; Flow Logs can go to CloudWatch Logs or S3.\nKey point: Flow Logs contain IP traffic metadata, not HTTP request bodies. ALB access logs record client IPs, request paths, latency, and server responses; these observe different layers.",
+    "frontZh": "要看谁连接了哪块网卡、哪个端口，或要看ALB上的HTTP请求路径和响应，分别应查什么日志？",
+    "backZh": "答：网络连接元数据看VPC Flow Logs；HTTP请求看ALB access logs，可把ALB日志投递到S3。VPC Flow Logs也可投递CloudWatch Logs或S3。\n考点：Flow Logs记录IP流量元数据，不包含HTTP请求正文；ALB访问日志记录客户端IP、请求路径、延迟和服务器响应，观察的是不同层次。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-nb03",
+    "topic": "CloudFront origin authorization / CloudFront源站授权",
+    "frontEn": "CloudFront must serve private S3 content and may accept uploads. Does a customer's access signature alone let CloudFront access S3?",
+    "backEn": "Answer: No. Configure origin access for the distribution and grant it the needed S3 actions in the bucket policy. OAC signs origin requests; legacy OAI provides a dedicated origin identity for its supported S3-read scenarios.\nKey point: Client-to-CloudFront and CloudFront-to-S3 are separate authorization boundaries. The distribution also needs permissions. Read-only permission cannot upload; uploads require the actual write actions.",
+    "frontZh": "CloudFront要提供私有S3内容，也可能接收上传。客户已经有访问签名，就足够让CloudFront访问S3吗？",
+    "backZh": "答：不够；为分发配置源站访问机制，在桶策略授权它执行所需S3动作。OAC为源站请求签名；旧OAI在其支持的S3读取场景中提供专用源站身份。\n考点：客户到CloudFront与CloudFront到S3是两段授权，分发也要有对应权限。只给读取权限不能上传；上传须允许实际写动作。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-nc03",
+    "topic": "Customer key isolation / 客户密钥隔离",
+    "frontEn": "Customers' data needs separate encryption and separate control over who decrypts it. Can all customers share one KMS key with identical permissions?",
+    "backEn": "Answer: Create appropriate independent KMS keys per customer and restrict each customer's key usage to its data boundary.\nKey point: Separate keys distinguish permissions and audits by customer. Different object prefixes under one key do not automatically create independent decryption permissions.",
+    "frontZh": "多客户数据必须分别加密、分别控制谁能解密。能否让所有客户共用一把具有相同权限的KMS key？",
+    "backZh": "答：按客户建立适当的独立KMS key，并把各客户的用钥权限限制到对应数据边界。\n考点：分开的key使权限与审计可按客户区分；只给同一把key换不同对象前缀，并不会自动产生独立的解密权限。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-nc05",
+    "topic": "Control Tower baselines / Control Tower基线",
+    "frontEn": "An organization wants low-maintenance account provisioning and governance with shared audit baselines. Is creating accounts and OUs in Organizations enough, and why?",
+    "backEn": "Answer: No. Establish a Control Tower landing zone in the management account, enable required service integrations such as CloudTrail, and enroll the targeted new and existing accounts.\nKey point: Control Tower supplies managed baselines and account-provisioning integration; preventive controls can block requests through SCPs. Existing organization membership alone does not enroll accounts. Auditing depends on actually enabled service integrations.",
+    "frontZh": "组织要少维护地开通和治理有共同审计基线的账户，只在Organizations创建账户和OU够吗，为什么？",
+    "backZh": "答：不够；在管理账户建立Control Tower landing zone，启用所需CloudTrail等服务集成，并把新旧目标账户纳入管理。\n考点：Control Tower提供托管基线和账户开通衔接；其预防型control可通过SCP在请求时阻止操作。已有账户不会仅因属于同一组织就自动纳管，审计须在实际启用的服务集成中落实。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-nc06",
+    "topic": "Centralized security findings / 统一安全发现",
+    "frontEn": "A company needs a unified view of security-service findings and security-standard control status. Should a new service rescan every threat?",
+    "backEn": "Answer: Use Security Hub to centralize applicable findings and enable the required standards and account scope. The source services still perform detection.\nKey point: The unified view aggregates security results and standard checks show control compliance. It does not turn PII scanning, vulnerability scanning, and behavior detection into the same task.",
+    "frontZh": "公司要统一查看安全服务发现及安全标准控制状态，应该让一个新服务重新扫描所有威胁吗？",
+    "backZh": "答：用Security Hub集中管理相应发现，并启用所需安全标准及账户范围；源检测仍由对应服务执行。\n考点：统一视图汇总安全结果，标准检查呈现控制是否满足要求；它不把PII扫描、漏洞扫描和行为检测变成同一种工作。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-new01",
+    "topic": "Root MFA with backup devices / Root多设备MFA",
+    "frontEn": "Root already has a strong unique password. How can you prevent takeover with only a leaked password and reduce the risk of losing one verification device?",
+    "backEn": "Answer: Enable root MFA and preregister more than one protected MFA device as backups.\nKey point: MFA requires a factor beyond the password. Another registered device remains usable if one is lost. An ordinary administrator's permissions cannot directly replace root sign-in.",
+    "frontZh": "root已经使用强而唯一的密码，还应怎样防止仅凭泄露密码就接管账户，并降低一个验证设备丢失带来的风险？",
+    "backZh": "答：给root启用MFA，并预先登记不止一个受保护的MFA设备作为备用。\n考点：MFA要求除密码外的验证因素；一个设备丢失时可用已登记的另一设备。普通管理员账户的权限不能直接替代root登录。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-new02",
+    "topic": "Certificate validation and renewal / 证书验证与续期",
+    "frontEn": "How does an ACM certificate use DNS to prove domain control and renew automatically? Can ACM also renew an imported external-CA certificate, and why?",
+    "backEn": "Answer: For ACM-issued certificates, add the supplied CNAME to DNS, retain it, and meet renewal conditions such as certificate use. Renew imported certificates with the external CA and reimport them.\nKey point: The CNAME proves domain control for subsequent ACM renewal validation. ACM cannot issue a new certificate on an external CA's behalf; an expiry reminder is not renewal.\nWatch out: An already issued email-validated certificate cannot be directly switched to DNS validation; request a new certificate.",
+    "frontZh": "ACM证书怎样用DNS证明域名归属并自动续期？导入的外部CA证书也能由ACM自动续领吗，为什么？",
+    "backZh": "答：ACM签发的证书把提供的CNAME加入域名DNS，保留记录并满足证书在用等续期条件；导入证书仍须向外部CA续领后重新导入。\n考点：CNAME是域名控制权证明，可供ACM后续验证续期；ACM不能代替外部CA签发新证书，到期提醒也不等于续领。\n易错提醒：已用邮件验证签发的证书不能直接切成DNS验证，需重新申请。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-new03",
+    "topic": "Explicit denial with NACLs / NACL明确拒绝",
+    "frontEn": "A public ALB receives traffic from a few known malicious IPs. Are security groups sufficient to explicitly deny those IPs at the network layer, and where should the rule go?",
+    "backEn": "Answer: Security groups have only allow rules. Add source-IP deny rules to the NACLs of the ALB entry subnets.\nKey point: NACLs evaluate rule numbers in ascending order and apply the first matching allow or deny. Place denials before rules that would otherwise allow that traffic.",
+    "frontZh": "公网ALB遭少数已知恶意IP访问。要在网络层明确拒绝这些地址，安全组够吗，应在哪里设置？",
+    "backZh": "答：安全组只有允许规则；可在ALB所在入口子网的NACL设置针对这些来源IP的拒绝规则。\n考点：NACL在子网边界按规则号从小到大匹配，先匹配的允许或拒绝规则生效；拒绝规则须排在会先放行这些流量的规则前。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-new05",
+    "topic": "Explicit Deny precedence / 显式Deny优先",
+    "frontEn": "One policy allows ec2:* and another explicitly denies ec2:TerminateInstances; resources and conditions in both apply. Can another Allow for termination enable it?",
+    "backEn": "Answer: No. The explicit Deny matching this termination request wins; another Allow does not remove it.\nKey point: The Action wildcard matches any characters at that position, so ec2:* already includes termination. Policies do not overwrite by order. Find statements matching the action, resource, and conditions; a nonmatching Deny does not affect this request.",
+    "frontZh": "一条策略允许ec2:*，另一条明确拒绝ec2:TerminateInstances；两条的资源和条件都适用。再加一条允许终止的策略，就能终止实例吗？",
+    "backZh": "答：不能。匹配当前终止请求的显式Deny优先，增加Allow不会解除它。\n考点：Action中的*匹配该位置任意字符，因此ec2:*已包含终止动作；策略不是按先后顺序覆盖。须先按当前动作、资源和条件找适用声明，不匹配的Deny不参与这次判断。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-sc01",
+    "topic": "Resource and key authorization / 资源与密钥授权",
+    "frontEn": "An execution identity can read an encrypted resource. Why might access still fail, and what must be checked even if IAM allows KMS?",
+    "backEn": "Answer: Check that the actual key-using identity is authorized for the required KMS operations. IAM Allow also requires the key policy to permit that authorization method.\nKey point: Resource authorization and key authorization are separate checks. A key policy can grant access directly or enable IAM-based authorization. Without the latter, adding only an IAM Allow is ineffective.\nWatch out: Sharing objects or snapshots does not automatically share KMS-key permissions.",
+    "frontZh": "运行身份已有读取加密资源的权限，为什么仍可能被拒绝？即使IAM策略写了KMS Allow，还要检查什么？",
+    "backZh": "答：检查实际用钥身份是否获准执行所需KMS操作；IAM Allow还需要该key的key policy允许这种授权方式。\n考点：资源授权与用钥授权是两道检查。key policy可直接授权，也可允许IAM策略参与授权；未开放后者时，单加IAM Allow无效。\n易错提醒：共享对象或快照不会自动共享其KMS key权限。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-xa003",
+    "topic": "Self-managed AD and SSO / 自管AD与SSO",
+    "frontEn": "Staff remain in on-premises self-managed AD but need Identity Center cross-account SSO. How can the directory connect, and which trust direction is needed if using AWS Managed Microsoft AD?",
+    "backEn": "Answer: Bridge the existing AD with AD Connector; if connecting through AWS Managed Microsoft AD, establish a two-way forest trust.\nKey point: AD Connector forwards directory requests to the original AD. One trust direction serves authentication and the other lets Identity Center read user and group information.\nWatch out: AD Connector sees only its connected single domain; use the Managed Microsoft AD path for multiple domains or forests.",
+    "frontZh": "人员继续在本地自管AD维护，又要用Identity Center跨账户SSO。如何连接原目录？如果经过AWS Managed Microsoft AD，信任应是什么方向？",
+    "backZh": "答：可用AD Connector桥接原AD；若经AWS Managed Microsoft AD连接原目录，建立双向林信任。\n考点：AD Connector把目录请求转回原AD；双向信任一边用于身份验证，另一边让Identity Center读取用户和组信息。\n易错提醒：AD Connector只看到所连接的单个域；需要多域或多林时采用Managed Microsoft AD路径。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-xa004",
+    "topic": "Cross-Region client-side decryption / 跨Region客户端解密",
+    "frontEn": "An application encrypts client-side in two Regions and must decrypt ciphertext directly in the other Region without calling the original Region or reencrypting under a different key. Which KMS keys fit?",
+    "backEn": "Answer: Deploy related KMS multi-Region keys in both Regions.\nKey point: Related primary and replica keys share key material and key ID, allowing ciphertext from one Region to be decrypted with its related key in another.\nWatch out: Key policies remain independently managed by Region. S3 server-side cross-Region replication still reencrypts using the destination Region's key; shared material does not skip that step.",
+    "frontZh": "应用在两个Region做客户端加密，密文要在另一Region直接解密，不想回调原Region或换钥重加密。怎样选KMS key？",
+    "backZh": "答：在两个Region部署同一组相关的KMS multi-Region keys。\n考点：相关主密钥与副本共享密钥材料和key ID，所以一地加密的密文可在另一地用相关key解密。\n易错提醒：各Region的key策略仍分别管理；S3服务端跨Region复制仍会按目标Region的key重加密，不能据材料相同推断其跳过该步骤。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-xa005",
+    "topic": "Certificate expiry notifications / 证书临期通知",
+    "frontEn": "An ALB uses an imported ACM certificate and needs a warning 30 days early. How can ACM events and Config evaluations each trigger it? Does the warning renew the certificate?",
+    "backEn": "Answer: Filter ACM approaching-expiry events by DaysToExpiry at 30 days, or set the Config certificate-expiry rule to a 30-day threshold; connect the notification chain through EventBridge. Neither renews with the external CA.\nKey point: ACM emits approaching-expiry events for active imported certificates; Config evaluates the threshold. These generate reminder signals; obtaining and reimporting a certificate is a separate action.",
+    "frontZh": "ALB使用导入ACM的证书，要提前30天通知。ACM事件和Config评估分别怎样触发提醒，提醒会自动续期吗？",
+    "backZh": "答：可用ACM临近到期事件按DaysToExpiry筛到30天，或用Config证书到期规则设30天阈值；经EventBridge接通知链。两者都不会代外部CA续期。\n考点：ACM发布活动导入证书的临期事件，Config按阈值评估是否到期；它们产生提醒信号，取得新证书并重新导入是另一项动作。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-xa006",
+    "topic": "Negated SourceIp conditions / SourceIp否定条件",
+    "frontEn": "An Allow matches EC2 termination. A Deny uses NotIpAddress on aws:SourceIp with two allowed network ranges. The request comes from neither range. What happens, and why?",
+    "backEn": "Answer: The request is denied.\nKey point: aws:SourceIp checks the requester's IP, not the terminated instance's. NotIpAddress matches when the source is outside every listed range; the matching explicit Deny overrides Allow.\nWatch out: ec2:Region checks the target Region. StringNotEquals:us-east-1 matches other Regions; this differs from the requester's source IP.",
+    "frontZh": "终止EC2的Allow已匹配；另有Deny，条件为NotIpAddress、aws:SourceIp列出两个允许网段。请求来自两个网段之外，会怎样，为什么？",
+    "backZh": "答：会被Deny拒绝。\n考点：aws:SourceIp检查请求者来源IP，不是被终止实例的IP；NotIpAddress在来源不属于任一列出网段时匹配，匹配的显式Deny覆盖Allow。\n易错提醒：ec2:Region检查请求目标Region；StringNotEquals:us-east-1只在其他Region匹配。它与请求者来源IP是两种条件。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-xa007",
+    "topic": "Cross-account WAF management / 跨账户WAF管理",
+    "frontEn": "REST APIs across multiple accounts and Regions need continuous application of the same WAF protections. How can you avoid manually copying and maintaining them in each account?",
+    "backEn": "Answer: Use Firewall Manager to manage WAF policies centrally, configuring protection scope in the involved Regions.\nKey point: It applies central policies to scoped accounts and resources, including newly added eligible resources. WAF still inspects individual HTTP requests.",
+    "frontZh": "多个账户、多个Region的REST API都要持续应用同一套WAF防护，怎样避免各账户手工复制维护？",
+    "backZh": "答：使用Firewall Manager集中管理WAF策略，并在涉及的Region配置保护范围。\n考点：它把中央策略应用到范围内的账户和资源，新加入的适用资源也会获得保护；WAF仍负责检查具体HTTP请求。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-xa008",
+    "topic": "Account contacts / 账户联系人",
+    "frontEn": "Important AWS account email must survive staff departures, while billing, operations, and security messages should reach responsible teams. How should contacts be arranged?",
+    "backEn": "Answer: Use a controlled administrator distribution list for each account's root email; set billing, operations, and security alternate contacts to their respective team lists.\nKey point: Root email maintains continuity for account-owner messages. Alternate contacts route category-specific notices to teams and do not replace root-email maintenance.",
+    "frontZh": "AWS账户重要邮件不能因一人离职而漏接，还要按账单、运维、安全类别送给负责团队。联系人怎样安排？",
+    "backZh": "答：每个账户的root邮箱使用受控管理员分发列表；再分别设置billing、operations、security备用联系人为对应团队列表。\n考点：root邮箱保障账户负责人持续收信；备用联系人把相应类别通知送到职责团队，不能代替维护root邮箱。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-xa011",
+    "topic": "Field-level encryption / 字段级加密",
+    "frontEn": "Users submit sensitive forms through CloudFront. Beyond HTTPS, selected fields must remain ciphertext through intermediate applications and be readable only by a designated downstream application. What fits?",
+    "backEn": "Answer: Configure CloudFront field-level encryption to encrypt the selected form fields at the edge.\nKey point: CloudFront encrypts selected fields with a public key. They remain ciphertext through subsequent applications; only an application holding the corresponding private key can decrypt them.\nWatch out: HTTPS protects connections and CloudFront signed URLs control content requests; neither keeps downstream fields encrypted.",
+    "frontZh": "用户经CloudFront提交敏感表单，HTTPS之外还要求经过中间应用时字段仍是密文，只有指定下游应用可读。选什么？",
+    "backZh": "答：配置CloudFront field-level encryption，对指定表单字段在边缘加密。\n考点：CloudFront用公钥加密选定字段，数据经过后续应用时仍为密文；只有持对应私钥的应用能解密。\n易错提醒：HTTPS保护连接；CloudFront签名URL控制谁能请求内容，均不让下游字段持续保持密文。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-xa014",
+    "topic": "IAM password policy / IAM密码策略",
+    "frontEn": "All IAM users in one account need uniform console-password complexity and expiry. At which level is the policy configured?",
+    "backEn": "Answer: Set the AWS account's IAM password policy.\nKey point: The account password policy applies uniformly to IAM-user passwords, without separate complexity rules per user.\nWatch out: It does not govern the root password or invalidate IAM access keys when passwords expire.",
+    "frontZh": "一个账户内所有IAM用户的控制台密码，都必须满足统一复杂度和到期周期。策略设在哪一级？",
+    "backZh": "答：设置该AWS账户的IAM password policy。\n考点：账户密码策略统一作用于IAM用户密码，不必逐用户另建复杂度规则。\n易错提醒：它不管root密码，也不让IAM access key随密码到期而失效。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-xa015",
+    "topic": "CloudFormation service roles / CloudFormation服务角色",
+    "frontEn": "A deployment engineer should operate only specified stacks without directly receiving permissions to create EC2 and other resources. How can CloudFormation deploy them?",
+    "backEn": "Answer: Give the engineer required stack-operation permissions and let the stack use a CloudFormation service role limited to required resource actions. Initially specifying the role requires the corresponding iam:PassRole permission.\nKey point: The engineer initiates stack operations; CloudFormation assumes the service role to create resources. The identities can have different permissions without granting the engineer AdministratorAccess.",
+    "frontZh": "部署工程师只应操作指定堆栈，创建EC2等资源的权限不想直接交给他。CloudFormation怎样完成部署？",
+    "backZh": "答：给工程师所需的堆栈操作权限，并让堆栈使用仅含所需资源动作的CloudFormation service role；首次指定角色需有相应iam:PassRole。\n考点：工程师发起堆栈操作，CloudFormation代入服务角色创建实际资源；两种身份可拥有不同权限，不必给工程师AdministratorAccess。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-xa017",
+    "topic": "BoolIfExists and action scope / BoolIfExists与动作范围",
+    "frontEn": "A policy denies StopInstances and TerminateInstances when BoolIfExists tests aws:MultiFactorAuthPresent=false. If that field is false or absent, which actions are denied, and why?",
+    "backEn": "Answer: Both cases match the Deny, but only its listed stop and terminate actions are denied.\nKey point: BoolIfExists matches a missing field; when present, its value must be false. The Deny's effect remains limited by Action and does not automatically cover every EC2 operation.",
+    "frontZh": "策略对StopInstances和TerminateInstances设Deny，条件是BoolIfExists检查aws:MultiFactorAuthPresent=false。MFA字段为false或根本缺失时，会拒绝哪些动作，为什么？",
+    "backZh": "答：两种情况都匹配这条Deny，但只拒绝声明列出的停止和终止动作。\n考点：BoolIfExists使字段缺失也匹配条件；字段存在时再检查是否为false。Deny的影响仍受Action范围限制，不会自动覆盖全部EC2操作。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-xa018",
+    "topic": "Lake Formation tag authorization / Lake Formation标签授权",
+    "frontEn": "Lake Formation tables are growing. How can an engineering team receive cross-account access to data with a certain category of tags without table-by-table grants, and why?",
+    "backEn": "Answer: Use Lake Formation tag-based access control (LF-TBAC): attach LF-Tags to Data Catalog resources and grant cross-account permissions by tag values.\nKey point: Permissions follow resource-tag matches. Correctly tagging new tables lets the same rule manage them, reducing individual grants.\nWatch out: LF-Tags are Lake Formation permission tags; ordinary IAM tags are not interchangeable with them.",
+    "frontZh": "Lake Formation里的表越来越多，要把符合某类标签的数据跨账户授权给工程团队，怎样避免逐表授权，为什么？",
+    "backZh": "答：使用Lake Formation tag-based access control（LF-TBAC），给数据目录资源贴LF-Tag，按标签值授予跨账户权限。\n考点：授权跟随资源标签匹配；同类新表正确标记后可按同一规则管理，减少逐表维护。\n易错提醒：LF-Tag是Lake Formation权限标签，不能直接拿普通IAM标签当作它。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-xa020",
+    "topic": "Controlled self-service provisioning / 受控自助开通",
+    "frontEn": "Developers need to provision company-approved databases and tools themselves, using only permitted configurations. How can central management and self-service coexist, and why?",
+    "backEn": "Answer: Publish approved configurations as Service Catalog products, expose the appropriate portfolio to developers, and set provisioning constraints.\nKey point: Administrators manage provisionable products and configuration boundaries; users launch from the authorized catalog. Merely supplying template files does not centrally manage available products.",
+    "frontZh": "开发者要自己开通公司批准的数据库等工具，但只能使用限定配置。怎样兼顾中央管理和自助部署，为什么？",
+    "backZh": "答：把批准配置发布为Service Catalog产品，向开发者开放相应portfolio，并设置开通约束。\n考点：管理员维护可开通的产品和配置边界，用户从授权目录自助启动；只给模板文件不等于集中管理可用产品。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-xa021",
+    "topic": "EKS control-plane encryption / EKS控制平面加密",
+    "frontEn": "Sensitive values are in Kubernetes Secrets on EKS. To protect control-plane etcd data, which encryption layer matters? Is encrypting EBS or keeping another copy in Secrets Manager enough, and why?",
+    "backEn": "Answer: Check KMS envelope encryption for EKS Kubernetes API data. EKS 1.28 and later provide it by default; use a customer managed KMS key as needed.\nKey point: The API server encrypts data before storing it in etcd, and KMS protects the data key. Node EBS encryption or an external secret store is not this control-plane protection.",
+    "frontZh": "EKS中敏感值已写进Kubernetes Secret，目标是保护控制平面etcd里的数据。应检查哪一层加密，改EBS卷或把另一份值放Secrets Manager够吗，为什么？",
+    "backZh": "答：检查EKS Kubernetes API数据的KMS封套加密；EKS 1.28及以上已默认提供，可按需要使用客户管理KMS key。\n考点：API服务器先加密数据再存etcd，数据密钥又由KMS key保护；节点EBS加密或外部秘密库不是控制平面etcd的这层保护。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-xa023",
+    "topic": "Control Tower drift / Control Tower漂移",
+    "frontEn": "In a Control Tower-managed environment, governance relationships change, such as an account moving OUs. How can operations detect and receive alerts with little maintenance, and why?",
+    "backEn": "Answer: Use Control Tower drift detection and subscribe to applicable drift notifications.\nKey point: Control Tower checks deviations in managed governance state, including account drift from moves. CloudFormation drift compares stack resources and does not automatically cover organization-wide governance relationships.\nWatch out: Notifications depend on configuration; documented account SNS drift notifications are unavailable when account auto-enroll is enabled.",
+    "frontZh": "Control Tower纳管环境中，账户被移到其他OU等治理关系发生变化，需要少维护地发现并提醒运维。应使用什么能力，为什么？",
+    "backZh": "答：使用Control Tower drift detection，并订阅适用的漂移通知。\n考点：Control Tower检查纳管治理状态的偏离，账户移动等变化可成为account drift；CloudFormation drift只比较堆栈资源，不自动覆盖整套组织治理关系。\n易错提醒：具体通知随配置而变；启用账户auto-enroll时，文档所列账户SNS漂移通知不可用。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-xa025",
+    "topic": "Moving between organizations / 组织迁移",
+    "frontEn": "An existing subsidiary AWS account must move to another organization while retaining its resources. Can it belong to both during transition? What order applies, and why?",
+    "backEn": "Answer: No. Leave the original organization before accepting the new management account's invitation.\nKey point: An account belongs to only one Organizations organization at a time. Changing membership does not require creating a new account and moving all resources.",
+    "frontZh": "子公司现有AWS账户要迁入另一组织，并保留账户内资源。能同时加入两个组织过渡吗，应按什么顺序，为什么？",
+    "backZh": "答：不能；先退出原组织，再接受新组织管理账户的邀请。\n考点：一个账户同一时间只能属于一个Organizations组织；迁成员资格不等于必须新建账户搬全部资源。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-xa026",
+    "topic": "Corporate directory federation / 企业目录联合身份",
+    "frontEn": "Staff must sign into AWS through the corporate directory without new IAM users. How do temporary-identity paths differ for an existing SAML 2.0 IdP versus an LDAP directory without SAML support, and why?",
+    "backEn": "Answer: Use SAML federation mapped to authorized IAM roles for the former. For the latter, a custom identity broker can authenticate against LDAP and obtain temporary STS credentials.\nKey point: The corporate directory still authenticates staff; AWS grants access through restricted roles or temporary credentials, not by turning corporate passwords into long-term AWS access keys.",
+    "frontZh": "员工要沿用企业目录登录AWS，不另建IAM用户。已有SAML 2.0身份提供商与只有不兼容SAML的LDAP目录时，临时身份的桥接路径有什么不同，为什么？",
+    "backZh": "答：前者建立SAML federation并映射到授权IAM角色；后者可由自建identity broker先验证LDAP身份，再向STS取得临时凭证。\n考点：企业目录仍验证员工；AWS端用受限角色或临时凭证授予访问，而不是把企业密码变成长期AWS access key。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-xa027",
+    "topic": "Wildcard certificate scope / 通配符证书范围",
+    "frontEn": "A website serves example.com, cn.example.com, and nz.example.com. Is *.example.com alone sufficient on its certificate, and why?",
+    "backEn": "Answer: No. Include both example.com and *.example.com.\nKey point: The wildcard covers only that subdomain level, not the apex or deeper names such as test.cn.example.com. One certificate can list multiple names.",
+    "frontZh": "网站要同时支持example.com、cn.example.com和nz.example.com。证书只写*.example.com够吗，为什么？",
+    "backZh": "答：不够；证书须同时包含example.com和*.example.com。\n考点：通配符只覆盖这一层子域，不覆盖根域，也不覆盖test.cn.example.com这样的更深一层；同一证书可列多个名称。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-xa028",
+    "topic": "ACM public certificate charges / ACM公有证书费用",
+    "frontEn": "Public browsers use an ALB or CloudFront custom domain. Which ACM certificate avoids additional certificate charges, and why?",
+    "backEn": "Answer: Choose an ACM non-exportable public certificate for use with integrated AWS services.\nKey point: A public certificate is issued by a publicly trusted CA for public domains. This non-exportable integrated-service certificate has no additional certificate charge; that pricing does not extend to exportable certificates or Private CA.",
+    "frontZh": "公众浏览器访问ALB或CloudFront自定义域名，要用ACM证书且不增加证书费用，应选哪类证书，为什么？",
+    "backZh": "答：选择供集成AWS服务使用的ACM non-exportable public certificate。\n考点：public certificate由公信CA签发供公网域名使用；这一非导出型集成服务证书没有额外证书费用，不能把价格套到可导出证书或Private CA。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-xa029",
+    "topic": "KMS external key stores / KMS外部密钥库",
+    "frontEn": "Regulations require actual cryptographic keys to remain in an on-premises third-party key manager while integrating encryption and decryption with KMS. Which key store fits, and why?",
+    "backEn": "Answer: Use a KMS external key store, with the external key manager retaining and using the actual keys.\nKey point: KMS delegates cryptographic operations through the XKS proxy and cannot read, create, or delete those external keys. This differs from importing material into AWS.\nWatch out: External manager or connectivity failures affect key availability; you operate that path.",
+    "frontZh": "法规要求实际密码密钥始终留在本地第三方密钥管理器，还要让AWS KMS衔接加解密。选哪类key store，为什么？",
+    "backZh": "答：使用KMS external key store，由外部key manager保留并使用实际密钥。\n考点：KMS经XKS proxy把密码操作交给外部管理器，不能读取、创建或删除其中的外部密钥；这不同于把材料导入AWS。\n易错提醒：外部管理器或连接不可用会影响用钥可用性，需要自行承担这条路径的运维。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-xa030",
+    "topic": "Shared CIDR lists / 共享CIDR清单",
+    "frontEn": "Office CIDRs change often, requiring security-group updates across accounts. Only a centrally maintained address list is needed. How can maintenance and extra governance-service charges be reduced?",
+    "backEn": "Answer: Create a customer-managed prefix list, share it through AWS RAM, and reference it from the security groups.\nKey point: The prefix list centrally stores reusable CIDRs. After central updates, groups use the same new list; RAM cross-account sharing adds no sharing fee.\nWatch out: Firewall Manager offers broader security-group governance but has per-Region policy charges and related Config costs. CIDR synchronization alone does not require it.",
+    "frontZh": "全球办公室的CIDR经常变化，多账户安全组都要跟着更新。只需集中维护地址清单，怎样减少维护和额外治理服务费用？",
+    "backZh": "答：建立customer-managed prefix list，经AWS RAM共享给相关账户；各安全组引用这份列表。\n考点：prefix list集中保存可引用的CIDR集合，中央更新后各安全组使用同一新清单；AWS RAM跨账户共享没有额外共享费用。\n易错提醒：Firewall Manager能做更完整的安全组治理，但其安全组策略有按Region的策略费和相关Config费用；只需同步CIDR时不必引入这套治理。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-xa032",
+    "topic": "Requiring tags to exist / 强制标签存在",
+    "frontEn": "EC2 must have Sensitivity=sensitive or nonsensitive, and users must not delete that tag. Is an Organizations tag policy alone enough, and why?",
+    "backEn": "Answer: No. Use the tag policy for allowed values on supported resources, plus SCP restrictions on creation without the tag and on deleting it.\nKey point: Tag policies validate submitted tags but do not evaluate untagged resources. Denying the relevant requests with SCPs covers missing-tag creation and deletion.",
+    "frontZh": "EC2必须有Sensitivity标签，值只能是sensitive或nonsensitive，而且用户不能删除它。只启用Organizations tag policy够吗，为什么？",
+    "backZh": "答：不够；tag policy规范受支持资源的标签值，再用SCP限制缺标签的创建请求与删除该标签的操作。\n考点：tag policy校验已提交标签的合规值，不评估未标记资源；SCP在相应请求发生时拒绝，才能补上缺失和删除这两个入口。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-xa033",
+    "topic": "MSK public access and mTLS / MSK公网与mTLS",
+    "frontEn": "MSK Provisioned already meets public-subnet routing and security-group requirements. Internet clients need certificate authentication and encrypted connections. What else must be configured at the cluster entry, and why?",
+    "backEn": "Answer: Enable public access after cluster creation, and use mTLS authentication with TLS encryption.\nKey point: Public access exposes public broker endpoints; mTLS authenticates clients with certificates and TLS protects connections. Public-subnet connectivity alone does not enable the MSK public entry.",
+    "frontZh": "MSK Provisioned已满足公有子网路由和安全组条件。互联网客户要用证书验证身份并加密连接，集群入口还应怎样设置，为什么？",
+    "backZh": "答：在集群创建后启用public access，并使用mTLS认证及TLS加密。\n考点：public access提供公网broker入口；mTLS用客户端证书向MSK验证身份，TLS保护连接。只有公有子网路径，不会自动打开MSK公网入口。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-xa035",
+    "topic": "Root usage boundaries / Root使用边界",
+    "frontEn": "Should daily administration of a new AWS account use root? How can necessary root capability be retained while reducing credential exposure, and why?",
+    "backEn": "Answer: Use workforce identities with appropriate permissions for daily work. Reserve root for tasks requiring it and protect its sign-in credentials.\nKey point: Root spans the entire account. Frequent routine use repeatedly exposes these powerful credentials; ordinary administration can be delegated to controlled identities.",
+    "frontZh": "新AWS账户的日常管理工作，应直接使用root吗？如何保留必要root能力又降低凭据暴露，为什么？",
+    "backZh": "答：日常使用获授适当权限的人员身份；root仅用于确需root的任务，并保护其登录凭据。\n考点：root权限覆盖整个账户，频繁日常使用会不断暴露这套高权限凭据；普通管理权限可授给受控身份，不必用root执行。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-xa037",
+    "topic": "Sharing AMIs by OU / AMI按OU共享",
+    "frontEn": "Only accounts in the development OU may launch a company-approved AMI, not the whole organization. How should its sharing scope be set, and why?",
+    "backEn": "Answer: Add the development OU ARN to the AMI launch permissions.\nKey point: AMI launch access can be granted by OU. The target OU defines scope; the organization root or organization-wide scope would include other accounts.\nWatch out: Sharing an encrypted AMI for launch does not automatically grant access to the snapshot's KMS key.",
+    "frontZh": "公司批准的AMI只应给开发OU中的账户启动，不能让整个组织都用。应怎样设定共享范围，为什么？",
+    "backZh": "答：把开发OU的ARN加入AMI launch permissions。\n考点：AMI支持按OU授予启动使用权，范围随目标OU确定；把组织根或全组织作为范围会把其他账户也包括进来。\n易错提醒：加密AMI的启动共享不自动授予快照KMS key的使用权限。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-xa038",
+    "topic": "EFS read-only IAM enforcement / EFS只读IAM限制",
+    "frontEn": "An EC2 application may only read EFS reference data; IAM must prevent changes and deletion. It already uses the EFS mount helper and IAM authentication. What restriction applies, and why?",
+    "backEn": "Answer: Explicitly deny elasticfilesystem:ClientWrite to the application role in the EFS filesystem resource policy.\nKey point: ClientWrite is the EFS client's write permission. Denial prevents file-data modification through this IAM authorization path; a client-selected read-only mount is not a server-side IAM restriction.",
+    "frontZh": "EC2应用只准读取EFS参考数据，必须由IAM阻止它改写或删除。已使用EFS mount helper及IAM认证，应怎样限制，为什么？",
+    "backZh": "答：在EFS文件系统资源策略中，对应用角色明确拒绝elasticfilesystem:ClientWrite。\n考点：ClientWrite是EFS客户端写权限；拒绝它使应用不能通过这条IAM授权路径修改文件数据，客户端自行选择只读挂载不是服务端IAM限制。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-xa039",
+    "topic": "Proactive deployment controls / 部署前主动控制",
+    "frontEn": "In Control Tower, resource configuration must be checked before CloudFormation creation and noncompliant deployment blocked. Which control fits, and why not a later Config alert?",
+    "backEn": "Answer: Enable the applicable proactive control.\nKey point: Its CloudFormation hook checks targeted resources before creation or update. Detective controls or Config evaluations examine existing configuration and cannot guarantee predeployment blocking.\nWatch out: These hooks check CloudFormation operations; do not infer they block all direct service API calls.",
+    "frontZh": "Control Tower环境中，要在CloudFormation创建资源前检查配置，不合规就阻止部署。应选哪种control，为什么不是事后Config告警？",
+    "backZh": "答：启用对应的proactive control。\n考点：它通过CloudFormation hook在创建或更新前检查目标资源；detective control或Config评估发现的是已存在配置，不能据此保证部署前阻止。\n易错提醒：这类hook检查CloudFormation操作，不应推断能拦住所有直接服务API调用。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-xa040",
+    "topic": "Isolating Lambda environment values / Lambda环境值隔离",
+    "frontEn": "Lambda needs a sensitive environment value. Developers may view configuration but must not see plaintext. How can the function use it while developers cannot decrypt it, and why?",
+    "backEn": "Answer: Use KMS and Lambda encryption helpers for client-side encryption. Function code decrypts; grant kms:Decrypt to the execution role, not developers.\nKey point: Configuration holds ciphertext for application decryption. Configuration visibility and key use are separately controlled; default encryption at rest alone does not create that separation.",
+    "frontZh": "Lambda需要使用环境变量中的敏感值，开发者能查看配置却不应看到明文。怎样让函数可用、开发者不可解密，为什么？",
+    "backZh": "答：用KMS和Lambda encryption helpers做客户端加密；函数代码解密，执行角色获kms:Decrypt，开发者不获该解密权限。\n考点：配置中保存的是应用要解密的密文，谁能看配置与谁能用key分开控制；仅靠默认静态加密不会自动形成这条权限隔离。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-xa041",
+    "topic": "Canceling KMS deletion / 取消KMS删除",
+    "frontEn": "A symmetric customer managed KMS key was mistakenly scheduled for deletion and its waiting period has not ended. What saves it? Can cancellation recover it after actual deletion, and why?",
+    "backEn": "Answer: Run CancelKeyDeletion during the waiting period. After actual deletion, cancellation cannot recover it.\nKey point: ScheduleKeyDeletion first places the key in pending deletion; destruction occurs after the waiting period. Cancellation applies to an existing key. After cancellation it is Disabled and needs EnableKey before reuse.",
+    "frontZh": "对称客户管理KMS key被误计划删除，等待期还未结束。应执行什么操作保住key，真正删除后还能靠取消找回吗，为什么？",
+    "backZh": "答：等待期内执行CancelKeyDeletion；真正删除后不能再靠取消恢复。\n考点：ScheduleKeyDeletion先把key置于待删除状态，等待期结束才销毁；取消针对尚存在的key。取消后key处于Disabled，恢复使用还需EnableKey。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-xa042",
+    "topic": "Cognito adaptive authentication / Cognito风险验证",
+    "frontEn": "An application needs extra verification for sign-in risks such as unusual IPs, devices, or locations. At which Cognito layer should risk be assessed and MFA required as configured, and why?",
+    "backEn": "Answer: Enable supported threat-protection adaptive authentication in the Cognito user pool and configure risk-based MFA requirements.\nKey point: The user pool evaluates sign-in risk and applies challenges. An identity pool primarily exchanges identities for temporary AWS credentials, not customer sign-in risk validation.\nWatch out: Once a user enables MFA, later sign-ins still require MFA challenges; low risk does not automatically cancel enabled MFA.",
+    "frontZh": "应用要根据异常IP、设备或地点等登录风险追加验证。应在Cognito哪一层评估风险并按配置要求MFA，为什么？",
+    "backZh": "答：在Cognito user pool启用支持的threat protection adaptive authentication，并按风险配置要求MFA。\n考点：用户池评估本次登录风险，再执行对应挑战；identity pool主要换AWS临时凭证，不负责这种客户登录风险验证。\n易错提醒：用户一旦启用MFA，后续登录仍要接受MFA挑战；不能理解为低风险会自动取消已启用的MFA。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-xa044",
+    "topic": "Managed-node inventory / 受管节点清单",
+    "frontEn": "Hundreds of managed EC2 instances need regular centralized information on installed software, versions, and system configuration. How can it be obtained, and why?",
+    "backEn": "Answer: Configure Systems Manager Inventory to collect managed-node metadata.\nKey point: Inventory captures software versions and configuration to identify machines needing updates. It neither installs patches nor scans known vulnerabilities.",
+    "frontZh": "数百台受管EC2需要定期知道装了哪些软件和版本、哪些系统配置，怎样集中取得清单，为什么？",
+    "backZh": "答：配置Systems Manager Inventory收集受管节点的元数据。\n考点：Inventory采集软件版本和配置，帮助找出需要更新的机器；它不是安装补丁或扫描已知漏洞的执行工具。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-xa047",
+    "topic": "Unified security data lake / 统一安全数据湖",
+    "frontEn": "Security logs and events come from multiple accounts, SaaS, and on-premises environments. What should first collect them into an analyzable unified data lake with little development, and why?",
+    "backEn": "Answer: Use Amazon Security Lake to collect security data from supported sources.\nKey point: It centralizes security logs and events into an S3 data lake in your account and normalizes formats. Security Hub aggregates findings and control results, not this raw security-data collection layer.",
+    "frontZh": "安全日志和事件来自多个账户、SaaS及本地环境，希望少开发地汇入统一可分析数据湖。应先选什么，为什么？",
+    "backZh": "答：使用Amazon Security Lake收集受支持来源的安全数据。\n考点：它把安全日志与事件集中到本账户的S3数据湖，并规范化数据格式；Security Hub汇总安全发现和控制结果，不能直接代替这层原始安全数据汇聚。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-xa048",
+    "topic": "Unused-access analysis / 未用权限分析",
+    "frontEn": "To review whether organization IAM users and roles retain long-unused permissions, choose permission analysis or software vulnerability scanning, and why?",
+    "backEn": "Answer: Use IAM Access Analyzer unused access analysis, then reduce permissions according to actual needs.\nKey point: It identifies unused access for IAM identities to support least-privilege reviews. Inspector analyzes software vulnerabilities, not whether IAM permissions are used.\nWatch out: Unused access is a review lead, not proof it will never be needed; verify actual responsibilities before changes.",
+    "frontZh": "要审查组织中IAM用户和角色是否长期拥有未使用的权限，应选权限分析还是软件漏洞扫描，为什么？",
+    "backZh": "答：使用IAM Access Analyzer的unused access analysis，再据实际需要收敛权限。\n考点：它识别IAM身份未使用的访问权，帮助最小权限审查；Inspector分析软件漏洞，不负责判断IAM权限是否用得上。\n易错提醒：未使用是审查线索，不是自动证明业务永远不需要；修改前仍要核实真实职责。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-xa049",
+    "topic": "Cross-account SNS invocation / 跨账户SNS调用",
+    "frontEn": "Account A's SNS topic must invoke account B's Lambda. Where are subscription-creation permission and subsequent function-invocation permission granted, and why?",
+    "backEn": "Answer: A's topic resource policy permits B's subscribing identity to subscribe; B's function resource policy permits the SNS service to invoke it from that topic.\nKey point: Subscription registers delivery with the topic; delivery is SNS calling Lambda. These requests target different resources and use different identities. Giving the function execution role resource-read permission is insufficient.",
+    "frontZh": "账户A的SNS主题要调用账户B的Lambda。创建订阅的权限，和消息到达后调用函数的权限，分别在哪一侧授权，为什么？",
+    "backZh": "答：A的主题资源策略允许B的订阅创建身份订阅；B的函数资源策略允许SNS服务从该主题调用函数。\n考点：订阅是有人向主题登记投递关系，投递时则是SNS调用Lambda；这两个请求的目标和调用身份不同，不能只给函数执行角色读资源的权限。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-xa051",
+    "topic": "EMR job identity / EMR作业身份",
+    "frontEn": "Teams share an EMR cluster supporting runtime roles. Jobs need isolated permissions and must not obtain host permissions through instance metadata. How should jobs be submitted, and why?",
+    "backEn": "Answer: Enable EMR runtime roles, grant restricted roles per team, and specify the appropriate runtime role at job submission.\nKey point: Jobs access AWS resources as their specified role instead of sharing the EC2 instance role. Jobs in this mode cannot access cluster EC2 IMDS or borrow its instance profile.",
+    "frontZh": "多个团队共用支持runtime role的EMR集群，作业权限要各自隔离，也不能借节点元数据拿到整机权限。应怎样提交作业，为什么？",
+    "backZh": "答：启用EMR runtime roles，为各团队授受限角色，并在提交作业时指定对应runtime role。\n考点：作业以指定角色访问AWS资源，而不是共享EC2实例角色；此模式的作业不能访问集群EC2的Instance Metadata Service或借用其instance profile。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-xa053",
+    "topic": "API source-IP admission / API来源IP准入",
+    "frontEn": "An API needs source-IP admission. How do REST API resource policies and HTTP API Lambda authorizers implement it? Can the configuration be copied directly?",
+    "backEn": "Answer: REST APIs can use an applicable resource policy. HTTP APIs do not support that policy; a Lambda authorizer can judge the source IP in request context. Do not copy the REST policy directly.\nKey point: Match the mechanism the API product actually supports. HTTP APIs usually have lower per-request prices but must meet required capabilities. HTTP authorizer 2.0 events expose requestContext.http.sourceIp; trust API context, not client-supplied IP headers.\nWatch out: If results differ by IP, do not reuse authorization caching across IPs; setting authorizer TTL to zero reevaluates every request.",
+    "frontZh": "API要按来源IP准入。REST API资源策略，与HTTP API的Lambda authorizer，应怎样落实，能直接照搬配置吗？",
+    "backZh": "答：REST API可用适用resource policy；HTTP API不支持这项策略，但可让Lambda authorizer用请求上下文来源IP判断是否允许。不能直接照搬REST策略。\n考点：先匹配API产品实际支持的准入机制；HTTP API通常请求单价较低，但能力须够用。HTTP authorizer的2.0事件可读取requestContext.http.sourceIp，应使用API上下文，而非信任客户端自填IP请求头。\n易错提醒：若不同IP应有不同结果，不能把同一授权缓存跨IP复用；可将authorizer缓存TTL设0，每次重新判断。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-xa054",
+    "topic": "Key identity for node launches / 节点启动用钥身份",
+    "frontEn": "Auto Scaling launches an EKS managed node group's nodes with a customer-managed-key-encrypted root EBS volume. Besides pod roles, which role needs key authorization, and why?",
+    "backEn": "Answer: Authorize the Auto Scaling service-linked role actually launching instances to use the customer managed key.\nKey point: The Auto Scaling launch workflow creates encrypted EBS volumes. Pod workload permissions or only granting the EKS control-plane role does not authorize this caller automatically.",
+    "frontZh": "EKS managed node group由Auto Scaling启动节点，根EBS卷使用客户管理KMS key。除Pod角色外，应授权哪种角色使用这把key，为什么？",
+    "backZh": "答：授权实际启动实例的Auto Scaling service-linked role使用该客户管理key。\n考点：创建加密EBS卷的是Auto Scaling启动流程；Pod工作负载角色或只给EKS控制平面角色权限，不会自动替这个调用身份取得用钥权限。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-xa056",
+    "topic": "NLB TLS termination / NLB终止TLS",
+    "frontEn": "Devices connect through an NLB to EC2. The client connection must be encrypted and the NLB must complete the TLS handshake. How should listener and certificate be configured, and why?",
+    "backEn": "Answer: Configure a TLS listener and associate at least one server certificate with it.\nKey point: The TLS listener encrypts and decrypts the NLB's client connection; its server certificate supports that handshake. WAF rules or EBS at-rest encryption do not enable connection TLS.\nWatch out: If decryption must occur at the backend, use a TCP listener to pass existing TLS through. NLB TLS termination does not automatically encrypt the next connection.",
+    "frontZh": "设备经NLB连接EC2，希望客户端这段连接加密，并由NLB完成TLS握手。监听器与证书应怎样配置，为什么？",
+    "backZh": "答：配置TLS listener，并在这个监听器关联至少一张服务器证书。\n考点：TLS listener在NLB处理客户端连接的加解密，服务器证书用于这段TLS握手；WAF规则或EBS静态加密不会把客户端连接变成TLS。\n易错提醒：若必须让后端解密，可用TCP监听器透传既有TLS流量；在NLB终止TLS也不会自动加密后续连接。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-xb001",
+    "topic": "Domain-based egress filtering / 域名出站过滤",
+    "frontEn": "Private-subnet servers may access only approved software-repository domains. What inspects and blocks other outbound HTTP/HTTPS traffic, and why are threat alerts alone insufficient?",
+    "backEn": "Answer: Use an AWS Network Firewall domain allow list, ensure unmatched HTTP/HTTPS traffic is dropped, and route traffic through the firewall.\nKey point: Only traffic traversing the firewall can be checked against HTTP Host or TLS SNI domain names. Alerts report findings but do not automatically create a blocking point.",
+    "frontZh": "私有子网中的服务器只能访问批准的软件仓库域名。要在出站途中检查并拦下其他HTTP/HTTPS流量，应使用什么，为什么不能只收集威胁告警？",
+    "backZh": "答：使用AWS Network Firewall域名允许列表，确保未匹配的HTTP/HTTPS流量被丢弃，并用路由表把流量导向防火墙。\n考点：流量实际经过防火墙后，规则才能按HTTP Host或TLS SNI中的域名检查和放行；告警只报告发现，不会自动成为流量的阻断点。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-xb002",
+    "topic": "GWLB inspection paths / GWLB检查路径",
+    "frontEn": "A third-party firewall supports GWLB's required GENEVE encapsulation. Traffic from several application VPCs must transparently traverse it. How should they connect?",
+    "backEn": "Answer: Deploy Gateway Load Balancer on the appliance side, create GWLB endpoints on the application side, and route traffic needing inspection to those endpoints.\nKey point: GWLB distributes network-layer IP traffic to inspection appliances. Its endpoints connect application and appliance VPCs, making inspection a hop in the request path.\nWatch out: Appliances must support GENEVE; receiving ordinary IP packets alone does not prove compatibility.",
+    "frontZh": "第三方防火墙已支持GWLB所需的GENEVE封装。多个应用VPC的流量都要透明经过它检查，应怎样连接？",
+    "backZh": "答：设备侧部署Gateway Load Balancer，应用侧创建GWLB endpoint，并用路由把待检查流量送至该端点。\n考点：GWLB在网络层把IP流量分配给检查设备；GWLB endpoint把应用VPC与设备VPC连接起来，让检查成为请求路径的一跳。\n易错提醒：设备必须兼容GENEVE；只知道设备能接收普通IP包，还不足以确认兼容。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-xb003",
+    "topic": "External dashboard sharing / 外部仪表板共享",
+    "frontEn": "A product manager without an AWS account only needs periodic viewing of one CloudWatch dashboard. How can access be provided without shared IAM login credentials?",
+    "backEn": "Answer: Share the dashboard in CloudWatch with their email address; after accepting the invitation, they open the shared link using their own password.\nKey point: Dashboard sharing supplies an external viewing entry without borrowing the team's AWS login identity.\nWatch out: Sharing still permits querying all CloudWatch metrics and EC2 names/tags in the account; it does not promise visibility limited to data on that chart.",
+    "frontZh": "产品经理没有AWS账号，只需定期查看一个CloudWatch仪表板。怎样给他入口，而不分发共享IAM登录凭据？",
+    "backZh": "答：在CloudWatch分享该仪表板，指定他的邮箱，完成邀请后让他用自己的密码打开分享链接。\n考点：仪表板共享自带外部查看入口，收件人不必借用团队的AWS登录身份。\n易错提醒：共享权限仍允许查询账户内全部CloudWatch指标及EC2名称/标签；不能承诺只看得到这张图上的数据。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-xb005",
+    "topic": "HTTP redirection / HTTP重定向",
+    "frontEn": "An ALB listens on HTTP and HTTPS, but visitors can still open HTTP URLs. How can requests switch to HTTPS, and why is a certificate alone insufficient?",
+    "backEn": "Answer: Configure the HTTP listener with a redirect action to the HTTPS URL.\nKey point: The certificate enables an HTTPS connection. Redirect returns a new HTTPS address, prompting the originally HTTP client to establish an encrypted connection.",
+    "frontZh": "网站的ALB已分别监听HTTP和HTTPS，但访问者仍可能打开HTTP地址。怎样让这些请求转为HTTPS，为什么只装证书不够？",
+    "backZh": "答：给HTTP监听器配置redirect动作，重定向到HTTPS地址。\n考点：证书让HTTPS连接能够建立；redirect则返回新的HTTPS地址，让原本走HTTP的客户端重新发起加密连接。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-xb014",
+    "topic": "SFTP with existing AD identities / SFTP沿用AD身份",
+    "frontEn": "Existing SFTP users authenticate with on-premises Microsoft AD. Files should move to S3 without client changes or a new user directory. How should the managed entry connect identity?",
+    "backEn": "Answer: Use a Transfer Family SFTP server with AWS Directory Service as identity provider; bridge on-premises AD with AD Connector and grant directory groups appropriate file access.\nKey point: Transfer Family manages SFTP while AD Connector sends identity checks back to the existing directory, letting users keep AD credentials without reissued migration passwords.\nWatch out: The directory and server must meet Region and other support requirements. Simple AD is unsupported; AD Connector integration does not imply support for existing RADIUS MFA.",
+    "frontZh": "现有SFTP用户用本地Microsoft AD凭据登录，文件要放S3，又不想改客户端或另建一套用户。托管入口应怎样接身份？",
+    "backZh": "答：使用Transfer Family SFTP服务器，选AWS Directory Service身份提供方；用AD Connector桥接本地Microsoft AD，并授予相应目录组文件访问。\n考点：SFTP协议由Transfer Family托管，AD Connector把身份检查接回原目录，因此用户沿用原AD凭据，不必迁移时重发密码。\n易错提醒：目录与Transfer服务器须符合Region等支持条件；不支持Simple AD，也不能把AD Connector接入等同于支持现有RADIUS MFA。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-xb018",
+    "topic": "SFTP endpoint scope / SFTP入口范围",
+    "frontEn": "A Transfer Family SFTP entry must restrict connectivity. Which VPC-hosted endpoint fits an already connected corporate network versus partners using specified public IPs?",
+    "backEn": "Answer: Choose Internal for corporate private access. For public partners, choose Internet Facing, associate Elastic IPs, and restrict endpoint security groups to trusted sources.\nKey point: Internal provides private addresses requiring an existing private path. Internet Facing supplies an internet entry; security groups restrict callers. IAM file permissions do not replace network-entry restrictions.",
+    "frontZh": "Transfer Family SFTP入口需要限制谁能连接。仅从已连通公司网络访问，与必须让指定公网IP的伙伴访问，应怎样选VPC托管端点？",
+    "backZh": "答：公司私网访问选Internal；公网伙伴访问选Internet Facing，关联Elastic IP，并用端点安全组只放行可信来源。\n考点：Internal只有私有地址，需现有私网路径；Internet Facing提供互联网入口，安全组再控制允许连接的来源，IAM文件权限不会替代网络入口限制。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-xb021",
+    "topic": "S3 object ARNs / S3对象ARN",
+    "frontEn": "A policy allows ListBucket and DeleteObject on arn:aws:s3:::example-bucket, but object deletion fails. What is the minimal addition, and why?",
+    "backEn": "Answer: Add object resource arn:aws:s3:::example-bucket/* for s3:DeleteObject; retain ListBucket on the bucket ARN.\nKey point: ListBucket targets a bucket; DeleteObject targets an object. Object ARNs have a slash and object key after the bucket name. The bucket ARN alone does not match objects.",
+    "frontZh": "策略已允许对arn:aws:s3:::example-bucket执行ListBucket和DeleteObject，却仍删不了桶内对象。怎样最小补充，为什么？",
+    "backZh": "答：为s3:DeleteObject增加对象资源arn:aws:s3:::example-bucket/*，保留列桶动作在桶ARN上。\n考点：ListBucket操作桶；DeleteObject操作桶内对象。对象ARN在桶名后有斜线和对象键，只有桶ARN并没有匹配到对象。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-xb023",
+    "topic": "Migrating Windows permissions / 迁移Windows权限",
+    "frontEn": "On-premises Windows SMB files must move to FSx for Windows with users' read/write permissions intact. Which transfer fits, and why not copy only content?",
+    "backEn": "Answer: Use DataSync SMB-to-FSx for Windows transfer with an identity authorized to copy Windows ACLs and other required metadata.\nKey point: Content and access control are separate data. The SMB path can retain NTFS ACLs so the target enforces original user/group permissions; ordinary object copying does not guarantee Windows permission preservation.",
+    "frontZh": "本地Windows SMB文件要迁到FSx for Windows，要求用户原有读写权限不变。应选择什么传输方式，为什么不能只复制文件内容？",
+    "backZh": "答：使用DataSync的SMB→FSx for Windows传输，并让传输身份具备复制Windows ACL等元数据的必要权限。\n考点：文件内容与访问控制是不同数据；SMB路径可保留NTFS访问控制列表，目标继续按原用户/组的权限判断，而普通对象复制不能据此保证保留Windows权限。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-xb025",
+    "topic": "EKS API entry types / EKS两类API入口",
+    "frontEn": "An EKS cluster has a private Kubernetes API endpoint and nodes in the same VPC. Can an additional EKS interface VPC endpoint replace node connectivity to the Kubernetes control plane?",
+    "backEn": "Answer: No. Nodes must connect to the cluster's own private Kubernetes API endpoint, allowed by the cluster security group. The EKS interface endpoint serves AWS EKS management APIs.\nKey point: AWS EKS APIs manage cluster resources; Kubernetes APIs serve node registration and cluster operations. They are different entries.",
+    "frontZh": "EKS集群已启用私有Kubernetes API端点，节点也在同VPC。再创建EKS的interface VPC endpoint，就能代替节点到Kubernetes控制面的连接吗？",
+    "backZh": "答：不能。节点要连集群自己的私有Kubernetes API端点，并获集群安全组放行；EKS interface endpoint用于AWS EKS管理API。\n考点：AWS EKS管理API负责管理集群资源；Kubernetes API服务节点注册和集群操作，二者不是同一个入口。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-xb026",
+    "topic": "SSM session archiving / SSM会话归档",
+    "frontEn": "An administrator's native interactive Session Manager sessions must be archived in S3. Does successful login automatically archive content? What is needed?",
+    "backEn": "Answer: No. Enable S3 logging in Session Manager preferences, specify the bucket, and configure required write/encryption permissions.\nKey point: Session establishment proves only the access path. Logging preferences separately control archive output. Native session logs need no extra CloudWatch Agent forwarding.\nWatch out: Port forwarding and SSH tunneled through Session Manager do not provide this session-content logging.",
+    "frontZh": "管理员使用Session Manager原生交互会话，要求会话内容进入S3留档。已能登录就会自动归档吗，应配置什么？",
+    "backZh": "答：不会；在Session Manager preferences启用S3 logging，指定归档桶，并配置必要写入/加密权限。\n考点：能建立会话只证明访问路径可用；日志偏好另行决定交互会话数据是否输出到归档位置，无需额外装CloudWatch Agent转存这类原生日志。\n易错提醒：端口转发或经Session Manager隧道使用SSH时，不提供这种会话内容日志。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-xb033",
+    "topic": "ECS application roles / ECS应用角色",
+    "frontEn": "ECS container code must read S3. Does permission belong in the task role or task execution role, and why not only the image-pulling role?",
+    "backEn": "Answer: Grant the application's needed S3 permissions to the task role.\nKey point: Its credentials are provided to application code. The task execution role serves ECS/Fargate agent actions such as image pulls and logging; those credentials are not directly provided to application code.\nWatch out: On shared EC2 container hosts, task roles alone are not strict isolation boundaries; appropriate host and network isolation is also needed.",
+    "frontZh": "ECS容器里的应用要读S3。应把权限给task role还是task execution role，为什么不能只给拉取镜像的角色？",
+    "backZh": "答：给task role（任务角色）授予应用需要的S3权限。\n考点：任务角色的凭据交给容器应用调用AWS；task execution role供ECS/Fargate Agent拉镜像、写日志等运行任务操作，不直接把凭据交给应用代码。\n易错提醒：共享EC2容器主机上任务角色本身不构成严格隔离边界；还需适当主机与网络隔离。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-xb036",
+    "topic": "SSM default host management / SSM默认主机管理",
+    "frontEn": "An existing EC2 application role accesses databases and cannot be replaced. SSM Agent, IMDSv2, and connectivity meet automatic-management conditions. How can Systems Manager manage it without breaking application permissions?",
+    "backEn": "Answer: Enable Default Host Management Configuration in the account/Region and manage through its default management role, retaining the application role.\nKey point: Default host management separates SSM management permissions from the application instance role, without attaching a second instance role. The original role retains database permissions.\nWatch out: If the existing instance profile allows ssm:UpdateInstanceInformation, the agent prefers it; follow official conditions to use default management permissions.",
+    "frontZh": "EC2现有实例角色只供应用访问数据库，不能被替换。实例的SSM Agent、IMDSv2和联网均满足自动纳管条件。怎样让Systems Manager纳管，又不破坏应用权限？",
+    "backZh": "答：在该账户/Region启用Default Host Management Configuration，使用其默认管理角色纳管实例，保留应用角色。\n考点：默认主机管理把SSM管理权限与应用实例角色分开，不必给EC2挂第二个实例角色；应用原有数据库权限继续由原角色提供。\n易错提醒：若现有instance profile允许ssm:UpdateInstanceInformation，Agent优先使用它；须按官方条件处理才能使用默认管理权限。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-xb040",
+    "topic": "ECR image scanning / ECR镜像扫描",
+    "frontEn": "ECS must retain its task deployment while both existing and future images need known-vulnerability checks. How can a managed registry provide scanning without switching to EKS?",
+    "backEn": "Answer: Store images in private ECR repositories and configure basic scan on push for the relevant repositories; manually initiate scans for existing images as needed.\nKey point: Scanning checks image packages against known CVEs. Push triggers cover future images. ECS/EKS is the runtime choice; changing orchestrators does not automatically scan repository images.",
+    "frontZh": "ECS仍用原来的任务部署，但已有镜像和以后新推送镜像都要检查已知漏洞。怎样用托管仓库接入扫描，不必改成EKS？",
+    "backZh": "答：把镜像放在ECR私有仓库，对相应仓库配置basic scan on push；已有镜像按需要启动一次手动扫描。\n考点：扫描针对镜像中的软件包和已知CVE，推送触发负责后续新镜像；ECS/EKS是运行方式，换容器编排器不会自动扫描仓库镜像。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-xb042",
+    "topic": "Per-application access points / 按应用访问点",
+    "frontEn": "Many applications share an S3 bucket, each limited to its own prefix. How can permission maintenance avoid one huge bucket policy without copying data?",
+    "backEn": "Answer: Create separate S3 Access Points per application; each access-point policy restricts application identity and allowed prefixes.\nKey point: Access points are named entries to the same stored data with separate policies. Objects stay in the original bucket without permission-driven copies.\nWatch out: Access-point and underlying bucket policies must both allow access; a new entry does not bypass bucket permissions.",
+    "frontZh": "许多应用共用一个S3桶，每个应用只能操作自己的前缀。怎样减少把全部权限塞进一条大桶策略的维护负担，而不复制数据？",
+    "backZh": "答：为各应用创建独立S3 Access Point，在各自访问点策略中限制应用身份及允许的前缀。\n考点：访问点是同一存储数据的命名入口，各入口可有独立策略；对象仍在原桶中，不必为了应用权限拆出多份副本。\n易错提醒：访问点策略须与底层桶策略共同允许；新建入口不会自动绕过桶权限。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-xb043",
+    "topic": "Adding NLB security groups / NLB补加安全组",
+    "frontEn": "An existing NLB was created without any security group. It must now accept only trusted IPs. Can a group be added directly, and what should be done?",
+    "backEn": "Answer: No. Create a replacement NLB with a security group, configure trusted-source rules, switch entry traffic, and close the old unrestricted entry.\nKey point: NLB security-group associations can be changed later only if a group was associated at creation. Adding a restricted NLB alongside an open original leaves the old access path intact.",
+    "frontZh": "现有NLB创建时没有关联任何安全组，现在要只允许可信IP连接。能直接给它补上安全组吗，应怎样处理？",
+    "backZh": "答：不能；创建带安全组的替代NLB，配置可信来源规则后切换入口，并关闭旧的未受限入口。\n考点：NLB只有创建时已关联安全组，之后才可修改关联；并排增加一个受限NLB，却留下原入口，不会消除原来的访问路径。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-xb045",
+    "topic": "Patching with traffic draining / 补丁自动上下线",
+    "frontEn": "EC2 is registered in a load-balancer target group by instance ID and SSM requirements are met. Business traffic must pause during patching and resume afterward. Which managed workflow does more than scheduling a maintenance time?",
+    "backEn": "Answer: Use the AWSEC2-PatchLoadBalancerInstance Automation runbook: deregister, wait for connection draining, patch, and reregister.\nKey point: A maintenance window schedules execution; this runbook orchestrates removing and restoring traffic rather than patching while receiving new business requests.\nWatch out: Target-group type cannot change in place. Moving IP registration to instance IDs requires a new instance-type target group and cutover.",
+    "frontZh": "EC2已按实例ID注册到负载均衡目标组，SSM条件已满足。补丁期间必须暂停接收业务，打完再恢复。应选哪个托管自动化流程，而不只安排一个维护时间？",
+    "backZh": "答：使用AWSEC2-PatchLoadBalancerInstance Automation runbook：移出目标、等待连接排空、执行补丁，再重新注册。\n考点：维护窗口安排何时运行；该runbook才编排下线与恢复流量，让补丁不是在继续接收新业务时盲目执行。\n易错提醒：目标组类型不能原地修改；若需从IP注册改为实例ID，应新建instance类型目标组再切换。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-xr102",
+    "topic": "Remote-worker VPN / 员工远程VPN",
+    "frontEn": "Staff at home or traveling need secure access from personal devices to VPC file shares. Choose Client VPN or the office Site-to-Site VPN, and why?",
+    "backEn": "Answer: Use AWS Client VPN for encrypted client connections, granting target-network access by user or group.\nKey point: Client VPN connects individual devices without requiring office-network presence. Site-to-Site VPN connects fixed-network gateways, such as an office, to AWS.\nWatch out: VPN authorizes network access; FSx, AD, and other file permissions still control files.",
+    "frontZh": "员工在家或流动地点，要从自己的设备安全访问VPC内的文件共享。应使用Client VPN还是办公室的Site-to-Site VPN，为什么？",
+    "backZh": "答：用AWS Client VPN，让员工通过VPN客户端建立加密连接，并按用户或组授予目标网络访问权限。\n考点：Client VPN接入的是个人终端，不要求员工先位于办公室网络；Site-to-Site VPN连接办公室等固定网络的网关与AWS。\n易错提醒：VPN授权的是网络访问；文件本身仍由FSx和AD等文件权限控制。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-aws-rb2-20261105-boundary-aurora-iam-token-login",
+    "topic": "Aurora token login / Aurora令牌登录",
+    "frontEn": "An EC2 application connects to Aurora without maintaining a static database password. Networking works and the database version supports IAM authentication. Which authentication and EC2 identity fit, and why?",
+    "backEn": "Answer: Enable IAM database authentication and create the corresponding database user. Grant the EC2 instance role connection permission; the application logs in using an authentication token obtained with the role.\nKey point: The role supplies temporary AWS credentials. IAM database authentication uses them to generate a login token instead of storing a long-term database password.\nWatch out: Associate the role through an instance profile; an IAM user cannot be attached as an instance role.",
+    "frontZh": "EC2应用要连接Aurora，但不想维护静态数据库密码。网络已连通，数据库版本支持IAM认证。应采用什么认证方式，EC2应使用哪种身份，为什么？",
+    "backZh": "答：启用IAM数据库认证并创建对应数据库用户；给EC2实例角色授予连接权限，应用使用角色获取的认证令牌登录。\n考点：角色为EC2应用提供临时AWS凭据；IAM数据库认证用这些凭据生成登录令牌，替代应用保存长期数据库密码。\n易错提醒：EC2通过instance profile关联IAM角色，不能把IAM用户当作实例角色来关联。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-aws-rb2-domain1-normal-batch06-20261105-roles-anywhere-workload-identity",
+    "topic": "On-premises workload identity / 机房机器身份",
+    "frontEn": "An unattended on-premises VM application needs S3 without long-term AWS keys. It has an X.509 certificate from a trusted corporate CA. Which credentials fit, and why?",
+    "backEn": "Answer: Use IAM Roles Anywhere: authenticate with the certificate and obtain temporary credentials for an IAM role with required S3 permissions.\nKey point: A CA issues certificates. Registering it as a trust anchor lets the certificate authenticate the external workload; the role defines its allowed AWS operations.\nWatch out: Existing Identity Center access for employees does not automatically give on-premises applications this machine identity.",
+    "frontZh": "机房VM上的无人值守应用要访问S3，不想保存长期AWS访问密钥。公司已有受信任CA签发的X.509证书。应采用什么凭据方案，为什么？",
+    "backZh": "答：使用IAM Roles Anywhere，让应用用证书验证身份，换取有相应S3权限的IAM角色临时凭据。\n考点：CA是证书签发机构。将其登记为信任锚后，证书用于验证外部应用身份，角色规定它能执行哪些AWS操作。\n易错提醒：已有Identity Center供员工登录，不等于机房应用已经获得这种机器身份。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-aws-rb2-domain1-normal-batch08-20261105-s3-account-public-access-guardrail",
+    "topic": "Account-wide public-access prevention / 账户级防公开",
+    "frontEn": "Existing and future S3 buckets in Organizations member accounts must resist accidental employee exposure, and employees must not disable protection. What control combination can work, and why is it preferable to repair after exposure?",
+    "backEn": "Answer: For example, enable every account-level S3 Block Public Access setting and use an SCP to deny employee changes to those settings.\nKey point: Block Public Access prevents exposure through public policies or ACLs; the SCP caps organization-level permissions and protects the settings themselves, before objects become public.\nWatch out: Protecting one bucket does not cover an account. Account-level settings cover existing and future buckets.",
+    "frontZh": "Organizations成员账户的现有和未来S3桶都不能被员工误公开，员工也不能关闭防护。可采用什么控制组合？为什么比发现公开后再修复更合适？",
+    "backZh": "答：例如：启用账户级全部S3 Block Public Access设置，再用SCP拒绝员工更改这些防护设置。\n考点：Block Public Access预先阻止公共策略或ACL造成公开；SCP是组织层权限上限，可保护设置本身，不必等对象已公开再补救。\n易错提醒：只给某一个桶开启防护不能覆盖全账户；账户级设置作用于现有和未来的桶。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-vc-008",
+    "topic": "New security-group defaults / 新建安全组默认值",
+    "frontEn": "Web and database servers in one VPC use separately created security groups. Default routing and the default NACL are unchanged. The database runs but cannot be reached. Why check database-group inbound rules first?",
+    "backEn": "Answer: The VPC already has its local route and the default NACL permits traffic, but new security groups deny inbound by default. Allow the Web group to reach the database listening port.\nKey point: An existing network path does not authorize new connections at the receiver. Security groups are independent admission gates, not a missing same-VPC route.\nWatch out: The VPC's default security group has a same-group self-reference; distinguish it from a newly created group's initial state.",
+    "frontZh": "同一VPC的Web和数据库使用分别新建的安全组，默认路由和默认NACL未改。数据库运行正常却连不上，为什么应先看数据库安全组入站？",
+    "backZh": "答：同VPC默认已有local路由，默认NACL允许流量，但新安全组默认不允许入站；须在数据库组放行Web组到数据库监听端口。\n考点：网络路径已具备，不等于接收端已授权新连接。安全组是独立的准入门，不能用“还需要一条同VPC路由”代替它。\n易错提醒：VPC自带default security group另有同组自引用规则；不要把它和“新建安全组的初始状态”混为一谈。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-vc-011",
+    "topic": "S3 default encryption choices / S3默认加密选择",
+    "frontEn": "S3 needs ordinary at-rest encryption without key management versus an explicit customer KMS key. Is default encryption enough?",
+    "backEn": "Answer: Ordinary requirements can use S3-managed SSE-S3, already automatic for new uploads. A customer-KMS-key requirement needs SSE-KMS with that customer key.\nKey point: Both protect stored data; key control differs. S3 manages SSE-S3 keys, also compatible with encrypted cross-Region replication. KMS supplies corresponding key-policy and key-use auditing controls.",
+    "frontZh": "S3只要求普通静态加密、不想自行管理密钥，与明确要求客户KMS key时，默认加密够吗？",
+    "backZh": "答：普通要求可用S3管理密钥的SSE-S3，当前新上传已自动启用；要求客户KMS key时应选对应客户key的SSE-KMS。\n考点：两者都保护落盘数据，区别在密钥控制。SSE-S3由S3管理key，也可配合跨Region复制保持对象加密；KMS方式提供相应的key policy和用钥审计控制。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-vc-013",
+    "topic": "SSE-C keys on each request / SSE-C逐请求密钥",
+    "frontEn": "Existing and future S3 objects must use SSE-C with a customer-supplied key on every request. Is changing bucket default encryption enough, and what is required?",
+    "backEn": "Answer: No. Copy or rewrite old objects using SSE-C-supported requests to create encrypted copies. Future uploads must supply the key on each request; SSE-C cannot be bucket default encryption.\nKey point: S3 does not store this customer key; encryption and reads need it each time. Defaults do not rewrite old bytes; specifying target encryption during copy creates the required copy.\nWatch out: Bucket settings may currently block SSE-C writes by default, requiring explicit allowance. If the source is also SSE-C, provide its decryption key too.",
+    "frontZh": "S3旧对象和今后上传都必须采用客户逐次提供密钥的SSE-C。只改桶默认加密就够吗，应怎样处理？",
+    "backZh": "答：不够；旧对象需用支持SSE-C的copy/重写请求生成加密副本，后续上传也须逐请求提供客户密钥，不能把SSE-C设成桶的默认加密方式。\n考点：S3不保存这把客户密钥；每次加密/读取都要提供它。改默认设置不会改写旧对象的字节，copy时指定目标加密才生成所需副本。\n易错提醒：当前SSE-C写入可能默认被桶设置禁止，需显式允许；若复制源本来也是SSE-C，还要提供源对象解密所需的密钥。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-ca15",
+    "topic": "Highly available Windows files / Windows文件高可用",
+    "frontEn": "A Windows application must retain SMB and AD file permissions and minimize loss of just-written files during maintenance or an AZ failure. How should file storage be deployed?",
+    "backEn": "Answer: Use a fully managed FSx for Windows File Server Multi-AZ deployment integrated with AD.\nKey point: AWS manages file servers; Multi-AZ synchronously replicates between two AZs and fails over automatically. AD identities and Windows ACLs still control access.\nWatch out: Daily cross-Region backups are separate recovery points; they do not themselves guarantee only five minutes of data loss in a Region disaster.",
+    "frontZh": "Windows应用要保留SMB和AD文件权限，计划维护或一个AZ故障时，还要尽量不丢刚写入的文件。应怎样部署文件后端？",
+    "backZh": "答：使用适配AD的全托管FSx for Windows File Server Multi-AZ部署。\n考点：AWS管理底层文件服务器；Multi-AZ在两个AZ间同步复制并自动接管，文件访问仍由AD身份和Windows ACL控制。\n易错提醒：跨Region每日备份是独立恢复点；它本身不保证发生Region灾难时也只有5分钟数据丢失。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-cb01",
+    "topic": "RDS Multi-AZ types / RDS两类Multi-AZ",
+    "frontEn": "RDS needs cross-AZ automatic failover and more read capacity. What differs between a classic Multi-AZ standby and a Multi-AZ DB cluster?",
+    "backEn": "Answer: A classic Multi-AZ DB instance's standby serves no reads. A Multi-AZ DB cluster includes two readable replicas accessible through the reader endpoint.\nKey point: Cluster replicas support both failover and reads; most failovers typically take under 35 seconds. A classic standby synchronously protects the primary rather than receiving read traffic.\nWatch out: Typical failover time is not a hard SLA for every failure. Distinguish deployment types when scaling reads.",
+    "frontZh": "RDS需要跨AZ自动接管，还要增加读容量。经典Multi-AZ standby和Multi-AZ DB cluster有什么关键差别？",
+    "backZh": "答：经典Multi-AZ DB instance的standby不服务读取；Multi-AZ DB cluster内置两个可读副本，读请求可走reader endpoint。\n考点：cluster让副本同时承担接管与读取，多数故障切换通常少于35秒；经典standby主要同步保护主库，不是读流量入口。\n易错提醒：通常的切换时间不是所有故障的硬性SLA；需要扩读时要分清是哪种Multi-AZ部署。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-cb03",
+    "topic": "Compute capacity across AZs / 跨AZ计算容量",
+    "frontEn": "Compute must not stop entirely when one AZ fails. How should subnets and instances be placed, and what does Auto Scaling do?",
+    "backEn": "Answer: Create subnets in multiple AZs, distribute instances, and maintain capacity with a multi-AZ Auto Scaling group.\nKey point: A subnet belongs to one AZ. Distributing instances across independent AZs avoids simultaneous failure in one fault domain; Auto Scaling replenishes lost capacity.\nWatch out: Cross-AZ deployment is not Region-level disaster recovery; many instances within one AZ still share its failure risk.",
+    "frontZh": "计算层不能因一个AZ失效全部停止。子网和实例应怎样放，Auto Scaling负责什么？",
+    "backZh": "答：在多个AZ各设子网并分散实例，由跨AZ Auto Scaling组维持容量。\n考点：一张子网只属于一个AZ；把实例分散到独立AZ，才避免同一故障域一起失效，Auto Scaling再补足损失。\n易错提醒：同Region跨AZ不能替代Region级灾备；单AZ内多台实例仍共享AZ故障风险。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-cb06",
+    "topic": "Independent NAT per AZ / 每AZ独立NAT",
+    "frontEn": "Private instances across AZs need internet egress. One AZ failure must not cut off other AZs. How should NAT paths be arranged?",
+    "backEn": "Answer: Deploy a NAT gateway in each AZ and route private subnets through their own AZ's gateway.\nKey point: AWS manages NAT gateways with redundancy inside their AZ and automatic bandwidth scaling. Sharing one AZ's egress still creates a common failure point; separate paths across AZs.",
+    "frontZh": "多个AZ的私有实例都依赖互联网出站，不能让某一AZ故障切断其他AZ出口，应怎样安排NAT路径？",
+    "backZh": "答：每个AZ部署自己的NAT gateway，私有子网使用本AZ的NAT出口。\n考点：NAT gateway由AWS托管、在所属AZ内冗余并自动扩展带宽；但共用一个AZ的出口仍有共同故障点，须把各AZ出站路径分开。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-cc13",
+    "topic": "S3 historical-version recovery / S3历史版本恢复",
+    "frontEn": "S3 documents are continually updated, and historical versions must be recoverable after accidental deletion. What should be enabled, and why is the current object list insufficient?",
+    "backEn": "Answer: Enable Versioning and inspect object versions during recovery, not only the current object list.\nKey point: Same-name uploads retain separate versions. Ordinary deletion can add a delete marker hiding the current object while history remains. Authorized deletion of a specified version can still permanently remove it.",
+    "frontZh": "S3文档允许持续修改上传，但需要误删后找回历史版本，应启用什么？为什么只看对象列表不够？",
+    "backZh": "答：启用Versioning；恢复时检查对象版本，而不只看当前对象列表。\n考点：同名上传保留独立版本，普通删除可加入delete marker而隐藏当前对象；历史版本可仍在，授权的指定版本删除仍可能永久删除它。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-nb04",
+    "topic": "Historical backups versus current replicas / 历史备份与当前副本",
+    "frontEn": "A database mistake requires old data, or an emptied cache needs restoration. Can the current cross-AZ replica replace historical backups?",
+    "backEn": "Answer: No. Use supported RDS/Aurora or DynamoDB backup/PITR mechanisms. Redis OSS/Valkey ElastiCache can restore snapshots into a new cache.\nKey point: Continuously replicated copies follow current changes; backups retain old states. Restoring a Redshift snapshot creates an independent point-in-time cluster that does not follow later source updates. Aurora continuous backups support PITR within its window; cache snapshots retain capture-time data.\nWatch out: Snapshots do not synchronously persist every write; cache data added afterward can still be lost.",
+    "frontZh": "数据库误改后要找回过去的数据，或内存缓存清空后要恢复。跨AZ当前副本能代替历史备份吗？",
+    "backZh": "答：不能。RDS/Aurora或DynamoDB使用各自支持的备份/时间点恢复；ElastiCache的Redis OSS/Valkey可从快照恢复到新缓存。\n考点：持续复制的副本追随当前变化，历史备份保留旧状态。Redshift从snapshot另建集群是独立的时间点副本，不追随源集群后续更新。Aurora自动持续备份支持窗口内PITR，缓存快照则保留拍摄时的数据。\n易错提醒：快照不是每次写入都同步落盘；缓存快照后新增的数据仍可能丢失。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-nb08",
+    "topic": "Stickiness and session persistence / 粘滞与会话持久化",
+    "frontEn": "Web instances behind an ALB store sessions locally. How do sticky sessions route requests? Do they preserve sessions after instance failure?",
+    "backEn": "Answer: Requests from a session preferentially continue to the same target, but stickiness does not replicate local sessions. For state across instances, externalize sessions to shared storage such as DynamoDB or Redis.\nKey point: Instances use a shared session identifier to read/write shared data, allowing another instance to continue after one leaves. Changing routing alone does not preserve a machine's local state.",
+    "frontZh": "ALB后Web实例本机保存会话。开启sticky sessions会怎样分配请求？能保证实例故障后会话还在吗？",
+    "backZh": "答：同一会话尽量继续到同一目标；粘滞不复制本机会话。要跨实例保留状态，可把会话外置到DynamoDB或Redis等共享存储。\n考点：各Web实例用同一会话标识读写共享会话数据，某台实例退出后其他实例仍可接着读取；仅改变请求去向不会保存那台机器的本地状态。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-ns03",
+    "topic": "Backup planning tools / 备份计划工具",
+    "frontEn": "To schedule backups and retention expiry, how do tools differ for only EBS snapshots/EBS-backed AMIs versus unified protection across services?",
+    "backEn": "Answer: Use Data Lifecycle Manager for EBS snapshot and EBS-backed AMI lifecycles, including configured automatic cross-Region copies. Use AWS Backup for unified cross-service plans.\nKey point: AWS Backup manages periodic recovery points for supported resources, including long retention and supported cross-Region copies such as EFS. Long-term periodic snapshots differ from continuous PITR with a limited window.\nWatch out: DynamoDB backup cold-tier transitions require AWS Backup advanced features. A unified plan does not mean every resource and backup supports cold storage.",
+    "frontZh": "要自动安排备份周期与到期保留。仅管理EBS快照或EBS-backed AMI，与统一保护多个服务时，工具怎样选？",
+    "backZh": "答：EBS快照和EBS-backed AMI生命周期可用Data Lifecycle Manager，也可配置自动跨Region复制；跨服务统一计划用AWS Backup。\n考点：AWS Backup统一管理受支持资源的周期恢复点，可按计划长期保留并安排支持的跨Region副本，例如EFS。周期快照的长期保留，不等于PITR只有有限时间窗口的连续恢复。\n易错提醒：DynamoDB备份转冷层需启用AWS Backup高级功能；统一计划不表示每种资源和备份都支持转冷。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-xb016",
+    "topic": "Lifecycle wait points / 生命周期等待关口",
+    "frontEn": "Auto Scaling instances must report to auditing after launch and before termination. Termination cannot delete an instance before reporting. Which mechanism fits?",
+    "backEn": "Answer: Configure launch and termination lifecycle hooks to trigger reporting and continue the lifecycle only after completion during the wait.\nKey point: Hooks pause transitions in a wait state for custom actions. User data mainly runs on launch and cannot replace the pretermination wait point.",
+    "frontZh": "Auto Scaling实例启动后、终止前都要向审计系统提交信息；终止时不能在上报前就删掉实例。应使用什么机制？",
+    "backZh": "答：为启动和终止配置lifecycle hooks，触发上报动作，在等待期间完成后再继续生命周期。\n考点：生命周期hook把转换暂停在等待状态，给自定义动作时间；user data主要在启动执行，不能替代终止前的等待关口。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-xb030",
+    "topic": "Outposts site responsibilities / Outposts现场责任",
+    "frontEn": "AWS maintains equipment inside an Outposts rack. What must the company provide for on-site operation, and why cannot all failure reserve be left to AWS?",
+    "backEn": "Answer: Provide physical site access control, power, and network connectivity, and plan sufficient workload and spare failure capacity.\nKey point: AWS manages rack hardware and services, while the customer supplies site conditions. Rack capacity is finite; extra servers do not appear as with Region resources, so failure/maintenance reserve needs advance planning.",
+    "frontZh": "公司安装Outposts rack，AWS维护机柜内设备。公司还要为现场运行保障什么，为什么不能把故障余量都交给AWS？",
+    "backZh": "答：公司负责场地物理访问控制、供电和网络连接，并规划足够工作负载容量及故障备用容量。\n考点：AWS管理机柜内硬件和服务；客户场地条件仍由客户提供。机柜容量有限，不会像Region资源那样自动出现额外服务器，故障或维护余量须提前安排。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-ca13",
+    "topic": "Global HTTP edge entry / 全球HTTP边缘入口",
+    "frontEn": "A website serves global HTTP users from regional static and dynamic origins. How can requests first enter AWS near users?",
+    "backEn": "Answer: Use CloudFront distribution. API Gateway REST APIs also offer an edge-optimized entry with a built-in CloudFront path.\nKey point: Edge locations accept nearby connections, serving eligible cached content and forwarding misses or dynamic requests to origins, reducing long-distance access impact.\nWatch out: An edge entry does not move business computation near every user; dynamic requests may still reach regional origins.",
+    "frontZh": "网站向全球用户交付HTTP内容，静态和动态源站都在Region。怎样让请求先走靠近用户的AWS入口？",
+    "backZh": "答：使用CloudFront分发；API Gateway REST API也有内置CloudFront路径的edge-optimized入口。\n考点：边缘位置就近承接连接，适用内容可从缓存返回，未命中或动态请求再到源站，减少远距离访问的影响。\n易错提醒：边缘入口不等于业务计算已经迁到每个用户附近，动态请求仍可能访问区域源站。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-ca16",
+    "topic": "Static website hosting / 静态网站托管",
+    "frontEn": "A website contains only HTML, CSS, browser JavaScript, and images, with no server-executed code. How can it be hosted with less server maintenance?",
+    "backEn": "Answer: Use S3 static website hosting or a suitable managed static-frontend service.\nKey point: Storage returns page files directly and scripts execute in browsers. Server-side code such as PHP needs a compute backend and cannot execute in S3 static hosting.",
+    "frontZh": "网站只有HTML、CSS、浏览器JavaScript和图片，没有需要服务器执行的代码。怎样托管可少维护服务器？",
+    "backZh": "答：可用S3静态网站托管或适配的托管静态前端服务。\n考点：存储直接返回页面文件，脚本在浏览器运行；PHP等服务器端代码需要计算后端，不能由S3静态托管执行。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-cb16",
+    "topic": "Peering and routes / 对等连接与路由",
+    "frontEn": "EC2 in two nonoverlapping VPCs needs direct private communication, without centralized inspection or transit-appliance failure/bandwidth bottlenecks. What fits, which routes are needed, and why?",
+    "backEn": "Answer: Use VPC peering and configure peer routes in both communicating subnets' route tables.\nKey point: Peering uses VPC infrastructure without a separate gateway or transit appliance, avoiding that appliance's failure and bandwidth bottlenecks. Request and response routes still need separate configuration. Peering has no connection fee and avoids TGW attachment-hour and processing charges, but actual data-transfer charges still apply.\nWatch out: Any overlapping IPv4 or IPv6 CIDR prevents peering, even if only nonoverlapping portions would be used.",
+    "frontZh": "两个地址不重叠的VPC要让EC2直接私网通信，没有集中检查需求，也不想引入中转设备单点或带宽瓶颈。选什么，路由还须怎样配，为什么？",
+    "backZh": "答：选择VPC peering，并为两边参与通信子网设置指向对端的路由。\n考点：peering复用VPC基础设施，不依赖单独网关或中转设备，因此连接本身不引入这种设备的单点与带宽瓶颈；请求和响应的路由仍须分别配置。 peering连接本身不另收连接费；相较TGW可避免其附件小时费和处理费，但仍须计实际数据传输费。\n易错提醒：两个VPC的IPv4或IPv6 CIDR只要有重叠，就不能建立peering；即便只打算使用不重叠的那部分地址也不行。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-cc03",
+    "topic": "Occasional SQL on S3 / S3数据偶发SQL",
+    "frontEn": "Structured results or logs are in S3 and need occasional SQL with little server administration. Must they first move into a self-managed database?",
+    "backEn": "Answer: Use Athena with appropriate table definitions, without moving data into a self-managed database. Encrypted data must meet readable-format requirements and have required table properties and permissions.\nKey point: Athena scans S3 in parallel using table definitions, with compute occurring for queries. It supports qualifying CSE-KMS client-encrypted data, not arbitrary custom ciphertext.\nWatch out: EMRFS-uploaded CSE-KMS Parquet requires disabling multipart; same-Region, compatible encryption-client, and correct key-use requirements still apply.",
+    "frontZh": "结构化结果或日志已经在S3，偶尔用SQL分析且希望少管服务器，是否需要先搬到自管数据库？",
+    "backZh": "答：用Athena查询S3数据并建立相应表定义，不必先搬进自管数据库；加密数据还要符合其读取格式并配好所需表属性和权限。\n考点：Athena查询引擎按表定义并行扫描S3，计算按查询发生。它支持符合要求的CSE-KMS客户端加密数据，不等于任何自定义密文都能直接解释。\n易错提醒：EMRFS上传的CSE-KMS Parquet需禁用multipart；同Region、兼容加密客户端和正确用钥配置仍须满足。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-cc17",
+    "topic": "Event filtering and transformation / 事件筛选与转换",
+    "frontEn": "Application events or GuardDuty findings must conditionally reach functions, each receiving only needed fields. What do EventBridge patterns and input transformation each do, and why?",
+    "backEn": "Answer: Event patterns filter and route events; target input transformers select or rearrange fields sent to functions.\nKey point: Sources include application events, directly published service findings, or supported API calls recorded by CloudTrail. Filtering decides recipients; transformation decides content. Target functions still perform actual resource changes.",
+    "frontZh": "应用事件或GuardDuty发现要按条件送给处理函数，每个函数只接收需要的字段。EventBridge事件模式与输入转换各负责什么，为什么？",
+    "backZh": "答：事件模式筛选并路由事件；目标的input transformer裁剪或重排发送给函数的字段。\n考点：来源既可为应用事件、服务直接发布的发现，也可为CloudTrail记录的受支持API调用；筛选决定交给谁，转换决定对方收到什么，实际改资源仍由目标函数执行。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-cc22",
+    "topic": "Managed relational databases / 关系数据库托管",
+    "frontEn": "A relational application must retain applicable engine and transaction capabilities while reducing server/platform maintenance. Why consider RDS instead of self-managing EC2?",
+    "backEn": "Answer: Migrate to the corresponding RDS engine if its engine and features are compatible.\nKey point: RDS handles database infrastructure and platform maintenance. Customers still choose database configuration, maintenance windows, and data access. Object or key-value models may require application changes.",
+    "frontZh": "关系应用要保留适用的数据库引擎与事务能力，又希望减少服务器和数据库平台维护，为什么考虑RDS而非在EC2自管？",
+    "backZh": "答：在引擎和功能兼容的前提下迁移到相应RDS。\n考点：RDS接管数据库基础设施和平台维护；客户仍决定数据库配置、维护窗口与数据访问，换成对象或键值模型可能要求应用改造。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-cmp-m19",
+    "topic": "Managed transfer backends / 托管传输后端",
+    "frontEn": "Partners must retain SFTP or FTP clients with less transfer-server administration. Which backend fits object access versus Linux shared files with user/group permissions?",
+    "backEn": "Answer: Use a Transfer Family entry supporting the protocol. Choose S3 for objects, or EFS with POSIX user/group identities for shared Linux files.\nKey point: Transfer Family supports SFTP, FTPS, and FTP, with scalable multi-AZ-redundant managed entries. S3 retains objects while EFS retains shared-file/POSIX semantics; protocol entry does not change backend semantics.\nWatch out: FTP is not encrypted SFTP. Meet protocol-specific endpoint, networking, identity, and file-permission requirements.",
+    "frontZh": "伙伴要保留SFTP或FTP客户端、少管传输服务器。后端只需对象存取，与要Linux共享文件及用户/组权限时，怎样选择？",
+    "backZh": "答：用支持该协议的Transfer Family入口；对象存取接S3，Linux共享文件接EFS并配置POSIX用户/组身份。\n考点：Transfer Family支持SFTP、FTPS和FTP，托管入口可跨AZ冗余并伸缩；S3保存对象，EFS保留共享文件及POSIX权限，协议入口不改变后端文件语义。\n易错提醒：FTP不是加密的SFTP；还要满足所用协议的端点、网络、身份和文件权限要求。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-na02",
+    "topic": "BI dashboard sharing / BI仪表板分享",
+    "frontEn": "Data comes from S3 and relational databases. Teams need interactive charts, with management and staff seeing different scopes. How should dashboards be provided and assigned?",
+    "backEn": "Answer: Connect datasets in QuickSight, build visualizations, publish dashboards, and share with appropriate QuickSight users or groups.\nKey point: The BI layer organizes queried data into business charts. Dashboard recipients determine who can view it; possessing an AWS IAM role does not mean the dashboard is shared with you.\nWatch out: Dashboard viewers can also see data used by related analyses; sensitive rows/columns need separate restrictions.",
+    "frontZh": "数据来自S3和关系数据库，团队要交互图表，管理层与普通员工的查看范围不同。应怎样提供并分配仪表板？",
+    "backZh": "答：用QuickSight连接相应数据集、建立可视化并发布仪表板，再分享给相应QuickSight用户或组。\n考点：BI层把查询数据组织成业务图表；仪表板的分享对象决定谁能查看，拥有AWS IAM角色并不等于已被分享该仪表板。\n易错提醒：能查看仪表板的用户也能看到相关分析使用的数据；敏感行列仍须另外限制。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-na05",
+    "topic": "Multi-AZ object storage / 多AZ对象存储",
+    "frontEn": "Applications need durable files across AZs through object access, without mounting disks. Should those files be tied to one EC2 EBS volume?",
+    "backEn": "Answer: Prefer an appropriate multi-AZ S3 storage class such as S3 Standard instead of a single-AZ block volume.\nKey point: Regional object storage keeps independent objects accessible through APIs, beyond a single instance/block-volume lifecycle. Multi-AZ classes also distribute AZ failure risk.",
+    "frontZh": "应用只需按对象存取文件，无须把它挂成磁盘；大量持久文件要供多个AZ的应用访问。应把它绑定某台EC2的EBS卷吗？",
+    "backZh": "答：优先放在适合的多AZ S3存储类别，例如S3 Standard，而不绑定单个AZ的块卷。\n考点：区域对象存储把文件作为独立对象保存，应用按API访问，不受单个实例和其块卷的生命周期约束；多AZ类别还分散单AZ故障风险。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-nb01",
+    "topic": "Dedicated connections and internet VPNs / 专线与互联网VPN",
+    "frontEn": "On premises needs long-term AWS access without public-internet transit, or wants its main link unaffected by internet congestion. Which connection fits?",
+    "backEn": "Answer: Use AWS Direct Connect. Internet-based Site-to-Site VPN is a different transport path.\nKey point: Direct Connect supplies a dedicated connection to AWS, bypassing public-internet transit. VPN encryption does not turn the internet into a dedicated circuit.",
+    "frontZh": "本地要长期连接AWS，数据不得经公共互联网，或要避免互联网拥塞影响主链路，应选什么？",
+    "backZh": "答：选择AWS Direct Connect专线；经过公共互联网的Site-to-Site VPN不是同一种承载路径。\n考点：专线提供到AWS的专用网络连接，绕开公共互联网承载；VPN的加密不能把互联网变成专线。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-nc07",
+    "topic": "CLI and DataSync transfers / CLI与DataSync传输",
+    "frontEn": "On-premises files move to S3 once at 100 GB with no further changes versus ongoing changes with shared-link bandwidth control. Which transfer fits each?",
+    "backEn": "Answer: Use AWS CLI s3 sync for a small one-time move; use DataSync tasks for managed ongoing transfer, validation, or throttling.\nKey point: CLI compares and copies files needing updates and verifies certificates over encrypted connections by default. DataSync protects AWS-bound transfers with TLS and manages repetition, validation, and bandwidth limits.\nWatch out: Verify completion against volume, bandwidth, and deadline. One-time transfer does not mean every scale suits CLI.",
+    "frontZh": "机房文件搬到S3：一次性100GB后不再改，与源文件持续变化、还要控制共享链路占用，传输方式怎样选？",
+    "backZh": "答：一次小规模搬运可用AWS CLI s3 sync；持续托管传输、校验或限速需求可用DataSync任务。\n考点：CLI比较并复制需更新的文件，默认通过加密连接校验证书；DataSync以TLS保护传入AWS的数据，并管理重复传输、校验和限速。\n易错提醒：仍须按数据量、可用带宽和期限验证能否完成；一次性不等于任何规模都适合CLI。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-xa012",
+    "topic": "Cross-Region tag search / 跨Region标签查询",
+    "frontEn": "An application's EC2, Lambda, and RDS resources span Regions and share an application tag. How can its components be found quickly without per-service scripts?",
+    "backEn": "Answer: Use Resource Groups Tag Editor, selecting relevant Regions and resource types and searching by the application tag key/value.\nKey point: Tag Editor searches supported resource tags across selected Regions. CloudTrail events do not directly list all currently tagged resources.",
+    "frontZh": "某应用的EC2、Lambda、RDS等资源散在多个Region，已带相同application标签。怎样最快查出组成资源，避免逐服务脚本查询？",
+    "backZh": "答：用Resource Groups Tag Editor，选择相关Region和资源类型，按application标签键值查询。\n考点：Tag Editor跨所选Region搜索受支持的资源标签；CloudTrail事件日志不会直接给出当前所有带该标签的资源清单。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-xa013",
+    "topic": "Edge execution and caching / 边缘执行与缓存",
+    "frontEn": "CloudFront requests need custom authentication or supported content processing with fewer trips to a central origin. Where should code run, and can a cache policy replace execution?",
+    "backEn": "Answer: Run code in an applicable CloudFront edge function, such as Lambda@Edge. Cache or request-header policies alone do not execute custom processing.\nKey point: Functions execute logic in the edge request path, performing processing suitable for that runtime before origin access.\nWatch out: Choose the event phase correctly: viewer-response can modify viewer response headers but does not change an already cached object's lifetime. Adding Expires there cannot set edge TTL.",
+    "frontZh": "CloudFront请求要先自定义鉴权或做受支持的内容处理，希望少回到集中源站。代码放在哪一层，缓存策略能代替执行吗？",
+    "backZh": "答：在适用的CloudFront边缘函数中执行，例如Lambda@Edge；仅改缓存或请求头策略不能执行自定义处理代码。\n考点：函数在边缘请求链路中真正运行逻辑，可在回源前完成适合该运行环境的处理。\n易错提醒：须选择正确事件阶段：viewer-response可修改发给用户的响应头，但不会改变CloudFront已缓存对象的寿命；不能靠这一阶段补Expires来设置边缘TTL。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-xa031",
+    "topic": "Repeatable template deployment / 模板重复部署",
+    "frontEn": "A verified network, load balancer, instances, and database must repeatedly deploy into new environments. How can manual per-service creation be avoided, and why?",
+    "backEn": "Answer: Declare resources and properties in a CloudFormation template and deploy a stack.\nKey point: The template declares desired infrastructure; CloudFormation provisions and configures dependent resources. Config records/evaluates existing configuration rather than creating the entire environment from a template.",
+    "frontZh": "已验证的一套网络、负载均衡、实例和数据库，要反复在新环境自动部署。怎样避免逐服务手工创建，为什么？",
+    "backZh": "答：把资源及属性写成CloudFormation模板，以stack部署。\n考点：模板声明期望基础设施，CloudFormation负责开通并配置依赖资源；Config记录与评估现有配置，不负责按模板创建整套环境。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-xa036",
+    "topic": "Cross-account observability / 跨账户可观测性",
+    "frontEn": "CloudWatch metrics, logs, and traces from several accounts in one Region need unified queries in a dedicated monitoring account. How is sharing established, and why?",
+    "backEn": "Answer: Configure CloudWatch cross-account observability: create the receiving configuration in the monitoring account and sharing links from each source account.\nKey point: The monitoring account reads selected source observability data. Creating IAM users there or attaching SCPs does not automatically establish data-sharing links.",
+    "frontZh": "同一Region内多个AWS账户的CloudWatch指标、日志和追踪要在专用监控账户统一查询，如何建立共享关系，为什么？",
+    "backZh": "答：配置CloudWatch cross-account observability：监控账户建立接收配置，各源账户建立到它的共享链接。\n考点：监控账户读取源账户选定的可观测性数据；只在监控账户建IAM用户，或附SCP，不会自动建立这些数据共享链接。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-xa046",
+    "topic": "Shared VPC subnets / 共享VPC子网",
+    "frontEn": "Workloads use separate accounts while a central team owns networking. Can they create their own resources inside the central VPC, and why?",
+    "backEn": "Answer: Yes. The network account shares VPC subnets through AWS RAM with workload accounts in the same organization.\nKey point: Participants deploy their own EC2, RDS, and other resources in shared subnets while the network account retains VPC management, avoiding a duplicate VPC per account.\nWatch out: Subnet sharing does not let participants manage other participants' or the VPC owner's application resources.",
+    "frontZh": "各工作负载要分账户部署，但网络由中央团队统一维护。能让它们在中央VPC里创建自己的资源吗，为什么？",
+    "backZh": "答：可以；网络账户用AWS RAM把VPC子网共享给同组织的工作负载账户。\n考点：参与账户把自己的EC2、RDS等资源部署到共享子网，网络账户保留中央VPC管理；不必为每个账户复制整套VPC。\n易错提醒：共享子网不让参与账户管理其他参与者或VPC所有者的应用资源。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-xb004",
+    "topic": "Multi-consumer ingestion / 多消费者摄取",
+    "frontEn": "Continuous transactions need independent reads by several applications plus a processing path stripping sensitive fields before DynamoDB writes. How should ingestion and processing be organized?",
+    "backEn": "Answer: Write transactions to Kinesis Data Streams. Applications consume independently; a separate Lambda consumer cleans records and writes DynamoDB.\nKey point: The stream retains records for consumers. Lambda receives batches through an event source mapping, and function code cleans and writes them; Kinesis does not rewrite records automatically.",
+    "frontZh": "持续到达的交易既要供多个应用分别读取，又要由一条处理路径去掉敏感字段后写DynamoDB。怎样组织摄取与处理？",
+    "backZh": "答：把交易写入Kinesis Data Streams；各应用作为消费者读取，另用Lambda消费者清理记录并写入DynamoDB。\n考点：流保留记录供消费者读取；Lambda通过事件源映射取得一批记录，再由函数代码完成清理和写库，Kinesis不会自动改写记录。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-xb006",
+    "topic": "Scanned medical-record extraction / 扫描病历识别",
+    "frontEn": "A hospital uploads English scanned medical PDFs or JPEGs and needs medical information or PHI identified without its own model. Which services run in sequence?",
+    "backEn": "Answer: Use Textract to extract text, then Comprehend Medical to identify medical entities or PHI.\nKey point: OCR first converts scans to text; medical language analysis then identifies meaning and sensitive entities. Their input/output stages must connect.\nWatch out: Comprehend Medical processes English text. Results are not diagnoses; important uses still require appropriate confidence thresholds and human review.",
+    "frontZh": "医院上传英文扫描病历PDF或JPEG，要找出其中的医疗信息或受保护健康信息PHI，又不想自建识别模型。应先后调用什么？",
+    "backZh": "答：先用Textract提取文字，再用Comprehend Medical识别文字中的医疗实体或PHI。\n考点：扫描文件先需要OCR把图像变成文字；医疗自然语言分析再识别文字的医学含义和敏感实体，两步输入输出才能衔接。\n易错提醒：Comprehend Medical处理英文文字；识别结果不是医学诊断，重要用途仍需按置信度和人工复核要求处理。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-xb010",
+    "topic": "Relational ingestion into a lake / 关系数据入湖",
+    "frontEn": "An S3 lake has fine-grained permissions. Relational database data must join it for combined analysis. Is granting Lake Formation permission on the original database enough, and how should it connect?",
+    "backEn": "Answer: No. Establish a supported Glue JDBC connection and use a Lake Formation blueprint workflow to ingest relational data into S3, then grant lake-table permissions.\nKey point: JDBC connects to relational data; the blueprint generates a Glue ingestion workflow. After data becomes lake tables, Lake Formation governs row/column access on supported query paths.",
+    "frontZh": "S3数据湖已有细粒度权限，团队还要把关系数据库的数据放进同一个湖做联合分析。只给原数据库加Lake Formation授权够吗，应怎样接入？",
+    "backZh": "答：不够；建立受支持的Glue JDBC连接，用Lake Formation蓝图工作流把关系数据摄取到S3数据湖，再授予湖表所需权限。\n考点：JDBC是读取关系库的连接方式；蓝图生成在Glue运行的摄取流程。数据进入湖表后，Lake Formation才能在受支持查询路径上管理行列权限。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-xb011",
+    "topic": "Event notification and execution / 事件通知与执行",
+    "frontEn": "EventBridge has matched AWS service events. Which targets send people email versus execute resource-changing code?",
+    "backEn": "Answer: Use an SNS topic with confirmed email subscriptions for email; target the appropriate Lambda function for custom actions.\nKey point: EventBridge filters/delivers events, SNS notifies subscribers, and Lambda executes code. SQS is a consumer queue and does not directly email people.",
+    "frontZh": "EventBridge已匹配到需要处理的AWS服务事件。要给人员发邮件，与要运行代码修改资源，应分别选什么目标？",
+    "backZh": "答：人员邮件用SNS主题和已确认的邮件订阅；执行自定义动作则把相应Lambda函数设为目标。\n考点：EventBridge筛选并投递事件；SNS把消息送给订阅者，Lambda运行处理代码。SQS只是让消费者取消息的队列，不会直接把邮件送给人员。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-xb013",
+    "topic": "Key access and analytical warehousing / 键值访问与分析仓库",
+    "frontEn": "How should DynamoDB and Redshift be chosen for high-concurrency known-key access versus parallel SQL analysis of large datasets?",
+    "backEn": "Answer: Prefer DynamoDB for online key-value/document access and Redshift for parallel warehouse analytics; applicable Redshift Serverless reduces cluster administration.\nKey point: DynamoDB locates records by designed keys; ordinary attributes can vary by item and sort keys organize hierarchy. Redshift MPP splits large analytics across compute units.",
+    "frontZh": "按已知键高并发读写，和对大量数据做并行SQL分析，应怎样在DynamoDB与Redshift间选择？",
+    "backZh": "答：在线键值/文档访问优先考虑DynamoDB；数据仓库的并行分析考虑Redshift，少管理集群可用适用的Redshift Serverless。\n考点：DynamoDB围绕设计好的键定位记录，普通属性可随项目变化，排序键可组织层级；Redshift以MPP把大分析任务分给多个计算单元并行完成。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-xb019",
+    "topic": "Fargate and kernel control / Fargate与内核控制",
+    "frontEn": "How does the choice between Fargate and self-managed EC2 change when containers need less host maintenance versus mandatory Linux-kernel changes?",
+    "backEn": "Answer: Choose Fargate to reduce host maintenance; kernel control requires an applicable deployment with a self-managed OS, such as EC2.\nKey point: Managed infrastructure transfers host administration to AWS and removes customer control over that OS. Control and maintenance responsibility move together.\nWatch out: ECS orchestration does not remove customer instance-OS maintenance when using EC2.",
+    "frontZh": "容器只想少维护主机，与应用必须修改Linux内核，这两个条件怎样改变Fargate和自管EC2的选择？",
+    "backZh": "答：少维护宿主机可选Fargate；必须自行控制内核时，需要能自管OS的EC2等适用部署。\n考点：托管基础设施让AWS承担宿主机管理，也收回客户对底层OS的控制；控制权和维护责任一起变化。\n易错提醒：ECS负责容器编排，不表示使用EC2时客户也不必维护实例系统。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-xb020",
+    "topic": "Private API backend integration / API私网后端集成",
+    "frontEn": "A public REST API has container backends in private VPC subnets. How does API Gateway reach them, and why not create a private API endpoint for clients?",
+    "backEn": "Answer: Configure a REST API private integration with a VPC link to a supported ALB or NLB, then the container service.\nKey point: VPC link handles API Gateway-to-private-backend connectivity. An interface endpoint handles client-to-private-API connectivity; direction and connected resource differ.",
+    "frontZh": "对外REST API的容器后端在私有VPC子网中。API Gateway怎样把请求送到后端，为什么不是给客户端建private API端点？",
+    "backZh": "答：配置REST API的private integration，通过VPC link连接受支持的ALB或NLB，再转到容器服务。\n考点：VPC link解决API Gateway到私网后端这一段；interface endpoint解决客户端到private API这一段，方向和被连接对象不同。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-xb031",
+    "topic": "Managed AS2 entry / 托管AS2入口",
+    "frontEn": "Supply-chain partners require AS2 file exchange with little protocol-server maintenance. Which AWS entry fits, and why cannot ordinary file synchronization directly replace it?",
+    "backEn": "Answer: Use a Transfer Family AS2 server and applicable AS2 connection configuration.\nKey point: AS2 defines message exchange and partner configuration. Transfer Family supplies that protocol entry; a copying task such as DataSync does not become AS2 merely by moving files.\nWatch out: AS2 servers cannot select a Lambda identity provider like SFTP servers. Design application login for the actual entry.",
+    "frontZh": "供应链伙伴要求用AS2交换文件，想少维护协议服务器。应选哪种AWS入口，为什么普通文件同步任务不能直接替代？",
+    "backZh": "答：使用Transfer Family的AS2服务器及适用的AS2连接配置。\n考点：AS2有规定的消息交换协议与伙伴配置；Transfer Family提供协议入口，DataSync之类的数据复制任务不会仅因能搬文件就成为AS2端点。\n易错提醒：AS2服务器不能像SFTP服务器那样选择Lambda身份提供方；应用登录认证应另按实际入口设计。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-xb037",
+    "topic": "Configuration and secret management / 配置与秘密管理",
+    "frontEn": "An application needs secure database-password storage and gradual release of ordinary settings such as log levels or feature flags. Which service manages ordinary settings, and why not treat everything as secrets?",
+    "backEn": "Answer: Use AppConfig to manage and deploy ordinary application configuration; retain passwords and sensitive credentials in Secrets Manager.\nKey point: AppConfig handles validation, gradual rollout, and behavior changes. Secrets Manager handles controlled secret retrieval and rotation; their management goals differ.",
+    "frontZh": "应用既要安全保管数据库密码，又要分批发布日志级别、功能开关等普通配置。普通配置应由什么管理，为什么不把一切都当秘密？",
+    "backZh": "答：用AppConfig管理和发布普通应用配置；密码等敏感凭据仍放Secrets Manager。\n考点：AppConfig解决配置验证、渐进发布和改变应用行为；Secrets Manager解决秘密的受控读取与轮换，两者管理目标不同。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-xr001",
+    "topic": "Read-time object transformation / 读取时对象转换",
+    "frontEn": "A team eligible for S3 Object Lambda needs redacted or filtered views of one original object for different applications, without pre-storing copies. How does it work?",
+    "backEn": "Answer: Send GET requests through an Object Lambda access point; Lambda processes the object before returning results.\nKey point: Transformation occurs on the read-response path. Applications receive processed views without precreating and storing an object for every view.",
+    "frontZh": "已获S3 Object Lambda使用资格的团队，希望读取同一原始对象时，按应用需要返回脱敏或筛选后的结果，又不预存多份副本。这项服务怎样完成？",
+    "backZh": "答：让GET请求经过Object Lambda access point，由Lambda处理后再把结果返回应用。\n考点：转换发生在读取的返回路径，应用得到处理后的视图；不必为每种视图预先创建并保存一份衍生对象。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-xr101",
+    "topic": "Log metrics versus raw content / 日志指标与原文",
+    "frontEn": "CloudWatch Logs has received logs. What handles alarms on matching-event counts versus sending raw logs to OpenSearch search?",
+    "backEn": "Answer: For counts, create metrics with a metric filter and notify through a CloudWatch metric alarm's SNS action. For raw search, use a subscription filter and supported OpenSearch forwarding path, such as the official Lambda subscription integration.\nKey point: Metric filters extract numbers and alarms evaluate thresholds. Subscriptions copy matched log content downstream. Choose statistics versus original content.",
+    "frontZh": "CloudWatch Logs已收到日志。要根据匹配事件的次数告警，和要把日志原文交给OpenSearch检索，两种需求应分别用什么处理方式？",
+    "backZh": "答：计数告警用metric filter生成指标，再用CloudWatch metric alarm的SNS动作通知；原文检索用subscription filter，经受支持的转发路径送OpenSearch，例如官方Lambda订阅集成。\n考点：metric filter把匹配日志提炼成数字，alarm判断阈值；subscription复制匹配日志内容供下游处理。选择取决于需要统计结果还是原文。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-gcl-001",
+    "topic": "Application email versus notifications / 应用邮件与通知",
+    "frontEn": "An application sends custom HTML reports, order confirmations, or marketing email. Is an SNS event-email subscription equivalent?",
+    "backEn": "Answer: No. Evaluate a dedicated email-delivery service such as SES.\nKey point: Application email needs content and delivery-process control supplied by dedicated email services. Topic email primarily serves subscriber notifications.\nWatch out: Sender verification, sending eligibility, and delivery restrictions still apply; arbitrary unverified senders cannot simply mass-mail.",
+    "frontZh": "应用要向客户发送自定义HTML报告、订单确认或营销邮件。SNS发事件通知的邮件订阅就等价吗？",
+    "backZh": "答：不等价；应评估SES等专门的邮件投递服务。\n考点：应用邮件需要控制内容和投递流程，专门邮件服务承担相应发送能力；事件主题邮件主要用于订阅通知。\n易错提醒：邮件服务仍有身份验证、发送资格和投递限制，不是让任意未验证发件地址直接群发。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-gsc-023",
+    "topic": "Accelerating object transfers / 双向对象传输加速",
+    "frontEn": "Global users upload/download unique large files to one S3 bucket. Distance slows transfers and download cache reuse is poor. How can the path improve?",
+    "backEn": "Answer: Evaluate S3 Transfer Acceleration, using its accelerated endpoint for supported uploads and downloads.\nKey point: Requests traverse nearby edges and optimized network paths to/from the bucket. It improves bidirectional object transfers rather than repeated-content cache hits.\nWatch out: Acceleration can add charges. Test benefits from actual source locations and meet bucket/request restrictions.",
+    "frontZh": "全球用户对同一S3桶上传和下载独有大文件，远距离传输慢，下载也很难复用缓存。怎样优化路径？",
+    "backZh": "答：评估S3 Transfer Acceleration，使用加速端点执行支持的上传与下载操作。\n考点：请求经附近边缘位置及优化网络路径往返目标桶；它优化双向对象传输路径，不是靠缓存重复内容命中来加速。\n易错提醒：加速可能增加费用，须测试实际来源地点的收益，并满足桶和请求限制。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-gsc-029",
+    "topic": "Object-creation triggers / 对象创建触发",
+    "frontEn": "New S3 files need immediate processing without hourly bucket scans. How should computation start?",
+    "backEn": "Answer: Use S3 object-created events to notify Lambda or SQS as needed, or route through EventBridge; EventBridge can also target supported SageMaker Pipelines.\nKey point: Writes trigger processing of changes without repeatedly listing the entire bucket to discover files.\nWatch out: Avoid recursive triggers when processing writes into the same trigger scope; consumers must tolerate duplicate events.",
+    "frontZh": "文件一进入S3就要处理，不想每小时扫描整个桶。怎样触发后续计算？",
+    "backZh": "答：使用S3对象创建事件，按需要通知Lambda、送入SQS，或经EventBridge路由；EventBridge也可把SageMaker Pipelines设为受支持目标。\n考点：由写入事件启动处理，只响应变化，不必反复列举整个桶寻找新文件。\n易错提醒：若处理又写回同一触发范围，要防止递归触发；消费者也应承受重复事件。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-gsc-089",
+    "topic": "Time and event triggers / 时间与事件触发",
+    "frontEn": "How do triggers differ for a report at a fixed daily time versus processing immediately when an order event occurs?",
+    "backEn": "Answer: Use an appropriate scheduler such as EventBridge Scheduler for fixed times; use event matching such as EventBridge rules for business events.\nKey point: One follows a clock and the other actual event content. Periodic scanning introduces delay and checks unchanged data.\nWatch out: A scheduled trigger does not guarantee business success; manage target permissions, retries, and outcomes.",
+    "frontZh": "每天固定时间运行报表，与订单事件出现时立即启动处理，触发方式怎样选？",
+    "backZh": "答：固定时间用适用调度器，如EventBridge Scheduler；业务事件用EventBridge规则等事件匹配路径。\n考点：一个按时钟触发，一个按实际事件内容触发；定时扫描会引入等待并检查大量没有变化的数据。\n易错提醒：调度触发不保证业务已经成功，目标权限、失败重试和运行结果仍须管理。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-gsc-133",
+    "topic": "Lambda execution compatibility / Lambda运行环境兼容",
+    "frontEn": "Both tasks run minutes: a Python function needs 1 GB and another is an existing Windows container. Can both use standard Lambda?",
+    "backEn": "Answer: Use a supported Python runtime with 1 GB for the function. Standard Lambda does not fit Windows containers; use a Windows-version-compatible ECS/Fargate or Batch environment.\nKey point: Standard Lambda provides supported Linux function environments with configurable memory. Short duration does not make a different-OS container compatible.\nWatch out: Standard invocation is generally limited to 900 seconds. Specialized execution-product modes have their own limits, not universally identical rules.",
+    "frontZh": "同样只跑几分钟：Python函数需要1GB内存，另一项是现成Windows容器。两者都能直接用标准Lambda吗？",
+    "backZh": "答：Python函数可用受支持的Python运行时并配置1GB内存；Windows容器不适合标准Lambda，可在支持该Windows版本的ECS/Fargate或Batch Windows环境运行。\n考点：标准Lambda提供受支持的Linux函数执行环境，内存可以配置；任务短不等于能把另一种操作系统的现成容器直接运行进去。\n易错提醒：标准Lambda调用通常受900秒上限；特殊执行产品模式另按其限制判断，不能把一种模式的规则推给全部计算。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-cmp-m01",
+    "topic": "Infrequent multi-AZ retrieval / 低频多AZ取回",
+    "frontEn": "Infrequent S3 files need multi-AZ storage. How does immediate access versus waiting for restore change storage-class choice?",
+    "backEn": "Answer: Immediate access can use applicable instant tiers such as Standard-IA or Glacier Instant Retrieval. With restore delay acceptable, consider Glacier Flexible Retrieval/Deep Archive and lifecycle transitions.\nKey point: Satisfy retrieval delay and multi-AZ needs before total cost. Deep Archive exchanges longer waits for the lowest archive storage rate, fitting rare multi-year access; Glacier Instant Retrieval retains immediate access for rare long-retained data.\nWatch out: One Zone-IA is single-AZ. Retrieval charges, minimum duration, and object overhead mean lowest unit rate is not necessarily the lowest bill.",
+    "frontZh": "低频S3文件仍需多AZ保存。必须立即读取，与允许先恢复后读取，两种条件怎样改变存储层选择？",
+    "backZh": "答：立即读取可选Standard-IA或Glacier Instant Retrieval等适用即时层；能等待恢复时，才考虑Glacier Flexible Retrieval或Deep Archive，并按阶段用Lifecycle转换。\n考点：先满足取回等待与多AZ要求，再比总费用。Deep Archive以更长等待换最低的归档存储单价，适合多年极少读取；Glacier Instant Retrieval仍可即时读，适合长保留且极少读取。\n易错提醒：One Zone-IA只有单AZ；低单价仍要计取回费、最低保留期和对象开销，不能直接等同最低总账单。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-xa019",
+    "topic": "Budget alerts and restrictions / 预算通知与限制",
+    "frontEn": "After a budget threshold, notify the owner and automatically prohibit new resources. Is an alert alone enough, and why?",
+    "backEn": "Answer: No. Configure an AWS Budgets action with an authorized service role applying a denying IAM policy or SCP, plus notifications.\nKey point: Alerts inform; budget actions enforce permission restrictions. The service role authorizes Budgets to attach policies.\nWatch out: Cost/action updates lag and existing resources may keep charging; this is not an absolute spending cap.",
+    "frontZh": "账户达到预算阈值后，既要通知负责人，又要自动禁止继续创建资源。只设预算告警够吗，为什么？",
+    "backZh": "答：不够；配置AWS Budgets action，由有权限的服务角色应用拒绝新建资源的IAM策略或SCP，并设置通知。\n考点：告警负责告知，budget action才执行权限限制；服务角色使Budgets有权代为附加策略。\n易错提醒：费用数据和动作有更新延迟，已有资源也可能继续计费，不能当作绝对费用硬上限。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-aws-rb2-domain1-normal-batch07-20261105-s3-bucket-key-request-cost",
+    "topic": "S3 Bucket Key request charges / S3 Bucket Key请求费",
+    "frontEn": "S3 objects use SSE-KMS with continuing new writes and frequent reads. KMS encryption must stay. How can KMS request costs fall, and why?",
+    "backEn": "Answer: Enable S3 Bucket Key for new objects.\nKey point: S3 temporarily retains a KMS-derived bucket-level key to generate object data keys, reducing per-object KMS requests.\nWatch out: This reduces rather than eliminates KMS calls. Existing objects do not automatically adopt Bucket Keys when the bucket setting changes.",
+    "frontZh": "S3对象使用SSE-KMS，新增对象持续写入且读取频繁。必须继续使用KMS加密，怎样减少KMS请求费用，为什么？",
+    "backZh": "答：为新增对象启用S3 Bucket Key（桶密钥）。\n考点：S3临时保留从KMS取得的桶级密钥，用它生成对象数据密钥，减少逐对象访问KMS的请求。\n易错提醒：这会减少而非消除KMS调用；已有对象不会因开启桶设置就自动使用Bucket Key。"
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-gsc-043",
+    "topic": "Separating analytics and live reads / 分析与在线读取隔离",
+    "frontEn": "DynamoDB history needs analysis without large Scans consuming production read capacity. How can workloads separate?",
+    "backEn": "Answer: Export table data to S3 under supported conditions and analyze the export.\nKey point: Supported export avoids scanning table read capacity. Analytics operates on another data copy.\nWatch out: Point-in-time, format, and PITR conditions apply; exports do not continuously match live data in real time.",
+    "frontZh": "要分析DynamoDB历史数据，又不能用大量Scan挤占线上表读取能力。可怎样把分析与在线读取分开？",
+    "backZh": "答：在支持条件下把表数据导出S3，再对导出数据分析。\n考点：受支持的数据导出不靠扫描消耗表的读取容量，分析在另一个数据副本上进行。\n易错提醒：导出有时间点、格式及PITR等适用条件，不代表分析副本持续实时等于在线表。"
+  }
+]

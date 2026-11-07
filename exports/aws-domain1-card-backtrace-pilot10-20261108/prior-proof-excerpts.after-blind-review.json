@@ -1,0 +1,126 @@
+{
+  "scope": "Historical comparison after restricted159 freeze; not evaluator input",
+  "source": "/Users/qc/.local/share/codex-workflows/recallsmith/aws-basics-bilingual-rag-release-20261028/runtime/full-card-rebuild-v2-20261102/global-card-proof-20261106/validation/legacy-current-exact-proof-reuse.json",
+  "sourceSha256": "ebf667adfd6f2129861d281de1a03ff95962de6fa66b8b92f45352c81bb2feae",
+  "rows": [
+    {
+      "qid": 189,
+      "status": "SUPPORTED",
+      "questionCanonicalSha256": "dbc4dadc1c79b1a8f4e1d73e92c33be5113971dd3c378b83da1ff7e7ed9f2f36",
+      "fullStemAndAllOptionsRead": true,
+      "notNewSemanticRead": true,
+      "selectedOptionOrdinals": [
+        2,
+        4
+      ],
+      "usedRuleIds": [
+        "CUR:CC05",
+        "CUR:CC06",
+        "CUR:CMP-M16"
+      ],
+      "necessaryAnchors": [
+        {
+          "ruleId": "CUR:CMP-M16",
+          "bodySha256": "635cf3b86c9616c05a8e989c1c0ae643c3cbe274dff9f176a5e8fe5f34866423",
+          "field": "answerZH",
+          "quote": "固定期用对应Object Lock或Backup Vault Lock的compliance模式；S3无限期等待解除用legal hold。Versioning留历史，Lifecycle安排清理，不能替代强制保留。",
+          "startChar": 0,
+          "endChar": 107
+        },
+        {
+          "ruleId": "CUR:CC05",
+          "bodySha256": "c2322b2191586596152ebb70bb88d9194fbbf429ca85b8159e6327b3b03f8143",
+          "field": "answerZH",
+          "quote": "无自定义控制需求时可用服务支持的AWS managed key；要自行控制密钥生命周期时用customer managed key。",
+          "startChar": 0,
+          "endChar": 66
+        },
+        {
+          "ruleId": "CUR:CC06",
+          "bodySha256": "6d189ce4aedd81deea7d5b17ad0515999c8d17ff88291f566beaf643bb7378d4",
+          "field": "answerZH",
+          "quote": "选择AWS生成密钥材料、支持自动轮换的对称KMS key，并开启所需轮换；不能把导入材料默认视为同样支持。",
+          "startChar": 0,
+          "endChar": 53
+        }
+      ],
+      "actualVisibleGroup": [
+        {
+          "ruleId": "CUR:CC05",
+          "bodySha256": "c2322b2191586596152ebb70bb88d9194fbbf429ca85b8159e6327b3b03f8143"
+        },
+        {
+          "ruleId": "CUR:CC06",
+          "bodySha256": "6d189ce4aedd81deea7d5b17ad0515999c8d17ff88291f566beaf643bb7378d4"
+        },
+        {
+          "ruleId": "CUR:CMP-M16",
+          "bodySha256": "635cf3b86c9616c05a8e989c1c0ae643c3cbe274dff9f176a5e8fe5f34866423"
+        }
+      ],
+      "reasoningAndClosestCompetitor": "compliance保护5年；SSE-KMS选AWS生成材料且支持自动轮换的客户管理对称key，开启年度轮换。 1 governance可绕过；3没有客户配置SSE-S3年度KMS轮换路径；5不能把导入材料默认视为同样支持自动轮换。",
+      "missingJudgments": [],
+      "conditions": [],
+      "sourceIssues": [],
+      "reusedIndependentOriginalProof": {
+        "path": "/Users/qc/.local/share/codex-workflows/recallsmith/aws-basics-bilingual-rag-release-20261028/runtime/full-card-rebuild-v2-20261102/domain1-compression80-20261106/retest/worker-a/batch-02.json",
+        "sha256": "e1d84c164b0e6d4e9a6f6ff834279c525efc06b5c62c2069cfce5f5eb0966c8a"
+      },
+      "reusedIndependentEligibility": {
+        "path": "/Users/qc/.local/share/codex-workflows/recallsmith/aws-basics-bilingual-rag-release-20261028/runtime/full-card-rebuild-v2-20261102/global-card-proof-20261106/review/reuse-a/question-reuse371.json",
+        "sha256": "c5aece89674112b38e67cc39e895919acd1868015c52245f4a8ce2e17f4368d6",
+        "qid": 189,
+        "originalQuestionStemAndOptionsSha256": "dbc4dadc1c79b1a8f4e1d73e92c33be5113971dd3c378b83da1ff7e7ed9f2f36"
+      },
+      "bindingConvention": "Legacy exact four visible fields unchanged; omitted-empty old hash convention retained in eligibility, current canonical four-field hashes/quote offsets added mechanically. No verdict or teaching claim recomputed."
+    },
+    {
+      "qid": 761,
+      "status": "SUPPORTED",
+      "questionCanonicalSha256": "501053936c3cb180d724393d3c105a9d58ee3922108cda3a0c3599bea0d9b430",
+      "fullStemAndAllOptionsRead": true,
+      "notNewSemanticRead": true,
+      "selectedOptionOrdinals": [
+        4
+      ],
+      "usedRuleIds": [
+        "CUR:XA026"
+      ],
+      "necessaryAnchors": [
+        {
+          "ruleId": "CUR:XA026",
+          "bodySha256": "098ead702b8add81680abd5d9e98e08c7c9267471cc4aa67c543b441d7bc3b7c",
+          "field": "answerZH",
+          "quote": "前者建立SAML federation并映射到授权IAM角色；后者可由自建identity broker先验证LDAP身份，再向STS取得临时凭证。",
+          "startChar": 0,
+          "endChar": 74
+        }
+      ],
+      "actualVisibleGroup": [
+        {
+          "ruleId": "CUR:CA08",
+          "bodySha256": "dbeaee2f76ddfd27bc68c577b39e1c7bcee3ec9a435fed0d6654221b75194c42"
+        },
+        {
+          "ruleId": "CUR:XA026",
+          "bodySha256": "098ead702b8add81680abd5d9e98e08c7c9267471cc4aa67c543b441d7bc3b7c"
+        }
+      ],
+      "reasoningAndClosestCompetitor": "自建broker先验证非SAML LDAP身份，再用STS取得短期凭证用于联合控制台访问，保留原企业身份源。 普通LDAP不会仅启用Identity Center就自动成为兼容身份源；同步轮换长期IAM密钥不等于短期联合身份。",
+      "missingJudgments": [],
+      "conditions": [],
+      "sourceIssues": [],
+      "reusedIndependentOriginalProof": {
+        "path": "/Users/qc/.local/share/codex-workflows/recallsmith/aws-basics-bilingual-rag-release-20261028/runtime/full-card-rebuild-v2-20261102/domain1-final-card-catalog-20261105/backtest/1/batch-09.json",
+        "sha256": "aba446a0427edda1ddb9ba40d4f4c87902efa4d7e977f6b316895492e186e927"
+      },
+      "reusedIndependentEligibility": {
+        "path": "/Users/qc/.local/share/codex-workflows/recallsmith/aws-basics-bilingual-rag-release-20261028/runtime/full-card-rebuild-v2-20261102/global-card-proof-20261106/review/reuse-a/question-reuse371.json",
+        "sha256": "c5aece89674112b38e67cc39e895919acd1868015c52245f4a8ce2e17f4368d6",
+        "qid": 761,
+        "originalQuestionStemAndOptionsSha256": "501053936c3cb180d724393d3c105a9d58ee3922108cda3a0c3599bea0d9b430"
+      },
+      "bindingConvention": "Legacy exact four visible fields unchanged; omitted-empty old hash convention retained in eligibility, current canonical four-field hashes/quote offsets added mechanically. No verdict or teaching claim recomputed."
+    }
+  ]
+}

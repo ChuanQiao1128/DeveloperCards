@@ -1,0 +1,27 @@
+{
+  "recordId": "domain1-public-card-backtrace-pilot10-20261108",
+  "scope": "Post-package question-support challenge; card bodies and package-format acceptance unchanged",
+  "atUtc": "2026-11-07T19:27:52.627777+00:00",
+  "currentPackagedCardCount": 365,
+  "fullQuestionSupportHasOpenFindings": true,
+  "challengedOriginalQids": [
+    761,
+    189
+  ],
+  "affectedOriginalStatus": "NEEDS_TARGETED_RECHECK",
+  "historicalOriginalSupportedRecords": 899,
+  "challengedHistoricalSupportedRecords": 2,
+  "other897AreOldRecordsNotNewAudits": true,
+  "correctedPracticeCountUnchanged": 115,
+  "userAcceptedExceptionsUnchanged": [
+    49,
+    201,
+    454,
+    783
+  ],
+  "currentAuditStatePath": "/Users/qc/.local/share/codex-workflows/recallsmith/aws-basics-bilingual-rag-release-20261028/runtime/full-card-rebuild-v2-20261102/global-card-proof-20261106/domain1-card-backtrace-20261108/pilot10/state.json",
+  "currentFindingsPath": "/Users/qc/.local/share/codex-workflows/recallsmith/aws-basics-bilingual-rag-release-20261028/runtime/full-card-rebuild-v2-20261102/global-card-proof-20261106/domain1-card-backtrace-20261108/pilot10/findings.json",
+  "reportPath": "/Users/qc/Desktop/DeveloperCards/reports/2026-11-08-aws-domain1-card-backtrace-pilot10.md",
+  "independentResultSha256": "d7944c4cd5bd7466ef6356c233350018e62ec46a8d53ad0056bfb3d16e030a8e",
+  "globalFallbackResultSha256": "5c2019c3596e6a20b5891f899f9bd38447a1f3e46e572d912976d2bf6f29979d"
+}

@@ -1,0 +1,30 @@
+{
+  "status": "COMPLETE_PILOT10_WITH_OPEN_FINDINGS",
+  "completedUtc": "2026-11-07T19:27:52.627777+00:00",
+  "domain1PrimaryQuestionCount": 310,
+  "auditedQuestionCount": 10,
+  "notAuditedHere": 300,
+  "questionStatuses": {
+    "SUPPORTED": 8,
+    "PARTIAL": 2
+  },
+  "restrictedDomainCardCount": 159,
+  "globalFallbackOutsideCount": 206,
+  "findings": [
+    761,
+    189
+  ],
+  "navigationGaps": 0,
+  "contentBoundaryGaps": 2,
+  "missingJudgmentCount": 3,
+  "currentPackagedCards": 365,
+  "cardBodiesModified": false,
+  "learnerOutcomeMeasured": false,
+  "priorQuestionProofsOverwritten": false,
+  "priorFullCoverageNeedsTargetedRecheck": true,
+  "nextAction": "先用官方证据补清两处必要边界并定向复核，再沿此方法扩展领域1其余300题；本报告不执行改卡。",
+  "newContentModelCliApiCalls": 0,
+  "nativeUsage": "unknown",
+  "historyReset": false,
+  "firstRecordedUtc": "2026-11-07T18:52:54Z"
+}
