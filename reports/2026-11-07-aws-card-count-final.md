@@ -1,6 +1,6 @@
 # AWS 全库核心卡数验证终报（workflow-auto-closeout-20261107）
 
-> 最新续接：用户已接受Q49/201/454/783四项例外；N=365沿用。题侧为899原题充分＋115纠错练习＋4接受例外。双语包245/365，剩120，详见[双语进度](2026-11-07-aws-bilingual-package-progress.md)。下文是接受例外前的S8历史记录，保留原样。
+> 最新续接：用户已接受Q49/201/454/783四项例外；N=365沿用。题侧为899原题充分＋115纠错练习＋4接受例外。双语包365/365已完成本地总验，详见[双语终报](2026-11-07-aws-bilingual-package-final.md)。下文是接受例外前的S8历史记录，保留原样。
 
 日期：2026-11-07（Pacific/Auckland）· 运行：global-card-proof-20261106 · 最终回读：validation/s8-final-readback.json（17/17 PASS）
 

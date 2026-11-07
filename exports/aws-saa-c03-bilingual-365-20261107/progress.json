@@ -1,0 +1,45 @@
+{
+  "stage": "bilingual-packaging-20261107",
+  "status": "COMPLETE_LOCAL_BILINGUAL_PACKAGE",
+  "atUtc": "2026-11-07T09:45:40.523974+00:00",
+  "finalCoreCount": 365,
+  "authored": 365,
+  "independentSemanticPassed": 365,
+  "assembled": 365,
+  "remainingRuleIds": [],
+  "nextBatch": null,
+  "nextRuleId": null,
+  "uniquePrimaryCounts": {
+    "1": 116,
+    "2": 46,
+    "3": 159,
+    "4": 44
+  },
+  "sharedReviewCounts": {
+    "1": 159,
+    "2": 137,
+    "3": 197,
+    "4": 117
+  },
+  "questionDisposition": {
+    "originalSupported": 899,
+    "acceptedCorrectedPracticeSupported": 115,
+    "userAcceptedExceptions": [
+      49,
+      201,
+      454,
+      783
+    ],
+    "scopeTotal": 1018,
+    "note": "1014 supported originals/practices plus 4 accepted exceptions, not 1018 original questions supported"
+  },
+  "formalBilingualPackageComplete": true,
+  "published": false,
+  "learnerOutcomeMeasured": false,
+  "newModelCliApiCalls": 0,
+  "nativeUsage": "unknown",
+  "historyReset": false,
+  "evidence": "review/packaging365.review.json",
+  "verification": "validation365.json",
+  "completionPath": "completion.json"
+}
