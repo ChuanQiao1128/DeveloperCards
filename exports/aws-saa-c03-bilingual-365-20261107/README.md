@@ -1,5 +1,7 @@
 # AWS SAA-C03双语核心卡包
 
+> 2026-11-08后验核查：领域1首批10题为8充分、2部分；Q761/Q189的必要竞争边界尚未在全365张中找到。原双语/格式验收保留，全库题卡充分性需定向重核。见[逐题证据](../aws-domain1-card-backtrace-pilot10-20261108/README.md)。
+
 **365张，365/365通过本地独立总验。未发布、未OTA。**
 
 - [阅读稿](cards.deck.md)、[导入JSON](cards.import.json)、[公开数据](cards.public.json)、[私有数据与证据](cards.private.json)。

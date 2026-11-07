@@ -1,0 +1,53 @@
+{
+  "restrictedAuthorSha256": "1ae4ebb9c42d6419dcd54827637a5b45ecaf6b5c567a019e675234c59bfd4b17",
+  "outsideDomain1Count": 206,
+  "queries": {
+    "761": "LDAP|SAML|Identity Center|身份源|身份中心",
+    "189": "imported|import.{0,25}key|rotation|rotate|导入|轮换"
+  },
+  "candidates": {
+    "761": [],
+    "189": [
+      {
+        "stableUid": "aws-rb2-20261107-pack-gcl-019",
+        "topic": "Database backup formats / 数据库备份格式",
+        "frontEn": "Does placing a backup in S3 directly create Aurora? How do native snapshots, logical SQL dumps, and supported physical backups differ?",
+        "backEn": "Answer: A compatible-version native RDS MySQL snapshot can migrate directly to Aurora MySQL. SQL dumps usually need client-side logical import; physical backup restoration from S3 requires a format supported by the target engine.\nKey point: A common storage location does not imply a common backup format. Restoration depends on whether the database understands that format.\nWatch out: A mysqldump file is neither a native snapshot nor automatically a supported physical backup.",
+        "frontZh": "备份放S3就能直接创建Aurora吗？原生快照、逻辑SQL dump与受支持物理备份怎样区分？",
+        "backZh": "答：兼容版本的RDS MySQL原生快照可直接迁为Aurora MySQL；SQL dump通常用客户端逻辑导入；从S3恢复物理备份须符合目标引擎支持的格式。\n考点：存放位置相同不代表备份格式相同；恢复方式取决于数据库能否理解该格式。\n易错提醒：不能把mysqldump文件当作原生快照或受支持的物理备份。"
+      },
+      {
+        "stableUid": "aws-rb2-20261107-pack-gsc-006",
+        "topic": "Connecting Lustre and S3 / Lustre与S3衔接",
+        "frontEn": "HPC data is in S3, applications need file access, and final results must return to S3. How does Lustre bridge them?",
+        "backEn": "Answer: Associate FSx for Lustre with the S3 repository, process files, and export results to S3.\nKey point: Association presents S3 objects as files. Returned Snowball data imports into S3, so it can enter the bucket first and then be associated with Lustre. Results require an applicable export process into the durable repository.\nWatch out: S3 association does not mean every new result was automatically exported; configure and verify the export process.",
+        "frontZh": "HPC数据已经在S3，计算程序必须按文件访问，结果最终也要保留在S3。Lustre怎样衔接这两端？",
+        "backZh": "答：把FSx for Lustre关联S3数据仓库，按文件处理数据，再把结果导出回S3。\n考点：关联把S3对象呈现为文件；返运Snowball的导入目标是S3，可先导入该桶，再关联Lustre。处理结果须按适用导出流程写回持久数据仓库。\n易错提醒：关联S3不等于任何新结果已经自动写回；须配置并确认适用的导出流程。"
+      },
+      {
+        "stableUid": "aws-rb2-20261107-pack-gsc-048",
+        "topic": "Snapshot export and restoration / 快照导出与恢复",
+        "frontEn": "Can S3 data files exported from an RDS snapshot directly restore the same database as the original native snapshot?",
+        "backEn": "Answer: No. Snapshot export serves analytics; restore through supported snapshot-restoration or data-import paths.\nKey point: Queryable data files and native recovery points are different artifacts. Export does not preserve all database state in a directly restorable form.\nWatch out: A copy of database data in S3 does not mean any engine can directly restore those files.",
+        "frontZh": "RDS快照导出的S3数据文件，可以当作原RDS快照直接恢复出同一个数据库吗？",
+        "backZh": "答：不可以；快照导出面向数据分析，恢复数据库应使用受支持的快照恢复或数据导入路径。\n考点：可查询的数据文件与服务原生数据库恢复点是不同产物，导出不等于保存了可直接恢复的全部数据库状态。\n易错提醒：S3有一份数据库数据，不代表任意引擎都能直接从这些文件恢复。"
+      },
+      {
+        "stableUid": "aws-rb2-20261107-pack-gsc-077",
+        "topic": "Online and offline transfer / 在线与离线搬迁",
+        "frontEn": "Historical data has a fixed cloud-migration deadline but little shared-network bandwidth. How should online versus offline-device transfer be judged?",
+        "backEn": "Answer: Estimate an online lower bound as volume divided by actual available rate; if the window is insufficient, compare applicable offline devices.\nKey point: Use migration-available bandwidth, not total bandwidth. Eligible Snowball devices bypass narrow links with 256-bit device encryption and KMS-protected keys, but preparation, shipping, and import still take time.\nWatch out: Verify current eligibility, capacity, and delivery window; retired devices or omitted shipping time cannot prove feasibility.",
+        "frontZh": "海量历史数据须在固定期限内迁云，但共享网络带宽很小。怎样判断在线搬运还是离线设备运输？",
+        "backZh": "答：先用数据量÷实际可用传输速率估算在线下限；窗口不够时，比较适用的离线设备方案。\n考点：先区分迁移可用带宽和总带宽。适用Snowball离线设备可避开窄链路，设备数据有256位加密，KMS保护加密密钥；但仍要计入准备、运输及导入时间。\n易错提醒：须核对设备现行可用资格、可用容量和交付窗口，不能用退役设备或忽略运输时间证明可行。"
+      },
+      {
+        "stableUid": "aws-rb2-20261107-pack-gsc-123",
+        "topic": "Routing by outstanding requests / 按未完成请求分流",
+        "frontEn": "ALB RequestCount and TargetResponseTime rise and some targets accumulate work. How can new requests avoid targets with many unfinished requests?",
+        "backEn": "Answer: Evaluate least outstanding requests routing to eligible targets with fewer unfinished requests.\nKey point: It reflects current unfinished work better than simple rotation. Monitoring diagnoses the problem; two CloudWatch thresholds do not directly route requests.\nWatch out: ActiveConnectionCount measures connections, not response time; unfinished requests are not CPU usage.",
+        "frontZh": "ALB监控中RequestCount（请求数）和TargetResponseTime（后端响应耗时）升高，部分目标积压。怎样让新请求避开仍有大量未完成工作的目标？",
+        "backZh": "答：评估least outstanding requests算法，将新请求导向未完成请求较少的适用目标。\n考点：它依据当前未完成工作数分配请求，比只轮流分配更能反映这类忙闲差异；监控指标用于诊断，不是两条CloudWatch阈值直接控制路由。\n易错提醒：ActiveConnectionCount量连接而非响应耗时；未完成请求数也不等于CPU使用率。"
+      }
+    ]
+  }
+}
