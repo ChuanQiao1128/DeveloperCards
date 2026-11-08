@@ -42,7 +42,7 @@ CD = REPO_ROOT / ".github" / "workflows" / "cd.yml"
 OPERATORS = REPO_ROOT / "infra" / "modules" / "operators"
 PROD_MAIN = REPO_ROOT / "infra" / "envs" / "prod" / "main.tf"
 TFCI = REPO_ROOT / "docs" / "delivery" / "r27-issues" / "TFCI.plan-allow.json"
-REPO = "ChuanQiao1128/DeveloperCards"
+REPO = "ChuanQiao1128@195982986/DeveloperCards@1076433600"  # GitHub OIDC sub claim is ID-qualified since 2026
 
 ALLOW_OK = {"tags_only_updates": False, "changes": {"module.api.aws_apigatewayv2_route.this[\"x\"]": "create"}}
 LOCK_AWS = 'provider "registry.terraform.io/hashicorp/aws" {\n  version = "6.0.0"\n}\n'
