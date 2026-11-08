@@ -2,7 +2,7 @@
 
 The authenticated Console route is `/decks/release?deckId=15`, linked from that deck's card list. It is limited to ordinary signed-in `editor` / `super_admin` sessions; backend deck permissions and normal Console token authorization remain authoritative. It does not run a model or perform human per-card review. No credentials belong in a bundle or journal.
 
-`src/types/contentRelease.ts` is the typed contract. `parseReleaseBundle` in `src/lib/contentRelease.ts` rejects missing or extra top-level, card, evidence and per-card review fields, wrong scope, duplicate UIDs/order, absent Chinese/help fields, invalid MCQ/translation shapes, and expired evidence. `tests/support/contentReleaseFixtures.ts` provides a complete synthetic 337-card sample generator. Its synthetic hashes are test placeholders, never production review evidence.
+`src/types/contentRelease.ts` is the typed contract. `parseReleaseBundle` in `src/lib/contentRelease.ts` accepts 1–500 cards, matching the server import limit. Review coverage and current readback must match the frozen bundle's actual count exactly. It rejects missing or extra top-level, card, evidence and per-card review fields, wrong scope, duplicate UIDs/order, absent Chinese/help fields, invalid MCQ/translation shapes, and expired evidence. `tests/support/contentReleaseFixtures.ts` provides a synthetic sample generator with a configurable count (337 by default); regressions include 379 cards and the count boundaries. Its synthetic hashes are test placeholders, never production review evidence.
 
 The JSON object has exactly:
 
@@ -12,7 +12,7 @@ The JSON object has exactly:
   deckId: 15,
   deckSlug: 'aws-saa-fundamentals',
   releaseId: string, // nonempty, at most 160 characters; immutable release identity
-  cards: ImportCardInput[], // exactly 337, all fields below explicit
+  cards: ImportCardInput[], // 1–500, all fields below explicit
   review: {
     runId: string,
     batchAuthorizationRef: string, // existing user authorization reference, not a new claim of human content review
@@ -39,7 +39,7 @@ The JSON object has exactly:
 
 Every hash field is a lowercase 64-hex SHA-256. `evidenceRef` / `reportRef` and batch authorization reference permit 2000 characters; model and version strings permit 200; other identifiers permit 160. The authorization scope is fixed. Policy, policyHash, reviewSchema and schemaHash are **not bundle fields**: the page reads them from the current server snapshot when constructing `/release/review`.
 
-Every card has exactly `stableUid`, `question`, `explanation`, `codeSnippet`, `codeLanguage`, `realWorldUsage`, `topic`, `difficulty`, `orderInDeck`, `mcq`, `source`, `frontHelp`, `translations`. The six text fields are strings (empty string for absent optional text), already trimmed except codeSnippet, whose whitespace is preserved. `source` is `{url: httpsUrl, quote: string | null}`. `frontHelp` is an explicit array of up to two `{term,definition}` entries or null. `translations` includes a complete `zh-CN` v1 translation and matching Chinese help entry count. MCQ and translation shapes are the existing Console types, validated with the shared MCQ/translation validators. All existing active UIDs must remain in the 337-card candidate. Nothing soft-deletes omitted cards.
+Every card has exactly `stableUid`, `question`, `explanation`, `codeSnippet`, `codeLanguage`, `realWorldUsage`, `topic`, `difficulty`, `orderInDeck`, `mcq`, `source`, `frontHelp`, `translations`. The six text fields are strings (empty string for absent optional text), already trimmed except codeSnippet, whose whitespace is preserved. `source` is `{url: httpsUrl, quote: string | null}`. `frontHelp` is an explicit array of up to two `{term,definition}` entries or null. `translations` includes a complete `zh-CN` v1 translation and matching Chinese help entry count. MCQ and translation shapes are the existing Console types, validated with the shared MCQ/translation validators. All existing active UIDs must remain in the candidate. Nothing soft-deletes omitted cards.
 
 An exporter must bind local model PASS records to the **post-import** server hash/schema/revision/order. `src_C/Vpc/Qa/CardContentHash.cs` defines the backend hash, including PostgreSQL JSON object order, .NET serialization, translations and front-help schema. It is not the pipeline's sorted-key candidate hash. Do not copy a server hash onto an unrelated PASS record, invent a PASS, or label deterministic UI checks as model review. A mismatch blocks review registration. If an exporter cannot establish those expected values from immutable candidate/review/baseline evidence, it must stop; the Console does not guess them.
 

@@ -38,6 +38,7 @@ export function ContentReleasePage() {
   });
   const [session, setSession] = useState<ReleaseSession | null>(restored.session);
   const [bundle, setBundle] = useState<ReleaseBundle | null>(null);
+  const cardCount = session?.bundle.cards.length ?? bundle?.cards.length;
   const [restoreBlocked, setRestoreBlocked] = useState(Boolean(restored.error));
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
@@ -146,7 +147,7 @@ export function ContentReleasePage() {
 
   if (!allowed) return <ConsoleShell title={CONSOLE_NAME} {...consoleNav()}><Callout tone="danger" role="alert">This release page requires a signed-in Console editor or super_admin and AWS Basics deck 15. Server authorization remains authoritative.</Callout></ConsoleShell>;
   return <ConsoleShell title={CONSOLE_NAME} subtitle="AWS Basics bilingual release" {...consoleNav()}>
-    <div className="flex flex-wrap items-center justify-between gap-3"><h1 className={H1_CLASS}>AWS Basics release · 337 cards</h1><Link className="text-sm text-indigo-700 underline" to="/decks/cards?deckId=15">Back to AWS Basics</Link></div>
+    <div className="flex flex-wrap items-center justify-between gap-3"><h1 className={H1_CLASS}>AWS Basics release{cardCount ? ` · ${cardCount} cards` : ''}</h1><Link className="text-sm text-indigo-700 underline" to="/decks/cards?deckId=15">Back to AWS Basics</Link></div>
     <Callout tone="info">Load the immutable local bundle containing the existing model review. File checks and readback comparisons do not review content. The receipt records reviewedBy=codex and humanPerCardReview=false; the author submits batch authorization without asserting per-card human review.</Callout>
     {error && <Callout tone="danger" role="alert">{error}</Callout>}
     {message && <Callout tone="info" role="status">{message}</Callout>}
@@ -173,7 +174,7 @@ export function ContentReleasePage() {
           <h2 id={`${kind}-heading`} className={H2_CLASS}>{index + 2}. {kind === 'import' ? 'Import frozen candidate' : kind === 'review' ? 'Verify full readback and register local model evidence' : 'Publish reviewed snapshot'}</h2>
           {action && <p className="text-sm break-all">Action: {action.actionId} · {!action.reconciled ? 'Recovery unreconciled — query before continuing' : action.outcome === 'unknown' ? 'Outcome unknown — query before retry' : 'Commit confirmed'}{action.result?.error ? ` · ${action.result.error.code}` : ''}</p>}
           <div className="flex flex-wrap gap-3">
-            {!action && <Button disabled={busy || !ready} onClick={() => void run(() => dispatch(kind))}>{kind === 'import' ? 'Import 337 cards' : kind === 'review' ? 'Verify and register model review' : 'Publish reviewed release'}</Button>}
+            {!action && <Button disabled={busy || !ready} onClick={() => void run(() => dispatch(kind))}>{kind === 'import' ? `Import ${session.bundle.cards.length} cards` : kind === 'review' ? 'Verify and register model review' : 'Publish reviewed release'}</Button>}
             {action && <Button variant="outline" disabled={busy} onClick={() => void run(() => query(kind))}>Query {kind} action</Button>}
             {action && (action.outcome === 'unknown' || kind === 'publish') && <Button variant="outline" disabled={busy || !action.queried || !ready} onClick={() => void run(() => dispatch(kind, true))}>Retry identical {kind} request</Button>}
           </div>
@@ -181,7 +182,7 @@ export function ContentReleasePage() {
           {kind === 'publish' && <p className="text-sm text-slate-600">A 503 or timeout can leave a committed publish job. Query, then replay the same action if delivery is unconfirmed. Current job and live status appear below; manifestVerified remains false until external CDN verification.</p>}
         </section>;
       })}
-      <section className={`${CARD_CLASS} space-y-3`} aria-labelledby="verification-heading"><h2 id="verification-heading" className={H2_CLASS}>Readback and server status</h2><Button variant="outline" disabled={busy || !isConfirmedAction(session.actions.import) || !Object.values(session.actions).every(action => action.reconciled)} onClick={() => void run(async () => { const next = await owned(() => verify(session)); save(next); setMessage('Exact 337-card readback and local model review bindings verified. No new model review was performed.'); })}>Verify current editing readback</Button><p className="text-sm">manifestVerified=false · External CDN verification is pending.</p>
+      <section className={`${CARD_CLASS} space-y-3`} aria-labelledby="verification-heading"><h2 id="verification-heading" className={H2_CLASS}>Readback and server status</h2><Button variant="outline" disabled={busy || !isConfirmedAction(session.actions.import) || !Object.values(session.actions).every(action => action.reconciled)} onClick={() => void run(async () => { const next = await owned(() => verify(session)); save(next); setMessage(`Exact ${session.bundle.cards.length}-card readback and local model review bindings verified. No new model review was performed.`); })}>Verify current editing readback</Button><p className="text-sm">manifestVerified=false · External CDN verification is pending.</p>
         <details><summary className="cursor-pointer text-sm">Latest action query (actual jobs and live build)</summary><pre className="text-xs overflow-auto max-h-96 whitespace-pre-wrap break-all">{JSON.stringify(queryView ?? Object.fromEntries(Object.entries(session.actions).map(([kind, action]) => [kind, action?.query ?? action?.result])), null, 2)}</pre></details>
         <details><summary className="cursor-pointer text-sm">Frozen complete editing backup</summary><pre className="text-xs overflow-auto max-h-96 whitespace-pre-wrap break-all">{JSON.stringify(session.baseline, null, 2)}</pre></details>
       </section>
