@@ -157,7 +157,9 @@ public static class CardsPage
         c.source,
         nullif(to_jsonb(c) -> 'front_help', 'null'::jsonb) as "frontHelp",
         nullif(to_jsonb(c) -> 'translations', 'null'::jsonb) as translations,
-        nullif(to_jsonb(c) -> 'translation_basis', 'null'::jsonb) as "translationBasis"
+        nullif(to_jsonb(c) -> 'translation_basis', 'null'::jsonb) as "translationBasis",
+        nullif(to_jsonb(c) -> 'teaching', 'null'::jsonb) as teaching,
+        nullif(to_jsonb(c) -> 'tags', 'null'::jsonb) as tags
       from cards c
       """;
 

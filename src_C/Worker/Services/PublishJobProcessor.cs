@@ -195,7 +195,7 @@ public class PublishJobProcessor : IPublishJobProcessor, IReplayOutcome
   public static string SnapshotDigest(IEnumerable<CardExportData> cards) =>
     PublishSnapshot.Digest(cards.Select(c => new PublishSnapshotCard(c.StableUid, c.OrderInDeck, c.Difficulty, c.Question, c.Explanation,
       c.CodeLanguage, c.CodeSnippet, c.RealWorldUsage, c.Revision, c.Topic, c.Mcq?.GetRawText(), c.Source?.GetRawText(),
-      c.Translations?.GetRawText(), c.FrontHelp?.GetRawText())));
+      c.Translations?.GetRawText(), c.FrontHelp?.GetRawText(), c.Teaching?.GetRawText(), c.Tags?.GetRawText())));
 
   private static async Task ValidateReleaseJob(string jobId)
   {
@@ -286,7 +286,9 @@ public class PublishJobProcessor : IPublishJobProcessor, IReplayOutcome
       nullif(to_jsonb(cards) -> 'mcq', 'null'::jsonb) as mcq,
       nullif(to_jsonb(cards) -> 'source', 'null'::jsonb) as source,
       nullif(to_jsonb(cards) -> 'translations', 'null'::jsonb) as translations,
-      nullif(nullif(to_jsonb(cards) -> 'front_help', 'null'::jsonb), '[]'::jsonb) as "frontHelp"
+      nullif(nullif(to_jsonb(cards) -> 'front_help', 'null'::jsonb), '[]'::jsonb) as "frontHelp",
+      nullif(to_jsonb(cards) -> 'teaching', 'null'::jsonb) as teaching,
+      nullif(to_jsonb(cards) -> 'tags', 'null'::jsonb) as tags
     from cards where deck_id = $1 and is_deleted = 0 order by order_in_deck asc, id asc
     """;
 
@@ -310,6 +312,8 @@ public class PublishJobProcessor : IPublishJobProcessor, IReplayOutcome
       Source = c.TryGetValue("source", out var so) && so is string ss ? JsonSerializer.Deserialize<JsonElement>(ss) : null,
       FrontHelp = c.TryGetValue("frontHelp", out var fh) && fh is string hs ? JsonSerializer.Deserialize<JsonElement>(hs) : null,
       Translations = c.TryGetValue("translations", out var tr) && tr is string ts ? JsonSerializer.Deserialize<JsonElement>(ts) : null,
+      Teaching = c.TryGetValue("teaching", out var te) && te is string tes ? JsonSerializer.Deserialize<JsonElement>(tes) : null,
+      Tags = c.TryGetValue("tags", out var tg) && tg is string tgs ? JsonSerializer.Deserialize<JsonElement>(tgs) : null,
     }).ToList();
   }
 }

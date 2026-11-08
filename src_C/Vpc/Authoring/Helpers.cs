@@ -336,6 +336,10 @@ public static class Helpers
   public static APIGatewayProxyResponse TranslationsNotMigrated(Res res) =>
     ErrorEnvelope(res, 503, "MIGRATION_REQUIRED", "cards.translations does not exist yet; run migration 047 first");
 
+  /// <summary>503 MIGRATION_REQUIRED for a card teaching/tags write that reached a database without migration 051.</summary>
+  public static APIGatewayProxyResponse TeachingNotMigrated(Res res) =>
+    ErrorEnvelope(res, 503, "MIGRATION_REQUIRED", "cards.teaching/cards.tags do not exist yet; run migration 051 first");
+
   /// <summary>The deck's own locale (a card translation into it is refused), or null when the deck does not exist.</summary>
   public static async Task<string?> DeckLocaleAsync(NpgsqlConnection conn, long deckId) =>
     await DbUtil.ExecuteScalarAsync(conn, null, "select locale from decks where id = $1", [deckId]) as string;

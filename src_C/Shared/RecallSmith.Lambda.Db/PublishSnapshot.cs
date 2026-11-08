@@ -11,7 +11,7 @@ namespace RecallSmith.Lambda.Db;
 /// </summary>
 public sealed record PublishSnapshotCard(string? StableUid, int OrderInDeck, int? Difficulty, string? Question, string? Explanation,
   string? CodeLanguage, string? CodeSnippet, string? RealWorldUsage, int? Revision, string? Topic, string? McqJson, string? SourceJson,
-  string? TranslationsJson = null, string? FrontHelpJson = null);
+  string? TranslationsJson = null, string? FrontHelpJson = null, string? TeachingJson = null, string? TagsJson = null);
 
 /// <summary>
 /// The digest that binds a publish build to the cards the AI QA publish gate passed (R18 Y02, backend-design-16).
@@ -57,6 +57,15 @@ public static class PublishSnapshot
       var extended = HasFrontHelp(c.TranslationsJson, help);
       if (c.TranslationsJson is not null) fields.Add(extended ? CanonicalJson(c.TranslationsJson) : c.TranslationsJson);
       if (extended) fields.Add(new { schema = "front-help-v1", frontHelp = help is null ? (JsonElement?)null : JsonSerializer.Deserialize<JsonElement>(help) });
+      // Migration 051, same null-preserving rule as translations: only a card that carries a teaching
+      // payload contributes one, so every pre-051 card digests byte-identically under the new formula.
+      if (c.TeachingJson is not null)
+        fields.Add(new
+        {
+          schema = "teaching-v1",
+          teaching = JsonSerializer.Deserialize<JsonElement>(CanonicalJson(c.TeachingJson)),
+          tags = c.TagsJson is null ? (JsonElement?)null : JsonSerializer.Deserialize<JsonElement>(CanonicalJson(c.TagsJson)),
+        });
       return fields.ToArray();
     }).ToList();
     var hash = SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(payload)));
@@ -84,7 +93,9 @@ public static class PublishSnapshot
     Text(row, "source"),
     // Null-preserving, unlike Text: a card without translations must digest as before migration 047.
     Cell(row, "translations") is { } translations ? JsonText(translations) : null,
-    Cell(row, "frontHelp") is { } help ? JsonText(help) : null);
+    Cell(row, "frontHelp") is { } help ? JsonText(help) : null,
+    Cell(row, "teaching") is { } teaching ? JsonText(teaching) : null,
+    Cell(row, "tags") is { } tags ? JsonText(tags) : null);
 
   private static string JsonText(object value) => value is JsonElement element ? element.GetRawText() : Convert.ToString(value, CultureInfo.InvariantCulture)!;
 
