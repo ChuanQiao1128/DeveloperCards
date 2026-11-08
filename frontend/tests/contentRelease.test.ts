@@ -208,3 +208,21 @@ describe('captured complete all-row inventory (F04 residual)', () => {
     expect(() => parseReleaseSession(JSON.stringify(session), session.ownerSubject)).toThrow(/backup/);
   });
 });
+
+describe('migration 051 structured teaching payload and navigation tags', () => {
+  it('accepts cards carrying teaching and tags without invalidating standard bundles', () => {
+    const { bundle } = releaseFixture(1);
+    const card = bundle.cards[0] as unknown as Record<string, unknown>;
+    card.teaching = {
+      schema: 'teaching-v1',
+      answer: 'Attach a role.',
+      keyPoint: 'SSM Agent connects out.',
+      mustAnswer: ['Attach role'],
+      'zh-CN': { answer: '关联角色。', keyPoint: 'SSM Agent连出。' }
+    };
+    card.tags = { domain: '1', examTask: '1.1' };
+    const parsed = parseReleaseBundle(JSON.stringify(bundle));
+    expect(parsed.cards[0].teaching).toEqual(card.teaching);
+    expect(parsed.cards[0].tags).toEqual(card.tags);
+  });
+});
