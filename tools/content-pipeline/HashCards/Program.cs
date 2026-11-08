@@ -16,7 +16,7 @@ foreach (var line in File.ReadLines(args[0]))
     foreach (var field in new[] { "question", "explanation", "codeSnippet", "codeLanguage", "realWorldUsage", "topic" })
         cells[field] = card.TryGetProperty(field, out var value) && value.ValueKind != JsonValueKind.Null ? value.GetString() : null;
     cells["difficulty"] = card.GetProperty("difficulty").GetInt32();
-    foreach (var field in new[] { "mcq", "source", "translations", "frontHelp" })
+    foreach (var field in new[] { "mcq", "source", "translations", "frontHelp", "teaching", "tags" })
         cells[field] = card.TryGetProperty(field, out var value) && value.ValueKind != JsonValueKind.Null ? value.GetRawText() : null;
     rows.Add(new { stableUid = uid, cardContentHash = CardContentHash.Compute(cells),
                    schema = CardContentHash.Schema(cells), orderInDeck = card.GetProperty("orderInDeck").GetInt32() });

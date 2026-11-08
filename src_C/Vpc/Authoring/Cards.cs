@@ -57,7 +57,9 @@ public static class Cards
             c.source,
             nullif(to_jsonb(c) -> 'front_help', 'null'::jsonb) as "frontHelp",
             nullif(to_jsonb(c) -> 'translations', 'null'::jsonb) as translations,
-            nullif(to_jsonb(c) -> 'translation_basis', 'null'::jsonb) as "translationBasis"
+            nullif(to_jsonb(c) -> 'translation_basis', 'null'::jsonb) as "translationBasis",
+            nullif(to_jsonb(c) -> 'teaching', 'null'::jsonb) as teaching,
+            nullif(to_jsonb(c) -> 'tags', 'null'::jsonb) as tags
           from cards c
           """;
 
@@ -158,6 +160,8 @@ public static class Cards
         }
 
         var frontHelp = FrontHelpValidation.Read(body, out _);
+        var teaching = TeachingValidation.Read(body, out _);
+        var tags = TagsValidation.Read(body, out _);
 
         // Translations mirror the English just validated above; the basis records which English that was.
         string? translations = null;
@@ -175,11 +179,13 @@ public static class Cards
         if (withFrontHelp && !await Helpers.ColumnExistsAsync(conn, null, "cards", "front_help")) return Helpers.FrontHelpNotMigrated(res);
         var withTranslations = translations is not null;
         if (withTranslations && !await Helpers.ColumnExistsAsync(conn, null, "cards", "translations")) return Helpers.TranslationsNotMigrated(res);
+        var withTeaching = teaching is not null || tags is not null;
+        if (withTeaching && !await Helpers.ColumnExistsAsync(conn, null, "cards", "teaching")) return Helpers.TeachingNotMigrated(res);
 
         var sql = $"""
           insert into cards (
             deck_id, stable_uid, question, explanation, code_snippet, code_language,
-            real_world_usage, difficulty, order_in_deck, revision, version, topic, mcq, source{(withTranslations ? ", translations, translation_basis" : "")}{(withFrontHelp ? ", front_help" : "")}
+            real_world_usage, difficulty, order_in_deck, revision, version, topic, mcq, source{(withTranslations ? ", translations, translation_basis" : "")}{(withFrontHelp ? ", front_help" : "")}{(withTeaching ? ", teaching, tags" : "")}
           )
           values (
             $1,$2,$3,$4,$5,$6,$7,
@@ -189,7 +195,7 @@ public static class Cards
             coalesce($11,1),
             $12,
             $13::jsonb,
-            $14::jsonb{(withTranslations ? ", $15::jsonb, $16::jsonb" : "")}{(withFrontHelp ? (withTranslations ? ", $17::jsonb" : ", $15::jsonb") : "")}
+            $14::jsonb{(withTranslations ? ", $15::jsonb, $16::jsonb" : "")}{(withFrontHelp ? (withTranslations ? ", $17::jsonb" : ", $15::jsonb") : "")}{(withTeaching ? (withTranslations ? (withFrontHelp ? ", $18::jsonb, $19::jsonb" : ", $17::jsonb, $18::jsonb") : (withFrontHelp ? ", $16::jsonb, $17::jsonb" : ", $15::jsonb, $16::jsonb")) : "")}
           )
           returning
             id,
@@ -212,7 +218,9 @@ public static class Cards
             source,
             nullif(to_jsonb(cards) -> 'front_help', 'null'::jsonb) as "frontHelp",
             nullif(to_jsonb(cards) -> 'translations', 'null'::jsonb) as translations,
-            nullif(to_jsonb(cards) -> 'translation_basis', 'null'::jsonb) as "translationBasis";
+            nullif(to_jsonb(cards) -> 'translation_basis', 'null'::jsonb) as "translationBasis",
+            nullif(to_jsonb(cards) -> 'teaching', 'null'::jsonb) as teaching,
+            nullif(to_jsonb(cards) -> 'tags', 'null'::jsonb) as tags;
           """;
 
         var parameters = new List<object?>
@@ -237,6 +245,7 @@ public static class Cards
         }
 
         if (withFrontHelp) parameters.Add(frontHelp);
+        if (withTeaching) { parameters.Add(teaching); parameters.Add(tags); }
         var rows = await DbUtil.QueryAsync(conn, null, sql, parameters);
         if (rows.Count > 0)
         {
@@ -388,6 +397,12 @@ public static class Cards
           new("isDeleted", "is_deleted", v => Helpers.ParseBoolean(v, false) ? 1 : 0),
         };
         if (frontHelpSent && frontHelpReady) spec.Add(new("frontHelp", "front_help", _ => effectiveFrontHelp, "::jsonb"));
+        var incomingTeaching = TeachingValidation.Read(body, out var teachingSent);
+        var incomingTags = TagsValidation.Read(body, out var tagsSent);
+        var teachingReady = !teachingSent || await Helpers.ColumnExistsAsync(conn, null, "cards", "teaching");
+        if (!teachingReady && (incomingTeaching is not null || incomingTags is not null)) return Helpers.TeachingNotMigrated(res);
+        if (teachingSent && teachingReady) spec.Add(new("teaching", "teaching", _ => incomingTeaching, "::jsonb"));
+        if (tagsSent && teachingReady) spec.Add(new("tags", "tags", _ => incomingTags, "::jsonb"));
         if (writeTranslations)
         {
           // One body key, two columns: a translations block always writes its basis alongside.
@@ -440,7 +455,9 @@ public static class Cards
             source,
             nullif(to_jsonb(cards) -> 'front_help', 'null'::jsonb) as "frontHelp",
             nullif(to_jsonb(cards) -> 'translations', 'null'::jsonb) as translations,
-            nullif(to_jsonb(cards) -> 'translation_basis', 'null'::jsonb) as "translationBasis";
+            nullif(to_jsonb(cards) -> 'translation_basis', 'null'::jsonb) as "translationBasis",
+            nullif(to_jsonb(cards) -> 'teaching', 'null'::jsonb) as teaching,
+            nullif(to_jsonb(cards) -> 'tags', 'null'::jsonb) as tags;
           """;
 
         parameters.Add(idInt);

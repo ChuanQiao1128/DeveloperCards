@@ -80,4 +80,15 @@ public class CardExportData
 
   [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
   public JsonElement? FrontHelp { get; set; }
+
+  /// <summary>
+  /// Structured teaching payload (cards.teaching, migration 051). Omitted when null, so a card without one
+  /// serializes byte-identically to the builds before this field existed.
+  /// </summary>
+  [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+  public JsonElement? Teaching { get; set; }
+
+  /// <summary>Navigation tags (cards.tags, migration 051). Omitted when null, as above.</summary>
+  [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+  public JsonElement? Tags { get; set; }
 }

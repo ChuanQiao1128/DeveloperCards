@@ -23,7 +23,9 @@ public static class CardContentHash
     c.id, c.stable_uid as "stableUid", c.order_in_deck as "orderInDeck", c.question, c.explanation,
     c.code_snippet as "codeSnippet", c.code_language as "codeLanguage", c.real_world_usage as "realWorldUsage",
     c.difficulty, c.topic, c.mcq, c.source, nullif(to_jsonb(c) -> 'translations', 'null'::jsonb) as translations,
-    nullif(to_jsonb(c) -> 'front_help', 'null'::jsonb) as "frontHelp"
+    nullif(to_jsonb(c) -> 'front_help', 'null'::jsonb) as "frontHelp",
+    nullif(to_jsonb(c) -> 'teaching', 'null'::jsonb) as teaching,
+    nullif(to_jsonb(c) -> 'tags', 'null'::jsonb) as tags
     """;
 
   /// <summary>Lowercase hex SHA-256 of the canonical JSON array of the card's reviewable content.</summary>
@@ -46,6 +48,14 @@ public static class CardContentHash
     var extended = Schema(row) == "front-help-v1";
     if (translations is not null) payload.Add(extended ? JsonNode.Parse(PublishSnapshot.CanonicalJson(translations.ToJsonString())) : translations);
     if (extended) payload.Add(new { schema = "front-help-v1", frontHelp = help is null ? null : JsonNode.Parse(help) });
+    // Migration 051: a card with a teaching payload hashes it; a card without one hashes exactly as before.
+    if (Node(Cell(row, "teaching")) is { } teaching)
+      payload.Add(new
+      {
+        schema = "teaching-v1",
+        teaching = JsonNode.Parse(PublishSnapshot.CanonicalJson(teaching.ToJsonString())),
+        tags = Node(Cell(row, "tags")) is { } tags ? JsonNode.Parse(PublishSnapshot.CanonicalJson(tags.ToJsonString())) : null,
+      });
 
     var json = JsonSerializer.Serialize(payload);
     var hash = SHA256.HashData(Encoding.UTF8.GetBytes(json));
