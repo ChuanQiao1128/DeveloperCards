@@ -65,6 +65,46 @@ describe('AWS Basics release operator flow', () => {
     await user.click(screen.getByRole('button', { name: 'Import 337 cards' }));
     await waitFor(() => expect(api.sendReleaseAction).toHaveBeenCalledTimes(1));
   });
+  it('imports, verifies and publishes 379 cards from a baseline containing only deleted old cards', async () => {
+    const user = userEvent.setup(); const { bundle, snapshot, cards } = releaseFixture(379);
+    const baseline = structuredClone(snapshot);
+    baseline.cards = [];
+    baseline.editingSnapshot = '5'.repeat(64);
+    baseline.publishSnapshot = '6'.repeat(64);
+    baseline.deck.total_cards = 347;
+    baseline.backup = baseline.backup.slice(0, 347).map((row, index) => ({ ...row, id: index + 1001, stable_uid: `old-card-${index + 1}`, order_in_deck: index + 1001, is_deleted: 1 }));
+    snapshot.backup.push(...structuredClone(baseline.backup));
+    api.fetchReleaseSnapshot.mockResolvedValueOnce(ok(baseline)).mockResolvedValueOnce(ok(baseline)).mockResolvedValue(ok(snapshot));
+    api.fetchReleaseCards.mockResolvedValue(ok(cards));
+    api.sendReleaseAction
+      .mockResolvedValueOnce(ok({ editingSnapshot: snapshot.editingSnapshot }))
+      .mockResolvedValueOnce(ok({ receiptId: 'receipt-379', editingSnapshot: snapshot.editingSnapshot, publishSnapshot: snapshot.publishSnapshot }))
+      .mockResolvedValueOnce(ok({ jobId: 'job-379', buildId: 'build-379', outcome: 'committed', manifestVerified: false, snapshotSha256: snapshot.publishSnapshot }));
+    mount();
+    const file = new File([JSON.stringify(bundle)], 'synthetic-379.json', { type: 'application/json' });
+    Object.defineProperty(file, 'text', { value: async () => JSON.stringify(bundle) });
+    await user.upload(screen.getByLabelText('Immutable release bundle (JSON)'), file);
+    await screen.findByRole('heading', { name: 'AWS Basics release · 379 cards' });
+    await user.click(screen.getByRole('button', { name: 'Capture editing backup and freeze release' }));
+    await screen.findByRole('button', { name: 'Import 379 cards' });
+    expect(api.sendReleaseAction).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Import 379 cards' }));
+    await screen.findByText(/import: server returned committed/);
+    const imported = JSON.parse(api.sendReleaseAction.mock.calls[0][0].payload);
+    expect(imported).toMatchObject({ expectedEditingSnapshot: baseline.editingSnapshot, expectedLive: 'original-live', idempotencyKey: 'import' });
+    expect(imported.cards).toHaveLength(379);
+    expect(JSON.parse(sessionStorage.getItem(key)!).baseline.backup).toHaveLength(347);
+    await user.click(screen.getByRole('button', { name: 'Verify current editing readback' }));
+    await screen.findByText(/Exact 379-card readback/);
+    await user.click(screen.getByRole('button', { name: 'Verify and register model review' }));
+    await screen.findByText(/review: server returned committed/);
+    const reviewed = JSON.parse(api.sendReleaseAction.mock.calls[1][0].payload);
+    expect(reviewed.cards).toHaveLength(379);
+    expect(reviewed).toMatchObject({ expectedEditingSnapshot: snapshot.editingSnapshot, humanPerCardReview: false, reviewedBy: 'codex' });
+    await user.click(screen.getByRole('button', { name: 'Publish reviewed release' }));
+    await screen.findByText(/publish: server returned committed/);
+    expect(JSON.parse(api.sendReleaseAction.mock.calls[2][0].payload)).toMatchObject({ expectedLive: 'original-live', expectedEditingSnapshot: snapshot.editingSnapshot, receiptId: 'receipt-379' });
+  });
   it('requires query before replaying an unknown import and preserves exact bytes across reload', async () => {
     const user = userEvent.setup(); const { session, snapshot } = releaseFixture(); store(session);
     api.fetchReleaseSnapshot.mockResolvedValue(ok(snapshot));

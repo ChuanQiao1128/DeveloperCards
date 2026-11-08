@@ -4,9 +4,13 @@ import { releaseFixture } from './support/contentReleaseFixtures';
 import { ok } from './support/apiResult';
 
 describe('immutable AWS Basics bundle contract', () => {
-  it('accepts the documented synthetic 337-card bilingual/help contract without inventing review fields', () => {
-    const { bundle } = releaseFixture();
+  it.each([1, 337, 379, 500])('accepts a complete %i-card bilingual/help bundle without inventing review fields', cardCount => {
+    const { bundle } = releaseFixture(cardCount);
     expect(parseReleaseBundle(JSON.stringify(bundle))).toEqual(bundle);
+  });
+  it.each([0, 501])('rejects %i cards outside the server import range', cardCount => {
+    const { bundle } = releaseFixture(cardCount);
+    expect(() => parseReleaseBundle(JSON.stringify(bundle))).toThrow(/1–500/);
   });
   it.each(['cards', 'review', 'source', 'frontHelp', 'translations', 'hash', 'uid', 'scope', 'sha', 'extra', 'blocker', 'expiry'])('rejects malformed %s evidence before writes', (field) => {
     const { bundle } = releaseFixture();
@@ -28,9 +32,14 @@ describe('immutable AWS Basics bundle contract', () => {
 });
 
 describe('exact readback, snapshot and provenance gates', () => {
-  it('accepts complete matching server identities and local model PASS bindings', () => {
-    const { session, snapshot, cards } = releaseFixture();
+  it.each([337, 379])('accepts complete matching identities and local model PASS bindings for %i cards', cardCount => {
+    const { session, snapshot, cards } = releaseFixture(cardCount);
     expect(() => verifyReleaseReadback(session, snapshot, cards)).not.toThrow();
+  });
+  it('rejects a valid larger readback instead of accepting extra UIDs alongside the 379 candidates', () => {
+    const { session } = releaseFixture(379);
+    const { snapshot, cards } = releaseFixture(380);
+    expect(() => verifyReleaseReadback(session, snapshot, cards)).toThrow(/exactly the 379/);
   });
   it.each(['question', 'zh', 'help', 'zhHelp', 'source', 'difficulty', 'order', 'uid', 'version', 'revision', 'hash', 'schema', 'stale', 'live', 'missing'])('blocks mismatching %s readback', field => {
     const { session, snapshot, cards } = releaseFixture();
@@ -59,8 +68,8 @@ describe('exact readback, snapshot and provenance gates', () => {
     const { snapshot } = releaseFixture(); snapshot.backup.pop();
     expect(() => assertReleaseSnapshot(snapshot)).toThrow(/backup/);
   });
-  it('takes policy/schema from the current snapshot, preserves expectedLive, and never claims human review', () => {
-    const { session, snapshot } = releaseFixture();
+  it.each([337, 379])('takes current policy/schema and preserves expectedLive and provenance for %i cards', cardCount => {
+    const { session, snapshot } = releaseFixture(cardCount);
     session.actions.import = { ...prepareReleaseAction(session, 'import', 'import'), outcome: 'confirmed', reconciled: true, result: ok({ editingSnapshot: snapshot.editingSnapshot }) };
     session.verifiedSnapshot = snapshot;
     const review = prepareReleaseAction(session, 'review', 'review');

@@ -35,7 +35,7 @@ export function parseReleaseBundle(raw: string, now = Date.now(), requireFresh =
   keys(bundle, ['schema', 'deckId', 'deckSlug', 'releaseId', 'cards', 'review']);
   requireValue(bundle.schema === 'aws-basics-release-bundle-v1' && bundle.deckId === 15 && bundle.deckSlug === 'aws-saa-fundamentals', 'This page accepts only the AWS Basics release bundle v1 for deck 15.');
   text(bundle.releaseId);
-  requireValue(Array.isArray(bundle.cards) && bundle.cards.length === 337, 'The frozen release must contain exactly 337 cards.');
+  requireValue(Array.isArray(bundle.cards) && bundle.cards.length >= 1 && bundle.cards.length <= 500, 'The frozen release must contain 1–500 cards.');
   const uids = new Set<string>(); const orders = new Set<number>();
   for (const rawCard of bundle.cards) {
     const card = object(rawCard);
@@ -72,7 +72,7 @@ export function parseReleaseBundle(raw: string, now = Date.now(), requireFresh =
   for (const field of ['evidenceHash', 'reportHash', 'promptHash', 'corpusHash']) hash(review[field]);
   requireValue(typeof review.mainSHA === 'string' && /^[0-9a-fA-F]{40}$/.test(review.mainSHA), 'mainSHA must be a 40-character commit SHA.');
   requireValue(review.authorizationScope === 'aws-saa-fundamentals:full-deck-bilingual-release', 'Batch authorization must cover the entire bilingual release.');
-  requireValue(Array.isArray(review.cards) && review.cards.length === 337, 'Model review must cover all 337 cards.');
+  requireValue(Array.isArray(review.cards) && review.cards.length === bundle.cards.length, 'Model review must cover every candidate card exactly once.');
   const seen = new Set<string>();
   for (const rawReview of review.cards) {
     const item = object(rawReview);
@@ -150,7 +150,8 @@ export function canonicalReleaseCard(card: ImportCardInput | Card): string {
 
 export function verifyReleaseReadback(session: ReleaseSession, snapshot: ReleaseSnapshot, cards: Card[]): void {
   assertOriginalLive(session, snapshot);
-  requireValue(cards.length === 337 && snapshot.cards.length === 337 && new Set(cards.map(card => card.stableUid)).size === 337, 'Readback must contain exactly the 337 unique candidate UIDs.');
+  const cardCount = session.bundle.cards.length;
+  requireValue(cards.length === cardCount && snapshot.cards.length === cardCount && new Set(cards.map(card => card.stableUid)).size === cardCount, `Readback must contain exactly the ${cardCount} unique candidate UIDs.`);
   const byUid = new Map(cards.map(card => [card.stableUid, card]));
   for (const candidate of session.bundle.cards) {
     const actual = byUid.get(candidate.stableUid);
@@ -181,7 +182,7 @@ function expectedActionBody(session: ReleaseSession, kind: ReleaseKind): object 
   const snapshot = session.verifiedSnapshot;
   requireValue(session.actions.import && snapshot, 'Confirm import and verify full readback first.');
   assertOriginalLive(session, snapshot);
-  requireValue(snapshot.cards.length === 337 && bundle.review.cards.every(reviewed => snapshot.cards.some(meta => ['stableUid', 'cardContentHash', 'schema', 'revision', 'orderInDeck'].every(field => reviewed[field as keyof typeof reviewed] === meta[field as keyof typeof meta]))), 'Verified snapshot differs from frozen model review bindings.');
+  requireValue(snapshot.cards.length === bundle.cards.length && bundle.review.cards.every(reviewed => snapshot.cards.some(meta => ['stableUid', 'cardContentHash', 'schema', 'revision', 'orderInDeck'].every(field => reviewed[field as keyof typeof reviewed] === meta[field as keyof typeof meta]))), 'Verified snapshot differs from frozen model review bindings.');
   if (kind === 'review') return { ...bundle.review, ...common, actionId: kind, expectedEditingSnapshot: snapshot.editingSnapshot, policy: snapshot.policy, policyHash: snapshot.policyHash, reviewSchema: snapshot.reviewSchema, schemaHash: snapshot.schemaHash, reviewedBy: 'codex', humanPerCardReview: false };
   const review = session.actions.review;
   const receiptId = review?.result?.data?.receiptId;
