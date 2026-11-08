@@ -30,6 +30,10 @@ export interface Card {
   translations?: CardTranslations | null;
   /** Server verdict per translated locale ('stale' once the English changed after the translation); absent when there is none. */
   translationStatus?: TranslationStatus | null;
+  /** Structured teaching payload (cards.teaching, migration 051). */
+  teaching?: Record<string, unknown> | null;
+  /** Navigation tags (cards.tags, migration 051). */
+  tags?: Record<string, unknown> | null;
   revision?: number | null;
 
   version: number;

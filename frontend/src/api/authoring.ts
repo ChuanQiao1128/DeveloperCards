@@ -655,6 +655,10 @@ export interface ImportCardInput {
   frontHelp?: FrontHelpEntry[] | null;
   /** Optional on the type; the import runner always sets it (null clears the column, see TRANSLATIONS_WOULD_BE_CLEARED). */
   translations?: CardTranslations | null;
+  /** Structured teaching payload (cards.teaching, migration 051). */
+  teaching?: Record<string, unknown> | null;
+  /** Navigation tags (cards.tags, migration 051). */
+  tags?: Record<string, unknown> | null;
   difficulty: number;
   orderInDeck: number;
 }
