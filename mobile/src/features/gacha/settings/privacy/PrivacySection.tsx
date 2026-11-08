@@ -13,10 +13,11 @@ export const PRIVACY_COPY = {
     'Counts of first steps, like finishing setup or opening a first pack. No account, email or device ID is sent.',
 } as const;
 
-export function PrivacySection(props: { prefs: PrivacyPrefs; onToggleShare: (value: boolean) => void }) {
+export function PrivacySection(props: {
+  style?: any; prefs: PrivacyPrefs; onToggleShare: (value: boolean) => void }) {
   const { prefs, onToggleShare } = props;
   return (
-    <View style={styles.sectionCard}>
+    <View style={[styles.sectionCard, props.style]}>
       <Text style={styles.sectionTitle} numberOfLines={1}>
         {PRIVACY_COPY.title}
       </Text>

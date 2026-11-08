@@ -2,24 +2,26 @@ import React, { useEffect, useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
 import AppInfoScreen from '../components/AppInfoScreen';
+import {
+  getAuthIdentitySnapshot,
+  subscribeAuthIdentitySnapshot,
+  type AuthIdentitySnapshot,
+} from '../auth/sessionBoundary';
 import { getAudiencePreference, type AudiencePreference } from '../features/gacha/audience/audiencePrefs';
 import { getAudiencePreferenceLabel } from '../features/gacha/audience/audienceRules';
 import { loadStreakSnapshot, type StreakSnapshot } from '../features/gacha/streaks/streakTracker';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Profile'>;
 
-// Every number on this screen used to come from src/mock/user.ts, so each
-// shipped build told every user their streak was 4 and their week streak was
-// 2. The tracker that owns the real answer (applySessionStreak writes it on
-// every qualified session) sat one import away with no reader.
-//
-// The two are not the same shape, and the labels moved to match: the
-// snapshot counts *days completed inside the current week*, which is not a
-// week-over-week streak. Renaming the row was cheaper than inventing a
-// statistic to fill the old one.
 export function ProfileScreen({ navigation }: Props) {
   const [snapshot, setSnapshot] = useState<StreakSnapshot | null>(null);
   const [audience, setAudience] = useState<AudiencePreference | null>(null);
+  const [auth, setAuth] = useState<AuthIdentitySnapshot>(() => getAuthIdentitySnapshot());
+
+  useEffect(() => {
+    setAuth(getAuthIdentitySnapshot());
+    return subscribeAuthIdentitySnapshot(setAuth);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -43,11 +45,12 @@ export function ProfileScreen({ navigation }: Props) {
   const pending = snapshot === null;
   const dailyStreak = pending ? '—' : String(snapshot.currentDailyStreak);
   const daysThisWeek = pending ? '—' : String(snapshot.weekCompletedDays);
+  const signedIn = auth.status === 'signed_in';
 
   return (
     <AppInfoScreen
       eyebrow="Profile"
-      headerAction={{ label: 'Back', onPress: () => navigation.goBack() }}
+      headerAction={{ label: '← Back', onPress: () => navigation.goBack() }}
       title="Your study profile"
       body="Your streak, your week and the preferences that shape what you study."
       chips={['Streak', 'Progress']}
@@ -59,6 +62,12 @@ export function ProfileScreen({ navigation }: Props) {
         {
           title: 'Current setup',
           items: [
+            {
+              title: 'Account status',
+              subtitle: signedIn
+                ? `Signed in as ${auth.email ?? 'your account'} · Cloud sync on`
+                : 'Local guest profile on this device',
+            },
             { title: 'Audience', subtitle: audience ? getAudiencePreferenceLabel(audience) : '—' },
           ],
         },

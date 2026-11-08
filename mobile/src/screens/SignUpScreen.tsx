@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -17,15 +17,13 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { useAuthStore } from '../auth/authStore';
 import { friendlyAuthError, isAuthFlowError } from '../auth/authErrors';
+import { EMAIL_FORMAT_HINT, isValidEmail, normEmail } from '../auth/emailPolicy';
 import { evaluatePassword, isPasswordValid } from '../auth/passwordPolicy';
 import type { RootStackParamList } from '../navigation/types';
 import { recordFunnelEvent } from '../telemetry/funnel';
+import { colors } from '../theme/colors';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'SignUp'>;
-
-function normEmail(v: string) {
-  return String(v || '').trim().toLowerCase();
-}
 
 export default function SignUpScreen({ navigation }: Props) {
   const loading = useAuthStore((s) => s.loading);
@@ -34,17 +32,29 @@ export default function SignUpScreen({ navigation }: Props) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPwd, setShowPwd] = useState(false);
+  const [emailBlurred, setEmailBlurred] = useState(false);
+  const [inlineError, setInlineError] = useState<string | null>(null);
+  const inFlightRef = useRef(false);
 
   const passwordRules = useMemo(() => evaluatePassword(password), [password]);
+  const emailInvalid = emailBlurred && normEmail(email).length > 0 && !isValidEmail(email);
 
   const canSubmit = useMemo(() => {
-    return normEmail(email).length >= 3 && isPasswordValid(password) && !loading;
+    return isValidEmail(email) && isPasswordValid(password) && !loading;
   }, [email, password, loading]);
 
   async function onSubmit() {
-    if (!canSubmit) return;
+    if (inFlightRef.current) return;
+    if (!canSubmit) {
+      if (normEmail(email).length > 0 && !isValidEmail(email)) {
+        setEmailBlurred(true);
+      }
+      return;
+    }
 
     const e = normEmail(email);
+    inFlightRef.current = true;
+    setInlineError(null);
     // R24 M01: anonymous funnel step (no email or account data; once per install).
     recordFunnelEvent('signup_started');
     try {
@@ -52,12 +62,7 @@ export default function SignUpScreen({ navigation }: Props) {
       navigation.replace('ConfirmSignUp', { email: e });
     } catch (err: any) {
       if (isAuthFlowError(err, 'USERNAME_EXISTS')) {
-        // 2026-11-01: the user pool runs with PreventUserExistenceErrors
-        // ENABLED, so ResendConfirmationCode always answers success and the
-        // old "resend to detect a confirmed account" probe never throws.
-        // Always say the account exists and offer sign-in. An *unconfirmed*
-        // account surfaces at sign-in as UserNotConfirmedException and the
-        // sign-in flow routes it to ConfirmSignUp with a fresh code.
+        // Pre-existing PR #813 contract: route existing email to SignIn via Alert.
         Alert.alert(
           'Account already exists',
           'This email already has an account. Sign in instead.',
@@ -65,7 +70,11 @@ export default function SignUpScreen({ navigation }: Props) {
         );
         return;
       }
-      Alert.alert('Sign up failed', friendlyAuthError(err));
+      const friendly = friendlyAuthError(err);
+      setInlineError(friendly);
+      Alert.alert('Sign up failed', friendly);
+    } finally {
+      inFlightRef.current = false;
     }
   }
 
@@ -73,7 +82,7 @@ export default function SignUpScreen({ navigation }: Props) {
     <SafeAreaView style={styles.safeArea}>
       <LinearGradient
         pointerEvents="none"
-        colors={['#F5F3FF', '#E0F2FE']}
+        colors={[colors.parchmentBg, colors.parchmentBgDeep]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={StyleSheet.absoluteFill}
@@ -91,6 +100,8 @@ export default function SignUpScreen({ navigation }: Props) {
         >
           <View style={styles.headerRow}>
             <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Back"
               style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
               onPress={() => navigation.goBack()}
               disabled={loading}
@@ -108,29 +119,53 @@ export default function SignUpScreen({ navigation }: Props) {
             <Text style={styles.cardTitle}>Sign up</Text>
             <Text style={styles.cardHint}>We’ll send a verification code before cloud sync turns on.</Text>
 
+            <View style={styles.mergeBadge} testID="signup-merge-reassurance">
+              <Text style={styles.mergeBadgeText}>
+                Cards and study progress on this device merge into your new account automatically.
+              </Text>
+            </View>
+
+            {inlineError ? (
+              <View style={styles.errorBanner} testID="signup-error-banner" accessibilityRole="alert">
+                <Text style={styles.errorBannerText}>{inlineError}</Text>
+              </View>
+            ) : null}
+
             <Text style={styles.label}>Email</Text>
-            <View style={styles.inputWrap}>
+            <View style={[styles.inputWrap, emailInvalid && styles.inputWrapError]}>
               <TextInput
                 value={email}
-                onChangeText={setEmail}
+                onChangeText={(v) => {
+                  setEmail(v);
+                  if (inlineError) setInlineError(null);
+                }}
+                onBlur={() => setEmailBlurred(true)}
                 autoCapitalize="none"
                 autoCorrect={false}
                 keyboardType="email-address"
                 textContentType="username"
                 autoComplete="email"
                 placeholder="you@example.com"
-                placeholderTextColor="#9CA3AF"
+                placeholderTextColor={colors.inkSecondary}
                 style={styles.input}
                 editable={!loading}
                 returnKeyType="next"
               />
             </View>
+            {emailInvalid ? (
+              <Text style={styles.fieldError} testID="signup-email-hint" accessibilityRole="alert">
+                {EMAIL_FORMAT_HINT}
+              </Text>
+            ) : null}
 
             <Text style={[styles.label, { marginTop: 12 }]}>Password</Text>
             <View style={styles.inputWrap}>
               <TextInput
                 value={password}
-                onChangeText={setPassword}
+                onChangeText={(v) => {
+                  setPassword(v);
+                  if (inlineError) setInlineError(null);
+                }}
                 autoCapitalize="none"
                 autoCorrect={false}
                 secureTextEntry={!showPwd}
@@ -138,16 +173,17 @@ export default function SignUpScreen({ navigation }: Props) {
                 autoComplete="new-password"
                 passwordRules="minlength: 8; required: lower; required: upper; required: digit; required: special;"
                 placeholder="Create a password"
-                placeholderTextColor="#9CA3AF"
+                placeholderTextColor={colors.inkSecondary}
                 style={styles.input}
                 editable={!loading}
                 returnKeyType="done"
                 onSubmitEditing={onSubmit}
               />
               <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={showPwd ? 'Hide password' : 'Show password'}
                 onPress={() => setShowPwd((v) => !v)}
                 disabled={loading}
-                hitSlop={10}
                 style={({ pressed }) => [styles.pill, pressed && styles.pressed]}
               >
                 <Text style={styles.pillText}>{showPwd ? 'Hide' : 'Show'}</Text>
@@ -156,17 +192,22 @@ export default function SignUpScreen({ navigation }: Props) {
 
             <View style={styles.checklist}>
               {passwordRules.map((rule) => (
-                <Text
+                <View
                   key={rule.id}
-                  testID={`signup-password-rule-${rule.id}`}
-                  style={[styles.checklistItem, rule.ok && styles.checklistItemOk]}
+                  style={[styles.ruleChip, rule.ok && styles.ruleChipOk]}
                 >
-                  {(rule.ok ? '✓' : '•') + ' ' + rule.label}
-                </Text>
+                  <Text
+                    testID={`signup-password-rule-${rule.id}`}
+                    style={[styles.checklistItem, rule.ok && styles.checklistItemOk]}
+                  >
+                    {(rule.ok ? '✓' : '•') + ' ' + rule.label}
+                  </Text>
+                </View>
               ))}
             </View>
 
             <Pressable
+              accessibilityRole="button"
               style={({ pressed }) => [
                 styles.primaryBtn,
                 (!canSubmit || loading) && styles.disabled,
@@ -177,7 +218,7 @@ export default function SignUpScreen({ navigation }: Props) {
             >
               {loading ? (
                 <View style={styles.rowCenter}>
-                  <ActivityIndicator />
+                  <ActivityIndicator color={colors.ink} />
                   <Text style={[styles.primaryText, { marginLeft: 8 }]}>Creating…</Text>
                 </View>
               ) : (
@@ -192,6 +233,7 @@ export default function SignUpScreen({ navigation }: Props) {
             </View>
 
             <Pressable
+              accessibilityRole="button"
               style={({ pressed }) => [styles.secondaryBtn, pressed && styles.pressed]}
               onPress={() => navigation.replace('SignIn', { email: normEmail(email) || undefined })}
               disabled={loading}
@@ -211,96 +253,176 @@ export default function SignUpScreen({ navigation }: Props) {
   );
 }
 
-const CARD_BG = 'rgba(255,255,255,0.92)';
-const CARD_BORDER = 'rgba(255,255,255,0.55)';
-
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#F5F3FF' },
+  safeArea: { flex: 1, backgroundColor: colors.parchmentBg },
   flex: { flex: 1 },
   scrollContent: { paddingHorizontal: 18, paddingTop: 16, paddingBottom: 24 },
 
   pressed: { opacity: 0.9 },
-  disabled: { opacity: 0.6 },
+  disabled: { opacity: 0.55 },
 
   headerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
   backButton: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    minHeight: 44,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
     borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,0.8)',
+    backgroundColor: colors.softCream,
+    borderWidth: 1,
+    borderColor: colors.hairline,
     marginRight: 10,
+    justifyContent: 'center',
   },
-  backText: { fontSize: 13, color: '#111827', fontWeight: '700' },
+  backText: { fontSize: 13, color: colors.inkSoft, fontWeight: '800' },
 
-  title: { fontSize: 20, fontWeight: '800', color: '#111827' },
-  subtitle: { marginTop: 2, fontSize: 12, color: '#6B7280' },
+  title: { fontSize: 22, fontWeight: '900', color: colors.ink },
+  subtitle: { marginTop: 4, fontSize: 13, color: colors.inkSecondary, lineHeight: 18, fontWeight: '600' },
 
   card: {
     borderRadius: 24,
     paddingVertical: 18,
     paddingHorizontal: 16,
-    backgroundColor: CARD_BG,
+    backgroundColor: colors.softCream,
     borderWidth: 1,
-    borderColor: CARD_BORDER,
-    shadowColor: '#000',
-    shadowOpacity: 0.10,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 12 },
+    borderColor: colors.hairline,
+    shadowColor: colors.shadowSoft,
+    shadowOpacity: 1,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 4,
   },
-  cardTitle: { fontSize: 18, fontWeight: '800', color: '#111827' },
-  cardHint: { marginTop: 4, fontSize: 12, color: '#6B7280' },
+  cardTitle: { fontSize: 18, fontWeight: '900', color: colors.ink },
+  cardHint: { marginTop: 4, fontSize: 12, color: colors.inkSecondary, fontWeight: '600' },
 
-  label: { marginTop: 14, fontSize: 12, fontWeight: '800', color: '#374151' },
+  mergeBadge: {
+    marginTop: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    backgroundColor: colors.parchmentBg,
+    borderWidth: 1,
+    borderColor: colors.hairline,
+  },
+  mergeBadgeText: {
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: '600',
+    color: colors.inkSecondary,
+  },
+
+  errorBanner: {
+    marginTop: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: 'rgba(170,54,54,0.28)',
+  },
+  errorBannerText: {
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '700',
+    color: colors.danger,
+  },
+
+  label: { marginTop: 14, fontSize: 12, fontWeight: '900', color: colors.inkSoft, letterSpacing: 0.4 },
 
   inputWrap: {
     marginTop: 8,
-    borderRadius: 16,
+    minHeight: 48,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: 'rgba(17,24,39,0.10)',
+    borderColor: colors.hairline,
     backgroundColor: '#FFFFFF',
-    paddingHorizontal: 12,
+    paddingLeft: 12,
+    paddingRight: 6,
     paddingVertical: 2,
     flexDirection: 'row',
     alignItems: 'center',
   },
-  input: { flex: 1, paddingVertical: 10, fontSize: 14, color: '#111827' },
+  inputWrapError: {
+    borderColor: colors.danger,
+  },
+  input: { flex: 1, paddingVertical: 12, fontSize: 14, color: colors.inkSoft },
+
+  fieldError: {
+    marginTop: 6,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '700',
+    color: colors.danger,
+  },
 
   pill: {
     marginLeft: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
+    minHeight: 44,
+    minWidth: 56,
+    paddingHorizontal: 12,
     borderRadius: 999,
-    backgroundColor: 'rgba(79,70,229,0.10)',
+    backgroundColor: colors.pokeBlueFaint,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  pillText: { color: '#4F46E5', fontWeight: '800', fontSize: 12 },
+  pillText: { color: colors.ink, fontWeight: '900', fontSize: 12 },
 
-  checklist: { marginTop: 10, gap: 2 },
-  checklistItem: { fontSize: 12, color: '#6B7280', fontWeight: '600' },
-  checklistItemOk: { color: '#047857' },
+  checklist: {
+    marginTop: 10,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    rowGap: 6,
+  },
+  ruleChip: {
+    width: '48.5%',
+    minHeight: 30,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 10,
+    backgroundColor: colors.parchmentBg,
+    borderWidth: 1,
+    borderColor: colors.hairline,
+    justifyContent: 'center',
+  },
+  ruleChipOk: {
+    backgroundColor: colors.pokeBlueFaint,
+    borderColor: 'rgba(44,156,192,0.35)',
+  },
+  checklistItem: { fontSize: 11, color: colors.inkSecondary, fontWeight: '700' },
+  checklistItemOk: { color: colors.ink, fontWeight: '800' },
 
   primaryBtn: {
     marginTop: 16,
-    borderRadius: 16,
-    backgroundColor: '#4F46E5',
-    paddingVertical: 13,
+    minHeight: 56,
+    borderRadius: 999,
+    backgroundColor: colors.pokeBlue,
+    paddingHorizontal: 16,
     alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: 'rgba(44,156,192,0.4)',
+    shadowOpacity: 1,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
   },
-  primaryText: { fontSize: 14, fontWeight: '900', color: '#FFFFFF' },
+  primaryText: { fontSize: 15, fontWeight: '900', color: colors.ink, letterSpacing: 0.4 },
   rowCenter: { flexDirection: 'row', alignItems: 'center' },
 
   dividerRow: { flexDirection: 'row', alignItems: 'center', marginTop: 14, marginBottom: 10 },
-  dividerLine: { flex: 1, height: 1, backgroundColor: 'rgba(17,24,39,0.10)' },
-  dividerText: { marginHorizontal: 10, fontSize: 12, color: '#6B7280', fontWeight: '700' },
+  dividerLine: { flex: 1, height: 1, backgroundColor: colors.hairline },
+  dividerText: { marginHorizontal: 10, fontSize: 12, color: colors.inkSecondary, fontWeight: '700' },
 
   secondaryBtn: {
-    borderRadius: 16,
-    backgroundColor: 'rgba(17,24,39,0.04)',
+    minHeight: 48,
+    borderRadius: 999,
+    backgroundColor: 'transparent',
     borderWidth: 1,
-    borderColor: 'rgba(17,24,39,0.10)',
-    paddingVertical: 12,
+    borderColor: colors.hairline,
+    paddingHorizontal: 16,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  secondaryText: { fontSize: 14, fontWeight: '800', color: '#111827' },
+  secondaryText: { fontSize: 14, fontWeight: '800', color: colors.inkSoft },
 
-  footnote: { marginTop: 12, fontSize: 11, color: '#6B7280', lineHeight: 16 },
+  footnote: { marginTop: 12, fontSize: 11, color: colors.inkSecondary, lineHeight: 16, fontWeight: '600' },
 });

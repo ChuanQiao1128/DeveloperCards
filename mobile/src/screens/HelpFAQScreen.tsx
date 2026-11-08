@@ -5,6 +5,7 @@ import type { RootStackParamList } from '../navigation/types';
 import { navigateToTab } from '../navigation/tabNavigation';
 import AppInfoScreen from '../components/AppInfoScreen';
 import { FAQ_DISCLAIMER, FAQ_LIST } from '../content/faq';
+import { colors } from '../theme/colors';
 import { spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
 
@@ -14,10 +15,9 @@ export function HelpFAQScreen({ navigation }: Props) {
   return (
     <AppInfoScreen
       eyebrow="FAQ"
-      headerAction={{ label: 'Back', onPress: () => navigation.goBack() }}
+      headerAction={{ label: '← Back', onPress: () => navigation.goBack() }}
       title="Help and answers"
       body="Short answers to what people ask most: draws, rare cards, what you study, offline use and how cards are made. Missing something? Open Support from the Me tab."
-      cosmic
       chips={['Support', 'Answers']}
       stats={[
         { label: 'Top questions', value: String(FAQ_LIST.length) },
@@ -49,7 +49,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: typography.caption,
     lineHeight: 16,
-    color: '#D9D0AE',
+    color: colors.inkSecondary,
   },
 });
 

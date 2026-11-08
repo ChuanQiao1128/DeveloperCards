@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -18,14 +18,11 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
 import { useAuthStore } from '../auth/authStore';
 import { friendlyAuthError, isAuthFlowError } from '../auth/authErrors';
+import { EMAIL_FORMAT_HINT, isValidEmail, normEmail } from '../auth/emailPolicy';
 import { leaveAuthFlow, type LeaveAuthNavigation } from '../auth/leaveAuthFlow';
 import { colors } from '../theme/colors';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'SignIn'>;
-
-function normEmail(v: string) {
-  return String(v || '').trim().toLowerCase();
-}
 
 export default function SignInScreen({ navigation, route }: Props) {
   const loading = useAuthStore((s) => s.loading);
@@ -37,6 +34,9 @@ export default function SignInScreen({ navigation, route }: Props) {
   const [email, setEmail] = useState(route.params?.email ?? '');
   const [password, setPassword] = useState('');
   const [showPwd, setShowPwd] = useState(false);
+  const [emailBlurred, setEmailBlurred] = useState(false);
+  const [inlineError, setInlineError] = useState<string | null>(null);
+  const inFlightRef = useRef(false);
 
   useEffect(() => {
     if (isSignedIn) leaveAuthFlow(navigation as unknown as LeaveAuthNavigation);
@@ -49,19 +49,27 @@ export default function SignInScreen({ navigation, route }: Props) {
     if (next) setEmail(next);
   }, [route.params?.email]);
 
+  const emailInvalid = emailBlurred && normEmail(email).length > 0 && !isValidEmail(email);
+
   const canSubmit = useMemo(() => {
-    return normEmail(email).length >= 3 && password.length >= 1 && !loading && status !== 'signed_in';
+    return isValidEmail(email) && password.length >= 1 && !loading && status !== 'signed_in';
   }, [email, password, loading, status]);
 
   async function onSubmit() {
-    if (!canSubmit) return;
+    if (inFlightRef.current) return;
+    if (!canSubmit) {
+      if (normEmail(email).length > 0 && !isValidEmail(email)) {
+        setEmailBlurred(true);
+      }
+      return;
+    }
 
+    inFlightRef.current = true;
+    setInlineError(null);
     try {
       await signInWithEmail(email, password);
       leaveAuthFlow(navigation as unknown as LeaveAuthNavigation);
     } catch (e: any) {
-      // Unconfirmed account: resend a fresh code and route to ConfirmSignUp
-      // instead of dead-ending on an error alert.
       if (isAuthFlowError(e, 'NEEDS_CONFIRMATION')) {
         try {
           await resendConfirmCode(email);
@@ -74,21 +82,20 @@ export default function SignInScreen({ navigation, route }: Props) {
 
       const msg = String(e?.message ?? '');
       if (/already.*signed in/i.test(msg)) {
-        // Amplify already holds a session but our store may be stale (e.g. an
-        // offline cold start). Re-read the session before leaving so the app
-        // reflects the signed-in user instead of bouncing silently.
         await useAuthStore.getState().init();
         leaveAuthFlow(navigation as unknown as LeaveAuthNavigation);
         return;
       }
-      Alert.alert('Sign in failed', friendlyAuthError(e));
+      const friendly = friendlyAuthError(e);
+      setInlineError(friendly);
+      Alert.alert('Sign in failed', friendly);
+    } finally {
+      inFlightRef.current = false;
     }
   }
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      {/* Background gradient — aligned with the rest of the app's
-          parchment palette (was indigo→cyan, off-brand). */}
       <LinearGradient
         pointerEvents="none"
         colors={[colors.parchmentBg, colors.parchmentBgDeep]}
@@ -110,6 +117,8 @@ export default function SignInScreen({ navigation, route }: Props) {
           {/* Header */}
           <View style={styles.headerRow}>
             <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Back"
               style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
               onPress={() => navigation.goBack()}
             >
@@ -127,45 +136,70 @@ export default function SignInScreen({ navigation, route }: Props) {
             <Text style={styles.cardTitle}>Sign in</Text>
             <Text style={styles.cardHint}>Use the verified email tied to your study history.</Text>
 
+            <View style={styles.mergeBadge} testID="signin-merge-reassurance">
+              <Text style={styles.mergeBadgeText}>
+                Cards and study progress on this device stay safe and merge automatically when you sign in.
+              </Text>
+            </View>
+
+            {inlineError ? (
+              <View style={styles.errorBanner} testID="signin-error-banner" accessibilityRole="alert">
+                <Text style={styles.errorBannerText}>{inlineError}</Text>
+              </View>
+            ) : null}
+
             <Text style={styles.label}>Email</Text>
-            <View style={styles.inputWrap}>
+            <View style={[styles.inputWrap, emailInvalid && styles.inputWrapError]}>
               <TextInput
                 value={email}
-                onChangeText={setEmail}
+                onChangeText={(v) => {
+                  setEmail(v);
+                  if (inlineError) setInlineError(null);
+                }}
+                onBlur={() => setEmailBlurred(true)}
                 autoCapitalize="none"
                 autoCorrect={false}
                 keyboardType="email-address"
                 textContentType="username"
                 autoComplete="email"
                 placeholder="you@example.com"
-                placeholderTextColor={colors.inkMuted}
+                placeholderTextColor={colors.inkSecondary}
                 style={styles.input}
                 editable={!loading}
                 returnKeyType="next"
               />
             </View>
+            {emailInvalid ? (
+              <Text style={styles.fieldError} testID="signin-email-hint" accessibilityRole="alert">
+                {EMAIL_FORMAT_HINT}
+              </Text>
+            ) : null}
 
             <Text style={[styles.label, { marginTop: 12 }]}>Password</Text>
             <View style={styles.inputWrap}>
               <TextInput
                 value={password}
-                onChangeText={setPassword}
+                onChangeText={(v) => {
+                  setPassword(v);
+                  if (inlineError) setInlineError(null);
+                }}
                 autoCapitalize="none"
                 autoCorrect={false}
                 secureTextEntry={!showPwd}
                 textContentType="password"
                 autoComplete="current-password"
                 placeholder="Your password"
-                placeholderTextColor={colors.inkMuted}
+                placeholderTextColor={colors.inkSecondary}
                 style={styles.input}
                 editable={!loading}
                 returnKeyType="done"
                 onSubmitEditing={onSubmit}
               />
               <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={showPwd ? 'Hide password' : 'Show password'}
                 onPress={() => setShowPwd((v) => !v)}
                 disabled={loading}
-                hitSlop={10}
                 style={({ pressed }) => [styles.pill, pressed && styles.pressed]}
               >
                 <Text style={styles.pillText}>{showPwd ? 'Hide' : 'Show'}</Text>
@@ -174,17 +208,18 @@ export default function SignInScreen({ navigation, route }: Props) {
 
             <Pressable
               testID="signin-forgot-password"
+              accessibilityRole="button"
               onPress={() =>
                 navigation.navigate('ForgotPassword', { email: normEmail(email) || undefined })
               }
               disabled={loading}
-              hitSlop={8}
               style={({ pressed }) => [styles.forgotLink, pressed && styles.pressed]}
             >
               <Text style={styles.forgotText}>Forgot password?</Text>
             </Pressable>
 
             <Pressable
+              accessibilityRole="button"
               style={({ pressed }) => [
                 styles.primaryBtn,
                 (!canSubmit || loading) && styles.disabled,
@@ -195,7 +230,7 @@ export default function SignInScreen({ navigation, route }: Props) {
             >
               {loading ? (
                 <View style={styles.rowCenter}>
-                  <ActivityIndicator />
+                  <ActivityIndicator color={colors.ink} />
                   <Text style={[styles.primaryText, { marginLeft: 8 }]}>Signing in…</Text>
                 </View>
               ) : (
@@ -210,6 +245,7 @@ export default function SignInScreen({ navigation, route }: Props) {
             </View>
 
             <Pressable
+              accessibilityRole="button"
               style={({ pressed }) => [styles.secondaryBtn, pressed && styles.pressed]}
               onPress={() => navigation.navigate('SignUp')}
               disabled={loading}
@@ -239,18 +275,20 @@ const styles = StyleSheet.create({
 
   headerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
   backButton: {
-    paddingHorizontal: 12,
+    minHeight: 44,
+    paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 999,
     backgroundColor: colors.softCream,
     borderWidth: 1,
     borderColor: colors.hairline,
     marginRight: 10,
+    justifyContent: 'center',
   },
   backText: { fontSize: 13, color: colors.inkSoft, fontWeight: '800' },
 
   title: { fontSize: 22, fontWeight: '900', color: colors.ink },
-  subtitle: { marginTop: 4, fontSize: 13, color: colors.inkMuted, lineHeight: 18, fontWeight: '600' },
+  subtitle: { marginTop: 4, fontSize: 13, color: colors.inkSecondary, lineHeight: 18, fontWeight: '600' },
 
   card: {
     borderRadius: 24,
@@ -266,36 +304,82 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   cardTitle: { fontSize: 18, fontWeight: '900', color: colors.ink },
-  cardHint: { marginTop: 4, fontSize: 12, color: colors.inkMuted, fontWeight: '600' },
+  cardHint: { marginTop: 4, fontSize: 12, color: colors.inkSecondary, fontWeight: '600' },
+
+  mergeBadge: {
+    marginTop: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    backgroundColor: colors.parchmentBg,
+    borderWidth: 1,
+    borderColor: colors.hairline,
+  },
+  mergeBadgeText: {
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: '600',
+    color: colors.inkSecondary,
+  },
+
+  errorBanner: {
+    marginTop: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: 'rgba(170,54,54,0.28)',
+  },
+  errorBannerText: {
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '700',
+    color: colors.danger,
+  },
 
   label: { marginTop: 14, fontSize: 12, fontWeight: '900', color: colors.inkSoft, letterSpacing: 0.4 },
 
   inputWrap: {
     marginTop: 8,
+    minHeight: 48,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: colors.hairline,
     backgroundColor: '#FFFFFF',
-    paddingHorizontal: 12,
+    paddingLeft: 12,
+    paddingRight: 6,
     paddingVertical: 2,
     flexDirection: 'row',
     alignItems: 'center',
   },
+  inputWrapError: {
+    borderColor: colors.danger,
+  },
   input: { flex: 1, paddingVertical: 12, fontSize: 14, color: colors.inkSoft },
 
-  // Show/Hide password pill — pokeBlue brand color, no more indigo
+  fieldError: {
+    marginTop: 6,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '700',
+    color: colors.danger,
+  },
+
   pill: {
     marginLeft: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
+    minHeight: 44,
+    minWidth: 56,
+    paddingHorizontal: 12,
     borderRadius: 999,
     backgroundColor: colors.pokeBlueFaint,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  pillText: { color: colors.pokeBlueDeep, fontWeight: '900', fontSize: 12 },
+  pillText: { color: colors.ink, fontWeight: '900', fontSize: 12 },
 
-  // Primary CTA — pokeBlue 56pt pill matching the rest of the app
   primaryBtn: {
-    marginTop: 16,
+    marginTop: 12,
     minHeight: 56,
     borderRadius: 999,
     backgroundColor: colors.pokeBlue,
@@ -311,14 +395,24 @@ const styles = StyleSheet.create({
   primaryText: { fontSize: 15, fontWeight: '900', color: colors.ink, letterSpacing: 0.4 },
   rowCenter: { flexDirection: 'row', alignItems: 'center' },
 
-  forgotLink: { alignSelf: 'flex-end', marginTop: 10, paddingVertical: 4, paddingHorizontal: 2 },
-  forgotText: { fontSize: 13, fontWeight: '800', color: colors.pokeBlueDeep },
+  forgotLink: {
+    alignSelf: 'flex-end',
+    marginTop: 6,
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+  },
+  forgotText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: colors.inkSoft,
+    textDecorationLine: 'underline',
+  },
 
   dividerRow: { flexDirection: 'row', alignItems: 'center', marginTop: 14, marginBottom: 10 },
   dividerLine: { flex: 1, height: 1, backgroundColor: colors.hairline },
-  dividerText: { marginHorizontal: 10, fontSize: 12, color: colors.inkMuted, fontWeight: '700' },
+  dividerText: { marginHorizontal: 10, fontSize: 12, color: colors.inkSecondary, fontWeight: '700' },
 
-  // Secondary "Create an account" — ghost button matching DrawScreen ghost
   secondaryBtn: {
     minHeight: 48,
     borderRadius: 999,
@@ -331,5 +425,5 @@ const styles = StyleSheet.create({
   },
   secondaryText: { fontSize: 14, fontWeight: '800', color: colors.inkSoft },
 
-  footnote: { marginTop: 12, fontSize: 11, color: colors.inkMuted, lineHeight: 16, fontWeight: '600' },
+  footnote: { marginTop: 12, fontSize: 11, color: colors.inkSecondary, lineHeight: 16, fontWeight: '600' },
 });

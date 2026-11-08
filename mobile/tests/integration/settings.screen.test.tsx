@@ -433,7 +433,7 @@ describe('SettingsScreen', () => {
       .map((node) => nodeText(node))
       .join('\n');
 
-    expect(textBlob).toContain('Progress');
+    expect(textBlob).toContain('Account');
     expect(textBlob).toContain('0 days streak · 0 sessions that counted');
     expect(textBlob).not.toMatch(/Momentum|qualified sessions/);
 
@@ -466,7 +466,7 @@ describe('SettingsScreen', () => {
       .findAll((node) => (node.type as any) === 'Text')
       .map((node) => nodeText(node))
       .join('\n');
-    expect(postRetryBlob).toContain('Progress');
+    expect(postRetryBlob).toContain('Account');
   });
   it('opens the Debug menu after 7 taps on the version label within 3 s on the preview channel outside __DEV__', async () => {
     vi.useFakeTimers();

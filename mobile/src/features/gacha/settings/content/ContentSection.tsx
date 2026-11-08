@@ -18,6 +18,7 @@ export const CONTENT_COPY = {
 } as const;
 
 export function ContentSection(props: {
+  style?: any;
   audience: AudiencePreference;
   saving: boolean;
   onSelect: (next: AudiencePreference) => void;
@@ -25,7 +26,7 @@ export function ContentSection(props: {
   const { audience, saving, onSelect } = props;
 
   return (
-    <View style={styles.sectionCard}>
+    <View style={[styles.sectionCard, props.style]}>
       <Text style={styles.sectionTitle} numberOfLines={1}>
         {CONTENT_COPY.title}
       </Text>

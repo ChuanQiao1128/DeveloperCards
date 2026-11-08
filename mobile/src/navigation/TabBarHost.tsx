@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 
 import BottomTabBar from '../components/BottomTabBar';
+import { colors } from '../theme/colors';
 import { getMainTabForRouteName, shouldShowMainTabBar } from './mainTabs';
 import type { RouteNameStore } from './routeNameStore';
 import { statusBarStyleForRoute } from './statusBarStyle';
@@ -35,12 +36,12 @@ export function TabBarHost(props: {
 
 const styles = StyleSheet.create({
   mainTabSafeArea: {
-    backgroundColor: '#F5F3FF',
+    backgroundColor: colors.parchmentBg,
   },
   mainTabBarShell: {
     paddingHorizontal: 12,
     paddingTop: 6,
     paddingBottom: 8,
-    backgroundColor: '#F5F3FF',
+    backgroundColor: colors.parchmentBg,
   },
 });

@@ -2,6 +2,7 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { reportClientError } from '../telemetry/clientErrorReporter';
+import { colors } from '../theme/colors';
 
 type Props = { children: React.ReactNode };
 type State = { error: Error | null };
@@ -50,23 +51,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: 24,
-    backgroundColor: '#F5F3FF',
+    backgroundColor: colors.parchmentBg,
   },
   title: {
     fontSize: 18,
     fontWeight: '800',
-    color: '#111827',
+    color: colors.ink,
   },
   button: {
     marginTop: 16,
-    borderRadius: 14,
+    minHeight: 48,
+    borderRadius: 999,
     paddingVertical: 12,
     paddingHorizontal: 24,
-    backgroundColor: '#4F46E5',
+    backgroundColor: colors.pokeBlue,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   buttonText: {
-    color: '#fff',
-    fontWeight: '800',
+    color: colors.ink,
+    fontWeight: '900',
   },
 });
 

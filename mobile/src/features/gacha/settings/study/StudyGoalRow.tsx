@@ -291,9 +291,9 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(42,34,24,0.18)',
     backgroundColor: 'rgba(255,255,255,0.8)',
   },
-  optionActive: { borderColor: colors.gold, backgroundColor: '#FFFFFF' },
+  optionActive: { borderColor: colors.pokeBlueDeep, backgroundColor: colors.pokeBlueFaint },
   optionText: { fontSize: typography.bodySmall, fontWeight: '700', color: colors.ink },
-  optionTextActive: { color: colors.gold },
+  optionTextActive: { color: colors.ink, fontWeight: '900' },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   chip: {
     minHeight: 44,
@@ -304,9 +304,9 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(42,34,24,0.18)',
     backgroundColor: 'rgba(255,255,255,0.8)',
   },
-  chipActive: { borderColor: colors.gold, backgroundColor: '#FFFFFF' },
+  chipActive: { borderColor: colors.pokeBlueDeep, backgroundColor: colors.pokeBlueFaint },
   chipText: { fontSize: typography.caption, fontWeight: '800', color: colors.ink },
-  chipTextActive: { color: colors.gold },
+  chipTextActive: { color: colors.ink, fontWeight: '900' },
   stepperRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.xs },
   stepperDate: { flexShrink: 1, textAlign: 'center', fontSize: typography.bodySmall, fontWeight: '800', color: colors.ink },
   smallButton: {

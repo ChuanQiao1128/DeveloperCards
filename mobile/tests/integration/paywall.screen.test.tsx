@@ -425,6 +425,27 @@ describe('PaywallScreen', () => {
   });
 });
 
+
+  it('renders clear Free always includes and Premium comparison cards with cancellation notice', async () => {
+    const tree = await renderPaywall();
+    const blob = textBlob(tree);
+
+    // Free tier card
+    const freeCards = findHostNodesByTestID(tree, 'View', 'paywall-free-tier-card');
+    expect(freeCards).toHaveLength(1);
+    expect(blob).toContain('Free always includes');
+    expect(blob).toContain('Core starter and foundation decks');
+    expect(blob).toContain('Daily spaced-repetition reviews and Mistake Book');
+
+    // Premium tier card
+    const premiumCards = findHostNodesByTestID(tree, 'View', 'paywall-premium-tier-card');
+    expect(premiumCards).toHaveLength(1);
+    expect(blob).toContain('Access all premium decks');
+
+    // Cancellation disclosure
+    expect(blob).toContain('Cancel anytime in iOS Settings > Apple Account > Subscriptions');
+  });
+
 describe('SettingsScreen paywall entrance', () => {
   it('hides the Open premium card when features.paywall.hidden is true', async () => {
     featureFlagsMock.mockReturnValue({

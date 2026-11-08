@@ -19,6 +19,7 @@ export const STUDY_COPY = {
 } as const;
 
 export function StudySection(props: {
+  style?: any;
   prefs: StudyPrefs;
   onToggleFourButtons: (value: boolean) => void;
   /** U4: the study goal row. Omitted, the section shows only the rating-button toggle. */
@@ -28,7 +29,7 @@ export function StudySection(props: {
 }) {
   const { prefs, onToggleFourButtons, goal, cardLang } = props;
   return (
-    <View style={styles.sectionCard}>
+    <View style={[styles.sectionCard, props.style]}>
       <Text style={styles.sectionTitle} numberOfLines={1}>
         {STUDY_COPY.title}
       </Text>
