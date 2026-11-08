@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -18,10 +18,14 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
 import { useAuthStore } from '../auth/authStore';
 import { friendlyAuthError, isAuthFlowError } from '../auth/authErrors';
+import { OTP_SLOT_COUNT, OtpCodeSlots } from '../auth/components/OtpCodeSlots';
 import { leaveAuthFlow, type LeaveAuthNavigation } from '../auth/leaveAuthFlow';
 import { recordFunnelEvent } from '../telemetry/funnel';
+import { colors } from '../theme/colors';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ConfirmSignUp'>;
+
+const RESEND_COOLDOWN_SECONDS = 60;
 
 function maskEmail(email: string) {
   const e = String(email || '').trim();
@@ -40,21 +44,35 @@ export default function ConfirmSignUpScreen({ navigation, route }: Props) {
   const resendConfirmCode = useAuthStore((s) => s.resendConfirmCode);
 
   const [code, setCode] = useState('');
+  const [inlineError, setInlineError] = useState<string | null>(null);
+  const [resendNotice, setResendNotice] = useState<string | null>(null);
+  const [cooldownSec, setCooldownSec] = useState(0);
+  const inFlightRef = useRef(false);
+  const autoSubmittedCodeRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (cooldownSec <= 0) return;
+    const timer = setTimeout(() => setCooldownSec((prev) => Math.max(0, prev - 1)), 1000);
+    return () => clearTimeout(timer);
+  }, [cooldownSec]);
 
   const canSubmit = useMemo(() => {
     const c = String(code || '').trim();
-    return c.length >= 4 && !loading;
+    return c.length === OTP_SLOT_COUNT && !loading;
   }, [code, loading]);
 
-  async function onConfirm() {
-    if (!canSubmit) return;
+  async function submitCode(rawCode: string) {
+    const clean = String(rawCode || '').replace(/\s/g, '');
+    if (clean.length < OTP_SLOT_COUNT || loading || inFlightRef.current) return;
 
+    inFlightRef.current = true;
+    setInlineError(null);
+    setResendNotice(null);
     try {
-      const outcome = await confirmSignUpCode(email, code);
+      const outcome = await confirmSignUpCode(email, clean);
       // R24 M01: anonymous funnel step; both outcomes mean the account now exists.
       recordFunnelEvent('signup_completed');
       if (outcome === 'signed_in') {
-        // Auto sign-in completed within the window — leave the funnel.
         leaveAuthFlow(navigation as unknown as LeaveAuthNavigation);
         return;
       }
@@ -62,26 +80,61 @@ export default function ConfirmSignUpScreen({ navigation, route }: Props) {
         { text: 'Continue', onPress: () => navigation.popTo('SignIn', { email }) },
       ]);
     } catch (e: any) {
-      // 2026-11-01: confirming an already-verified account is not a failure —
-      // Cognito answers NotAuthorizedException("Current status is CONFIRMED")
-      // and authStore converts it to a typed AuthFlowError so we can point
-      // the user at sign-in instead of the generic "something went wrong".
       if (isAuthFlowError(e, 'ALREADY_CONFIRMED')) {
         Alert.alert('Already verified', e.message, [
           { text: 'Sign in', onPress: () => navigation.popTo('SignIn', { email }) },
         ]);
         return;
       }
-      Alert.alert('Confirm failed', friendlyAuthError(e));
+      const friendly = friendlyAuthError(e);
+      setInlineError(friendly);
+      Alert.alert('Confirm failed', friendly);
+    } finally {
+      inFlightRef.current = false;
     }
   }
 
+  function handleCodeChange(raw: string) {
+    const clean = String(raw || '').replace(/\D/g, '').slice(0, OTP_SLOT_COUNT);
+    setCode(clean);
+    if (inlineError) setInlineError(null);
+    if (clean.length < OTP_SLOT_COUNT) {
+      autoSubmittedCodeRef.current = null;
+      return;
+    }
+    if (clean.length === OTP_SLOT_COUNT && autoSubmittedCodeRef.current !== clean) {
+      autoSubmittedCodeRef.current = clean;
+      void submitCode(clean);
+    }
+  }
+
+  function onSubmitEditing() {
+    const clean = String(code || '').replace(/\s/g, '');
+    if (autoSubmittedCodeRef.current === clean) return;
+    void submitCode(clean);
+  }
+
+  function onPressVerify() {
+    const clean = String(code || '').replace(/\s/g, '');
+    void submitCode(clean);
+  }
+
   async function onResend() {
+    if (cooldownSec > 0 || loading || inFlightRef.current) return;
+    inFlightRef.current = true;
+    setInlineError(null);
+    setResendNotice(null);
     try {
       await resendConfirmCode(email);
+      setCooldownSec(RESEND_COOLDOWN_SECONDS);
+      setResendNotice('A new code has been sent to your email.');
       Alert.alert('Sent', 'A new code has been sent to your email.');
     } catch (e: any) {
-      Alert.alert('Resend failed', friendlyAuthError(e));
+      const friendly = friendlyAuthError(e);
+      setInlineError(friendly);
+      Alert.alert('Resend failed', friendly);
+    } finally {
+      inFlightRef.current = false;
     }
   }
 
@@ -89,7 +142,7 @@ export default function ConfirmSignUpScreen({ navigation, route }: Props) {
     <SafeAreaView style={styles.safeArea}>
       <LinearGradient
         pointerEvents="none"
-        colors={['#F5F3FF', '#E0F2FE']}
+        colors={[colors.parchmentBg, colors.parchmentBgDeep]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={StyleSheet.absoluteFill}
@@ -107,6 +160,8 @@ export default function ConfirmSignUpScreen({ navigation, route }: Props) {
         >
           <View style={styles.headerRow}>
             <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Back"
               style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
               onPress={() => navigation.goBack()}
               disabled={loading}
@@ -124,36 +179,50 @@ export default function ConfirmSignUpScreen({ navigation, route }: Props) {
             <Text style={styles.cardTitle}>Confirmation code</Text>
             <Text style={styles.cardHint}>Use the latest code to finish protecting sync and recovery.</Text>
 
-            <Text style={styles.label}>Code</Text>
-            <View style={styles.inputWrap}>
+            {inlineError ? (
+              <View style={styles.errorBanner} testID="confirm-error-banner" accessibilityRole="alert">
+                <Text style={styles.errorBannerText}>{inlineError}</Text>
+              </View>
+            ) : null}
+
+            {resendNotice ? (
+              <View style={styles.noticeBanner} testID="confirm-resend-notice" accessibilityLiveRegion="polite">
+                <Text style={styles.noticeBannerText}>{resendNotice}</Text>
+              </View>
+            ) : null}
+
+            <Text style={styles.label}>6-digit verification code</Text>
+            <OtpCodeSlots code={code}>
               <TextInput
                 value={code}
-                onChangeText={(v) => setCode(v.replace(/\s/g, ''))}
+                onChangeText={handleCodeChange}
                 keyboardType="number-pad"
                 textContentType="oneTimeCode"
                 autoComplete="one-time-code"
                 placeholder="123456"
-                placeholderTextColor="#9CA3AF"
-                style={styles.codeInput}
+                placeholderTextColor="transparent"
+                caretHidden
+                style={styles.codeOverlayInput}
                 editable={!loading}
                 returnKeyType="done"
-                onSubmitEditing={onConfirm}
-                maxLength={12}
+                onSubmitEditing={onSubmitEditing}
+                maxLength={OTP_SLOT_COUNT}
               />
-            </View>
+            </OtpCodeSlots>
 
             <Pressable
+              accessibilityRole="button"
               style={({ pressed }) => [
                 styles.primaryBtn,
                 (!canSubmit || loading) && styles.disabled,
                 pressed && canSubmit && styles.pressed,
               ]}
               disabled={!canSubmit || loading}
-              onPress={onConfirm}
+              onPress={onPressVerify}
             >
               {loading ? (
                 <View style={styles.rowCenter}>
-                  <ActivityIndicator />
+                  <ActivityIndicator color={colors.ink} />
                   <Text style={[styles.primaryText, { marginLeft: 8 }]}>Verifying…</Text>
                 </View>
               ) : (
@@ -168,11 +237,29 @@ export default function ConfirmSignUpScreen({ navigation, route }: Props) {
             </View>
 
             <Pressable
-              style={({ pressed }) => [styles.secondaryBtn, pressed && styles.pressed, loading && styles.disabled]}
+              testID="confirm-resend-code"
+              accessibilityRole="button"
+              style={({ pressed }) => [
+                styles.secondaryBtn,
+                pressed && styles.pressed,
+                (loading || cooldownSec > 0) && styles.disabled,
+              ]}
               onPress={onResend}
+              disabled={loading || cooldownSec > 0}
+            >
+              <Text style={styles.secondaryText}>
+                {cooldownSec > 0 ? `Resend code in ${cooldownSec}s` : 'Resend code'}
+              </Text>
+            </Pressable>
+
+            <Pressable
+              testID="confirm-change-email"
+              accessibilityRole="button"
+              style={({ pressed }) => [styles.changeEmailLink, pressed && styles.pressed]}
+              onPress={() => navigation.goBack()}
               disabled={loading}
             >
-              <Text style={styles.secondaryText}>Resend code</Text>
+              <Text style={styles.changeEmailText}>Wrong email address? Go back</Text>
             </Pressable>
 
             <Text style={styles.footnote}>Only the latest code works. If you requested several, use the newest email.</Text>
@@ -185,87 +272,133 @@ export default function ConfirmSignUpScreen({ navigation, route }: Props) {
   );
 }
 
-const CARD_BG = 'rgba(255,255,255,0.92)';
-const CARD_BORDER = 'rgba(255,255,255,0.55)';
-
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#F5F3FF' },
+  safeArea: { flex: 1, backgroundColor: colors.parchmentBg },
   flex: { flex: 1 },
   scrollContent: { paddingHorizontal: 18, paddingTop: 16, paddingBottom: 24 },
 
   pressed: { opacity: 0.9 },
-  disabled: { opacity: 0.6 },
+  disabled: { opacity: 0.55 },
 
   headerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
   backButton: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    minHeight: 44,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
     borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,0.8)',
+    backgroundColor: colors.softCream,
+    borderWidth: 1,
+    borderColor: colors.hairline,
     marginRight: 10,
+    justifyContent: 'center',
   },
-  backText: { fontSize: 13, color: '#111827', fontWeight: '700' },
+  backText: { fontSize: 13, color: colors.inkSoft, fontWeight: '800' },
 
-  title: { fontSize: 20, fontWeight: '800', color: '#111827' },
-  subtitle: { marginTop: 2, fontSize: 12, color: '#6B7280' },
+  title: { fontSize: 22, fontWeight: '900', color: colors.ink },
+  subtitle: { marginTop: 4, fontSize: 13, color: colors.inkSecondary, lineHeight: 18, fontWeight: '600' },
 
   card: {
     borderRadius: 24,
     paddingVertical: 18,
     paddingHorizontal: 16,
-    backgroundColor: CARD_BG,
+    backgroundColor: colors.softCream,
     borderWidth: 1,
-    borderColor: CARD_BORDER,
-    shadowColor: '#000',
-    shadowOpacity: 0.10,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 12 },
+    borderColor: colors.hairline,
+    shadowColor: colors.shadowSoft,
+    shadowOpacity: 1,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 4,
   },
-  cardTitle: { fontSize: 18, fontWeight: '800', color: '#111827' },
-  cardHint: { marginTop: 4, fontSize: 12, color: '#6B7280' },
+  cardTitle: { fontSize: 18, fontWeight: '900', color: colors.ink },
+  cardHint: { marginTop: 4, fontSize: 12, color: colors.inkSecondary, fontWeight: '600' },
 
-  label: { marginTop: 14, fontSize: 12, fontWeight: '800', color: '#374151' },
-
-  inputWrap: {
-    marginTop: 8,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(17,24,39,0.10)',
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 12,
-    paddingVertical: 2,
-  },
-  codeInput: {
+  errorBanner: {
+    marginTop: 12,
     paddingVertical: 10,
-    fontSize: 16,
-    letterSpacing: 2,
-    fontWeight: '800',
-    color: '#111827',
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: 'rgba(170,54,54,0.28)',
+  },
+  errorBannerText: {
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '700',
+    color: colors.danger,
+  },
+
+  noticeBanner: {
+    marginTop: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    backgroundColor: colors.pokeBlueFaint,
+    borderWidth: 1,
+    borderColor: 'rgba(44,156,192,0.35)',
+  },
+  noticeBannerText: {
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '700',
+    color: colors.ink,
+  },
+
+  label: { marginTop: 14, fontSize: 12, fontWeight: '900', color: colors.inkSoft, letterSpacing: 0.4 },
+
+  codeOverlayInput: {
+    ...StyleSheet.absoluteFillObject,
+    opacity: 0.02,
+    color: colors.ink,
+    fontSize: 18,
   },
 
   primaryBtn: {
     marginTop: 16,
-    borderRadius: 16,
-    backgroundColor: '#4F46E5',
-    paddingVertical: 13,
+    minHeight: 56,
+    borderRadius: 999,
+    backgroundColor: colors.pokeBlue,
+    paddingHorizontal: 16,
     alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: 'rgba(44,156,192,0.4)',
+    shadowOpacity: 1,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
   },
-  primaryText: { fontSize: 14, fontWeight: '900', color: '#FFFFFF' },
+  primaryText: { fontSize: 15, fontWeight: '900', color: colors.ink, letterSpacing: 0.4 },
   rowCenter: { flexDirection: 'row', alignItems: 'center' },
 
   dividerRow: { flexDirection: 'row', alignItems: 'center', marginTop: 14, marginBottom: 10 },
-  dividerLine: { flex: 1, height: 1, backgroundColor: 'rgba(17,24,39,0.10)' },
-  dividerText: { marginHorizontal: 10, fontSize: 12, color: '#6B7280', fontWeight: '700' },
+  dividerLine: { flex: 1, height: 1, backgroundColor: colors.hairline },
+  dividerText: { marginHorizontal: 10, fontSize: 12, color: colors.inkSecondary, fontWeight: '700' },
 
   secondaryBtn: {
-    borderRadius: 16,
-    backgroundColor: 'rgba(17,24,39,0.04)',
+    minHeight: 48,
+    borderRadius: 999,
+    backgroundColor: 'transparent',
     borderWidth: 1,
-    borderColor: 'rgba(17,24,39,0.10)',
-    paddingVertical: 12,
+    borderColor: colors.hairline,
+    paddingHorizontal: 16,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  secondaryText: { fontSize: 14, fontWeight: '800', color: '#111827' },
+  secondaryText: { fontSize: 14, fontWeight: '800', color: colors.inkSoft },
 
-  footnote: { marginTop: 12, fontSize: 11, color: '#6B7280', lineHeight: 16 },
+  changeEmailLink: {
+    marginTop: 10,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  changeEmailText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: colors.inkSoft,
+    textDecorationLine: 'underline',
+  },
+
+  footnote: { marginTop: 12, fontSize: 11, color: colors.inkSecondary, lineHeight: 16, fontWeight: '600' },
 });

@@ -22,6 +22,7 @@ export const MORNING_TIME_PRESETS = ['07:00', '08:00', '09:00'] as const;
 export const EVENING_TIME_PRESETS = ['19:00', '20:00', '21:00'] as const;
 
 type Props = {
+  style?: any;
   permission: NotificationPermissionState | 'unknown';
   prefs: ReminderPrefs;
   busy?: boolean;
@@ -53,7 +54,15 @@ function ToggleRow(props: {
 }) {
   const { testID, label, hint, enabled, onToggle } = props;
   return (
-    <View style={styles.row}>
+    <Pressable
+      testID={testID}
+      accessibilityRole="switch"
+      accessibilityLabel={label}
+      accessibilityHint={hint}
+      accessibilityState={{ checked: enabled }}
+      style={({ pressed }) => [styles.row, pressed && styles.pressed]}
+      onPress={() => onToggle(!enabled)}
+    >
       <View style={styles.rowLabelWrap}>
         <Text style={styles.rowLabel} numberOfLines={1}>
           {label}
@@ -64,18 +73,24 @@ function ToggleRow(props: {
           </Text>
         ) : null}
       </View>
-      <Pressable
-        testID={testID}
-        accessibilityRole="switch"
-        accessibilityState={{ checked: enabled }}
-        style={({ pressed }) => [styles.toggle, enabled && styles.toggleOn, pressed && styles.pressed]}
-        onPress={() => onToggle(!enabled)}
-      >
-        <Text style={styles.toggleText} numberOfLines={1}>
-          {enabled ? 'On' : 'Off'}
-        </Text>
-      </Pressable>
-    </View>
+      <View style={[styles.toggle, enabled ? styles.toggleOn : styles.toggleOff]}>
+        {enabled ? (
+          <>
+            <Text style={[styles.toggleText, styles.toggleTextOn]} numberOfLines={1}>
+              On
+            </Text>
+            <View style={styles.thumbOn} pointerEvents="none" />
+          </>
+        ) : (
+          <>
+            <View style={styles.thumbOff} pointerEvents="none" />
+            <Text style={[styles.toggleText, styles.toggleTextOff]} numberOfLines={1}>
+              Off
+            </Text>
+          </>
+        )}
+      </View>
+    </Pressable>
   );
 }
 
@@ -95,6 +110,7 @@ function TimeChips(props: {
             key={t}
             testID={`settings-reminders-${slot}-time-${t.replace(':', '')}`}
             accessibilityRole="button"
+            accessibilityLabel={t}
             accessibilityState={{ selected: isSelected }}
             style={({ pressed }) => [styles.chip, isSelected && styles.chipSelected, pressed && styles.pressed]}
             onPress={() => onSelect(t)}
@@ -127,7 +143,7 @@ export function RemindersSection(props: Props) {
   const showControls = permission === 'granted';
 
   return (
-    <View style={styles.sectionCard}>
+    <View style={[styles.sectionCard, props.style]}>
       <Text style={styles.sectionTitle} numberOfLines={1}>
         {REMINDERS_COPY.title}
       </Text>
@@ -234,6 +250,7 @@ const styles = StyleSheet.create({
   },
   row: {
     marginTop: spacing.sm,
+    minHeight: 44,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -254,22 +271,49 @@ const styles = StyleSheet.create({
   },
   toggle: {
     minHeight: 32,
-    minWidth: 56,
-    paddingHorizontal: spacing.sm,
+    minWidth: 64,
+    paddingHorizontal: 5,
+    paddingVertical: 4,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: 'rgba(42,34,24,0.18)',
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
+    gap: 6,
   },
   toggleOn: {
-    backgroundColor: colors.ink,
-    borderColor: colors.ink,
+    backgroundColor: colors.pokeBlue,
+    borderColor: colors.pokeBlueDeep,
+  },
+  toggleOff: {
+    backgroundColor: 'rgba(42,34,24,0.08)',
+    borderColor: colors.hairline,
+  },
+  thumbOn: {
+    width: 22,
+    height: 22,
+    borderRadius: 999,
+    backgroundColor: '#FFFFFF',
+  },
+  thumbOff: {
+    width: 22,
+    height: 22,
+    borderRadius: 999,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: colors.hairline,
   },
   toggleText: {
     fontSize: typography.caption,
-    fontWeight: '800',
+    fontWeight: '900',
+    letterSpacing: 0.3,
+    paddingHorizontal: 4,
+  },
+  toggleTextOn: {
     color: colors.ink,
+  },
+  toggleTextOff: {
+    color: colors.inkSecondary,
   },
   chipRow: {
     marginTop: spacing.xs,
@@ -277,9 +321,10 @@ const styles = StyleSheet.create({
   },
   chip: {
     marginRight: spacing.xs,
-    minHeight: 32,
+    minHeight: 44,
+    minWidth: 60,
     paddingHorizontal: spacing.sm,
-    borderRadius: spacing.buttonRadius,
+    borderRadius: 999,
     borderWidth: 1,
     borderColor: 'rgba(42,34,24,0.18)',
     alignItems: 'center',
@@ -299,21 +344,21 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     marginTop: spacing.sm,
-    minHeight: 44,
-    borderRadius: spacing.buttonRadius,
-    backgroundColor: colors.ink,
+    minHeight: 56,
+    borderRadius: 999,
+    backgroundColor: colors.pokeBlue,
     alignItems: 'center',
     justifyContent: 'center',
   },
   primaryButtonText: {
-    color: colors.parchmentBg,
+    color: colors.ink,
     fontSize: typography.button,
-    fontWeight: '800',
+    fontWeight: '900',
   },
   secondaryButton: {
     marginTop: spacing.sm,
     minHeight: 44,
-    borderRadius: spacing.buttonRadius,
+    borderRadius: 999,
     borderWidth: 1,
     borderColor: 'rgba(42,34,24,0.18)',
     alignItems: 'center',

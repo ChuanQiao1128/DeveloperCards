@@ -16,21 +16,23 @@ export const DATA_RESETS_COPY = {
     "Clear the active deck's study progress, owned cards and daily stats on this device. This cannot be undone.",
 } as const;
 
-/**
- * 2026-11-01 settings redesign: both "start over" actions in one place. The
- * schedule reset used to sit inside the Account card and the per-deck reset
- * inside Study; neither grouping matched what a learner is actually trying to
- * do ("make this deck feel new again").
- */
 export function DataResetsSection(props: {
+  style?: any;
   resettingSchedule: boolean;
   onResetReviewSchedule: () => void;
   hasActiveDeck: boolean;
+  activeDeckLabel?: string | null;
   onResetDeckProgress?: () => void;
 }) {
-  const { resettingSchedule, onResetReviewSchedule, hasActiveDeck, onResetDeckProgress } = props;
+  const {
+    resettingSchedule,
+    onResetReviewSchedule,
+    hasActiveDeck,
+    activeDeckLabel,
+    onResetDeckProgress,
+  } = props;
   return (
-    <View style={styles.sectionCard}>
+    <View style={[styles.sectionCard, props.style]}>
       <Text style={styles.sectionTitle} numberOfLines={1}>
         {DATA_RESETS_COPY.title}
       </Text>
@@ -60,14 +62,18 @@ export function DataResetsSection(props: {
           <Text style={styles.sectionTitle} numberOfLines={1}>
             {DATA_RESETS_COPY.deckTitle}
           </Text>
-          <Text style={styles.sectionBody}>{DATA_RESETS_COPY.deckBody}</Text>
+          <Text style={styles.sectionBody}>
+            {activeDeckLabel
+              ? `Clear ${activeDeckLabel} study progress, owned cards and daily stats on this device. This cannot be undone.`
+              : DATA_RESETS_COPY.deckBody}
+          </Text>
           <Pressable
-            style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
+            style={({ pressed }) => [styles.destructiveOutlineButton, pressed && styles.pressed]}
             accessibilityRole="button"
             onPress={onResetDeckProgress}
             testID="settings-reset-deck-progress"
           >
-            <Text style={styles.secondaryButtonText} numberOfLines={1}>
+            <Text style={styles.destructiveOutlineText} numberOfLines={1}>
               {DATA_RESETS_COPY.deckTitle}
             </Text>
           </Pressable>
@@ -106,7 +112,7 @@ const styles = StyleSheet.create({
   secondaryButton: {
     marginTop: spacing.sm,
     minHeight: 44,
-    borderRadius: spacing.buttonRadius,
+    borderRadius: 999,
     borderWidth: 1,
     borderColor: 'rgba(42,34,24,0.18)',
     alignItems: 'center',
@@ -117,6 +123,22 @@ const styles = StyleSheet.create({
     fontSize: typography.button,
     fontWeight: '700',
     color: colors.ink,
+  },
+  destructiveOutlineButton: {
+    marginTop: spacing.sm,
+    minHeight: 44,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(180,35,24,0.35)',
+    backgroundColor: 'rgba(180,35,24,0.04)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.sm,
+  },
+  destructiveOutlineText: {
+    fontSize: typography.button,
+    fontWeight: '800',
+    color: '#B42318',
   },
   pressed: { opacity: 0.9 },
 });

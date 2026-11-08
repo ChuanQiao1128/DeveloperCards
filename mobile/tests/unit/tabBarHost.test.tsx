@@ -81,11 +81,11 @@ describe('TabBarHost', () => {
   });
 
   it('uses a light status bar on cosmic routes and dark elsewhere', async () => {
-    const { store, tree } = await renderHost('More');
+    const { store, tree } = await renderHost('DebugMenu');
     expect(findStatusBar(tree).props.style).toBe('light');
 
     act(() => {
-      store.set('Home');
+      store.set('More');
     });
 
     expect(findStatusBar(tree).props.style).toBe('dark');
@@ -117,10 +117,11 @@ describe('TabBarHost', () => {
     expect(listener).toHaveBeenCalledTimes(2);
   });
 
-  it('maps the cosmic Me, Help and Debug routes to a light status bar', () => {
-    expect(statusBarStyleForRoute('More')).toBe('light');
-    expect(statusBarStyleForRoute('HelpFAQ')).toBe('light');
+  it('maps cosmic routes to a light status bar and parchment routes (including Me and Help) to dark', () => {
     expect(statusBarStyleForRoute('DebugMenu')).toBe('light');
+    expect(statusBarStyleForRoute('DrawCeremony')).toBe('light');
+    expect(statusBarStyleForRoute('More')).toBe('dark');
+    expect(statusBarStyleForRoute('HelpFAQ')).toBe('dark');
     expect(statusBarStyleForRoute('Home')).toBe('dark');
     expect(statusBarStyleForRoute(undefined)).toBe('dark');
   });

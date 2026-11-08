@@ -170,7 +170,7 @@ function ForceUpdateOverlay(props: ForceUpdateGate) {
 
   return (
     <View style={styles.updateOverlay} accessibilityViewIsModal>
-      <LinearGradient colors={['#F5F3FF', '#E0F2FE']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.gradient}>
+      <LinearGradient colors={['#FAF3E0', '#F3E8C8']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.gradient}>
         <View style={styles.updateCard}>
           <Text style={styles.updateTitle}>Update Required</Text>
           <Text style={styles.updateBody}>{props.message}</Text>
@@ -314,13 +314,13 @@ function App() {
 export default wrapRootComponent(App);
 
 const styles = StyleSheet.create({
-  appShell: { flex: 1, backgroundColor: '#F5F3FF' },
+  appShell: { flex: 1, backgroundColor: '#FAF3E0' },
   navigatorShell: { flex: 1 },
   gradient: { flex: 1 },
   updateOverlay: {
     ...StyleSheet.absoluteFillObject,
     // Opaque, so the app underneath is neither visible nor tappable.
-    backgroundColor: '#F5F3FF',
+    backgroundColor: '#FAF3E0',
     zIndex: 100,
     elevation: 100,
   },
@@ -329,21 +329,25 @@ const styles = StyleSheet.create({
     marginHorizontal: 18,
     borderRadius: 24,
     padding: 18,
-    backgroundColor: 'rgba(255,255,255,0.92)',
-    shadowColor: '#000',
-    shadowOpacity: 0.12,
+    backgroundColor: '#FCF5EA',
+    borderWidth: 1,
+    borderColor: 'rgba(67,42,18,0.12)',
+    shadowColor: 'rgba(67,42,18,0.10)',
+    shadowOpacity: 1,
     shadowRadius: 16,
     shadowOffset: { width: 0, height: 10 },
   },
-  updateTitle: { fontSize: 22, fontWeight: '900', color: '#111827' },
-  updateBody: { marginTop: 8, fontSize: 14, lineHeight: 20, color: '#4B5563' },
-  updateMeta: { fontSize: 12, color: '#6B7280' },
+  updateTitle: { fontSize: 22, fontWeight: '900', color: '#2A2218' },
+  updateBody: { marginTop: 8, fontSize: 14, lineHeight: 20, color: '#5A4B38' },
+  updateMeta: { fontSize: 12, color: '#5A4B38' },
   updateButton: {
     marginTop: 16,
-    borderRadius: 14,
-    backgroundColor: '#4F46E5',
+    minHeight: 56,
+    borderRadius: 999,
+    backgroundColor: '#3FB7DB',
     paddingVertical: 14,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  updateButtonText: { color: '#fff', fontSize: 15, fontWeight: '800' },
+  updateButtonText: { color: '#2A2218', fontSize: 15, fontWeight: '900' },
 });

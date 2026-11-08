@@ -81,6 +81,7 @@ vi.mock('../../src/features/gacha/audience/audiencePrefs', () => ({
 }));
 
 import appJson from '../../app.json';
+import { setAuthIdentitySnapshot } from '../../src/auth/sessionBoundary';
 import { MoreScreen, MORE_LINKS, MORE_BYLINE } from '../../src/screens/MoreScreen';
 import { ProfileScreen } from '../../src/screens/ProfileScreen';
 import { HelpFAQScreen } from '../../src/screens/HelpFAQScreen';
@@ -168,6 +169,7 @@ describe('Me tab · MoreScreen + Profile + Help real copy', () => {
     audienceFixture = 'both';
     activeDeckFixture = 'aws-saa-c03';
     installedDecksFixture = ['aws-saa-c03', 'csharp'];
+    setAuthIdentitySnapshot({ status: 'anonymous', email: null, sessionExpired: false });
     openUrlMock.mockClear();
   });
 
@@ -388,4 +390,54 @@ describe('Me tab · MoreScreen + Profile + Help real copy', () => {
     expect(blob).not.toContain('route pressure');
     expect(blob).not.toContain('Fresh Start');
   });
+
+
+  it('surfaces account & sync status at the top of Me and routes guest CTA to SignIn', async () => {
+    const navigate = vi.fn();
+    const tree = await renderMore(navigate);
+    const card = tree.root.findByProps({ testID: 'more-account-card' });
+    expect(collectText(card)).toContain('Local guest mode');
+    expect(collectText(card)).toContain('Back up your study progress');
+
+    act(() => {
+      tree.root.findByProps({ testID: 'more-account-cta' }).props.onPress();
+    });
+    expect(navigate).toHaveBeenCalledWith('SignIn');
+
+    // Signed-in state updates the identity card and routes to Settings.
+    await act(async () => {
+      setAuthIdentitySnapshot({ status: 'signed_in', email: 'learner@example.com', sessionExpired: false });
+    });
+    expect(collectText(card)).toContain('Signed in as learner@example.com');
+    expect(collectText(card)).toContain('Cloud sync active');
+    act(() => {
+      tree.root.findByProps({ testID: 'more-account-cta' }).props.onPress();
+    });
+    expect(navigate).toHaveBeenCalledWith('Settings');
+  });
+
+  it('renders enriched Me hub context: study goal, streak details, mistake count and external badges', async () => {
+    const navigate = vi.fn();
+    const tree = await renderMore(navigate);
+
+    // Bento stats sublabel
+    const blob = textBlob(tree);
+    expect(blob).toContain('This week: 3/7 days');
+    expect(blob).toContain('Best: 9');
+
+    // Study goal summary in snapshot card
+    const goalSummary = tree.root.findByProps({ testID: 'more-goal-summary' });
+    expect(goalSummary).toBeDefined();
+    const mistakesSummary = tree.root.findByProps({ testID: 'more-mistakes-summary' });
+    expect(mistakesSummary).toBeDefined();
+
+    // External link indicators
+    expect(tree.root.findByProps({ testID: 'more-external-icon-privacy' })).toBeDefined();
+    expect(tree.root.findByProps({ testID: 'more-external-icon-support' })).toBeDefined();
+
+    // Group headings
+    expect(blob).toContain('Study tools');
+    expect(blob).toContain('Preferences & support');
+  });
+
 });

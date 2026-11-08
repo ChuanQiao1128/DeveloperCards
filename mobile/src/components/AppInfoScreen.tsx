@@ -15,6 +15,7 @@ type Section = {
 type Stat = {
   label: string;
   value: string;
+  sublabel?: string;
 };
 
 export function AppInfoScreen(props: {
@@ -32,11 +33,6 @@ export function AppInfoScreen(props: {
   onTertiary?: () => void;
   cosmic?: boolean;
   footer?: React.ReactNode;
-  /**
-   * 2026-11-01 settings redesign: an optional top-of-screen affordance
-   * (e.g. Back / Close) so stack-pushed info pages that use this shell
-   * always show a way out, not just the swipe gesture.
-   */
   headerAction?: { label: string; onPress: () => void };
 }) {
   const cosmic = props.cosmic ?? false;
@@ -45,32 +41,38 @@ export function AppInfoScreen(props: {
     : [colors.parchmentBg, '#F6EEE0', colors.parchmentBgDeep];
   const titleColor = cosmic ? colors.cosmicInk : colors.ink;
   const bodyColor = cosmic ? '#D9D0AE' : colors.inkSecondary;
+  const eyebrowColor = cosmic ? colors.glowGold : colors.inkSecondary;
+  const statValueColor = cosmic ? colors.glowGold : colors.ink;
   const chipBg = cosmic ? 'rgba(232,184,90,0.14)' : '#EFE6CC';
-  const chipText = cosmic ? colors.cosmicInk : '#8C7A5B';
+  const chipText = cosmic ? colors.cosmicInk : colors.inkSoft;
   const cardBg = cosmic ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.9)';
   const cardBorder = cosmic ? 'rgba(232,184,90,0.18)' : 'rgba(42,34,24,0.06)';
   const itemBorder = cosmic ? 'rgba(245,236,196,0.08)' : 'rgba(42,34,24,0.06)';
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: cosmic ? colors.cosmicBgDeep : colors.parchmentBg }]}> 
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: cosmic ? colors.cosmicBgDeep : colors.parchmentBg }]}>
       <LinearGradient colors={gradient} style={styles.gradient}>
+        {props.headerAction ? (
+          <View style={styles.headerRow}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={props.headerAction.label}
+              onPress={props.headerAction.onPress}
+              style={({ pressed }) => [
+                styles.headerButton,
+                { backgroundColor: cosmic ? 'rgba(255,255,255,0.14)' : colors.softCream },
+                pressed && styles.headerButtonPressed,
+              ]}
+            >
+              <Text style={[styles.headerButtonText, { color: cosmic ? colors.cosmicInk : colors.inkSoft }]} numberOfLines={1}>
+                {props.headerAction.label}
+              </Text>
+            </Pressable>
+          </View>
+        ) : null}
         <ScrollView contentContainerStyle={styles.container}>
-          {props.headerAction ? (
-            <View style={styles.headerRow}>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={props.headerAction.label}
-                onPress={props.headerAction.onPress}
-                style={({ pressed }) => [styles.headerButton, { backgroundColor: cosmic ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.85)' }, pressed && styles.headerButtonPressed]}
-              >
-                <Text style={[styles.headerButtonText, { color: cosmic ? colors.cosmicInk : colors.ink }]} numberOfLines={1}>
-                  {props.headerAction.label}
-                </Text>
-              </Pressable>
-            </View>
-          ) : null}
-          <View style={[styles.heroCard, { backgroundColor: cosmic ? 'rgba(255,255,255,0.06)' : 'rgba(255,250,240,0.9)', borderColor: cardBorder }]}> 
-            <Text style={[styles.eyebrow, { color: cosmic ? colors.glowGold : colors.gold }]}>{props.eyebrow}</Text>
+          <View style={[styles.heroCard, { backgroundColor: cosmic ? 'rgba(255,255,255,0.06)' : 'rgba(255,250,240,0.9)', borderColor: cardBorder }]}>
+            <Text style={[styles.eyebrow, { color: eyebrowColor }]}>{props.eyebrow}</Text>
             <Text style={[styles.title, { color: titleColor }]}>{props.title}</Text>
             <View style={[styles.heroDivider, { backgroundColor: cosmic ? colors.glowGold : colors.gold }]} />
             <Text style={[styles.body, { color: bodyColor }]}>{props.body}</Text>
@@ -78,7 +80,7 @@ export function AppInfoScreen(props: {
             {(props.chips ?? []).length ? (
               <View style={styles.chipsRow}>
                 {(props.chips ?? []).map((chip) => (
-                  <View key={chip} style={[styles.heroChip, { backgroundColor: chipBg }]}> 
+                  <View key={chip} style={[styles.heroChip, { backgroundColor: chipBg }]}>
                     <Text style={[styles.heroChipText, { color: chipText }]}>{chip}</Text>
                   </View>
                 ))}
@@ -88,9 +90,14 @@ export function AppInfoScreen(props: {
             {(props.stats ?? []).length ? (
               <View style={styles.statsRow}>
                 {(props.stats ?? []).map((stat) => (
-                  <View key={stat.label} style={[styles.statCard, { backgroundColor: cosmic ? 'rgba(255,255,255,0.05)' : '#FFF7EA', borderColor: cardBorder }]}> 
-                    <Text style={[styles.statValue, { color: cosmic ? colors.glowGold : colors.gold }]}>{stat.value}</Text>
+                  <View key={stat.label} style={[styles.statCard, { backgroundColor: cosmic ? 'rgba(255,255,255,0.05)' : '#FFF7EA', borderColor: cardBorder }]}>
+                    <Text style={[styles.statValue, { color: statValueColor }]}>{stat.value}</Text>
                     <Text style={[styles.statLabel, { color: bodyColor }]}>{stat.label}</Text>
+                    {stat.sublabel ? (
+                      <Text style={[styles.statSublabel, { color: bodyColor }]}>
+                        {stat.sublabel}
+                      </Text>
+                    ) : null}
                   </View>
                 ))}
               </View>
@@ -98,11 +105,11 @@ export function AppInfoScreen(props: {
           </View>
 
           {(props.sections ?? []).map((section) => (
-            <View key={section.title} style={[styles.sectionCard, { backgroundColor: cardBg, borderColor: cardBorder }]}> 
+            <View key={section.title} style={[styles.sectionCard, { backgroundColor: cardBg, borderColor: cardBorder }]}>
               <Text style={[styles.sectionTitle, { color: titleColor }]}>{section.title}</Text>
               {section.body ? <Text style={[styles.sectionBody, { color: bodyColor }]}>{section.body}</Text> : null}
               {(section.items ?? []).map((item) => (
-                <View key={`${section.title}-${item.title}`} style={[styles.itemRow, { borderTopColor: itemBorder }]}> 
+                <View key={`${section.title}-${item.title}`} style={[styles.itemRow, { borderTopColor: itemBorder }]}>
                   <Text style={[styles.itemTitle, { color: titleColor }]}>{item.title}</Text>
                   {item.subtitle ? <Text style={[styles.itemSubtitle, { color: bodyColor }]}>{item.subtitle}</Text> : null}
                 </View>
@@ -136,11 +143,19 @@ export function AppInfoScreen(props: {
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
   gradient: { flex: 1 },
-  headerRow: { flexDirection: 'row', justifyContent: 'flex-end', marginBottom: spacing.xs },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
+    paddingHorizontal: spacing.screenPadding,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.xs,
+  },
   headerButton: {
-    minHeight: 40,
-    paddingHorizontal: 16,
+    minHeight: 44,
+    paddingHorizontal: 14,
     borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.hairline,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -169,17 +184,13 @@ const styles = StyleSheet.create({
   statCard: { flex: 1, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 14, borderWidth: 1 },
   statValue: { fontSize: 24, lineHeight: 28, fontWeight: '900' },
   statLabel: { marginTop: 6, fontSize: typography.caption, fontWeight: '700', letterSpacing: 0.8, textTransform: 'uppercase' },
+  statSublabel: { marginTop: 4, fontSize: typography.caption, fontWeight: '700', lineHeight: 15 },
   sectionCard: { marginTop: spacing.md, borderRadius: 24, padding: spacing.md, borderWidth: 1 },
   sectionTitle: { fontSize: 18, lineHeight: 22, fontWeight: '800' },
   sectionBody: { marginTop: spacing.xs, fontSize: typography.bodySmall, lineHeight: 19 },
   itemRow: { marginTop: spacing.sm, paddingTop: spacing.sm, borderTopWidth: 1 },
   itemTitle: { fontSize: typography.bodySmall, lineHeight: 18, fontWeight: '700' },
   itemSubtitle: { marginTop: 4, fontSize: typography.caption, lineHeight: 16 },
-  // ─── Brand-aligned button stack ────────────────────────────────────
-  // Default mode: pokeBlue primary 56pt pill + transparent ghost
-  // secondary + gold-text outlined tertiary. Matches Home / Draw /
-  // Session / Welcome action language. One file change cascades to 19
-  // secondary screens (Settings, Errors, About, Help, Profile, etc.).
   primaryButton: {
     marginTop: spacing.lg,
     minHeight: 56,
@@ -194,12 +205,9 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     elevation: 4,
   },
-  // Cosmic primary stays gold (premium-feel deep theme)
   primaryButtonCosmic: { backgroundColor: colors.glowGold, shadowColor: 'rgba(232,184,90,0.5)' },
   primaryButtonText: { color: colors.ink, fontSize: typography.button, fontWeight: '900', letterSpacing: 0.4 },
   primaryButtonTextCosmic: { color: colors.ink },
-  // Secondary = ghost button (transparent + hairline border), matching
-  // the Draw screen's "Open 1" demoted style.
   secondaryButton: {
     marginTop: spacing.sm,
     minHeight: 48,
@@ -211,13 +219,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: spacing.md,
   },
-  // Cosmic secondary uses the same ghost language as default — fully
-  // transparent + warm-cream hairline border. Replaces the slight gray
-  // fill so both themes share one visual vocabulary.
   secondaryButtonCosmic: { backgroundColor: 'transparent', borderColor: 'rgba(245,236,196,0.22)' },
   secondaryButtonText: { color: colors.inkSoft, fontSize: typography.bodySmall, fontWeight: '800', letterSpacing: 0.3 },
   secondaryButtonTextCosmic: { color: colors.cosmicInk },
-  // Tertiary stays as outlined gold-text (premium-leaning low-emphasis)
   tertiaryButton: {
     marginTop: spacing.sm,
     minHeight: 48,
@@ -226,10 +230,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: spacing.md,
     borderWidth: 1,
-    borderColor: 'rgba(200,136,58,0.32)',
+    borderColor: colors.hairline,
   },
   tertiaryButtonCosmic: { borderColor: 'rgba(245,236,196,0.18)' },
-  tertiaryButtonText: { color: colors.gold, fontSize: typography.bodySmall, fontWeight: '800', letterSpacing: 0.3 },
+  tertiaryButtonText: { color: colors.inkSoft, fontSize: typography.bodySmall, fontWeight: '800', letterSpacing: 0.3 },
   tertiaryButtonTextCosmic: { color: colors.glowGold },
   footerWrap: { marginTop: spacing.md },
 });

@@ -283,8 +283,22 @@ export function PaywallScreen({ navigation }: Props) {
               ) : null}
             </View>
 
+            {/* Free vs Premium comparison */}
+            <View style={styles.sectionCard} testID="paywall-free-tier-card">
+              <Text style={styles.sectionTitle}>Free always includes</Text>
+              <Text style={styles.sectionSubtitle}>
+                Core study decks, spaced repetition, and cloud sync stay free with no time limit.
+              </Text>
+
+              <View style={{ height: 10 }} />
+
+              <Bullet text="Core starter and foundation decks" />
+              <Bullet text="Daily spaced-repetition reviews and Mistake Book" />
+              <Bullet text="Cloud progress sync across your devices" />
+            </View>
+
             {/* What you get */}
-            <View style={styles.sectionCard}>
+            <View style={styles.sectionCard} testID="paywall-premium-tier-card">
               <Text style={styles.sectionTitle}>What you get</Text>
               <Text style={styles.sectionSubtitle}>
                 Premium keeps your deeper interview tracks, upgrades, and future releases in one stable lane.
@@ -356,12 +370,15 @@ export function PaywallScreen({ navigation }: Props) {
             </View>
 
             <View style={styles.footerBox}>
-              <Text style={styles.footerText}>Free decks stay available even if you never upgrade.</Text>
+              <Text style={styles.footerText}>
+                Free decks stay available even if you never upgrade. Cancel anytime in iOS Settings &gt; Apple Account &gt; Subscriptions.
+              </Text>
             </View>
 
             <View style={styles.legalRow}>
               <Pressable
                 testID="paywall-terms-link"
+                style={styles.legalLinkPressable}
                 onPress={() => void Linking.openURL(TERMS_OF_USE_URL)}
               >
                 <Text style={styles.legalLinkText}>Terms of Use</Text>
@@ -369,6 +386,7 @@ export function PaywallScreen({ navigation }: Props) {
               <Text style={styles.legalDot}>·</Text>
               <Pressable
                 testID="paywall-privacy-link"
+                style={styles.legalLinkPressable}
                 onPress={() => void Linking.openURL(PRIVACY_URL)}
               >
                 <Text style={styles.legalLinkText}>Privacy Policy</Text>
@@ -407,18 +425,20 @@ const styles = StyleSheet.create({
 
   headerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
   backButton: {
-    paddingHorizontal: 12,
+    minHeight: 44,
+    paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 999,
     backgroundColor: colors.softCream,
     marginRight: 10,
     borderWidth: 1,
     borderColor: colors.hairline,
+    justifyContent: 'center',
   },
   backText: { fontSize: 13, color: colors.inkSoft, fontWeight: '800' },
 
   title: { fontSize: 24, fontWeight: '900', color: colors.ink },
-  subtitle: { marginTop: 4, fontSize: 12, color: colors.inkMuted, fontWeight: '600' },
+  subtitle: { marginTop: 4, fontSize: 12, color: colors.inkSecondary, fontWeight: '600' },
 
   sectionCard: {
     borderRadius: 18,
@@ -435,7 +455,7 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   sectionTitle: { fontSize: 15, fontWeight: '900', color: colors.ink },
-  sectionSubtitle: { marginTop: 6, fontSize: 12, color: colors.inkMuted, lineHeight: 16, fontWeight: '600' },
+  sectionSubtitle: { marginTop: 6, fontSize: 12, color: colors.inkSecondary, lineHeight: 16, fontWeight: '600' },
 
   divider: {
     marginTop: 12,
@@ -445,46 +465,56 @@ const styles = StyleSheet.create({
   },
 
   kvRow: { marginTop: 8, flexDirection: 'row', justifyContent: 'space-between' },
-  kLabel: { fontSize: 12, color: colors.inkMuted, fontWeight: '600' },
+  kLabel: { fontSize: 12, color: colors.inkSecondary, fontWeight: '600' },
   kValue: { fontSize: 13, color: colors.inkSoft, fontWeight: '800' },
 
-  retryBtn: { marginTop: 10, alignSelf: 'flex-start', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 999, backgroundColor: colors.softCream, borderWidth: 1, borderColor: colors.hairline },
-  retryBtnText: { fontSize: 13, color: colors.pokeBlueDeep, fontWeight: '900' },
+  retryBtn: {
+    marginTop: 10,
+    minHeight: 44,
+    alignSelf: 'flex-start',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 999,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: colors.hairline,
+  },
+  retryBtnText: { fontSize: 13, color: colors.inkSoft, fontWeight: '900' },
 
-  // Premium bullets — gold dots reinforce the premium accent
   bulletRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 8 },
-  bulletDot: { width: 18, fontSize: 16, color: colors.gold, lineHeight: 18, fontWeight: '900' },
+  bulletDot: { width: 18, fontSize: 16, color: colors.inkSecondary, lineHeight: 18, fontWeight: '900' },
   bulletText: { flex: 1, fontSize: 13, color: colors.inkSoft, lineHeight: 18, fontWeight: '600' },
 
-  // Premium CTA = GOLD (not pokeBlue) — this is the upgrade tier
   primaryButton: {
     marginTop: 12,
     minHeight: 56,
     borderRadius: 999,
-    backgroundColor: colors.gold,
+    backgroundColor: colors.pokeBlue,
     paddingHorizontal: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: 'rgba(200,136,58,0.45)',
+    shadowColor: 'rgba(44,156,192,0.4)',
     shadowOpacity: 1,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 5 },
-    elevation: 5,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
   },
-  primaryButtonText: { fontSize: 15, fontWeight: '900', color: '#FFFFFF', letterSpacing: 0.4 },
+  primaryButtonText: { fontSize: 15, fontWeight: '900', color: colors.ink, letterSpacing: 0.4 },
   buttonPressed: { opacity: 0.9 },
   buttonDisabled: { opacity: 0.55 },
 
   rowInline: { flexDirection: 'row', alignItems: 'center' },
 
-  linkBtn: { marginTop: 12, alignItems: 'center', paddingVertical: 8 },
-  linkBtnText: { fontSize: 13, color: colors.pokeBlueDeep, fontWeight: '900' },
+  linkBtn: { marginTop: 10, minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingVertical: 8 },
+  linkBtnText: { fontSize: 13, color: colors.inkSoft, fontWeight: '900', textDecorationLine: 'underline' },
 
-  mutedNote: { marginTop: 10, fontSize: 11, color: colors.inkMuted, lineHeight: 15, fontWeight: '600' },
+  mutedNote: { marginTop: 10, fontSize: 11, color: colors.inkSecondary, lineHeight: 15, fontWeight: '600' },
 
   footerBox: { marginTop: 6, alignItems: 'center' },
-  footerText: { fontSize: 11, color: colors.inkMuted, textAlign: 'center', fontWeight: '600' },
-  legalRow: { flexDirection: 'row', justifyContent: 'center', marginTop: 12, gap: 8 },
-  legalLinkText: { fontSize: 12, color: colors.pokeBlueDeep, fontWeight: '800' },
-  legalDot: { fontSize: 12, color: colors.inkMuted },
+  footerText: { fontSize: 11, color: colors.inkSecondary, textAlign: 'center', fontWeight: '600' },
+  legalRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 8, gap: 8 },
+  legalLinkPressable: { minHeight: 44, minWidth: 44, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 6 },
+  legalLinkText: { fontSize: 12, color: colors.inkSoft, fontWeight: '800', textDecorationLine: 'underline', paddingVertical: 12, paddingHorizontal: 4 },
+  legalDot: { fontSize: 12, color: colors.inkSecondary },
 });

@@ -417,4 +417,49 @@ describe('auth screens record the anonymous funnel steps (R24 M01)', () => {
     expect(mockAlert).toHaveBeenCalled();
     expect(recordFunnelEventMock).not.toHaveBeenCalled();
   });
+
+  it('forgot password enforces 60s cooldown and in-flight guard on initial send and resend', async () => {
+    let resolveSend!: () => void;
+    store.requestPasswordReset.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveSend = resolve;
+        }),
+    );
+
+    const navigation = makeNav();
+    let tree!: renderer.ReactTestRenderer;
+    await act(async () => {
+      tree = renderer.create(
+        <ForgotPasswordScreen
+          navigation={navigation as any}
+          route={{ key: 'forgot', name: 'ForgotPassword', params: { email: 'user@example.com' } } as any}
+        />,
+      );
+    });
+
+    const sendBtn = byTestID(tree, 'forgot-send-code');
+
+    // Fire two taps while the first send is pending
+    let p1: Promise<any>;
+    let p2: Promise<any>;
+    await act(async () => {
+      p1 = sendBtn.props.onPress();
+      p2 = sendBtn.props.onPress();
+    });
+
+    expect(store.requestPasswordReset).toHaveBeenCalledTimes(1);
+
+    // Complete the send
+    await act(async () => {
+      resolveSend();
+      await Promise.all([p1, p2]);
+    });
+    await flush();
+
+    // After step transitions to confirm, Resend button is immediately in cooldown
+    const resendBtn = byTestID(tree, 'forgot-resend');
+    expect(resendBtn.props.disabled).toBe(true);
+  });
+
 });

@@ -47,6 +47,8 @@ const callers = [
   ['screens/AudienceSurveyScreen.tsx', 'primaryButton', 'primaryButtonText', 'pressed'],
   ['screens/PermissionPromptScreen.tsx', 'primaryButton', 'primaryButtonText', 'pressed'],
   ['screens/SignInScreen.tsx', 'primaryBtn', 'primaryText', 'pressed'],
+  ['screens/SignUpScreen.tsx', 'primaryBtn', 'primaryText', 'pressed'],
+  ['screens/ConfirmSignUpScreen.tsx', 'primaryBtn', 'primaryText', 'pressed'],
   ['screens/ForgotPasswordScreen.tsx', 'primaryBtn', 'primaryText', 'pressed'],
   ['screens/CardDetailScreen.tsx', 'primaryAction', 'primaryActionText', 'pressed'],
   ['screens/MistakeBookScreen.tsx', 'primaryAction', 'primaryActionText', 'pressed'],

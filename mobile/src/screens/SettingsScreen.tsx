@@ -19,6 +19,7 @@ import { getCurrentAppVersion } from '../config/remoteConfig';
 import { useFeatureFlags } from '../config/featureFlags';
 import { isDebugMenuAvailable } from '../config/debugMenu';
 import { useAuthStore } from '../auth/authStore';
+import { SUPPORT_LINKS } from '../content/supportLinks';
 import {
   DEFAULT_REMINDER_PREFS,
   getReminderPrefs,
@@ -43,7 +44,6 @@ import {
 import AccountSection from '../features/gacha/settings/account/AccountSection';
 import ContentSection from '../features/gacha/settings/content/ContentSection';
 import RemindersSection from '../features/gacha/settings/reminders/RemindersSection';
-import AppearanceSection from '../features/gacha/settings/appearance/AppearanceSection';
 import { FeedbackSection } from '../features/gacha/settings/feedback/FeedbackSection';
 import {
   getFeedbackPrefsSync,
@@ -52,6 +52,7 @@ import {
   type FeedbackPrefs,
 } from '../features/gacha/settings/feedbackPrefs';
 import { StudySection } from '../features/gacha/settings/study/StudySection';
+import { goalDeckLabel } from '../features/gacha/settings/study/studyGoalEditor';
 import { resetSingleDeckProgress } from '../features/gacha/deckReset';
 import { loadCardLangPref, setCardLangPref, useCardLangPref } from '../features/gacha/study/cardLangPrefs';
 import { getStudyGoal, type StudyGoal } from '../features/goal/studyGoal';
@@ -81,10 +82,6 @@ import { typography } from '../theme/typography';
 type Props = NativeStackScreenProps<RootStackParamList, 'Settings'>;
 type SettingsLoadState = 'loading' | 'ready' | 'error';
 
-const SUPPORT_URL =
-  'https://tartan-tortoise-e81.notion.site/DevCards-Spaced-Recall-Support-Help-2bfa758eb545809ead04d8f8321a40dc?pvs=74';
-const PRIVACY_URL =
-  'https://tartan-tortoise-e81.notion.site/DevCards-Spaced-Recall-Privacy-Policy-2bfa758eb54580db99a3ed89369f9a13?pvs=74';
 const PREMIUM_COPY = {
   title: 'Premium',
   body: 'Unlock premium tracks and keep upgrades in one place.',
@@ -134,23 +131,13 @@ export function SettingsScreen({ navigation }: Props) {
   const [streak, setStreak] = useState<StreakSnapshot | null>(null);
   const [streakOwner, setStreakOwner] = useState(authUserSub);
   const [resetting, setResetting] = useState(false);
-  // Device-global feedback prefs. Seeded from the synchronous in-memory value (defaults
-  // until App.tsx's mount load runs) and refreshed from storage in the focus load below.
   const [feedbackPrefs, setFeedbackPrefs] = useState<FeedbackPrefs>(() => getFeedbackPrefsSync());
-  // Device-global study prefs (two vs four rating buttons), same seeding as above.
   const [studyPrefs, setStudyPrefsState] = useState<StudyPrefs>(() => getStudyPrefsSync());
-  // Device-global card language (card translations), the same value the study toggle writes.
   const cardLang = useCardLangPref();
-  // Device-global "Share anonymous usage counts" (R24 M01), same seeding as above.
   const [privacyPrefs, setPrivacyPrefsState] = useState<PrivacyPrefs>(() => getPrivacyPrefsSync());
-  // U4: the study goal (onboarding's deck + exam date), editable here. Device-local, like onboarding.
   const [studyGoal, setStudyGoalState] = useState<StudyGoal | null>(null);
   const [activeDeckSlug, setActiveDeckSlugState] = useState<string | null>(null);
 
-  // True once the first load has succeeded. After that, refocus/auth reloads
-  // refresh the data silently instead of swapping the whole screen for a spinner
-  // (which would remount the sections and drop in-progress input such as the
-  // typed DELETE confirmation).
   const hasLoadedRef = useRef(false);
 
   const reminderPlan = useMemo(() => buildReminderPlanVM(reminderPrefs), [reminderPrefs]);
@@ -169,10 +156,8 @@ export function SettingsScreen({ navigation }: Props) {
         loadFeedbackPrefs(),
         loadStudyPrefs(),
         loadPrivacyPrefs(),
-        // Neither read throws: a storage error reads as "no goal" / "no active deck".
         getStudyGoal(),
         loadActiveDeckSlug(),
-        // The card language is a subscribed store (useCardLangPref below); this only refreshes it.
         loadCardLangPref(),
       ]);
 
@@ -191,8 +176,6 @@ export function SettingsScreen({ navigation }: Props) {
       setLoadState('ready');
       hasLoadedRef.current = true;
 
-      // A permission read must never flip the screen to the error state, so it
-      // runs in its own try/catch after the payload load has succeeded.
       try {
         const permission = await getNotificationPermissionState();
         if (currentUserRef.current === owner) setReminderPermission(permission);
@@ -201,8 +184,6 @@ export function SettingsScreen({ navigation }: Props) {
       }
     } catch {
       if (currentUserRef.current !== owner) return;
-      // Only surface the error screen before the first successful load. Once the
-      // screen is up, a failed background refresh keeps the current values.
       if (!hasLoadedRef.current) {
         setLoadError('Unable to load settings right now.');
         setLoadState('error');
@@ -307,20 +288,16 @@ export function SettingsScreen({ navigation }: Props) {
   }, [refresh]);
 
   const onToggleFeedback = useCallback((key: keyof FeedbackPrefs, value: boolean) => {
-    // Optimistic: reflect the choice immediately, then persist and store the result.
     setFeedbackPrefs((prev) => ({ ...prev, [key]: value }));
     void setFeedbackPref(key, value).then((saved) => setFeedbackPrefs(saved));
   }, []);
 
   const onToggleFourButtons = useCallback((value: boolean) => {
-    // Optimistic, like the feedback toggles above.
     setStudyPrefsState({ fourButtons: value });
     void setStudyPrefs({ fourButtons: value }).then((saved) => setStudyPrefsState(saved));
   }, []);
 
   const onToggleShareUsageCounts = useCallback((value: boolean) => {
-    // Optimistic, like the feedback toggles. Turning it off also drops anything the anonymous
-    // funnel had queued but not yet sent.
     setPrivacyPrefsState({ shareUsageCounts: value });
     void setPrivacyPref('shareUsageCounts', value).then((saved) => setPrivacyPrefsState(saved));
     if (!value) clearFunnelQueue();
@@ -330,21 +307,20 @@ export function SettingsScreen({ navigation }: Props) {
     navigation.navigate('SignIn');
   }, [navigation]);
 
-  // Release-build door to the Debug menu: 7 taps on the version label within 3 s, only
-  // where the menu exists (__DEV__ or a non-production update channel; R25 G03). On the
-  // production channel the label has no press handler. The __DEV__ Debug section below
-  // stays as it is.
   const debugMenuAvailable = useMemo(() => isDebugMenuAvailable(), []);
   const debugTaps = useRef(createDebugTapCounter());
   const onVersionPress = useCallback(() => {
     if (debugTaps.current.tap()) navigation.navigate('DebugMenu');
   }, [navigation]);
 
+  const activeDeckLabel = activeDeckSlug ? goalDeckLabel(activeDeckSlug) : null;
+
   const onResetDeckProgress = useCallback(() => {
     if (!activeDeckSlug) return;
+    const label = goalDeckLabel(activeDeckSlug);
     Alert.alert(
       'Reset deck progress?',
-      'This clears study progress, owned cards and daily stats for the active deck on this device. This cannot be undone.',
+      `This clears study progress, owned cards and daily stats for ${label} on this device. This cannot be undone.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -433,102 +409,124 @@ export function SettingsScreen({ navigation }: Props) {
         end={{ x: 1, y: 1 }}
         style={styles.gradient}
       >
-        <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+        <View style={styles.headerBar}>
           <View style={styles.headerRow}>
-            <Text style={styles.eyebrow} numberOfLines={1}>
-              Settings
-            </Text>
-            <Pressable style={({ pressed }) => [styles.backButton, pressed && styles.pressed]} onPress={() => navigation.goBack()}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Back"
+              style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
+              onPress={() => navigation.goBack()}
+            >
               <Text style={styles.backText} numberOfLines={1}>
-                Close
+                ← Back
               </Text>
             </Pressable>
-          </View>
-
-          <View style={styles.sectionCard}>
-            <Text style={styles.sectionTitle} numberOfLines={1}>
-              Progress
-            </Text>
-            <Text style={styles.sectionBody}>
-              {momentumDays} days streak · {totalSessions} sessions that counted
-            </Text>
-            <Text style={styles.sectionBody}>
-              Session totals are saved per account on this device.
-            </Text>
-            <Text style={styles.metaText}>
-              {reminderPlan.statusLine}
-            </Text>
-          </View>
-
-          <AccountSection
-            signedIn={signedIn}
-            email={email}
-            onSignIn={onSignIn}
-            onSignOut={() => void onSignOut()}
-            primaryCtaTestID="screen-settings-primary-cta"
-          />
-
-          <ContentSection
-            audience={audience}
-            saving={audienceSaving}
-            onSelect={(next) => void onSelectAudience(next)}
-          />
-
-          <StudySection
-            prefs={studyPrefs}
-            onToggleFourButtons={onToggleFourButtons}
-            goal={{ value: studyGoal, fallbackDeckSlug: activeDeckSlug, onSaved: setStudyGoalState }}
-            cardLang={{ value: cardLang, onSelect: (next) => void setCardLangPref(next) }}
-          />
-
-          <RemindersSection
-            permission={reminderPermission}
-            prefs={reminderPrefs}
-            busy={reminderBusy}
-            onTurnOn={() => void onTurnOnReminders()}
-            onOpenSettings={() => void onOpenReminderSettings()}
-            onToggleMorning={onToggleMorning}
-            onToggleEvening={onToggleEvening}
-            onSelectMorningTime={onSelectMorningTime}
-            onSelectEveningTime={onSelectEveningTime}
-          />
-
-          <AppearanceSection />
-
-          <FeedbackSection prefs={feedbackPrefs} onToggle={onToggleFeedback} />
-
-          <DataResetsSection
-            resettingSchedule={resetting}
-            onResetReviewSchedule={onResetReviewSchedule}
-            hasActiveDeck={activeDeckSlug !== null}
-            onResetDeckProgress={activeDeckSlug ? onResetDeckProgress : undefined}
-          />
-
-          <PrivacySection prefs={privacyPrefs} onToggleShare={onToggleShareUsageCounts} />
-
-          {paywallHidden ? null : (
-            <View style={styles.sectionCard}>
-              <Text style={styles.sectionTitle} numberOfLines={1}>
-                {PREMIUM_COPY.title}
+            <View style={styles.headerTitleWrap}>
+              <Text style={styles.eyebrow} numberOfLines={1}>
+                Settings
               </Text>
-              <Text style={styles.sectionBody}>
-                {PREMIUM_COPY.body}
-              </Text>
-              <Pressable
-                style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
-                onPress={() => navigation.navigate('Paywall')}
-              >
-                <Text style={styles.secondaryButtonText} numberOfLines={1}>
-                  {PREMIUM_COPY.action}
-                </Text>
-              </Pressable>
             </View>
-          )}
+          </View>
+        </View>
+        <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
 
+          {/* Group 1: Account & Subscription */}
+          <Text style={styles.groupHeading}>Account & subscription</Text>
+          <View style={styles.insetGroupCard}>
+            <AccountSection
+              signedIn={signedIn}
+              email={email}
+              onSignIn={onSignIn}
+              onSignOut={() => void onSignOut()}
+              primaryCtaTestID="screen-settings-primary-cta"
+              syncSummary={{
+                sessionsLine: `${momentumDays} days streak · ${totalSessions} sessions that counted`,
+                reminderLine: reminderPlan.statusLine,
+              }}
+              style={styles.groupedSection}
+            />
+            {paywallHidden ? null : (
+              <>
+                <View style={styles.groupDivider} />
+                <View style={styles.groupedSection}>
+                  <Text style={styles.sectionTitle} numberOfLines={1}>
+                    {PREMIUM_COPY.title}
+                  </Text>
+                  <Text style={styles.sectionBody}>
+                    {PREMIUM_COPY.body}
+                  </Text>
+                  <Pressable
+                    accessibilityRole="button"
+                    style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
+                    onPress={() => navigation.navigate('Paywall')}
+                  >
+                    <Text style={styles.secondaryButtonText} numberOfLines={1}>
+                      {PREMIUM_COPY.action}
+                    </Text>
+                  </Pressable>
+                </View>
+              </>
+            )}
+          </View>
+
+          {/* Group 2: Study Preferences */}
+          <Text style={styles.groupHeading}>Study preferences</Text>
+          <View style={styles.insetGroupCard}>
+            <StudySection
+              prefs={studyPrefs}
+              onToggleFourButtons={onToggleFourButtons}
+              goal={{ value: studyGoal, fallbackDeckSlug: activeDeckSlug, onSaved: setStudyGoalState }}
+              cardLang={{ value: cardLang, onSelect: (next) => void setCardLangPref(next) }}
+              style={styles.groupedSection}
+            />
+            <View style={styles.groupDivider} />
+            <ContentSection
+              audience={audience}
+              saving={audienceSaving}
+              onSelect={(next) => void onSelectAudience(next)}
+              style={styles.groupedSection}
+            />
+          </View>
+
+          {/* Group 3: Reminders & Audio */}
+          <Text style={styles.groupHeading}>Reminders & audio</Text>
+          <View style={styles.insetGroupCard}>
+            <RemindersSection
+              permission={reminderPermission}
+              prefs={reminderPrefs}
+              busy={reminderBusy}
+              onTurnOn={() => void onTurnOnReminders()}
+              onOpenSettings={() => void onOpenReminderSettings()}
+              onToggleMorning={onToggleMorning}
+              onToggleEvening={onToggleEvening}
+              onSelectMorningTime={onSelectMorningTime}
+              onSelectEveningTime={onSelectEveningTime}
+              style={styles.groupedSection}
+            />
+            <View style={styles.groupDivider} />
+            <FeedbackSection prefs={feedbackPrefs} onToggle={onToggleFeedback} style={styles.groupedSection} />
+          </View>
+
+          {/* Group 4: Privacy & Data Resets */}
+          <Text style={styles.groupHeading}>Privacy & data resets</Text>
+          <View style={styles.insetGroupCard}>
+            <PrivacySection prefs={privacyPrefs} onToggleShare={onToggleShareUsageCounts} style={styles.groupedSection} />
+            <View style={styles.groupDivider} />
+            <DataResetsSection
+              resettingSchedule={resetting}
+              onResetReviewSchedule={onResetReviewSchedule}
+              hasActiveDeck={activeDeckSlug !== null}
+              activeDeckLabel={activeDeckLabel}
+              onResetDeckProgress={activeDeckSlug ? onResetDeckProgress : undefined}
+              style={styles.groupedSection}
+            />
+          </View>
+
+          {/* About / Support Footer */}
           <AboutSection
             appVersion={appVersion}
-            onSupport={() => void openExternalLink(SUPPORT_URL)}
-            onPrivacy={() => void openExternalLink(PRIVACY_URL)}
+            onSupport={() => void openExternalLink(SUPPORT_LINKS.support)}
+            onPrivacy={() => void openExternalLink(SUPPORT_LINKS.privacy)}
             onVersionPress={debugMenuAvailable ? onVersionPress : undefined}
           />
 
@@ -549,9 +547,14 @@ const styles = StyleSheet.create({
   gradient: {
     flex: 1,
   },
+  headerBar: {
+    paddingHorizontal: spacing.screenPadding,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.xs,
+  },
   container: {
     paddingHorizontal: spacing.screenPadding,
-    paddingTop: spacing.screenPadding,
+    paddingTop: 4,
     paddingBottom: spacing.xl,
   },
   centerState: {
@@ -580,47 +583,79 @@ const styles = StyleSheet.create({
   retryButton: {
     marginTop: spacing.sm,
     minHeight: 44,
-    borderRadius: spacing.buttonRadius,
-    backgroundColor: colors.ink,
+    borderRadius: 999,
+    backgroundColor: colors.pokeBlue,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: spacing.lg,
   },
   retryText: {
-    color: colors.parchmentBg,
+    color: colors.ink,
     fontSize: typography.button,
-    fontWeight: '800',
+    fontWeight: '900',
   },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  eyebrow: {
-    fontSize: typography.caption,
-    color: colors.gold,
-    textTransform: 'uppercase',
-    fontWeight: '900',
-    letterSpacing: 0.6,
+    marginBottom: spacing.xs,
   },
   backButton: {
     minHeight: 44,
-    paddingHorizontal: spacing.sm,
+    paddingHorizontal: 14,
     paddingVertical: spacing.xs,
     borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,0.8)',
+    backgroundColor: colors.softCream,
+    borderWidth: 1,
+    borderColor: colors.hairline,
     justifyContent: 'center',
+    marginRight: 12,
   },
   backText: {
     fontSize: typography.bodySmall,
-    color: colors.ink,
-    fontWeight: '700',
-  },
-  title: {
-    marginTop: spacing.xs,
-    fontSize: typography.title3,
-    color: colors.ink,
+    color: colors.inkSoft,
     fontWeight: '800',
+  },
+  headerTitleWrap: {
+    flex: 1,
+  },
+  eyebrow: {
+    fontSize: typography.title2,
+    color: colors.ink,
+    fontWeight: '900',
+  },
+  insetGroupCard: {
+    borderRadius: 24,
+    backgroundColor: colors.softCream,
+    borderWidth: 1,
+    borderColor: colors.hairline,
+    shadowColor: colors.shadowSoft,
+    shadowOpacity: 1,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
+    overflow: 'hidden',
+  },
+  groupedSection: {
+    marginTop: 0,
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+    borderRadius: 0,
+    padding: spacing.md,
+  },
+  groupDivider: {
+    height: 1,
+    backgroundColor: colors.hairline,
+    marginHorizontal: spacing.md,
+  },
+  groupHeading: {
+    marginTop: spacing.md,
+    marginBottom: 4,
+    paddingHorizontal: 4,
+    fontSize: typography.caption,
+    fontWeight: '900',
+    color: colors.inkSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 1.0,
   },
   sectionCard: {
     marginTop: spacing.sm,
@@ -649,7 +684,7 @@ const styles = StyleSheet.create({
   secondaryButton: {
     marginTop: spacing.sm,
     minHeight: 44,
-    borderRadius: spacing.buttonRadius,
+    borderRadius: 999,
     borderWidth: 1,
     borderColor: 'rgba(42,34,24,0.18)',
     alignItems: 'center',

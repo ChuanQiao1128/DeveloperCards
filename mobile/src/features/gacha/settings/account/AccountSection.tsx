@@ -8,18 +8,16 @@ import { AccountDeletionError } from '../../../../auth/deleteServerAccount';
 export const ACCOUNT_COPY = {
   title: 'Account',
   body: 'Manage sign-in and keep your progress tied to this account.',
-  signedOutState: 'Signed out',
+  signedOutState: 'Signed out · Local progress only',
   signedInState: (email: string) => `Signed in as ${email}`,
   signIn: 'Sign in',
   signOut: 'Sign out',
-  // 2026-11-01 settings redesign: the "review everything again" reset moved to
-  // DataResetsSection (settings/data), which groups both start-over actions.
   deleteTitle: 'Delete account',
   deleteBody:
     'Permanently deletes your account and the progress, cards and saved draws stored for it on our servers and on this device. This cannot be undone.',
   subscriptionNotice:
     'Deleting your account does not cancel an App Store subscription. Cancel it first in iOS Settings > Apple Account > Subscriptions.',
-  deleteOpen: 'Delete account',
+  deleteOpen: 'Delete account…',
   deleteConfirmPrompt: 'Type DELETE to confirm',
   deleteConfirmCta: 'Delete my account',
   deleteCancel: 'Keep my account',
@@ -37,6 +35,11 @@ export function AccountSection(props: {
   onSignIn: () => void;
   onSignOut: () => void;
   primaryCtaTestID?: string;
+  syncSummary?: {
+    sessionsLine: string;
+    reminderLine: string;
+  };
+  style?: any;
 }) {
   const {
     signedIn,
@@ -44,6 +47,7 @@ export function AccountSection(props: {
     onSignIn,
     onSignOut,
     primaryCtaTestID,
+    syncSummary,
   } = props;
 
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -65,8 +69,6 @@ export function AccountSection(props: {
       setConfirmOpen(false);
       setConfirmText('');
     } catch (e) {
-      // Keep confirmText so a retry does not require retyping DELETE. A typed
-      // deletion error carries friendly copy; anything else uses the generic one.
       setDeleteError(e instanceof AccountDeletionError ? e.message : ACCOUNT_COPY.deleteError);
     } finally {
       setDeleting(false);
@@ -74,7 +76,7 @@ export function AccountSection(props: {
   }
 
   return (
-    <View style={styles.sectionCard}>
+    <View style={[styles.sectionCard, props.style]}>
       <Text style={styles.sectionTitle} numberOfLines={1}>
         {ACCOUNT_COPY.title}
       </Text>
@@ -82,17 +84,33 @@ export function AccountSection(props: {
         {ACCOUNT_COPY.body}
       </Text>
 
-      <Text style={styles.metaText}>
-        {signedIn ? ACCOUNT_COPY.signedInState(email ?? 'your account') : ACCOUNT_COPY.signedOutState}
-      </Text>
+      <View style={styles.statusPill}>
+        <View style={[styles.statusDot, signedIn ? styles.statusDotSignedIn : styles.statusDotSignedOut]} />
+        <Text style={styles.metaText}>
+          {signedIn ? ACCOUNT_COPY.signedInState(email ?? 'your account') : ACCOUNT_COPY.signedOutState}
+        </Text>
+      </View>
+
+      {syncSummary ? (
+        <View style={styles.syncSummaryBox} testID="settings-account-sync-summary">
+          <Text style={styles.syncSummaryLine}>{syncSummary.sessionsLine}</Text>
+          <Text style={styles.syncSummaryMeta}>{syncSummary.reminderLine}</Text>
+        </View>
+      ) : null}
 
       <Pressable
-        style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}
+        style={({ pressed }) => [
+          signedIn ? styles.secondaryButton : styles.signInButton,
+          pressed && styles.pressed,
+        ]}
         accessibilityRole="button"
         onPress={signedIn ? onSignOut : onSignIn}
         testID={primaryCtaTestID}
       >
-        <Text style={styles.primaryButtonText} numberOfLines={1}>
+        <Text
+          style={signedIn ? styles.secondaryButtonText : styles.signInButtonText}
+          numberOfLines={1}
+        >
           {signedIn ? ACCOUNT_COPY.signOut : ACCOUNT_COPY.signIn}
         </Text>
       </Pressable>
@@ -102,32 +120,34 @@ export function AccountSection(props: {
       {deleted ? (
         <Text style={styles.noticeText}>{ACCOUNT_COPY.deletedNotice}</Text>
       ) : signedIn && !confirmOpen ? (
+        <View style={styles.collapsedDeleteRow}>
+          <Text style={styles.collapsedDeleteLabel} numberOfLines={1}>
+            {ACCOUNT_COPY.deleteTitle}
+          </Text>
+          <Pressable
+            style={({ pressed }) => [styles.dangerGhostButton, pressed && styles.pressed]}
+            accessibilityRole="button"
+            onPress={() => setConfirmOpen(true)}
+            testID="settings-delete-account-open"
+          >
+            <Text style={styles.dangerGhostButtonText} numberOfLines={1}>
+              {ACCOUNT_COPY.deleteOpen}
+            </Text>
+          </Pressable>
+        </View>
+      ) : signedIn && confirmOpen ? (
         <>
           <Text style={styles.sectionTitle} numberOfLines={1}>
             {ACCOUNT_COPY.deleteTitle}
           </Text>
           <Text style={styles.sectionBody}>{ACCOUNT_COPY.deleteBody}</Text>
-          <Text style={styles.sectionBody}>{ACCOUNT_COPY.subscriptionNotice}</Text>
-          <Pressable
-            style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
-            accessibilityRole="button"
-            onPress={() => setConfirmOpen(true)}
-            testID="settings-delete-account-open"
-          >
-            <Text style={styles.secondaryButtonText} numberOfLines={1}>
-              {ACCOUNT_COPY.deleteOpen}
-            </Text>
-          </Pressable>
-        </>
-      ) : signedIn && confirmOpen ? (
-        <>
-          <Text style={styles.sectionBody}>{ACCOUNT_COPY.deleteConfirmPrompt}</Text>
           <Text
             style={styles.sectionBody}
             testID="settings-delete-account-subscription-notice"
           >
             {ACCOUNT_COPY.subscriptionNotice}
           </Text>
+          <Text style={styles.confirmPrompt}>{ACCOUNT_COPY.deleteConfirmPrompt}</Text>
           <TextInput
             testID="settings-delete-account-input"
             style={styles.confirmInput}
@@ -215,28 +235,63 @@ const styles = StyleSheet.create({
     fontSize: typography.bodySmall,
     color: colors.inkSecondary,
   },
-  metaText: {
+  statusPill: {
     marginTop: spacing.xs,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 999,
+  },
+  statusDotSignedIn: {
+    backgroundColor: colors.mint,
+  },
+  statusDotSignedOut: {
+    backgroundColor: colors.gold,
+  },
+  metaText: {
     fontSize: typography.caption,
+    fontWeight: '700',
     color: colors.inkSecondary,
   },
-  primaryButton: {
+  syncSummaryBox: {
+    marginTop: spacing.xs,
+    paddingTop: spacing.xs,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(42,34,24,0.08)',
+  },
+  syncSummaryLine: {
+    fontSize: typography.caption,
+    fontWeight: '700',
+    color: colors.inkSoft,
+  },
+  syncSummaryMeta: {
+    marginTop: 2,
+    fontSize: typography.caption,
+    color: colors.inkSecondary,
+    lineHeight: 17,
+  },
+  signInButton: {
     marginTop: spacing.sm,
-    minHeight: 44,
-    borderRadius: spacing.buttonRadius,
-    backgroundColor: colors.ink,
+    minHeight: 56,
+    borderRadius: 999,
+    backgroundColor: colors.pokeBlue,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: spacing.md,
   },
-  primaryButtonText: {
+  signInButtonText: {
     fontSize: typography.button,
-    fontWeight: '800',
-    color: colors.parchmentBg,
+    fontWeight: '900',
+    color: colors.ink,
   },
   secondaryButton: {
     marginTop: spacing.sm,
     minHeight: 44,
-    borderRadius: spacing.buttonRadius,
+    borderRadius: 999,
     borderWidth: 1,
     borderColor: 'rgba(42,34,24,0.18)',
     alignItems: 'center',
@@ -253,10 +308,41 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: 'rgba(42,34,24,0.12)',
   },
+  collapsedDeleteRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    minHeight: 44,
+  },
+  collapsedDeleteLabel: {
+    fontSize: typography.bodySmall,
+    fontWeight: '700',
+    color: colors.inkSecondary,
+  },
+  dangerGhostButton: {
+    minHeight: 44,
+    paddingHorizontal: spacing.sm,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(180,35,24,0.28)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dangerGhostButtonText: {
+    fontSize: typography.caption,
+    fontWeight: '800',
+    color: '#B42318',
+  },
+  confirmPrompt: {
+    marginTop: spacing.xs,
+    fontSize: typography.caption,
+    fontWeight: '800',
+    color: colors.ink,
+  },
   dangerButton: {
     marginTop: spacing.sm,
     minHeight: 44,
-    borderRadius: spacing.buttonRadius,
+    borderRadius: 999,
     backgroundColor: '#B42318',
     alignItems: 'center',
     justifyContent: 'center',
@@ -278,6 +364,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     fontSize: typography.body,
     color: colors.ink,
+    backgroundColor: '#FFFFFF',
   },
   errorText: {
     marginTop: spacing.xs,

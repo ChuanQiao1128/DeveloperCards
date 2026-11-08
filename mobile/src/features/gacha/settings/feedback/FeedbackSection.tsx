@@ -21,9 +21,9 @@ type ToggleRowProps = {
   onPress: () => void;
 };
 
-// A Switch-shaped row without RN's Switch: the per-file RN mocks in the test suite
-// do not provide Switch, so we use a Pressable with accessibilityRole="switch" and a
-// visible On/Off pill instead.
+// Switch-track row without RN's native Switch so per-file RN mocks in the test
+// suite work out of the box. Renders a 64x32pt track with a 22pt thumb and an
+// explicit On/Off label for both sighted users and screen readers.
 export function ToggleRow({ testID, label, body, value, onPress }: ToggleRowProps) {
   return (
     <Pressable
@@ -41,21 +41,34 @@ export function ToggleRow({ testID, label, body, value, onPress }: ToggleRowProp
         <Text style={styles.rowBody}>{body}</Text>
       </View>
       <View style={[styles.pill, value ? styles.pillOn : styles.pillOff]}>
-        <Text style={[styles.pillText, value ? styles.pillTextOn : styles.pillTextOff]} numberOfLines={1}>
-          {value ? 'On' : 'Off'}
-        </Text>
+        {value ? (
+          <>
+            <Text style={[styles.pillText, styles.pillTextOn]} numberOfLines={1}>
+              On
+            </Text>
+            <View style={styles.thumbOn} pointerEvents="none" />
+          </>
+        ) : (
+          <>
+            <View style={styles.thumbOff} pointerEvents="none" />
+            <Text style={[styles.pillText, styles.pillTextOff]} numberOfLines={1}>
+              Off
+            </Text>
+          </>
+        )}
       </View>
     </Pressable>
   );
 }
 
 export function FeedbackSection(props: {
+  style?: any;
   prefs: FeedbackPrefs;
   onToggle: (key: keyof FeedbackPrefs, value: boolean) => void;
 }) {
   const { prefs, onToggle } = props;
   return (
-    <View style={styles.sectionCard}>
+    <View style={[styles.sectionCard, props.style]}>
       <Text style={styles.sectionTitle} numberOfLines={1}>
         {FEEDBACK_COPY.title}
       </Text>
@@ -115,26 +128,44 @@ const styles = StyleSheet.create({
     lineHeight: 17,
   },
   pill: {
-    minWidth: 48,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
+    minWidth: 64,
+    minHeight: 32,
+    paddingHorizontal: 5,
+    paddingVertical: 4,
     borderRadius: 999,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     borderWidth: 1,
+    gap: 6,
   },
   pillOn: {
     backgroundColor: colors.pokeBlue,
-    borderColor: colors.pokeBlue,
+    borderColor: colors.pokeBlueDeep,
   },
   pillOff: {
-    backgroundColor: 'rgba(42,34,24,0.06)',
+    backgroundColor: 'rgba(42,34,24,0.08)',
+    borderColor: colors.hairline,
+  },
+  thumbOn: {
+    width: 22,
+    height: 22,
+    borderRadius: 999,
+    backgroundColor: '#FFFFFF',
+  },
+  thumbOff: {
+    width: 22,
+    height: 22,
+    borderRadius: 999,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
     borderColor: colors.hairline,
   },
   pillText: {
     fontSize: typography.caption,
     fontWeight: '900',
-    letterSpacing: 0.4,
+    letterSpacing: 0.3,
+    paddingHorizontal: 4,
   },
   pillTextOn: {
     color: colors.ink,

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -18,6 +18,8 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
 import { useAuthStore } from '../auth/authStore';
 import { friendlyAuthError } from '../auth/authErrors';
+import { OTP_SLOT_COUNT, OtpCodeSlots } from '../auth/components/OtpCodeSlots';
+import { EMAIL_FORMAT_HINT, isValidEmail, normEmail } from '../auth/emailPolicy';
 import { evaluatePassword, isPasswordValid } from '../auth/passwordPolicy';
 import { colors } from '../theme/colors';
 
@@ -25,10 +27,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'ForgotPassword'>;
 
 const PASSWORD_RULES_ATTR =
   'minlength: 8; required: lower; required: upper; required: digit; required: special;';
-
-function normEmail(v: string) {
-  return String(v || '').trim().toLowerCase();
-}
+const RESEND_COOLDOWN_SECONDS = 60;
 
 export default function ForgotPasswordScreen({ navigation, route }: Props) {
   const loading = useAuthStore((s) => s.loading);
@@ -40,47 +39,85 @@ export default function ForgotPasswordScreen({ navigation, route }: Props) {
   const [code, setCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [showPwd, setShowPwd] = useState(false);
+  const [emailBlurred, setEmailBlurred] = useState(false);
+  const [inlineError, setInlineError] = useState<string | null>(null);
+  const [cooldownSec, setCooldownSec] = useState(0);
+  const inFlightRef = useRef(false);
+
+  useEffect(() => {
+    if (cooldownSec <= 0) return;
+    const timer = setTimeout(() => setCooldownSec((prev) => Math.max(0, prev - 1)), 1000);
+    return () => clearTimeout(timer);
+  }, [cooldownSec]);
 
   const passwordRules = useMemo(() => evaluatePassword(newPassword), [newPassword]);
+  const emailInvalid = emailBlurred && normEmail(email).length > 0 && !isValidEmail(email);
 
   const canSend = useMemo(
-    () => normEmail(email).length >= 3 && !loading,
+    () => isValidEmail(email) && !loading,
     [email, loading],
   );
 
   const canConfirm = useMemo(
-    () => String(code || '').trim().length >= 4 && isPasswordValid(newPassword) && !loading,
+    () => String(code || '').trim().length === OTP_SLOT_COUNT && isPasswordValid(newPassword) && !loading,
     [code, newPassword, loading],
   );
 
   async function onSend() {
-    if (!canSend) return;
+    if (inFlightRef.current) return;
+    if (!canSend) {
+      if (normEmail(email).length > 0 && !isValidEmail(email)) {
+        setEmailBlurred(true);
+      }
+      return;
+    }
+    inFlightRef.current = true;
+    setInlineError(null);
     try {
       await requestPasswordReset(email);
+      setCooldownSec(RESEND_COOLDOWN_SECONDS);
       setStep('confirm');
     } catch (e: any) {
-      Alert.alert('Reset failed', friendlyAuthError(e));
+      const friendly = friendlyAuthError(e);
+      setInlineError(friendly);
+      Alert.alert('Reset failed', friendly);
+    } finally {
+      inFlightRef.current = false;
     }
   }
 
   async function onResend() {
+    if (cooldownSec > 0 || loading || inFlightRef.current) return;
+    inFlightRef.current = true;
+    setInlineError(null);
     try {
       await requestPasswordReset(email);
+      setCooldownSec(RESEND_COOLDOWN_SECONDS);
       Alert.alert('Sent', 'A new code has been sent to your email.');
     } catch (e: any) {
-      Alert.alert('Reset failed', friendlyAuthError(e));
+      const friendly = friendlyAuthError(e);
+      setInlineError(friendly);
+      Alert.alert('Reset failed', friendly);
+    } finally {
+      inFlightRef.current = false;
     }
   }
 
   async function onConfirm() {
-    if (!canConfirm) return;
+    if (!canConfirm || inFlightRef.current) return;
     const e = normEmail(email);
+    inFlightRef.current = true;
+    setInlineError(null);
     try {
       await confirmPasswordReset(e, code, newPassword);
       Alert.alert('Password updated', 'Sign in with your new password.');
       navigation.popTo('SignIn', { email: e });
     } catch (err: any) {
-      Alert.alert('Reset failed', friendlyAuthError(err));
+      const friendly = friendlyAuthError(err);
+      setInlineError(friendly);
+      Alert.alert('Reset failed', friendly);
+    } finally {
+      inFlightRef.current = false;
     }
   }
 
@@ -106,6 +143,8 @@ export default function ForgotPasswordScreen({ navigation, route }: Props) {
         >
           <View style={styles.headerRow}>
             <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Back"
               style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
               onPress={() => navigation.goBack()}
               disabled={loading}
@@ -122,6 +161,12 @@ export default function ForgotPasswordScreen({ navigation, route }: Props) {
           </View>
 
           <View style={styles.card}>
+            {inlineError ? (
+              <View style={styles.errorBanner} testID="forgot-error-banner" accessibilityRole="alert">
+                <Text style={styles.errorBannerText}>{inlineError}</Text>
+              </View>
+            ) : null}
+
             {step === 'request' ? (
               <>
                 <Text style={styles.cardTitle}>Forgot your password?</Text>
@@ -130,26 +175,36 @@ export default function ForgotPasswordScreen({ navigation, route }: Props) {
                 </Text>
 
                 <Text style={styles.label}>Email</Text>
-                <View style={styles.inputWrap}>
+                <View style={[styles.inputWrap, emailInvalid && styles.inputWrapError]}>
                   <TextInput
                     value={email}
-                    onChangeText={setEmail}
+                    onChangeText={(v) => {
+                      setEmail(v);
+                      if (inlineError) setInlineError(null);
+                    }}
+                    onBlur={() => setEmailBlurred(true)}
                     autoCapitalize="none"
                     autoCorrect={false}
                     keyboardType="email-address"
                     textContentType="username"
                     autoComplete="email"
                     placeholder="you@example.com"
-                    placeholderTextColor={colors.inkMuted}
+                    placeholderTextColor={colors.inkSecondary}
                     style={styles.input}
                     editable={!loading}
                     returnKeyType="done"
                     onSubmitEditing={onSend}
                   />
                 </View>
+                {emailInvalid ? (
+                  <Text style={styles.fieldError} testID="forgot-email-hint" accessibilityRole="alert">
+                    {EMAIL_FORMAT_HINT}
+                  </Text>
+                ) : null}
 
                 <Pressable
                   testID="forgot-send-code"
+                  accessibilityRole="button"
                   style={({ pressed }) => [
                     styles.primaryBtn,
                     (!canSend || loading) && styles.disabled,
@@ -160,7 +215,7 @@ export default function ForgotPasswordScreen({ navigation, route }: Props) {
                 >
                   {loading ? (
                     <View style={styles.rowCenter}>
-                      <ActivityIndicator />
+                      <ActivityIndicator color={colors.ink} />
                       <Text style={[styles.primaryText, { marginLeft: 8 }]}>Sending…</Text>
                     </View>
                   ) : (
@@ -180,29 +235,36 @@ export default function ForgotPasswordScreen({ navigation, route }: Props) {
                 </Text>
 
                 <Text style={styles.label}>Code</Text>
-                <View style={styles.inputWrap}>
+                <OtpCodeSlots code={code}>
                   <TextInput
                     testID="forgot-code-input"
                     value={code}
-                    onChangeText={(v) => setCode(v.replace(/\s/g, ''))}
+                    onChangeText={(v) => {
+                      setCode(v.replace(/\D/g, '').slice(0, OTP_SLOT_COUNT));
+                      if (inlineError) setInlineError(null);
+                    }}
                     keyboardType="number-pad"
                     textContentType="oneTimeCode"
                     autoComplete="one-time-code"
                     placeholder="123456"
-                    placeholderTextColor={colors.inkMuted}
-                    style={styles.input}
+                    placeholderTextColor="transparent"
+                    caretHidden
+                    style={styles.codeOverlayInput}
                     editable={!loading}
                     returnKeyType="next"
-                    maxLength={12}
+                    maxLength={OTP_SLOT_COUNT}
                   />
-                </View>
+                </OtpCodeSlots>
 
                 <Text style={[styles.label, { marginTop: 12 }]}>New password</Text>
                 <View style={styles.inputWrap}>
                   <TextInput
                     testID="forgot-new-password-input"
                     value={newPassword}
-                    onChangeText={setNewPassword}
+                    onChangeText={(v) => {
+                      setNewPassword(v);
+                      if (inlineError) setInlineError(null);
+                    }}
                     autoCapitalize="none"
                     autoCorrect={false}
                     secureTextEntry={!showPwd}
@@ -210,16 +272,17 @@ export default function ForgotPasswordScreen({ navigation, route }: Props) {
                     autoComplete="new-password"
                     passwordRules={PASSWORD_RULES_ATTR}
                     placeholder="Create a new password"
-                    placeholderTextColor={colors.inkMuted}
+                    placeholderTextColor={colors.inkSecondary}
                     style={styles.input}
                     editable={!loading}
                     returnKeyType="done"
                     onSubmitEditing={onConfirm}
                   />
                   <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={showPwd ? 'Hide password' : 'Show password'}
                     onPress={() => setShowPwd((v) => !v)}
                     disabled={loading}
-                    hitSlop={10}
                     style={({ pressed }) => [styles.pill, pressed && styles.pressed]}
                   >
                     <Text style={styles.pillText}>{showPwd ? 'Hide' : 'Show'}</Text>
@@ -228,18 +291,23 @@ export default function ForgotPasswordScreen({ navigation, route }: Props) {
 
                 <View style={styles.checklist}>
                   {passwordRules.map((rule) => (
-                    <Text
+                    <View
                       key={rule.id}
-                      testID={`forgot-password-rule-${rule.id}`}
-                      style={[styles.checklistItem, rule.ok && styles.checklistItemOk]}
+                      style={[styles.ruleChip, rule.ok && styles.ruleChipOk]}
                     >
-                      {(rule.ok ? '✓' : '•') + ' ' + rule.label}
-                    </Text>
+                      <Text
+                        testID={`forgot-password-rule-${rule.id}`}
+                        style={[styles.checklistItem, rule.ok && styles.checklistItemOk]}
+                      >
+                        {(rule.ok ? '✓' : '•') + ' ' + rule.label}
+                      </Text>
+                    </View>
                   ))}
                 </View>
 
                 <Pressable
                   testID="forgot-confirm"
+                  accessibilityRole="button"
                   style={({ pressed }) => [
                     styles.primaryBtn,
                     (!canConfirm || loading) && styles.disabled,
@@ -250,7 +318,7 @@ export default function ForgotPasswordScreen({ navigation, route }: Props) {
                 >
                   {loading ? (
                     <View style={styles.rowCenter}>
-                      <ActivityIndicator />
+                      <ActivityIndicator color={colors.ink} />
                       <Text style={[styles.primaryText, { marginLeft: 8 }]}>Saving…</Text>
                     </View>
                   ) : (
@@ -266,11 +334,18 @@ export default function ForgotPasswordScreen({ navigation, route }: Props) {
 
                 <Pressable
                   testID="forgot-resend"
-                  style={({ pressed }) => [styles.secondaryBtn, pressed && styles.pressed, loading && styles.disabled]}
+                  accessibilityRole="button"
+                  style={({ pressed }) => [
+                    styles.secondaryBtn,
+                    pressed && styles.pressed,
+                    (loading || cooldownSec > 0) && styles.disabled,
+                  ]}
                   onPress={onResend}
-                  disabled={loading}
+                  disabled={loading || cooldownSec > 0}
                 >
-                  <Text style={styles.secondaryText}>Resend code</Text>
+                  <Text style={styles.secondaryText}>
+                    {cooldownSec > 0 ? `Resend code in ${cooldownSec}s` : 'Resend code'}
+                  </Text>
                 </Pressable>
               </>
             )}
@@ -293,18 +368,20 @@ const styles = StyleSheet.create({
 
   headerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
   backButton: {
-    paddingHorizontal: 12,
+    minHeight: 44,
+    paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 999,
     backgroundColor: colors.softCream,
     borderWidth: 1,
     borderColor: colors.hairline,
     marginRight: 10,
+    justifyContent: 'center',
   },
   backText: { fontSize: 13, color: colors.inkSoft, fontWeight: '800' },
 
   title: { fontSize: 22, fontWeight: '900', color: colors.ink },
-  subtitle: { marginTop: 4, fontSize: 13, color: colors.inkMuted, lineHeight: 18, fontWeight: '600' },
+  subtitle: { marginTop: 4, fontSize: 13, color: colors.inkSecondary, lineHeight: 18, fontWeight: '600' },
 
   card: {
     borderRadius: 24,
@@ -320,35 +397,96 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   cardTitle: { fontSize: 18, fontWeight: '900', color: colors.ink },
-  cardHint: { marginTop: 4, fontSize: 12, color: colors.inkMuted, fontWeight: '600' },
+  cardHint: { marginTop: 4, fontSize: 12, color: colors.inkSecondary, fontWeight: '600' },
+
+  errorBanner: {
+    marginTop: 4,
+    marginBottom: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: 'rgba(170,54,54,0.28)',
+  },
+  errorBannerText: {
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '700',
+    color: colors.danger,
+  },
 
   label: { marginTop: 14, fontSize: 12, fontWeight: '900', color: colors.inkSoft, letterSpacing: 0.4 },
 
+  codeOverlayInput: {
+    ...StyleSheet.absoluteFillObject,
+    opacity: 0.02,
+    color: colors.ink,
+    fontSize: 18,
+  },
+
   inputWrap: {
     marginTop: 8,
+    minHeight: 48,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: colors.hairline,
     backgroundColor: '#FFFFFF',
-    paddingHorizontal: 12,
+    paddingLeft: 12,
+    paddingRight: 6,
     paddingVertical: 2,
     flexDirection: 'row',
     alignItems: 'center',
   },
+  inputWrapError: {
+    borderColor: colors.danger,
+  },
   input: { flex: 1, paddingVertical: 12, fontSize: 14, color: colors.inkSoft },
+
+  fieldError: {
+    marginTop: 6,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '700',
+    color: colors.danger,
+  },
 
   pill: {
     marginLeft: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
+    minHeight: 44,
+    minWidth: 56,
+    paddingHorizontal: 12,
     borderRadius: 999,
     backgroundColor: colors.pokeBlueFaint,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  pillText: { color: colors.pokeBlueDeep, fontWeight: '900', fontSize: 12 },
+  pillText: { color: colors.ink, fontWeight: '900', fontSize: 12 },
 
-  checklist: { marginTop: 10, gap: 2 },
-  checklistItem: { fontSize: 12, color: colors.inkMuted, fontWeight: '600' },
-  checklistItemOk: { color: colors.pokeBlueDeep },
+  checklist: {
+    marginTop: 10,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    rowGap: 6,
+  },
+  ruleChip: {
+    width: '48.5%',
+    minHeight: 30,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 10,
+    backgroundColor: colors.parchmentBg,
+    borderWidth: 1,
+    borderColor: colors.hairline,
+    justifyContent: 'center',
+  },
+  ruleChipOk: {
+    backgroundColor: colors.pokeBlueFaint,
+    borderColor: 'rgba(44,156,192,0.35)',
+  },
+  checklistItem: { fontSize: 11, color: colors.inkSecondary, fontWeight: '700' },
+  checklistItemOk: { color: colors.ink, fontWeight: '800' },
 
   primaryBtn: {
     marginTop: 16,
@@ -369,7 +507,7 @@ const styles = StyleSheet.create({
 
   dividerRow: { flexDirection: 'row', alignItems: 'center', marginTop: 14, marginBottom: 10 },
   dividerLine: { flex: 1, height: 1, backgroundColor: colors.hairline },
-  dividerText: { marginHorizontal: 10, fontSize: 12, color: colors.inkMuted, fontWeight: '700' },
+  dividerText: { marginHorizontal: 10, fontSize: 12, color: colors.inkSecondary, fontWeight: '700' },
 
   secondaryBtn: {
     minHeight: 48,
@@ -383,5 +521,5 @@ const styles = StyleSheet.create({
   },
   secondaryText: { fontSize: 14, fontWeight: '800', color: colors.inkSoft },
 
-  footnote: { marginTop: 12, fontSize: 11, color: colors.inkMuted, lineHeight: 16, fontWeight: '600' },
+  footnote: { marginTop: 12, fontSize: 11, color: colors.inkSecondary, lineHeight: 16, fontWeight: '600' },
 });

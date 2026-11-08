@@ -2,6 +2,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React from 'react';
 import { fetchAuthSession } from 'aws-amplify/auth';
+import { setAuthIdentitySnapshot } from '../auth/sessionBoundary';
 
 const KEY_PREFIX = 'devcards:entitlements:isPremium:v1:';
 
@@ -85,6 +86,7 @@ export async function setIsPremiumUser(v: boolean, userKeyHint?: string | null):
   }
 
   // notify
+  setAuthIdentitySnapshot({ isPremium: value });
   for (const fn of listeners) fn(value, userKey);
 }
 
@@ -102,6 +104,7 @@ export async function clearIsPremiumUser(userKeyHint?: string | null): Promise<v
     // ignore
   }
 
+  setAuthIdentitySnapshot({ isPremium: false });
   for (const fn of listeners) fn(false, userKey);
 }
 

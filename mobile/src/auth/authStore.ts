@@ -20,7 +20,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AuthFlowError, AUTH_ERROR_COPY, friendlyAuthError } from './authErrors';
 import { isPasswordValid } from './passwordPolicy';
 import { deleteServerAccountData } from './deleteServerAccount';
-import { getAuthSessionGeneration, invalidateAuthSession } from './sessionBoundary';
+import { getAuthSessionGeneration, invalidateAuthSession, setAuthIdentitySnapshot } from './sessionBoundary';
 
 import { setSyncAccessToken, forceProgressSync, setActiveUserSub } from '../sync/progressSync';
 import { adoptAnonGachaState } from '../sync/drawStateSync';
@@ -683,6 +683,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 }));
 
 useAuthStore.subscribe((state, previous) => {
+  setAuthIdentitySnapshot({
+    status: state.status,
+    email: state.email,
+    sessionExpired: state.sessionExpired,
+  });
   if (state.status !== previous.status || state.userSub !== previous.userSub || state.userId !== previous.userId) {
     invalidateAuthSession();
   }
