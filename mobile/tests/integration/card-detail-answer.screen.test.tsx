@@ -405,6 +405,11 @@ describe('CardDetailScreen — show answer', () => {
     const watchOut = byTestId(tree, 'teaching-watch-out');
     expect(watchOut).toHaveLength(1);
     expect(blob).toContain('Bastion host requires maintaining public IP');
+
+    // Prerequisite interactive chip
+    const prereqChip = byTestId(tree, 'prereq-chip-aws-pre-01');
+    expect(prereqChip).toHaveLength(1);
+    expect(textBlob(tree)).toContain('aws-pre-01 →');
   });
 
   it('opens a card from a deck that is not the active one', async () => {

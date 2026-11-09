@@ -307,3 +307,32 @@ describe('library topics', () => {
     );
   });
 });
+
+  it('exposes domain chips and filters by domain when cards carry Tags.domain', () => {
+    const awsFundamentalsDeck = {
+      Slug: 'aws-saa-fundamentals',
+      Title: 'AWS Basics',
+      Locale: 'en-US',
+      Version: '1',
+      DeckType: 1,
+      TotalCards: 4,
+      Cards: [
+        { StableUid: 'c1', OrderInDeck: 1, Difficulty: 1, Question: 'Q1', Topic: 'Access', Tags: { domain: '1' } },
+        { StableUid: 'c2', OrderInDeck: 2, Difficulty: 2, Question: 'Q2', Topic: 'VPC', Tags: { domain: '1' } },
+        { StableUid: 'c3', OrderInDeck: 3, Difficulty: 2, Question: 'Q3', Topic: 'EFS', Tags: { domain: '2' } },
+        { StableUid: 'c4', OrderInDeck: 4, Difficulty: 1, Question: 'Q4', Topic: 'S3 Cost', Tags: { domain: '4' } },
+      ],
+    } as any;
+
+    const vm = buildLibraryVM({ deck: awsFundamentalsDeck, progress: [], now: NOW });
+    expect(vm.topics.map((t) => [t.key, t.label, t.count])).toEqual([
+      ['all', 'All domains', 4],
+      ['d1', 'Design Secure Architectures', 2],
+      ['d2', 'Design Resilient Architectures', 1],
+      ['d4', 'Design Cost-Optimized Architectures', 1],
+    ]);
+
+    const d1Filtered = buildLibraryVM({ deck: awsFundamentalsDeck, progress: [], now: NOW, topicFilter: 'd1' });
+    expect(d1Filtered.cards.map((c) => c.stableUid)).toEqual(['c1', 'c2']);
+    expect(d1Filtered.topicFilter).toBe('d1');
+  });

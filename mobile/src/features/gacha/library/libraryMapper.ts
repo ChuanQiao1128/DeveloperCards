@@ -8,6 +8,7 @@ import { formatDateKey } from '../../../review/model';
 import { rarityFromDifficulty, type Rarity } from '../draw/cardRarity';
 import { cardIconFor } from '../../../theme/cardIcon';
 import { compareTopicLabels, normalizeTopic, topicKey, UNTAGGED_TOPIC_KEY, UNTAGGED_TOPIC_LABEL } from './topics';
+import { domainsForDeck } from '../../domains/examDomains';
 import { formatRank, rankCardsByOrder } from './cardRank';
 import { normalizeMcq } from '../mcq/normalizeMcq';
 
@@ -191,6 +192,7 @@ export function buildLibraryCardRows(params: {
         topic: normalizeTopic(card.Topic),
         rank: ranks.get(card.StableUid) ?? 0,
         isMcq: mcqEnabled && normalizeMcq(card.Mcq) !== null,
+        ...((card.Tags?.domain ?? (card as any).tags?.domain) ? { domain: String(card.Tags?.domain ?? (card as any).tags?.domain) } : {}),
       };
     });
 }
@@ -271,35 +273,56 @@ export function buildLibraryVM(params: {
                 ? rows.filter((item) => item.rarity === 'LEG')
                 : rows;
 
-  const groupKeyOf = (row: LibraryCardRow): string => (row.topic === null ? UNTAGGED_TOPIC_KEY : topicKey(row.topic));
-  const hasTopics = rows.some((row) => row.topic !== null);
-  // One chip per distinct key; the label is the first-seen normalized text, so "IAM/S3" and
-  // "IAM & S3" share one chip. Chips are then sorted by label (numeric-aware, see
-  // compareTopicLabels): deck order put "4.1 Cost" before "1.2 Secure" because that is where the
-  // authoring tool happened to put the first card of each domain.
-  const topicOrder: string[] = [];
-  const topicLabel = new Map<string, string>();
-  const topicCount = new Map<string, number>();
-  if (hasTopics) {
-    for (const row of rows) {
-      if (row.topic === null) continue;
-      const key = topicKey(row.topic);
-      if (!topicLabel.has(key)) {
-        topicOrder.push(key);
-        topicLabel.set(key, row.topic);
-      }
-      topicCount.set(key, (topicCount.get(key) ?? 0) + 1);
+  const domains = domainsForDeck(deck.Slug);
+  const hasDomainTags = domains.length > 0 && rows.some((row: any) => row.domain);
+  const hasTopics = hasDomainTags || rows.some((row) => row.topic !== null);
+
+  let topics: LibraryTopicChip[] = [];
+  let groupKeyOf: (row: LibraryCardRow) => string;
+
+  if (hasDomainTags) {
+    groupKeyOf = (row: any) => (row.domain ? `d${row.domain}` : UNTAGGED_TOPIC_KEY);
+    const domainCounts = new Map<string, number>();
+    for (const row of rows as any[]) {
+      const k = row.domain ? `d${row.domain}` : UNTAGGED_TOPIC_KEY;
+      domainCounts.set(k, (domainCounts.get(k) ?? 0) + 1);
     }
-    topicOrder.sort((a, b) => compareTopicLabels(topicLabel.get(a) ?? a, topicLabel.get(b) ?? b));
+    const chips: LibraryTopicChip[] = [
+      { key: 'all', label: 'All domains', count: rows.length },
+    ];
+    for (const d of domains) {
+      const count = domainCounts.get(d.key) ?? 0;
+      if (count > 0) chips.push({ key: d.key, label: d.title, count });
+    }
+    const untagged = domainCounts.get(UNTAGGED_TOPIC_KEY) ?? 0;
+    if (untagged > 0) chips.push({ key: UNTAGGED_TOPIC_KEY, label: UNTAGGED_TOPIC_LABEL, count: untagged });
+    topics = chips;
+  } else {
+    groupKeyOf = (row: LibraryCardRow): string => (row.topic === null ? UNTAGGED_TOPIC_KEY : topicKey(row.topic));
+    const topicOrder: string[] = [];
+    const topicLabel = new Map<string, string>();
+    const topicCount = new Map<string, number>();
+    if (hasTopics) {
+      for (const row of rows) {
+        if (row.topic === null) continue;
+        const key = topicKey(row.topic);
+        if (!topicLabel.has(key)) {
+          topicOrder.push(key);
+          topicLabel.set(key, row.topic);
+        }
+        topicCount.set(key, (topicCount.get(key) ?? 0) + 1);
+      }
+      topicOrder.sort((a, b) => compareTopicLabels(topicLabel.get(a) ?? a, topicLabel.get(b) ?? b));
+    }
+    const untaggedCount = rows.filter((row) => row.topic === null).length;
+    topics = hasTopics
+      ? [
+          { key: 'all', label: 'All topics', count: rows.length },
+          ...topicOrder.map((key) => ({ key, label: topicLabel.get(key) ?? key, count: topicCount.get(key) ?? 0 })),
+          ...(untaggedCount > 0 ? [{ key: UNTAGGED_TOPIC_KEY, label: UNTAGGED_TOPIC_LABEL, count: untaggedCount }] : []),
+        ]
+      : [];
   }
-  const untaggedCount = rows.filter((row) => row.topic === null).length;
-  const topics: LibraryTopicChip[] = hasTopics
-    ? [
-        { key: 'all', label: 'All topics', count: rows.length },
-        ...topicOrder.map((key) => ({ key, label: topicLabel.get(key) ?? key, count: topicCount.get(key) ?? 0 })),
-        ...(untaggedCount > 0 ? [{ key: UNTAGGED_TOPIC_KEY, label: UNTAGGED_TOPIC_LABEL, count: untaggedCount }] : []),
-      ]
-    : [];
   const effectiveTopicFilter =
     topicFilter !== null && topicFilter !== 'all' && topics.some((chip) => chip.key === topicFilter) ? topicFilter : null;
   const groupIndex = new Map(topics.map((chip, index) => [chip.key, index]));
