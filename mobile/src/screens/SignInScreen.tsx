@@ -5,7 +5,6 @@ import {
   TextInput,
   Pressable,
   StyleSheet,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
@@ -86,9 +85,7 @@ export default function SignInScreen({ navigation, route }: Props) {
         leaveAuthFlow(navigation as unknown as LeaveAuthNavigation);
         return;
       }
-      const friendly = friendlyAuthError(e);
-      setInlineError(friendly);
-      Alert.alert('Sign in failed', friendly);
+      setInlineError(friendlyAuthError(e));
     } finally {
       inFlightRef.current = false;
     }
@@ -156,7 +153,10 @@ export default function SignInScreen({ navigation, route }: Props) {
                   setEmail(v);
                   if (inlineError) setInlineError(null);
                 }}
-                onBlur={() => setEmailBlurred(true)}
+                onBlur={() => {
+                  setEmail((prev) => normEmail(prev));
+                  setEmailBlurred(true);
+                }}
                 autoCapitalize="none"
                 autoCorrect={false}
                 keyboardType="email-address"
@@ -247,7 +247,7 @@ export default function SignInScreen({ navigation, route }: Props) {
             <Pressable
               accessibilityRole="button"
               style={({ pressed }) => [styles.secondaryBtn, pressed && styles.pressed]}
-              onPress={() => navigation.navigate('SignUp')}
+              onPress={() => navigation.replace('SignUp')}
               disabled={loading}
             >
               <Text style={styles.secondaryText}>Create an account</Text>

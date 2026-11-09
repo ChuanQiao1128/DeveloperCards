@@ -4,6 +4,8 @@ import { EMAIL_FORMAT_HINT, isValidEmail, normEmail } from '../../src/auth/email
 describe('emailPolicy', () => {
   it('normalizes whitespace and case', () => {
     expect(normEmail('  User@Example.COM  ')).toBe('user@example.com');
+    expect(normEmail('\u3000You@Example.com\u3000')).toBe('you@example.com');
+    expect(normEmail('You@Example.com\u200B')).toBe('you@example.com');
     expect(normEmail('')).toBe('');
   });
 

@@ -70,9 +70,7 @@ export default function SignUpScreen({ navigation }: Props) {
         );
         return;
       }
-      const friendly = friendlyAuthError(err);
-      setInlineError(friendly);
-      Alert.alert('Sign up failed', friendly);
+      setInlineError(friendlyAuthError(err));
     } finally {
       inFlightRef.current = false;
     }
@@ -139,7 +137,10 @@ export default function SignUpScreen({ navigation }: Props) {
                   setEmail(v);
                   if (inlineError) setInlineError(null);
                 }}
-                onBlur={() => setEmailBlurred(true)}
+                onBlur={() => {
+                  setEmail((prev) => normEmail(prev));
+                  setEmailBlurred(true);
+                }}
                 autoCapitalize="none"
                 autoCorrect={false}
                 keyboardType="email-address"

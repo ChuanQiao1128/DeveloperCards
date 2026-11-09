@@ -119,6 +119,86 @@ describe('auth recovery screens', () => {
     warnSpy.mockRestore();
   });
 
+
+  it('sign-in failure stays on the inline banner and does not open an alert', async () => {
+    store.signInWithEmail.mockRejectedValue(new Error('network down'));
+    const navigation = makeNav();
+    let tree!: renderer.ReactTestRenderer;
+    await act(async () => {
+      tree = renderer.create(
+        <SignInScreen navigation={navigation as any} route={{ key: 'signin', name: 'SignIn', params: {} } as any} />,
+      );
+    });
+    await act(async () => {
+      byPlaceholder(tree, 'you@example.com').props.onChangeText('user@example.com');
+    });
+    await act(async () => {
+      byPlaceholder(tree, 'Your password').props.onChangeText('whatever');
+    });
+    await act(async () => {
+      byPlaceholder(tree, 'Your password').props.onSubmitEditing();
+    });
+    await flush();
+    expect(mockAlert).not.toHaveBeenCalled();
+    expect(collectText(byTestID(tree, 'signin-error-banner'))).toContain('Something went wrong');
+  });
+
+  it('create account replaces sign-in instead of stacking another auth screen', async () => {
+    const navigation = makeNav();
+    let tree!: renderer.ReactTestRenderer;
+    await act(async () => {
+      tree = renderer.create(
+        <SignInScreen navigation={navigation as any} route={{ key: 'signin', name: 'SignIn', params: {} } as any} />,
+      );
+    });
+    const create = tree.root.findAll(
+      (node) => typeof node.props?.onPress === 'function' && collectText(node).includes('Create an account'),
+    )[0];
+    act(() => {
+      create.props.onPress();
+    });
+    expect(navigation.replace).toHaveBeenCalledWith('SignUp');
+    expect(navigation.navigate).not.toHaveBeenCalled();
+  });
+
+  it('trims a trailing suggestion space from the email when the field blurs', async () => {
+    const navigation = makeNav();
+    let tree!: renderer.ReactTestRenderer;
+    await act(async () => {
+      tree = renderer.create(
+        <SignInScreen navigation={navigation as any} route={{ key: 'signin', name: 'SignIn', params: {} } as any} />,
+      );
+    });
+    await act(async () => {
+      byPlaceholder(tree, 'you@example.com').props.onChangeText('  You@Example.com \u200B');
+    });
+    await act(async () => {
+      byPlaceholder(tree, 'you@example.com').props.onBlur();
+    });
+    expect(byPlaceholder(tree, 'you@example.com').props.value).toBe('you@example.com');
+    expect(tree.root.findAllByProps({ testID: 'signin-email-hint' })).toHaveLength(0);
+  });
+
+  it('forgot-password failure stays inline', async () => {
+    store.requestPasswordReset.mockRejectedValue(new Error('offline'));
+    const navigation = makeNav();
+    let tree!: renderer.ReactTestRenderer;
+    await act(async () => {
+      tree = renderer.create(
+        <ForgotPasswordScreen
+          navigation={navigation as any}
+          route={{ key: 'forgot', name: 'ForgotPassword', params: { email: 'user@example.com' } } as any}
+        />,
+      );
+    });
+    await act(async () => {
+      byTestID(tree, 'forgot-send-code').props.onPress();
+    });
+    await flush();
+    expect(mockAlert).not.toHaveBeenCalled();
+    expect(collectText(byTestID(tree, 'forgot-error-banner'))).toContain('Something went wrong');
+  });
+
   it('sign-in shows a Forgot password link that opens ForgotPassword with the typed email', async () => {
     const navigation = makeNav();
     let tree!: renderer.ReactTestRenderer;
@@ -411,10 +491,24 @@ describe('auth screens record the anonymous funnel steps (R24 M01)', () => {
     expect(recordFunnelEventMock).toHaveBeenCalledWith('signup_completed');
   });
 
-  it('a wrong confirmation code records nothing', async () => {
+  it('a wrong confirmation code records nothing and stays inline', async () => {
     store.confirmSignUpCode.mockRejectedValue(new AuthFlowError('FAILED', 'wrong code'));
-    await confirmWith('000000');
-    expect(mockAlert).toHaveBeenCalled();
+    const navigation = makeNav();
+    let tree!: renderer.ReactTestRenderer;
+    await act(async () => {
+      tree = renderer.create(
+        <ConfirmSignUpScreen
+          navigation={navigation as any}
+          route={{ key: 'confirm', name: 'ConfirmSignUp', params: { email: 'user@example.com' } } as any}
+        />,
+      );
+    });
+    await act(async () => {
+      byPlaceholder(tree, '123456').props.onChangeText('000000');
+    });
+    await flush();
+    expect(mockAlert).not.toHaveBeenCalled();
+    expect(collectText(byTestID(tree, 'confirm-error-banner'))).toContain('wrong code');
     expect(recordFunnelEventMock).not.toHaveBeenCalled();
   });
 
