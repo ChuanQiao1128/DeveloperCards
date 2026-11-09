@@ -72,7 +72,7 @@ const AWS_DECK = {
   Locale: 'en-US',
   Version: '1',
   DeckType: 1,
-  TotalCards: 1,
+  TotalCards: 2,
   Cards: [
     {
       StableUid: 'aws-mcq',
@@ -81,6 +81,22 @@ const AWS_DECK = {
       Question: 'Which options make the copy durable?',
       Explanation: 'Durability comes from replication plus retention.',
       Mcq: MCQ,
+    },
+    {
+      StableUid: 'aws-teaching',
+      OrderInDeck: 2,
+      Difficulty: 2,
+      Question: 'How to manage private EC2 without SSH keys?',
+      Explanation: 'Answer: Attach SSM role and use Session Manager.\nKey point: Agent connects out.',
+      Tags: { domain: '1', examTask: '1.1' },
+      Teaching: {
+        schema: 'teaching-v1',
+        answer: 'Attach an instance role with SSM permissions and use Session Manager.',
+        keyPoint: 'SSM Agent connects out to management endpoint; no inbound SSH needed.',
+        watchOut: 'Bastion host requires maintaining public IP and key pairs.',
+        mustAnswer: ['Attach an instance role', 'Use Session Manager'],
+        prerequisites: ['aws-pre-01'],
+      },
     },
   ],
 };
@@ -363,6 +379,32 @@ describe('CardDetailScreen — show answer', () => {
     const blob = textBlob(tree);
     expect(blob).toContain('Card not found');
     expect(blob).toContain("isn't on this phone");
+  });
+
+
+  it('renders structured teaching self-check points and domain pill for teaching cards', async () => {
+    ownedFixture = new Set(['aws-teaching']);
+    const tree = await renderScreen('aws-teaching');
+
+    // Domain pill on hero
+    const domainChip = byTestId(tree, 'card-detail-domain-chip');
+    expect(domainChip).toHaveLength(1);
+    expect(textBlob(tree)).toContain('D1 · 1.1');
+
+    // Click show answer
+    await press(tree, 'card-detail-show-answer');
+
+    // Self-check list
+    const selfCheck = byTestId(tree, 'teaching-self-check-list');
+    expect(selfCheck).toHaveLength(1);
+    const blob = textBlob(tree);
+    expect(blob).toContain('Attach an instance role');
+    expect(blob).toContain('Use Session Manager');
+
+    // Watch out callout
+    const watchOut = byTestId(tree, 'teaching-watch-out');
+    expect(watchOut).toHaveLength(1);
+    expect(blob).toContain('Bastion host requires maintaining public IP');
   });
 
   it('opens a card from a deck that is not the active one', async () => {
