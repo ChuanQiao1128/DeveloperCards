@@ -19,6 +19,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { AuthFlowError, AUTH_ERROR_COPY, friendlyAuthError } from './authErrors';
 import { isPasswordValid } from './passwordPolicy';
+import { normEmail } from './emailPolicy';
 import { deleteServerAccountData } from './deleteServerAccount';
 import { getAuthSessionGeneration, invalidateAuthSession, setAuthIdentitySnapshot } from './sessionBoundary';
 
@@ -109,10 +110,6 @@ export async function purgeUserScopedStorage(userSub: string | null): Promise<st
   invalidateProgressQueueCache(userSub ?? undefined);
   invalidateDrawStateCache();
   return doomed;
-}
-
-function normEmail(v: string) {
-  return String(v || '').trim().toLowerCase();
 }
 
 function tokenToString(t: any): string | null {

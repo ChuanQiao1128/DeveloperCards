@@ -133,6 +133,7 @@ describe('auth polish screens', () => {
     const gradient = tree.root.findByType('LinearGradient' as any);
     expect(gradient.props.colors).toEqual([colors.parchmentBg, colors.parchmentBgDeep]);
     expect(tree.root.findAllByProps({ testID: 'otp-code-slots' }).length).toBeGreaterThan(0);
+    expect(tree.root.findByProps({ placeholder: '123456' }).props.autoFocus).toBe(true);
 
     const resendBtn = tree.root.findByProps({ testID: 'confirm-resend-code' });
     await act(async () => {

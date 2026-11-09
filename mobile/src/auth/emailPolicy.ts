@@ -9,7 +9,11 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export const EMAIL_FORMAT_HINT = 'Enter a valid email address (for example, you@example.com).';
 
 export function normEmail(value: string): string {
-  return String(value || '').trim().toLowerCase();
+  // Trim, drop zero-width characters iOS keyboards leave on suggestions, then lowercase.
+  return String(value || '')
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .trim()
+    .toLowerCase();
 }
 
 export function isValidEmail(value: string): boolean {

@@ -5,7 +5,6 @@ import {
   TextInput,
   Pressable,
   StyleSheet,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
@@ -43,6 +42,8 @@ export default function ForgotPasswordScreen({ navigation, route }: Props) {
   const [inlineError, setInlineError] = useState<string | null>(null);
   const [cooldownSec, setCooldownSec] = useState(0);
   const inFlightRef = useRef(false);
+  const codeInputRef = useRef<TextInput>(null);
+  const newPasswordRef = useRef<TextInput>(null);
 
   useEffect(() => {
     if (cooldownSec <= 0) return;
@@ -80,7 +81,6 @@ export default function ForgotPasswordScreen({ navigation, route }: Props) {
     } catch (e: any) {
       const friendly = friendlyAuthError(e);
       setInlineError(friendly);
-      Alert.alert('Reset failed', friendly);
     } finally {
       inFlightRef.current = false;
     }
@@ -93,11 +93,9 @@ export default function ForgotPasswordScreen({ navigation, route }: Props) {
     try {
       await requestPasswordReset(email);
       setCooldownSec(RESEND_COOLDOWN_SECONDS);
-      Alert.alert('Sent', 'A new code has been sent to your email.');
     } catch (e: any) {
       const friendly = friendlyAuthError(e);
       setInlineError(friendly);
-      Alert.alert('Reset failed', friendly);
     } finally {
       inFlightRef.current = false;
     }
@@ -110,12 +108,10 @@ export default function ForgotPasswordScreen({ navigation, route }: Props) {
     setInlineError(null);
     try {
       await confirmPasswordReset(e, code, newPassword);
-      Alert.alert('Password updated', 'Sign in with your new password.');
       navigation.popTo('SignIn', { email: e });
     } catch (err: any) {
       const friendly = friendlyAuthError(err);
       setInlineError(friendly);
-      Alert.alert('Reset failed', friendly);
     } finally {
       inFlightRef.current = false;
     }
@@ -182,7 +178,10 @@ export default function ForgotPasswordScreen({ navigation, route }: Props) {
                       setEmail(v);
                       if (inlineError) setInlineError(null);
                     }}
-                    onBlur={() => setEmailBlurred(true)}
+                    onBlur={() => {
+                      setEmail((prev) => normEmail(prev));
+                      setEmailBlurred(true);
+                    }}
                     autoCapitalize="none"
                     autoCorrect={false}
                     keyboardType="email-address"
@@ -235,13 +234,19 @@ export default function ForgotPasswordScreen({ navigation, route }: Props) {
                 </Text>
 
                 <Text style={styles.label}>Code</Text>
+                <Pressable accessible={false} testID="forgot-code-touch" onPress={() => codeInputRef.current?.focus()}>
                 <OtpCodeSlots code={code}>
                   <TextInput
+                    ref={codeInputRef}
                     testID="forgot-code-input"
                     value={code}
                     onChangeText={(v) => {
-                      setCode(v.replace(/\D/g, '').slice(0, OTP_SLOT_COUNT));
+                      const clean = v.replace(/\D/g, '').slice(0, OTP_SLOT_COUNT);
+                      setCode(clean);
                       if (inlineError) setInlineError(null);
+                      if (clean.length === OTP_SLOT_COUNT) {
+                        newPasswordRef.current?.focus();
+                      }
                     }}
                     keyboardType="number-pad"
                     textContentType="oneTimeCode"
@@ -249,16 +254,19 @@ export default function ForgotPasswordScreen({ navigation, route }: Props) {
                     placeholder="123456"
                     placeholderTextColor="transparent"
                     caretHidden
+                    autoFocus
                     style={styles.codeOverlayInput}
                     editable={!loading}
                     returnKeyType="next"
                     maxLength={OTP_SLOT_COUNT}
                   />
                 </OtpCodeSlots>
+                </Pressable>
 
                 <Text style={[styles.label, { marginTop: 12 }]}>New password</Text>
                 <View style={styles.inputWrap}>
                   <TextInput
+                    ref={newPasswordRef}
                     testID="forgot-new-password-input"
                     value={newPassword}
                     onChangeText={(v) => {

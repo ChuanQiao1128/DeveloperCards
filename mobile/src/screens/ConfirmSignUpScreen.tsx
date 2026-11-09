@@ -49,6 +49,7 @@ export default function ConfirmSignUpScreen({ navigation, route }: Props) {
   const [cooldownSec, setCooldownSec] = useState(0);
   const inFlightRef = useRef(false);
   const autoSubmittedCodeRef = useRef<string | null>(null);
+  const codeInputRef = useRef<TextInput>(null);
 
   useEffect(() => {
     if (cooldownSec <= 0) return;
@@ -86,9 +87,7 @@ export default function ConfirmSignUpScreen({ navigation, route }: Props) {
         ]);
         return;
       }
-      const friendly = friendlyAuthError(e);
-      setInlineError(friendly);
-      Alert.alert('Confirm failed', friendly);
+      setInlineError(friendlyAuthError(e));
     } finally {
       inFlightRef.current = false;
     }
@@ -128,11 +127,8 @@ export default function ConfirmSignUpScreen({ navigation, route }: Props) {
       await resendConfirmCode(email);
       setCooldownSec(RESEND_COOLDOWN_SECONDS);
       setResendNotice('A new code has been sent to your email.');
-      Alert.alert('Sent', 'A new code has been sent to your email.');
     } catch (e: any) {
-      const friendly = friendlyAuthError(e);
-      setInlineError(friendly);
-      Alert.alert('Resend failed', friendly);
+      setInlineError(friendlyAuthError(e));
     } finally {
       inFlightRef.current = false;
     }
@@ -192,8 +188,10 @@ export default function ConfirmSignUpScreen({ navigation, route }: Props) {
             ) : null}
 
             <Text style={styles.label}>6-digit verification code</Text>
+            <Pressable accessible={false} testID="confirm-code-touch" onPress={() => codeInputRef.current?.focus()}>
             <OtpCodeSlots code={code}>
               <TextInput
+                ref={codeInputRef}
                 value={code}
                 onChangeText={handleCodeChange}
                 keyboardType="number-pad"
@@ -202,6 +200,7 @@ export default function ConfirmSignUpScreen({ navigation, route }: Props) {
                 placeholder="123456"
                 placeholderTextColor="transparent"
                 caretHidden
+                autoFocus
                 style={styles.codeOverlayInput}
                 editable={!loading}
                 returnKeyType="done"
@@ -209,6 +208,7 @@ export default function ConfirmSignUpScreen({ navigation, route }: Props) {
                 maxLength={OTP_SLOT_COUNT}
               />
             </OtpCodeSlots>
+            </Pressable>
 
             <Pressable
               accessibilityRole="button"
