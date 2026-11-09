@@ -381,6 +381,9 @@ export function CardDetailScreen({ navigation, route }: Props) {
   const cardStatus = cardDetailStatus(cardProgress);
   const kindChip =
     mcq === null ? null : mcqRequiredCount(mcq) >= 2 ? MCQ_COPY.detailChipPick(mcqRequiredCount(mcq)) : MCQ_COPY.detailChip;
+  const domainLabel = card?.Tags?.domain
+    ? `D${card.Tags.domain}${card.Tags.examTask ? ` · ${card.Tags.examTask}` : ''}`
+    : null;
   const slotLabel = `#${formatRank(slot)}`;
   const totalInDeck = deck?.Cards?.length ?? 0;
   const lastSeen = formatRelativeTime(cardProgress?.lastReviewedAt);
@@ -444,6 +447,13 @@ export function CardDetailScreen({ navigation, route }: Props) {
                           : 'Common'}
                   </Text>
                 </View>
+                {domainLabel ? (
+                  <View testID="card-detail-domain-chip" style={styles.heroDomainChip}>
+                    <Text style={styles.heroDomainChipText} numberOfLines={1} maxFontSizeMultiplier={CHROME_MAX_FONT_SCALE}>
+                      {domainLabel}
+                    </Text>
+                  </View>
+                ) : null}
                 {kindChip ? (
                   <View testID="card-detail-kind-chip" style={styles.heroKindChip}>
                     <Text style={styles.heroKindChipText} numberOfLines={1} maxFontSizeMultiplier={CHROME_MAX_FONT_SCALE}>
@@ -717,6 +727,8 @@ const styles = StyleSheet.create({
   },
   heroStatusMastered: { backgroundColor: colors.gold },
   heroStatusChipText: { color: colors.inkSoft, fontSize: typography.caption, fontWeight: '900', letterSpacing: 0.4 },
+  heroDomainChip: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, backgroundColor: 'rgba(63,183,219,0.20)', borderWidth: 1, borderColor: 'rgba(44,156,192,0.40)' },
+  heroDomainChipText: { color: colors.pokeBlueDeep, fontSize: typography.caption, fontWeight: '900', letterSpacing: 0.4 },
   heroKindChip: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, backgroundColor: 'rgba(20,23,55,0.72)' },
   heroKindChipText: { color: colors.softCream, fontSize: typography.caption, fontWeight: '900', letterSpacing: 0.4 },
 
