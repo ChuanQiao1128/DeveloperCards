@@ -34,13 +34,16 @@ function csharpArea(n: number, title: string): DomainDef {
   return { key: `c${n}`, title, match: startsWithAny(`${n}.`) };
 }
 
+const SAA_DOMAINS = [
+  awsDomain(1, 'Design Secure Architectures', '30%'),
+  awsDomain(2, 'Design Resilient Architectures', '26%'),
+  awsDomain(3, 'Design High-Performing Architectures', '24%'),
+  awsDomain(4, 'Design Cost-Optimized Architectures', '20%'),
+];
+
 export const DOMAINS: Record<string, DomainDef[]> = {
-  'aws-saa-c03': [
-    awsDomain(1, 'Design Secure Architectures', '30%'),
-    awsDomain(2, 'Design Resilient Architectures', '26%'),
-    awsDomain(3, 'Design High-Performing Architectures', '24%'),
-    awsDomain(4, 'Design Cost-Optimized Architectures', '20%'),
-  ],
+  'aws-saa-c03': SAA_DOMAINS,
+  'aws-saa-fundamentals': SAA_DOMAINS,
   'claude-ccdv-f': [
     ccdvfDomain(1, 'Agents & workflows', '14.7%'),
     ccdvfDomain(2, 'Applications & integration', '33.1%'),

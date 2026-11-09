@@ -60,6 +60,14 @@ export function computeDomainProgress(
   const other: Group = { key: OTHER_DOMAIN_KEY, title: OTHER_DOMAIN_TITLE, examWeight: null, cards: [] };
 
   for (const card of cards) {
+    const domainTag = card.Tags?.domain ?? (card as any).tags?.domain;
+    if (domainTag) {
+      const tagIndex = domains.findIndex((d) => d.key === `d${domainTag}`);
+      if (tagIndex >= 0) {
+        domainGroups[tagIndex].cards.push(card);
+        continue;
+      }
+    }
     const topic = normalizeTopic(card.Topic);
     if (topic === null) {
       other.cards.push(card);

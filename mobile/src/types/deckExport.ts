@@ -26,6 +26,32 @@ export interface CardExport {
   OrderInDeck: number;
   Topic?: string | null;        // C05 cards.topic; absent in pre-018 files, null when untagged
   Mcq?: McqExport | null;       // C08/C09 cards.mcq. Server-shaped, unvalidated on this type: read only through normalizeMcq / resolveMcq / isMcqCard (D00 §0)
+  Tags?: CardTags | null;       // Migration 051 navigation tags (domain, examTask)
+  Teaching?: CardTeaching | null; // Migration 051 structured teaching payload
+}
+
+export interface CardTags {
+  domain?: string;
+  examTask?: string;
+  [key: string]: unknown;
+}
+
+export interface CardTeachingZh {
+  answer: string;
+  keyPoint: string;
+  watchOut?: string;
+  goal?: string;
+}
+
+export interface CardTeaching {
+  schema: string;
+  answer: string;
+  keyPoint: string;
+  watchOut?: string;
+  mustAnswer: string[];
+  prerequisites?: string[];
+  goal?: string;
+  'zh-CN'?: CardTeachingZh;
 }
 
 export interface McqOption { key: string; text: string; why: string | null; correct: boolean }
