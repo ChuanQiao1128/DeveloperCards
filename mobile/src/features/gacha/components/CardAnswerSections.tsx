@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import CodeBlock from '../../../components/CodeBlock';
 import type { CardExport } from '../../../types/deckExport';
@@ -96,8 +96,8 @@ function ExplanationWithKeyLine(props: { split: AnswerKeyLine; lang: CardTextLan
 // sections — the same labels, order, CodeBlock wiring and empty hint — instead
 // of drifting apart. The section labels follow the card's language
 // (CardTextLangContext); the body text is whatever card the caller passes.
-export function CardAnswerSections(props: { card: CardExport; testID?: string }) {
-  const { card, testID } = props;
+export function CardAnswerSections(props: { card: CardExport; testID?: string; onPressPrerequisite?: (uid: string) => void }) {
+  const { card, testID, onPressPrerequisite } = props;
   const lang = useCardTextLang();
   const labels = cardSectionLabels(lang);
 
@@ -181,11 +181,28 @@ export function CardAnswerSections(props: { card: CardExport; testID?: string })
                 : `Requires understanding ${t.prerequisites.length} foundational card(s) first:`}
             </Text>
             <View style={styles.prereqChipsRow}>
-              {t.prerequisites.map((pUid, pIdx) => (
-                <View key={pIdx} style={styles.prereqChip}>
-                  <Text style={styles.prereqChipText} numberOfLines={1}>{pUid}</Text>
-                </View>
-              ))}
+              {t.prerequisites.map((pUid, pIdx) => {
+                const isInteractive = Boolean(onPressPrerequisite);
+                return (
+                  <Pressable
+                    key={pIdx}
+                    testID={`prereq-chip-${pUid}`}
+                    accessibilityRole={isInteractive ? 'button' : undefined}
+                    accessibilityLabel={isZh ? `先修卡：${pUid}` : `Prerequisite card: ${pUid}`}
+                    disabled={!isInteractive}
+                    style={({ pressed }) => [
+                      styles.prereqChip,
+                      isInteractive && styles.prereqChipInteractive,
+                      pressed && isInteractive && styles.pressed,
+                    ]}
+                    onPress={() => onPressPrerequisite?.(pUid)}
+                  >
+                    <Text style={[styles.prereqChipText, isInteractive && styles.prereqChipTextInteractive]} numberOfLines={1}>
+                      {pUid}{isInteractive ? ' →' : ''}
+                    </Text>
+                  </Pressable>
+                );
+              })}
             </View>
           </View>
         ),
@@ -409,6 +426,9 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 6,
   },
+  pressed: {
+    opacity: 0.75,
+  },
   prereqChip: {
     backgroundColor: colors.softMist,
     borderRadius: 6,
@@ -416,6 +436,14 @@ const styles = StyleSheet.create({
     borderColor: colors.hairline,
     paddingVertical: 3,
     paddingHorizontal: 8,
+  },
+  prereqChipInteractive: {
+    backgroundColor: 'rgba(63, 183, 219, 0.12)',
+    borderColor: 'rgba(44, 156, 192, 0.40)',
+  },
+  prereqChipTextInteractive: {
+    color: colors.pokeBlueDeep,
+    fontWeight: '800',
   },
   prereqChipText: {
     fontSize: 11,

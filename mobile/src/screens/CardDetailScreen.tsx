@@ -563,7 +563,7 @@ export function CardDetailScreen({ navigation, route }: Props) {
                           ))}
                       </View>
                     ) : null}
-                    <CardAnswerSections card={displayCard ?? card} />
+                    <CardAnswerSections card={displayCard ?? card} onPressPrerequisite={(pUid) => navigation.push('CardDetail', { cardId: pUid })} />
                     {source ? (
                       <Pressable
                         testID="card-detail-source"
