@@ -421,6 +421,8 @@ type RawDeckJsonV1 = {
     revision?: number | null;
     version?: number | null;
     updatedAt?: string | null;
+    tags?: unknown;
+    teaching?: unknown;
   }>;
 };
 
@@ -445,6 +447,8 @@ type RawDeckJsonFlat = {
     revision?: number | null;
     version?: number | null;
     updatedAt?: string | null;
+    tags?: unknown;
+    teaching?: unknown;
   }>;
 };
 
@@ -1730,6 +1734,8 @@ function mapRawDeckV1ToDeckExport(raw: RawDeckJsonV1): DeckExport {
       OrderInDeck: order,
       Topic: typeof (c as any).topic === 'string' ? (c as any).topic : null,
       Mcq: typeof (c as any).mcq === 'object' && (c as any).mcq !== null ? (c as any).mcq : null,
+      ...(((c as any).tags && typeof (c as any).tags === 'object') ? { Tags: (c as any).tags } : ((c as any).Tags && typeof (c as any).Tags === 'object') ? { Tags: (c as any).Tags } : {}),
+      ...(((c as any).teaching && typeof (c as any).teaching === 'object') ? { Teaching: (c as any).teaching } : ((c as any).Teaching && typeof (c as any).Teaching === 'object') ? { Teaching: (c as any).Teaching } : {}),
 
       Revision: revision,
       Version: version,
@@ -1792,6 +1798,8 @@ function mapRawDeckFlatToDeckExport(raw: RawDeckJsonFlat): DeckExport {
       OrderInDeck: order,
       Topic: typeof (c as any).topic === 'string' ? (c as any).topic : null,
       Mcq: typeof (c as any).mcq === 'object' && (c as any).mcq !== null ? (c as any).mcq : null,
+      ...(((c as any).tags && typeof (c as any).tags === 'object') ? { Tags: (c as any).tags } : ((c as any).Tags && typeof (c as any).Tags === 'object') ? { Tags: (c as any).Tags } : {}),
+      ...(((c as any).teaching && typeof (c as any).teaching === 'object') ? { Teaching: (c as any).teaching } : ((c as any).Teaching && typeof (c as any).Teaching === 'object') ? { Teaching: (c as any).Teaching } : {}),
 
       Revision: revision,
       Version: version,

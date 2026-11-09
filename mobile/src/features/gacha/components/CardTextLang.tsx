@@ -29,6 +29,9 @@ export const CARD_SECTION_LABELS = Object.freeze({
     usage: 'REAL USAGE',
     correctAnswer: 'CORRECT ANSWER',
     source: 'SOURCE',
+    selfCheck: 'SELF-CHECK (MUST-ANSWER)',
+    watchOut: 'WATCH OUT',
+    prerequisites: 'PREREQUISITES',
   }),
   'zh-CN': Object.freeze({
     question: '题目',
@@ -37,6 +40,9 @@ export const CARD_SECTION_LABELS = Object.freeze({
     usage: '实际应用',
     correctAnswer: '正确答案',
     source: '来源',
+    selfCheck: '自查得分点',
+    watchOut: '易错提醒',
+    prerequisites: '前置先修',
   }),
 });
 

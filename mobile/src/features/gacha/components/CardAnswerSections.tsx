@@ -106,7 +106,92 @@ export function CardAnswerSections(props: { card: CardExport; testID?: string })
     : null;
 
   const sections: Array<{ key: string; label: string; node: React.ReactNode }> = [];
-  if (card.Explanation) {
+  if (card.Teaching) {
+    const t = card.Teaching;
+    const isZh = lang === 'zh-CN';
+    const answer = isZh && t['zh-CN']?.answer ? t['zh-CN'].answer : t.answer;
+    const keyPoint = isZh && t['zh-CN']?.keyPoint ? t['zh-CN'].keyPoint : t.keyPoint;
+    const watchOut = isZh && t['zh-CN']?.watchOut ? t['zh-CN'].watchOut : t.watchOut;
+
+    // 1. Conclusion & Key Point
+    sections.push({
+      key: 'teaching-answer',
+      label: labels.explanation,
+      node: (
+        <View>
+          <View style={styles.keyLineBlock} testID={ANSWER_KEY_LINE_TEST_ID}>
+            <InlineCodeText
+              style={styles.keyLineText}
+              accessibilityLabel={keyLineA11yLabel(answer, lang)}
+              text={(isZh ? '答：' : 'Answer: ') + answer}
+            />
+          </View>
+          {keyPoint ? (
+            <View style={styles.keyPointBlock}>
+              <Text style={styles.keyPointLabel}>{isZh ? '考点：' : 'Key point: '}</Text>
+              <InlineCodeText style={styles.sectionBody} text={keyPoint} />
+            </View>
+          ) : null}
+        </View>
+      ),
+    });
+
+    // 2. Self-Check Points (mustAnswer)
+    if (t.mustAnswer && t.mustAnswer.length > 0) {
+      sections.push({
+        key: 'teaching-self-check',
+        label: (labels as any).selfCheck || (isZh ? '自查得分点' : 'SELF-CHECK POINTS'),
+        node: (
+          <View style={styles.selfCheckContainer} testID="teaching-self-check-list">
+            {t.mustAnswer.map((point, pIdx) => (
+              <View key={pIdx} style={styles.selfCheckRow}>
+                <Text style={styles.selfCheckCheckmark}>✓</Text>
+                <Text style={styles.selfCheckText}>{point}</Text>
+              </View>
+            ))}
+          </View>
+        ),
+      });
+    }
+
+    // 3. Watch out (if present)
+    if (watchOut) {
+      sections.push({
+        key: 'teaching-watch-out',
+        label: (labels as any).watchOut || (isZh ? '易错提醒' : 'WATCH OUT'),
+        node: (
+          <View style={styles.watchOutBlock} testID="teaching-watch-out">
+            <Text style={styles.watchOutIcon}>⚠</Text>
+            <InlineCodeText style={styles.watchOutText} text={watchOut} />
+          </View>
+        ),
+      });
+    }
+
+    // 4. Prerequisites (if present)
+    if (t.prerequisites && t.prerequisites.length > 0) {
+      sections.push({
+        key: 'teaching-prerequisites',
+        label: (labels as any).prerequisites || (isZh ? '前置先修' : 'PREREQUISITES'),
+        node: (
+          <View style={styles.prereqContainer}>
+            <Text style={styles.prereqHint}>
+              {isZh
+                ? `掌握该卡需先理解以下 ${t.prerequisites.length} 张基础卡：`
+                : `Requires understanding ${t.prerequisites.length} foundational card(s) first:`}
+            </Text>
+            <View style={styles.prereqChipsRow}>
+              {t.prerequisites.map((pUid, pIdx) => (
+                <View key={pIdx} style={styles.prereqChip}>
+                  <Text style={styles.prereqChipText} numberOfLines={1}>{pUid}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        ),
+      });
+    }
+  } else if (card.Explanation) {
     // Null for every answer that does not open with 答： (all English decks): rendered as before.
     const keySplit = splitKeyLine(card.Explanation);
     sections.push({
@@ -245,5 +330,97 @@ const styles = StyleSheet.create({
     color: colors.inkSoft,
     lineHeight: 22,
     fontWeight: '500',
+  },
+  keyPointBlock: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginTop: 4,
+  },
+  keyPointLabel: {
+    fontSize: typography.body,
+    lineHeight: 22,
+    color: colors.gold,
+    fontWeight: '800',
+  },
+  selfCheckContainer: {
+    backgroundColor: 'rgba(126, 157, 94, 0.08)',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(126, 157, 94, 0.25)',
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    marginTop: 2,
+  },
+  selfCheckRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginVertical: 3,
+  },
+  selfCheckCheckmark: {
+    color: colors.mint,
+    fontWeight: '900',
+    fontSize: 14,
+    marginRight: 6,
+    lineHeight: 20,
+  },
+  selfCheckText: {
+    flex: 1,
+    fontSize: typography.bodySmall,
+    lineHeight: 20,
+    color: colors.ink,
+    fontWeight: '600',
+  },
+  watchOutBlock: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: 'rgba(200, 136, 58, 0.08)',
+    borderLeftWidth: 3,
+    borderLeftColor: colors.gold,
+    borderRadius: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    marginTop: 2,
+  },
+  watchOutIcon: {
+    color: colors.gold,
+    fontWeight: '900',
+    fontSize: 14,
+    marginRight: 6,
+    lineHeight: 20,
+  },
+  watchOutText: {
+    flex: 1,
+    fontSize: typography.bodySmall,
+    lineHeight: 20,
+    color: colors.inkSoft,
+    fontWeight: '500',
+  },
+  prereqContainer: {
+    marginTop: 2,
+  },
+  prereqHint: {
+    fontSize: typography.caption,
+    color: colors.inkMuted,
+    fontWeight: '500',
+    marginBottom: 6,
+  },
+  prereqChipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  prereqChip: {
+    backgroundColor: colors.softMist,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: colors.hairline,
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+  },
+  prereqChipText: {
+    fontSize: 11,
+    color: colors.inkMuted,
+    fontWeight: '700',
+    fontFamily: 'monospace',
   },
 });

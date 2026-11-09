@@ -276,6 +276,23 @@ describe('computeDomainProgress', () => {
     ]);
   });
 
+
+  it('groups aws-saa-fundamentals cards by Tags.domain regardless of topic string', () => {
+    const cards: CardExport[] = [
+      { StableUid: 'c1', Question: 'Q1', Difficulty: 1, OrderInDeck: 10, Topic: 'Session management and private access', Tags: { domain: '1', examTask: '1.1' } },
+      { StableUid: 'c2', Question: 'Q2', Difficulty: 2, OrderInDeck: 20, Topic: 'Cross-account authorization paths', Tags: { domain: '2', examTask: '2.1' } },
+      { StableUid: 'c3', Question: 'Q3', Difficulty: 2, OrderInDeck: 30, Topic: 'Multi-AZ DB failover', Tags: { domain: '3', examTask: '3.1' } },
+      { StableUid: 'c4', Question: 'Q4', Difficulty: 1, OrderInDeck: 40, Topic: 'S3 lifecycle transitions', Tags: { domain: '4', examTask: '4.1' } },
+    ];
+    const out = computeDomainProgress('aws-saa-fundamentals', cards, [], null, [], NOW);
+    expect(out.map((d) => [d.key, d.title, d.examWeight, d.total, d.uids])).toEqual([
+      ['d1', 'Design Secure Architectures', '30%', 1, ['c1']],
+      ['d2', 'Design Resilient Architectures', '26%', 1, ['c2']],
+      ['d3', 'Design High-Performing Architectures', '24%', 1, ['c3']],
+      ['d4', 'Design Cost-Optimized Architectures', '20%', 1, ['c4']],
+    ]);
+  });
+
   it('counts a mistake once per card and only for this deck', () => {
     const cards = [card('m1', '5.1 EF Core Querying and Tracking'), card('m2', '5.2 Transactions and Indexes')];
     const mistakes = [
