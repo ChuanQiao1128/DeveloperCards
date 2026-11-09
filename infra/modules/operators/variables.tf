@@ -45,9 +45,12 @@ variable "rds_instance_id" {
   type = string
 }
 
+# GitHub's OIDC sub claim includes the owner and repository IDs since 2026 (CloudTrail shows
+# repo:ChuanQiao1128@195982986/DeveloperCards@1076433600:environment:...); the trust subjects must
+# match that exact format or AssumeRoleWithWebIdentity is denied (RUNBOOK, trust fix 2026-11-09).
 variable "github_repository" {
   type    = string
-  default = "ChuanQiao1128/DeveloperCards"
+  default = "ChuanQiao1128@195982986/DeveloperCards@1076433600"
 }
 
 variable "github_environment" {

@@ -1,0 +1,19 @@
+{
+  "changes": {
+    "module.operators.aws_iam_role.gha_prod": {
+      "action": "update",
+      "keys": [
+        "assume_role_policy",
+        "description"
+      ]
+    },
+    "module.operators.aws_iam_role.gha_infra": {
+      "action": "update",
+      "keys": [
+        "assume_role_policy",
+        "description"
+      ]
+    }
+  },
+  "_note": "GitHub OIDC sub claim is now ID-qualified (repo:ChuanQiao1128@195982986/DeveloperCards@1076433600:environment:...). Aligns the committed trust subjects with the live roles updated on 2026-11-09 (original policies backed up in the release exports). Same scope as repository-rename-20261102.plan-allow.json: assume_role_policy/description updates on the two operator roles only; no resources are recreated."
+}

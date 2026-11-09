@@ -263,7 +263,9 @@ public static partial class Publish
       source,
       nullif(to_jsonb(cards) -> 'front_help', 'null'::jsonb) as "frontHelp",
       nullif(to_jsonb(cards) -> 'translations', 'null'::jsonb) as translations,
-      nullif(to_jsonb(cards) -> 'translation_basis', 'null'::jsonb) as "translationBasis"
+      nullif(to_jsonb(cards) -> 'translation_basis', 'null'::jsonb) as "translationBasis",
+      nullif(to_jsonb(cards) -> 'teaching', 'null'::jsonb) as teaching,
+      nullif(to_jsonb(cards) -> 'tags', 'null'::jsonb) as tags
     from cards
     where deck_id = $1 and is_deleted = 0
     order by order_in_deck asc, id asc
@@ -338,6 +340,10 @@ public static partial class Publish
         };
         if (Helpers.JsonbElement(c, "frontHelp") is { } help && FrontHelpValidation.Canonicalize(help) is { } canonical)
           fields["frontHelp"] = JsonSerializer.Deserialize<JsonElement>(canonical);
+        if (Helpers.JsonbElement(c, "teaching") is { } teaching && TeachingValidation.Canonicalize(teaching) is { } teachingCanonical)
+          fields["teaching"] = JsonSerializer.Deserialize<JsonElement>(teachingCanonical);
+        if (Helpers.JsonbElement(c, "tags") is { } tags && TagsValidation.Canonicalize(tags) is { } tagsCanonical)
+          fields["tags"] = JsonSerializer.Deserialize<JsonElement>(tagsCanonical);
         return fields;
       }).ToList();
 

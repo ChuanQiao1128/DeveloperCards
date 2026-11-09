@@ -39,7 +39,13 @@ export function parseReleaseBundle(raw: string, now = Date.now(), requireFresh =
   const uids = new Set<string>(); const orders = new Set<number>();
   for (const rawCard of bundle.cards) {
     const card = object(rawCard);
-    keys(card, ['stableUid', ...TEXT_FIELDS, 'difficulty', 'orderInDeck', 'mcq', 'source', 'frontHelp', 'translations']);
+    const cardKeys = Object.keys(card);
+    const baseFields = ['stableUid', ...TEXT_FIELDS, 'difficulty', 'orderInDeck', 'mcq', 'source', 'frontHelp', 'translations'];
+    requireValue(
+      (cardKeys.length === baseFields.length && baseFields.every(key => Object.hasOwn(card, key))) ||
+      (cardKeys.length === baseFields.length + 2 && [...baseFields, 'teaching', 'tags'].every(key => Object.hasOwn(card, key))),
+      `Expected standard ${baseFields.length} or extended ${baseFields.length + 2} fields, got: ${cardKeys.join(', ')}`
+    );
     requireValue(typeof card.stableUid === 'string' && isValidStableUid(card.stableUid) && !uids.has(card.stableUid), 'Invalid or duplicate stable UID.');
     uids.add(card.stableUid);
     for (const field of TEXT_FIELDS) requireValue(typeof card[field] === 'string' && (field === 'codeSnippet' || card[field] === card[field].trim()), `${card.stableUid}: ${field} must be canonical text.`);
@@ -139,12 +145,24 @@ export function assertOriginalLive(session: ReleaseSession, snapshot: ReleaseSna
 }
 
 /** Mirrors the import reconciler, preserving code whitespace and checking help explicitly. */
+function canonicalizeJson(val: unknown): unknown {
+  if (val === null || typeof val !== 'object') return val;
+  if (Array.isArray(val)) return val.map(canonicalizeJson);
+  const out: Record<string, unknown> = {};
+  for (const k of Object.keys(val as Record<string, unknown>).sort()) {
+    out[k] = canonicalizeJson((val as Record<string, unknown>)[k]);
+  }
+  return out;
+}
+
 export function canonicalReleaseCard(card: ImportCardInput | Card): string {
   return JSON.stringify([
     card.stableUid, card.orderInDeck, card.difficulty,
     ...TEXT_FIELDS.map(field => field === 'codeSnippet' ? card[field] ?? '' : (card[field] ?? '').trim()),
     normalizeMcqForCompare(card.mcq), normalizeSourceForCompare(card.source),
     normalizeFrontHelpForCompare(card.frontHelp), normalizeTranslationsForCompare(card.translations),
+    card.teaching ? canonicalizeJson(card.teaching) : null,
+    card.tags ? canonicalizeJson(card.tags) : null,
   ]);
 }
 

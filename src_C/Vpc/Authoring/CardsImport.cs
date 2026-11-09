@@ -45,7 +45,8 @@ public static class CardsImport
     string? Source,
     string? Translations,
     string? TranslationBasis,
-    bool TranslationsSent, string? FrontHelp, bool FrontHelpSent);
+    bool TranslationsSent, string? FrontHelp, bool FrontHelpSent,
+    string? Teaching, bool TeachingSent, string? Tags, bool TagsSent);
 
   /// <summary>What the core learned about the import, for the after-response side effects.</summary>
   private sealed class ImportOutcome
@@ -235,9 +236,12 @@ public static class CardsImport
           // block mirrors this card's English and is restamped, so the file is the translation's new basis.
           var frontHelp = FrontHelpValidation.Read(cardEl, out var frontHelpSent);
           var translationsSent = cardEl.TryGetProperty("translations", out var trEl);
+          var teaching = TeachingValidation.Read(cardEl, out var teachingSent);
+          var tags = TagsValidation.Read(cardEl, out var tagsSent);
           // Validate translations after locking the row: an older client may omit the stored English help.
           cards.Add(new ImportCard(i, uid, question, explanation, codeSnippet, codeLanguage, realWorldUsage, difficulty, orderInDeck, topic, mcq, source,
-            translationsSent ? trEl.GetRawText() : null, null, translationsSent, frontHelp, frontHelpSent));
+            translationsSent ? trEl.GetRawText() : null, null, translationsSent, frontHelp, frontHelpSent,
+            teaching, teachingSent, tags, tagsSent));
         }
         catch (McqValidationError ex)
         {
@@ -295,6 +299,12 @@ public static class CardsImport
       var translationsReady = await Helpers.ColumnExistsAsync(conn, tx, "cards", "translations");
       var frontHelpReady = await Helpers.ColumnExistsAsync(conn, tx, "cards", "front_help");
       if (!frontHelpReady && cards.Any(c => c.FrontHelp is not null)) return Helpers.FrontHelpNotMigrated(res);
+      // Migration 051 is one deploy unit: checking teaching alone decides both columns. The teaching
+      // columns ride on the modern (post-047/049) upsert shape, so a database missing any of the three
+      // migrations takes the older SQL paths exactly as before.
+      var teachingReady = await Helpers.ColumnExistsAsync(conn, tx, "cards", "teaching");
+      if (!teachingReady && cards.Any(c => c.TeachingSent || c.TagsSent)) return Helpers.TeachingNotMigrated(res);
+      var extended = translationsReady && frontHelpReady && teachingReady;
 
       var deckRows = await DbUtil.QueryAsync(conn, tx,
         "select id from decks where id = $1 and is_deleted = 0 for update", [deckId]);
@@ -399,9 +409,9 @@ public static class CardsImport
       var upsertSql = $"""
         insert into cards (
           deck_id, stable_uid, question, explanation, code_snippet, code_language,
-          real_world_usage, difficulty, order_in_deck, topic, mcq, source, translations, translation_basis{(frontHelpReady ? ", front_help" : "")}
+          real_world_usage, difficulty, order_in_deck, topic, mcq, source, translations, translation_basis{(frontHelpReady ? ", front_help" : "")}{(extended ? ", teaching, tags" : "")}
         )
-        values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, $12::jsonb, $13::jsonb, $14::jsonb{(frontHelpReady ? ", $16::jsonb" : "")})
+        values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, $12::jsonb, $13::jsonb, $14::jsonb{(frontHelpReady ? ", $16::jsonb" : "")}{(extended ? ", $18::jsonb, $19::jsonb" : "")})
         on conflict (deck_id, stable_uid) do update set
           question = excluded.question,
           explanation = excluded.explanation,
@@ -416,15 +426,16 @@ public static class CardsImport
           translations = case when $15::boolean then excluded.translations else cards.translations end,
           translation_basis = case when $15::boolean then excluded.translation_basis else cards.translation_basis end,
           {(frontHelpReady ? "front_help = case when $17::boolean then excluded.front_help else cards.front_help end," : "")}
+          {(extended ? "teaching = case when $20::boolean then excluded.teaching else cards.teaching end, tags = case when $21::boolean then excluded.tags else cards.tags end," : "")}
           version = cards.version + 1,
           updated_at = now()
         where (cards.question, cards.explanation, cards.code_snippet, cards.code_language, cards.real_world_usage,
-               cards.difficulty, cards.order_in_deck, cards.topic, cards.mcq, cards.source, cards.translations, cards.translation_basis{(frontHelpReady ? ", cards.front_help" : "")})
+               cards.difficulty, cards.order_in_deck, cards.topic, cards.mcq, cards.source, cards.translations, cards.translation_basis{(frontHelpReady ? ", cards.front_help" : "")}{(extended ? ", cards.teaching, cards.tags" : "")})
           is distinct from
               (excluded.question, excluded.explanation, excluded.code_snippet, excluded.code_language, excluded.real_world_usage,
                excluded.difficulty, excluded.order_in_deck, excluded.topic, excluded.mcq, excluded.source,
                case when $15::boolean then excluded.translations else cards.translations end,
-               case when $15::boolean then excluded.translation_basis else cards.translation_basis end{(frontHelpReady ? ", case when $17::boolean then excluded.front_help else cards.front_help end" : "")})
+               case when $15::boolean then excluded.translation_basis else cards.translation_basis end{(frontHelpReady ? ", case when $17::boolean then excluded.front_help else cards.front_help end" : "")}{(extended ? ", case when $20::boolean then excluded.teaching else cards.teaching end, case when $21::boolean then excluded.tags else cards.tags end" : "")})
         returning id, (xmax = 0) as inserted
         """;
       const string upsertSqlPre047 = """
@@ -463,6 +474,7 @@ public static class CardsImport
         };
         if (translationsReady) parameters.AddRange([c.Translations, c.TranslationBasis, c.TranslationsSent]);
         if (translationsReady && frontHelpReady) parameters.AddRange([c.FrontHelp, c.FrontHelpSent]);
+        if (extended) parameters.AddRange([c.Teaching, c.Tags, c.TeachingSent, c.TagsSent]);
         var rows = translationsReady
           ? await DbUtil.QueryAsync(conn, tx, upsertSql, parameters)
           : await DbUtil.QueryAsync(conn, tx, upsertSqlPre047, parameters);

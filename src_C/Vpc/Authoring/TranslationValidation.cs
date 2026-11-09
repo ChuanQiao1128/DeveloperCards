@@ -226,6 +226,8 @@ public static class TranslationValidation
     Helpers.JsonbCell(row, "translations");
     // Remove empty help after inserting status so Dictionary does not reuse its position before translations.
     FrontHelpValidation.ShapeRow(row);
+    // Same removal rule for the migration-051 fields on every authoring response path.
+    TeachingValidation.ShapeRow(row);
   }
 
   // ------------------------------------------------------------------------------------------- parsing
