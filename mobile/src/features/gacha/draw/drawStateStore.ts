@@ -246,12 +246,13 @@ async function claimGlobalDrawState(slug: string, userSub?: string, strict = fal
  * `devcards:draw-state:` key has to do the same, or its deletion will be
  * undone by the next read-modify-write.
  */
-export async function loadDrawState(slug: string): Promise<DrawStateRecord> {
+export async function loadDrawState(slug: string, options: { strict?: boolean } = {}): Promise<DrawStateRecord> {
   try {
     const prefix = await getUserScopedKey('');
     const sub = prefix.slice('devcards:u:'.length, -1);
-    return await withDrawStateLock(() => loadDrawStateUnderLock(slug, sub));
-  } catch {
+    return await withDrawStateLock(() => loadDrawStateUnderLock(slug, sub, options.strict));
+  } catch (error) {
+    if (options.strict) throw error;
     return { owned: [], pity: null };
   }
 }
@@ -314,7 +315,7 @@ export async function loadDrawStateUnderLock(slug: string, userSub?: string, str
  * Scans keys inside the current user's partition only, so it can never
  * report another account's decks.
  */
-export async function listDrawStateSlugs(): Promise<string[]> {
+export async function listDrawStateSlugs(options: { strict?: boolean } = {}): Promise<string[]> {
   try {
     const prefix = await stateKey('');
     const keys = await AsyncStorage.getAllKeys();
@@ -322,7 +323,8 @@ export async function listDrawStateSlugs(): Promise<string[]> {
       .filter((key) => key.startsWith(prefix))
       .map((key) => key.slice(prefix.length))
       .filter((slug) => slug.length > 0);
-  } catch {
+  } catch (error) {
+    if (options.strict) throw error;
     return [];
   }
 }

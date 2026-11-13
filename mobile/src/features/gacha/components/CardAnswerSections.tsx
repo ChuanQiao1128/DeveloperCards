@@ -464,6 +464,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
   },
   prereqChipInteractive: {
+    minHeight: 44,
+    minWidth: 44,
+    justifyContent: 'center',
     backgroundColor: 'rgba(63, 183, 219, 0.12)',
     borderColor: 'rgba(44, 156, 192, 0.40)',
   },

@@ -91,10 +91,11 @@ function normalizeSnapshot(raw: unknown): StreakSnapshot {
   };
 }
 
-export async function loadStreakSnapshot(): Promise<StreakSnapshot> {
+export async function loadStreakSnapshot(options: { strict?: boolean } = {}): Promise<StreakSnapshot> {
   try {
     return normalizeSnapshot(await readRecord(await getUserScopedKey(STREAK_SNAPSHOT_KEY)));
-  } catch {
+  } catch (error) {
+    if (options.strict) throw error;
     return EMPTY_SNAPSHOT;
   }
 }

@@ -1,5 +1,6 @@
 import type { DeckExport } from '../../../types/deckExport';
 import type { CardTranslations } from '../../../content/cardTranslation';
+import { cardTranslationFor, localizeForDisplay, type CardDisplayLang } from '../../../content/localizeCard';
 import { questionText } from '../../../content/questionCode';
 import { stripInlineCode } from '../../../content/inlineCode';
 import type { CardProgress } from '../../../review/model';
@@ -131,6 +132,8 @@ export function buildLibraryCardRows(params: {
   previewTotal?: number;
   ownedSet?: OwnedGate;
   mcqEnabled?: boolean;
+  cardLang?: CardDisplayLang;
+  translations?: ReadonlyMap<string, CardTranslations>;
 }): LibraryCardRow[] {
   const { deck, progress, now = new Date(), isTrial = false, previewTotal = 0, ownedSet = null, mcqEnabled = true } = params;
   const cards = isTrial ? (deck.Cards ?? []).slice(0, previewTotal) : deck.Cards ?? [];
@@ -167,7 +170,11 @@ export function buildLibraryCardRows(params: {
         orderInDeck: card.OrderInDeck,
         // Prose only: a library tile never prints a fenced code block's backticks (Y01) or an
         // inline code span's (Z01).
-        question: stripInlineCode(questionText(card.Question)),
+        question: stripInlineCode(questionText(localizeForDisplay({
+          card, mcq: mcqEnabled ? normalizeMcq(card.Mcq) : null, shownOrder: [],
+          translation: cardTranslationFor(params.translations?.get(card.StableUid), deck.Locale),
+          lang: params.cardLang ?? 'en',
+        }).card.Question)),
         difficulty: card.Difficulty,
         rarity: rarityFromDifficulty(card.Difficulty),
         icon: cardIconFor(card),
@@ -212,6 +219,7 @@ export function buildLibraryVM(params: {
   mcqEnabled?: boolean;
   searchQuery?: string;
   translations?: ReadonlyMap<string, CardTranslations>;
+  cardLang?: CardDisplayLang;
 }): LibraryViewModel {
   const {
     deck,
@@ -227,7 +235,8 @@ export function buildLibraryVM(params: {
     mcqEnabled = true,
     searchQuery = '',
   } = params;
-  const rows = buildLibraryCardRows({ deck, progress, now, isTrial, previewTotal, ownedSet, mcqEnabled });
+  const rows = buildLibraryCardRows({ deck, progress, now, isTrial, previewTotal, ownedSet, mcqEnabled,
+    cardLang: params.cardLang, translations: params.translations });
   // Gated, these three read "of the cards you hold" -- an unowned card carries
   // status 'missing' and so falls out of all three on its own, no second gate
   // needed here.
@@ -334,9 +343,11 @@ export function buildLibraryVM(params: {
   // for filter === 'all' the resolver hands back `rows` itself.
   const query = searchQuery.trim().toLocaleLowerCase();
   const numberQuery = /^#?0*(\d+)$/.exec(query);
+  const englishQuestions = new Map((deck.Cards ?? []).map(card => [card.StableUid, card.Question.toLocaleLowerCase()]));
   const searched = !query ? statusFiltered : statusFiltered.filter((row) =>
     row.stableUid.toLocaleLowerCase().includes(query) ||
     row.question.toLocaleLowerCase().includes(query) ||
+    (englishQuestions.get(row.stableUid)?.includes(query) ?? false) ||
     (params.translations?.get(row.stableUid)?.['zh-CN']?.question.toLocaleLowerCase().includes(query) ?? false) ||
     (numberQuery !== null && row.rank === Number(numberQuery[1])),
   );

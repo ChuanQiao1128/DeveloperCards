@@ -693,6 +693,9 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   backChip: {
+    minHeight: 44,
+    minWidth: 44,
+    justifyContent: 'center',
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 999,

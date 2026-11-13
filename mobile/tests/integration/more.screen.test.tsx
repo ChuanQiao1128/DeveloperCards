@@ -1,6 +1,6 @@
 import React from 'react';
 import renderer, { act } from 'react-test-renderer';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 /**
  * The Me tab used to render design-spec prose ("Treat this tab as your
@@ -80,13 +80,25 @@ vi.mock('../../src/content/starterOffline', () => ({
 vi.mock('../../src/features/gacha/audience/audiencePrefs', () => ({
   getAudiencePreference: vi.fn(async () => audienceFixture),
 }));
+vi.mock('../../src/features/gacha/mistakes/mistakeBook', () => ({
+  loadMistakeBook: vi.fn(async () => ({ v: 1, entries: {} })),
+  activeMistakes: vi.fn(() => []),
+}));
 
 import appJson from '../../app.json';
-import { setAuthIdentitySnapshot } from '../../src/auth/sessionBoundary';
+import { invalidateAuthSession, setAuthIdentitySnapshot } from '../../src/auth/sessionBoundary';
+import { loadStreakSnapshot } from '../../src/features/gacha/streaks/streakTracker';
+import { listDrawStateSlugs } from '../../src/features/gacha/draw/drawStateStore';
+import { loadMistakeBook } from '../../src/features/gacha/mistakes/mistakeBook';
 import { MoreScreen, MORE_LINKS, MORE_BYLINE } from '../../src/screens/MoreScreen';
 import { ProfileScreen } from '../../src/screens/ProfileScreen';
 import { HelpFAQScreen } from '../../src/screens/HelpFAQScreen';
 import { FAQ_DISCLAIMER, FAQ_LIST } from '../../src/content/faq';
+
+const rendered: renderer.ReactTestRenderer[] = [];
+afterEach(async () => {
+  await act(async () => { for (const tree of rendered.splice(0)) tree.unmount(); });
+});
 
 function collectText(node: renderer.ReactTestInstance): string {
   const parts: string[] = [];
@@ -127,6 +139,7 @@ async function renderMore(navigate = vi.fn()) {
     );
   });
   await flush();
+  rendered.push(tree);
   return tree;
 }
 
@@ -173,6 +186,39 @@ describe('Me tab · MoreScreen + Profile + Help real copy', () => {
     setAuthIdentitySnapshot({ status: 'anonymous', email: null, sessionExpired: false });
     openUrlMock.mockClear();
     alertMock.mockClear();
+  });
+
+  it('shows unavailable summaries and retry instead of claiming zero after failed reads', async () => {
+    vi.mocked(loadStreakSnapshot).mockRejectedValueOnce(new Error('storage unavailable'));
+    vi.mocked(listDrawStateSlugs).mockRejectedValueOnce(new Error('storage unavailable'));
+    vi.mocked(loadMistakeBook).mockRejectedValueOnce(new Error('storage unavailable'));
+    const tree = await renderMore();
+    expect(textBlob(tree)).not.toContain('Mistake Book clear');
+    expect(exactTexts(tree)).not.toContain('0');
+    expect(textBlob(tree)).toContain('Some study information could not be loaded');
+    const retry = tree.root.findAll(node => typeof node.type === 'string' && node.props.testID === 'more-summary-retry')[0];
+    await act(async () => retry.props.onPress());
+    await flush();
+    expect(textBlob(tree)).toContain('Mistake Book clear');
+    expect(textBlob(tree)).not.toContain('Some study information could not be loaded');
+    expect(loadMistakeBook).toHaveBeenCalledWith({ strict: true });
+  });
+
+  it('rejects an old identity read after the real identity broadcast order', async () => {
+    let finishOld!: (value: typeof streakSnapshotFixture) => void;
+    vi.mocked(loadStreakSnapshot).mockImplementationOnce(() => new Promise(resolve => { finishOld = resolve; }));
+    const tree = await renderMore();
+    streakSnapshotFixture = { ...streakSnapshotFixture, currentDailyStreak: 2, longestDailyStreak: 2 };
+    await act(async () => {
+      setAuthIdentitySnapshot({ status: 'signed_in', email: 'second@example.com' });
+      invalidateAuthSession();
+    });
+    await flush();
+    expect(exactTexts(tree)).toContain('2');
+    await act(async () => finishOld({ ...streakSnapshotFixture, currentDailyStreak: 99 }));
+    await flush();
+    expect(exactTexts(tree)).toContain('2');
+    expect(exactTexts(tree)).not.toContain('99');
   });
 
   it('renders the day streak and collection count the trackers actually hold', async () => {

@@ -27,6 +27,7 @@ import { ensureStarterDeckInstalled } from '../content/starterOffline';
 import { listVisibleManifestDecks } from '../content/visibleManifest';
 import { loadDeckProgress } from '../review/storage';
 import { useDeckTranslations } from '../features/gacha/study/useDeckTranslations';
+import { useCardLangPref } from '../features/gacha/study/cardLangPrefs';
 import {
   buildLibraryVM,
   type LibraryCardRow,
@@ -296,6 +297,7 @@ export function LibraryScreen({ navigation, route }: Props) {
   );
 
   const deckTranslations = useDeckTranslations(deck?.Slug, deck?.Version);
+  const cardLang = useCardLangPref();
   const translations = deckTranslations.status === 'ready' ? deckTranslations.map : undefined;
   const vm: LibraryViewModel | null = useMemo(() => {
     if (!deck) return null;
@@ -310,9 +312,10 @@ export function LibraryScreen({ navigation, route }: Props) {
       topicFilter,
       searchQuery,
       translations,
+      cardLang,
       mcqEnabled: getFeatureFlags().mcq.enabled,
     });
-  }, [deck, progress, filter, deckOptions, selectedSlug, ownedSet, topicFilter, searchQuery, translations]);
+  }, [deck, progress, filter, deckOptions, selectedSlug, ownedSet, topicFilter, searchQuery, translations, cardLang]);
 
   const visibleCards = vm?.cards ?? [];
 

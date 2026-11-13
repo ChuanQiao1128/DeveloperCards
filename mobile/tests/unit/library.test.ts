@@ -29,6 +29,16 @@ const sampleProgress = [
 ] as any;
 
 describe('buildLibraryVM', () => {
+  it('uses Chinese preview text while retaining both English and Chinese search', () => {
+    const translations = new Map([['2', { 'zh-CN': {
+      v: 1, question: '如何保护密钥？', explanation: null, realWorldUsage: null, mcq: null,
+    } }]]) as any;
+    const input = { deck: sampleDeck, progress: sampleProgress, translations, cardLang: 'zh-CN' as const };
+    expect(buildLibraryVM(input).cards.find(card => card.stableUid === '2')?.question).toBe('如何保护密钥？');
+    expect(buildLibraryVM({ ...input, searchQuery: 'Q2' }).cards.map(card => card.stableUid)).toEqual(['2']);
+    expect(buildLibraryVM({ ...input, searchQuery: '保护' }).cards.map(card => card.stableUid)).toEqual(['2']);
+    expect(buildLibraryVM({ ...input, cardLang: 'en' }).cards.find(card => card.stableUid === '2')?.question).toBe('Q2');
+  });
   it('finds a card by its built-in Chinese question while preserving the owned filter', () => {
     const translations = new Map([
       ['1', { 'zh-CN': { v: 1, question: '如何保护数据库？', explanation: null, realWorldUsage: null, mcq: null } }],
