@@ -54,6 +54,7 @@ public sealed class VpcFunction
     // function can produce -- including the OPTIONS preflight and the 500 from the catch
     // below -- has to carry the same CORS answer, or the browser reports the wrong failure.
     var res = new Res(req.TraceId, req.Origin);
+    if (Vpc.Db.DbSafety.MaintenanceOnly) return res.NotFound("Route not found");
 
     // The whole dispatch, wrapped once. Deliberately the only statement in this method that
     // can produce a response: there is no early return above it and no route below it, so a

@@ -56,6 +56,7 @@ public static class AppRole
     Res res,
     AuthContext auth)
   {
+    if (DbSafety.RuntimeIsolated) return res.NotFound("Route not found");
     var deny = Auth.RequireSuperAdmin(auth, res);
     if (deny is not null) return deny;
 

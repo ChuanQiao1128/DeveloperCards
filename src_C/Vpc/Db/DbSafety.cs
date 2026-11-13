@@ -11,6 +11,9 @@ namespace RecallSmith.Lambda.Vpc.Db;
 /// </summary>
 public static class DbSafety
 {
+  public static bool RuntimeIsolated => string.Equals(Environment.GetEnvironmentVariable("DB_ACCESS_MODE"), "isolated", StringComparison.Ordinal);
+  public static bool MaintenanceOnly => string.Equals(Environment.GetEnvironmentVariable("DB_ACCESS_MODE"), "maintenance", StringComparison.Ordinal);
+
   public const string AllowDestructiveEnv = "ALLOW_DESTRUCTIVE_DB";
   public const string MigrateSecretEnv = "MIGRATE_SECRET";
   public const string MigrateSecretHeader = "x-migrate-secret";
