@@ -12,7 +12,7 @@ namespace RecallSmith.Lambda.IntegrationTests;
 /// <summary>
 /// Publish enqueue resilience (CBE-15) against a real Postgres, reaching the enqueue path through
 /// the internal <see cref="Publish.EnqueueSeam"/> so no AWS client is ever built and PUBLISH_JOB_QUEUE_URL
-/// stays unset. Covers the SQS-send compensation (row → FAILED, 500), the concurrent-publish invariant
+/// stays unset. Covers ambiguous SQS results without state downgrades, the concurrent-publish invariant
 /// (exactly one active job), the stale-active-row 409, the 15-minute resume, and the message payload.
 /// Every test sets the seam in a try and resets it to null in a finally.
 /// </summary>
@@ -57,9 +57,9 @@ public class PublishEnqueueResilienceTests
     });
   }
 
-  private static async Task<APIGatewayProxyResponse> PublishAsync(long deckId, string? sub = null)
+  private static async Task<APIGatewayProxyResponse> PublishAsync(long deckId, string? sub = null, string? note = null)
   {
-    var req = new LambdaRequest(Event(sub ?? NewSub(), JsonSerializer.Serialize(new { deckId })));
+    var req = new LambdaRequest(Event(sub ?? NewSub(), JsonSerializer.Serialize(new { deckId, note })));
     var res = new Res(req.TraceId);
     var auth = await Auth.GetAuthContextAsync(req);
     return await Publish.HandleAuthoringPublish(req, res, auth);
@@ -96,29 +96,118 @@ public class PublishEnqueueResilienceTests
     return doc.RootElement.GetProperty("error").GetProperty("code").GetString();
   }
 
-  // ---- send failure compensation --------------------------------------------------------------
+  private static string AssertDispatchUnconfirmed(APIGatewayProxyResponse response)
+  {
+    Assert.Equal(503, response.StatusCode);
+    using var doc = JsonDocument.Parse(response.Body);
+    var root = doc.RootElement;
+    Assert.False(root.GetProperty("success").GetBoolean());
+    Assert.Equal("PUBLISH_DISPATCH_UNCONFIRMED", root.GetProperty("error").GetProperty("code").GetString());
+    var data = root.GetProperty("data");
+    Assert.Equal("dispatch_unconfirmed", data.GetProperty("outcome").GetString());
+    Assert.False(string.IsNullOrWhiteSpace(data.GetProperty("buildId").GetString()));
+    return Assert.IsType<string>(data.GetProperty("jobId").GetString());
+  }
 
-  [Fact]
-  public async Task SqsSendFailure_MarksJobFailed_AndReturns500()
+  // ---- ambiguous send results ----------------------------------------------------------------
+
+  [Theory]
+  [InlineData(false)]
+  [InlineData(true)]
+  public async Task SendFailure_LeavesPendingJob_WithStableUnconfirmedIdentity(bool acceptedResponseLost)
   {
     var deckId = await SeedFreeDeckWithCardAsync("sqsfail");
-
-    Func<SendMessageRequest, Task> send = _ => throw new InvalidOperationException("sqs down");
-    Publish.TestEnqueueSeam = new(SeamQueueUrl, SeamBucket, send);
+    string? acceptedJobId = null;
+    Publish.TestEnqueueSeam = new(SeamQueueUrl, SeamBucket, request =>
+    {
+      if (acceptedResponseLost)
+      {
+        using var message = JsonDocument.Parse(request.MessageBody);
+        acceptedJobId = message.RootElement.GetProperty("jobId").GetString();
+        throw new TimeoutException("accepted, but response was lost");
+      }
+      throw new InvalidOperationException("send result unavailable");
+    });
+    APIGatewayProxyResponse response;
     try
     {
-      var resp = await PublishAsync(deckId);
-      Assert.Equal(500, resp.StatusCode);
+      response = await PublishAsync(deckId);
     }
     finally
     {
       Publish.TestEnqueueSeam = null;
     }
 
-    // The compensation left exactly one row for the deck, marked FAILED.
-    var rows = await _db.QueryAsync("select status from deck_publishes where deck_id = $1", deckId);
-    Assert.Single(rows);
-    Assert.Equal("FAILED", Convert.ToString(rows[0]["status"], CultureInfo.InvariantCulture));
+    var row = Assert.Single(await _db.QueryAsync("select job_id, status from deck_publishes where deck_id = $1", deckId));
+    Assert.Equal("PENDING", row["status"]);
+    var jobId = AssertDispatchUnconfirmed(response);
+    Assert.Equal(jobId, row["job_id"]);
+    if (acceptedResponseLost) Assert.Equal(acceptedJobId, jobId);
+  }
+
+  [Theory]
+  [InlineData("PROCESSING")]
+  [InlineData("SUCCESS")]
+  public async Task SendResponseLost_AfterWorkerAdvances_PreservesWorkerStatus(string status)
+  {
+    var deckId = await SeedFreeDeckWithCardAsync("advanced");
+    string? sentJobId = null;
+    Publish.TestEnqueueSeam = new(SeamQueueUrl, SeamBucket, async request =>
+    {
+      using var message = JsonDocument.Parse(request.MessageBody);
+      sentJobId = message.RootElement.GetProperty("jobId").GetString();
+      await using var conn = await _db.OpenAsync();
+      await DbUtil.ExecuteAsync(conn, null,
+        "update deck_publishes set status = $2, updated_at = now() where job_id = $1", [sentJobId, status]);
+      throw new TimeoutException("worker received message, but send response was lost");
+    });
+    APIGatewayProxyResponse response;
+    try
+    {
+      response = await PublishAsync(deckId);
+    }
+    finally
+    {
+      Publish.TestEnqueueSeam = null;
+    }
+
+    var row = Assert.Single(await _db.QueryAsync("select job_id, status from deck_publishes where deck_id = $1", deckId));
+    Assert.Equal(sentJobId, row["job_id"]);
+    Assert.Equal(status, row["status"]);
+    Assert.Equal(sentJobId, AssertDispatchUnconfirmed(response));
+  }
+
+  [Fact]
+  public async Task RetryUnconfirmedPending_RedeliversSameJob_WithOriginalMetadata()
+  {
+    var deckId = await SeedFreeDeckWithCardAsync("retry");
+    var actor = NewSub();
+    var sent = new List<string>();
+    Publish.TestEnqueueSeam = new(SeamQueueUrl, SeamBucket, request =>
+    {
+      sent.Add(request.MessageBody);
+      if (sent.Count == 1) throw new TimeoutException("response lost");
+      return Task.CompletedTask;
+    });
+    try
+    {
+      var jobId = AssertDispatchUnconfirmed(await PublishAsync(deckId, actor, "original note"));
+      var retry = await PublishAsync(deckId, NewSub(), "retry note");
+      Assert.Equal(200, retry.StatusCode);
+      Assert.Equal(jobId, DataJobId(retry));
+      Assert.Equal(2, sent.Count);
+      Assert.Equal(sent[0], sent[1]);
+      using var message = JsonDocument.Parse(sent[1]);
+      Assert.Equal(actor, message.RootElement.GetProperty("adminSub").GetString());
+      Assert.Equal("original note", message.RootElement.GetProperty("note").GetString());
+      var row = Assert.Single(await _db.QueryAsync("select job_id, status from deck_publishes where deck_id = $1", deckId));
+      Assert.Equal(jobId, row["job_id"]);
+      Assert.Equal("PENDING", row["status"]);
+    }
+    finally
+    {
+      Publish.TestEnqueueSeam = null;
+    }
   }
 
   // ---- concurrency invariant ------------------------------------------------------------------
@@ -198,7 +287,7 @@ public class PublishEnqueueResilienceTests
   // ---- resume within window -------------------------------------------------------------------
 
   [Fact]
-  public async Task RepeatPublish_WithinWindow_ResumesExistingJob()
+  public async Task RepeatPublish_WithinWindow_RedeliversPendingJob()
   {
     var deckId = await SeedFreeDeckWithCardAsync("resume");
 
@@ -220,8 +309,31 @@ public class PublishEnqueueResilienceTests
       Publish.TestEnqueueSeam = null;
     }
 
-    // The resume path short-circuits before the send, so it fired exactly once.
-    Assert.Equal(1, calls);
+    // A PENDING retry redelivers the same job; duplicate delivery is fenced by worker acquisition.
+    Assert.Equal(2, calls);
+  }
+
+  [Fact]
+  public async Task RepeatProcessingPublish_ResumesWithoutRedelivery()
+  {
+    var deckId = await SeedFreeDeckWithCardAsync("processing");
+    var calls = 0;
+    Publish.TestEnqueueSeam = new(SeamQueueUrl, SeamBucket, _ => { calls++; return Task.CompletedTask; });
+    try
+    {
+      var jobId = DataJobId(await PublishAsync(deckId));
+      await using var conn = await _db.OpenAsync();
+      await DbUtil.ExecuteAsync(conn, null, "update deck_publishes set status = 'PROCESSING' where job_id = $1", [jobId]);
+      var retry = await PublishAsync(deckId);
+      Assert.Equal(200, retry.StatusCode);
+      Assert.Equal(jobId, DataJobId(retry));
+      Assert.Equal(1, calls);
+      Assert.Equal("PROCESSING", await _db.ScalarAsync("select status from deck_publishes where job_id = $1", jobId));
+    }
+    finally
+    {
+      Publish.TestEnqueueSeam = null;
+    }
   }
 
   // ---- message payload ------------------------------------------------------------------------

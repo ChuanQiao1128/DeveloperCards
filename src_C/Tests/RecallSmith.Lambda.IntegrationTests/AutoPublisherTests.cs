@@ -551,6 +551,55 @@ public class AutoPublisherTests
     Assert.Equal("automation", message.RootElement.GetProperty("adminSub").GetString());
   }
 
+  [Theory]
+  [InlineData("PENDING")]
+  [InlineData("PROCESSING")]
+  [InlineData("SUCCESS")]
+  public async Task Evaluate_Live_DispatchUnconfirmed_PreservesPublishingIdentityAndReconciliation(string workerStatus)
+  {
+    await using var scope = await LiveAsync();
+    var sub = AutomationTestKit.Sub("unconfirmed");
+    var deck = await A04Kit.PublishedDeckAsync(_sql, "unconfirmed");
+    var runId = await A04Kit.RunAsync(_sql, sub, deck.Id);
+    var card = await A04Kit.AutoAcceptedCardAsync(_db, sub, deck.Id, runId,
+      "Which synthetic relay retains a committed publish after its response is lost?");
+    await _sql.QueryAsync("update automation_runs set status = 'completed', completed_at = now() where run_id = $1", runId);
+    string? sentJobId = null;
+    Publish.TestEnqueueSeam = new(A04Kit.FakePublishQueueUrl, A04Kit.FakeContentBucket, async request =>
+    {
+      scope.PublishSent.Add(request);
+      using var message = JsonDocument.Parse(request.MessageBody);
+      sentJobId = message.RootElement.GetProperty("jobId").GetString();
+      await _sql.QueryAsync("update deck_publishes set status = $2, updated_at = now() where job_id = $1", sentJobId, workerStatus);
+      throw new TimeoutException("publish accepted, but send response was lost");
+    });
+
+    var outcome = await EvaluateAsync(deck.Id, runId);
+
+    AssertOutcome(outcome, "publishing", null);
+    var row = await A04Kit.PublishRowAsync(_sql, outcome!.PublishId);
+    Assert.Equal(sentJobId, row["job_id"]);
+    Assert.Null(row["finished_at"]);
+    Assert.Equal(new[] { card.CardId }, (long[])row["card_ids"]!);
+    var job = Assert.Single(await _sql.QueryAsync(
+      "select status, build_id, qa_snapshot_sha256 from deck_publishes where job_id = $1", sentJobId));
+    Assert.Equal(workerStatus, job["status"]);
+    Assert.Equal(job["build_id"], row["build_id"]);
+    Assert.NotNull(row["snapshot_sha256"]);
+    Assert.Equal(job["qa_snapshot_sha256"], row["snapshot_sha256"]);
+    Assert.Single(scope.PublishSent);
+    Assert.Empty(A04Kit.Messages(scope, deck.Slug));
+    Assert.Equal(0, await _sql.CountAsync("select count(*) from automation_events where dedupe_key = $1",
+      $"auto-publish-human:{outcome.PublishId}"));
+
+    await using (var conn = await _db.OpenAsync())
+      await AutoPublisher.ReconcileAsync(conn, int.MaxValue);
+    var reconciled = await A04Kit.PublishRowAsync(_sql, outcome.PublishId);
+    Assert.Equal(workerStatus == "SUCCESS" ? "published" : "publishing", reconciled["state"]);
+    Assert.Equal(sentJobId, reconciled["job_id"]);
+    Assert.Equal(2, await _sql.CountAsync("select count(*) from deck_publishes where deck_id = $1", deck.Id));
+  }
+
   [Fact]
   public async Task Evaluate_Live_NothingPending_IsPublishedWithoutJob()
   {

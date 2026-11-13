@@ -94,7 +94,8 @@ public class PublishExtractionTests
     var job = (await _sql.QueryAsync("select published_by_admin_sub, note, qa_snapshot_sha256 from deck_publishes where job_id = $1", jobId)).Single();
     Assert.Equal((sub, "console note"), ((string)job["published_by_admin_sub"]!, (string)job["note"]!));
     Assert.Null(job["qa_snapshot_sha256"]);
-    using (var message = JsonDocument.Parse(Assert.Single(scope.PublishSent).MessageBody))
+    Assert.Equal(2, scope.PublishSent.Count);
+    using (var message = JsonDocument.Parse(scope.PublishSent[1].MessageBody))
     {
       Assert.Equal(["jobId", "deckId", "adminSub", "note"], A04Kit.Keys(message.RootElement));
       Assert.Equal(sub, message.RootElement.GetProperty("adminSub").GetString());
