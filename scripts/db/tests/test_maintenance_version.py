@@ -7,7 +7,7 @@ ARN='arn:aws:lambda:ap-southeast-2:000000000000:function:core-vpc'
 SHA='a'*43+'='
 SECRET='local-maintenance-not-public'
 class Commands(unittest.TestCase):
-    def run_tool(self,action='invoke',body=None,fault=None,gateway='prod',aliased=False):
+    def run_tool(self,action='invoke',body=None,fault=None,gateway='prod',aliased=False,config_mode=0o600,config_reads=None):
         calls=[];configs=[];payloads=[]
         current={'FunctionArn':ARN,'Role':'runtime-role','Handler':'runtime-handler','Environment':{'Variables':{'PGPASSWORD':'local-runtime'}},'RevisionId':'r1','CodeSha256':SHA}
         safe={'PGUSER':'developercards_migrator','PGHOST':'localhost','PGDATABASE':'test','PGSSLMODE':'verify-full','DB_ACCESS_MODE':'maintenance','AUTOMATION_MODE':'off','AI_QA_ENABLED':'0'}
@@ -22,24 +22,34 @@ class Commands(unittest.TestCase):
             if name=='list-aliases':data={'Aliases':[{'Name':'prod','FunctionVersion':'22' if aliased else '10'}]}
             if name=='get-integrations':data={'Items':[{'IntegrationUri':ARN+':'+gateway}]}
             if name=='update-function-configuration':
-                config=json.loads(pathlib.Path(command[command.index('--cli-input-json')+1][7:]).read_text());configs.append(config);current.update(config)
+                path=pathlib.Path(command[command.index('--cli-input-json')+1][7:]);self.assertEqual(0o600,path.stat().st_mode & 0o777)
+                config=json.loads(path.read_text());configs.append(config);current.update(config)
             if name=='publish-version':
                 if fault=='publish':return subprocess.CompletedProcess(command,1,'','secret-diagnostic-must-not-leak')
                 data={'Version':'22','CodeSha256':'wrong' if fault=='published' else SHA}
             if name=='invoke':
-                arg=command[command.index('--payload')+1];payloads.append(json.loads(pathlib.Path(arg[7:]).read_text()) if arg.startswith('file://') else json.loads(arg))
+                arg=command[command.index('--payload')+1];self.assertTrue(arg.startswith('file://'))
+                path=pathlib.Path(arg[7:]);self.assertEqual(0o600,path.stat().st_mode & 0o777);payloads.append(json.loads(path.read_text()))
                 result=body if body is not None else {'statusCode':200,'body':json.dumps({'success':True,'data':{'dryRun':True,'pending':[{'version':56,'name':'rollback','file':'private','destructive':False}]}})}
                 pathlib.Path(command[-3]).write_text(json.dumps(result))
             return subprocess.CompletedProcess(command,0,json.dumps(data),'')
         out=io.StringIO();error=None
         with tempfile.TemporaryDirectory() as d:
-            config=pathlib.Path(d)/'private.json';config.write_text(json.dumps({'Environment':{'Variables':dict({k:v for k,v in safe.items() if k not in ('DB_ACCESS_MODE','AUTOMATION_MODE','AI_QA_ENABLED')},PGPASSWORD=SECRET)}}));config.chmod(0o600)
+            config=pathlib.Path(d)/'private.json';config.write_text('{}');config.chmod(config_mode)
+            # Keep the synthetic owner credential in memory; only this exact input read is mocked.
+            private={'Environment':{'Variables':dict({k:v for k,v in safe.items() if k not in ('DB_ACCESS_MODE','AUTOMATION_MODE','AI_QA_ENABLED')},PGPASSWORD=SECRET)}}
+            read_text=pathlib.Path.read_text
+            def read_config(path,*args,**kwargs):
+                if path == config:
+                    if config_reads is not None:config_reads.append(path)
+                    return json.dumps(private)
+                return read_text(path,*args,**kwargs)
             args=[action,'--api-id','local','--role-arn',ROLE,'--expected-code-sha256',SHA,'--config',str(config)]
             if fault=='missing-hash':del args[5:7]
             if action!='create':args+=['--version','22']
             if body and 'blockedBy' in str(body):args+=['--operation','migrate']
             if fault!='dry':args+=['--apply']
-            with patch.object(sys,'argv',['maintenance',*args]),patch.object(module.subprocess,'run',side_effect=aws),contextlib.redirect_stdout(out):
+            with patch.object(sys,'argv',['maintenance',*args]),patch.object(module.subprocess,'run',side_effect=aws),patch.object(pathlib.Path,'read_text',read_config),contextlib.redirect_stdout(out):
                 try:module.main()
                 except (RuntimeError,SystemExit) as ex:error=str(ex)
         return calls,out.getvalue(),error,current,configs,payloads
@@ -49,7 +59,13 @@ class Commands(unittest.TestCase):
         for fault in [None,'publish']:
             calls,out,error,current,configs,_=self.run_tool('create',fault=fault)
             self.assertEqual(fault is not None,error is not None);self.assertEqual('runtime-handler',current['Handler'])
-            self.assertNotIn('PGPASSWORD',configs[0]['Environment']['Variables']);self.assertNotIn(SECRET,json.dumps(configs)+out+str(error));self.assertFalse(any(c[2]=='update-alias' for c in calls))
+            self.assertNotIn('PGPASSWORD',configs[0]['Environment']['Variables']);self.assertNotIn(SECRET,json.dumps(configs)+json.dumps(calls)+out+str(error));self.assertFalse(any(c[2]=='update-alias' for c in calls))
+    def test_private_config_permissions_are_checked_before_mocked_read(self):
+        for action in ['create','invoke']:
+            reads=[]
+            _,_,error,_,configs,payloads=self.run_tool(action,config_mode=0o644,config_reads=reads)
+            self.assertEqual('Private owner 0600 maintenance config required',error)
+            self.assertFalse(reads);self.assertFalse(configs);self.assertFalse(payloads)
     def test_hash_binding_rejects_base_latest_published_and_frozen_mismatch(self):
         for fault in ['base','latest','published','frozen']:
             calls,_,error,_,_,payloads=self.run_tool('invoke' if fault=='frozen' else 'create',fault=fault)
