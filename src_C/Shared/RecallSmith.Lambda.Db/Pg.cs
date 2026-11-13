@@ -51,9 +51,6 @@ public static class Pg
       var portRaw = Environment.GetEnvironmentVariable("PGPORT");
       var port = int.TryParse(portRaw, out var p) ? p : 5432;
 
-      var sslModeRaw = (Environment.GetEnvironmentVariable("PGSSLMODE") ?? string.Empty).Trim().ToLowerInvariant();
-      var disableSsl = sslModeRaw == "disable";
-
       var maxRaw = Environment.GetEnvironmentVariable("PG_MAX");
       var max = int.TryParse(maxRaw, out var m) ? m : 1;
 
@@ -102,7 +99,6 @@ public static class Pg
         Database = database.Trim(),
         Username = user.Trim(),
         Password = password,
-        SslMode = disableSsl ? SslMode.Disable : SslMode.Require,
 
         Pooling = true,
         MaxPoolSize = max,
@@ -115,6 +111,7 @@ public static class Pg
         Options = PgSessionTimeouts.Current.ConnectionOptions,
       };
 
+      RecallSmith.Lambda.Db.PgConnectionSecurity.Apply(csb);
       _dataSource = new NpgsqlDataSourceBuilder(csb.ConnectionString).Build();
       return _dataSource;
     }
