@@ -77,6 +77,7 @@ import {
   showTrialUpsellDialog,
   sortCards,
 } from '../features/gacha/session/reviewContentHelpers';
+import { getAuthSessionGeneration } from '../auth/sessionBoundary';
 import { buildPrerequisiteLabels } from '../features/gacha/components/prerequisiteLabels';
 import { resetSessionStore, useSessionStore } from '../features/gacha/session/sessionStore';
 import { useScrollToTopOnChange } from '../features/gacha/session/useScrollToTopOnChange';
@@ -353,7 +354,13 @@ export function SessionCardScreen({ navigation, route }: Props) {
   const cardLang = useCardLangPref();
   const deckTranslations = useDeckTranslations(deck?.Slug ?? slug, deck?.Version ?? null);
   const prerequisiteLabels = useMemo(() => buildPrerequisiteLabels(deck?.Cards ?? [], cardLang === 'zh-CN' ? 'zh-CN' : undefined), [deck, cardLang]);
-  const openPrerequisite = useCallback((uid: string) => navigation.push('CardDetail', { cardId: uid, studyContext: true }), [navigation]);
+  const prerequisiteReturn = useRef<{ generation: number; sessionId: string | null; context: string } | null>(null);
+  const studyContext = JSON.stringify([slug, mode, previewLimit, focusKey, routeLimit, isPremiumUser]);
+  const openPrerequisite = useCallback((uid: string) => {
+    if (commitBusyRef.current) return;
+    prerequisiteReturn.current = { generation: getAuthSessionGeneration(), sessionId: useSessionStore.getState().sessionId, context: studyContext };
+    navigation.push('CardDetail', { cardId: uid, studyContext: true });
+  }, [navigation, studyContext]);
   const currentTranslation =
     current && deck ? cardTranslationFor(translationsForCard(deckTranslations, current.card.StableUid), deck.Locale) : null;
   const display = useMemo(
@@ -470,6 +477,10 @@ export function SessionCardScreen({ navigation, route }: Props) {
   }
   useFocusEffect(
     useCallback(() => {
+      const returning = prerequisiteReturn.current;
+      prerequisiteReturn.current = null;
+      if (returning && returning.generation === getAuthSessionGeneration() &&
+        returning.context === studyContext && returning.sessionId === useSessionStore.getState().sessionId) return;
       if (!slug) {
         setLoading(false);
         setLoadError('No deck available. Please install a deck from Settings.');
@@ -817,7 +828,7 @@ export function SessionCardScreen({ navigation, route }: Props) {
       // that flashed continuously. sessionLimit is derived state we
       // SET inside this effect, so it must not gate the effect itself.
       // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isPremiumUser, mode, navigation, previewLimit, slug, reloadToken, focusKey]),
+    }, [isPremiumUser, mode, navigation, previewLimit, slug, reloadToken, focusKey, studyContext]),
   );
   const now = new Date();
   const dueTodayCount = countDueToday(progress, now, ownedSet);

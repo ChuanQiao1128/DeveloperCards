@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
+import { getAuthSessionGeneration, subscribeAuthIdentitySnapshot } from '../auth/sessionBoundary';
 import type { RootStackParamList } from '../navigation/types';
 import type { DeckExport } from '../types/deckExport';
 import { splitQuestionCode } from '../content/questionCode';
@@ -131,15 +132,20 @@ export function MistakeBookScreen({ navigation, route }: Props) {
   // Load at mount and again on every focus: a focus run that clears mistakes returns here.
   useEffect(() => {
     let cancelled = false;
+    let focused = true;
+    let request = 0;
     const load = async () => {
+      const id = ++request;
+      const generation = getAuthSessionGeneration();
+      const stale = () => cancelled || !focused || id !== request || generation !== getAuthSessionGeneration();
       let next: DeckGroup[];
       try {
         next = await loadGroups(slug);
       } catch {
-        if (!cancelled) setLoadFailed(true);
+        if (!stale()) setLoadFailed(true);
         return;
       }
-      if (cancelled) return;
+      if (stale()) return;
       setLoadFailed(false);
       setNow(Date.now());
       setDoneToday(new Set());
@@ -147,11 +153,22 @@ export function MistakeBookScreen({ navigation, route }: Props) {
     };
     void load();
     const unsubscribe = navigation.addListener?.('focus', () => {
+      focused = true;
       void load();
+    });
+    const blur = navigation.addListener?.('blur', () => { focused = false; request += 1; });
+    const identity = subscribeAuthIdentitySnapshot(() => {
+      request += 1;
+      setGroups(null);
+      setLoadFailed(false);
+      if (focused) void load();
     });
     return () => {
       cancelled = true;
+      request += 1;
+      identity();
       if (typeof unsubscribe === 'function') unsubscribe();
+      if (typeof blur === 'function') blur();
     };
   }, [navigation, slug, reloadToken]);
 
@@ -241,7 +258,7 @@ export function MistakeBookScreen({ navigation, route }: Props) {
               <View style={styles.skeletonRow} />
               <View style={styles.skeletonRow} />
             </View>
-          ) : groups === null ? null : groups.length === 0 ? (
+          ) : groups === null || (loadFailed && groups.length === 0) ? null : groups.length === 0 ? (
             <View testID="mistake-book-empty" style={styles.emptyCard}>
               <Text style={styles.emptyTitle}>No mistakes to review</Text>
               <Text style={styles.emptyBody}>

@@ -72,9 +72,14 @@ vi.mock('expo-linear-gradient', () => {
   };
 });
 
+const focusEffects = vi.hoisted(() => ({ entries: new Map<() => any, any>() }));
 vi.mock('@react-navigation/native', () => ({
   useFocusEffect: (callback: any) => {
-    React.useEffect(() => callback(), [callback]);
+    React.useEffect(() => {
+      const cleanup = callback();
+      focusEffects.entries.set(callback, cleanup);
+      return () => { focusEffects.entries.delete(callback); cleanup?.(); };
+    }, [callback]);
   },
 }));
 
@@ -350,7 +355,7 @@ function serve(cards: any[], progress: any[], limit: number, nodes?: RouteNode[]
 }
 
 async function mount(mode = 'mixed') {
-  const navigation = { navigate: vi.fn(), goBack: vi.fn(), replace: vi.fn() } as any;
+  const navigation = { navigate: vi.fn(), goBack: vi.fn(), replace: vi.fn(), push: vi.fn() } as any;
   let tree!: renderer.ReactTestRenderer;
   await act(async () => {
     tree = renderer.create(
@@ -401,6 +406,7 @@ describe('SessionCardScreen learning step (R22 §6: teach before testing; 2026-1
     // A new learner on the two-button default, stored so the first read does not probe.
     store.set(STUDY_PREFS_KEY, JSON.stringify({ fourButtons: false }));
     resetSessionStore();
+    focusEffects.entries.clear();
     featureFlagsMock.mockReturnValue(flags());
     (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
     vi.useFakeTimers({ toFake: ['Date'] });
@@ -616,6 +622,29 @@ describe('SessionCardScreen learning step (R22 §6: teach before testing; 2026-1
     await press(tree, 'Show answer');
     expect(texts(tree)).toContain('A buffer between producer and consumer.');
     expect(byTestID(tree, 'session-card-report')).toHaveLength(0);
+  });
+
+  it('keeps the current card, revealed answer and completed count after a prerequisite round trip', async () => {
+    const next = { ...NEW_B, Teaching: { schema: 'teaching-v1', answer: 'Use the topic.', keyPoint: 'Fan-out delivers copies.',
+      mustAnswer: ['Use the topic'], prerequisites: ['new-a'] } };
+    serve([NEW_A, next], [fresh('new-a'), fresh('new-b')], 2);
+    const { tree, navigation } = await mount('learn-new');
+    await study(tree);
+    await press(tree, 'Show answer');
+    const originalSession = useSessionStore.getState().sessionId;
+    expect(useSessionStore.getState().completedCount).toBe(1);
+    await act(async () => byTestID(tree, 'prereq-chip-new-a')[0].props.onPress());
+    expect(navigation.push).toHaveBeenCalledWith('CardDetail', { cardId: 'new-a', studyContext: true });
+    const effects = [...focusEffects.entries.entries()];
+    await act(async () => { for (const [, cleanup] of effects) cleanup?.(); });
+    vi.setSystemTime(FIXED_NOW_MS + 60000);
+    await act(async () => { for (const [callback] of effects) focusEffects.entries.set(callback, callback()); });
+    await flush();
+    expect(useSessionStore.getState().sessionId).toBe(originalSession);
+    expect(useSessionStore.getState().completedCount).toBe(1);
+    expect(questionShown(tree)).toBe(NEW_B.Question);
+    expect(byTestID(tree, 'learning-study-got-it')).toHaveLength(1);
+    expect(subtitle(tree)).toBe('Card 2 of 2');
   });
 
   it('Got it commits hard, due in one day, as learning_study: reward, streak, saved progress, no mistake', async () => {

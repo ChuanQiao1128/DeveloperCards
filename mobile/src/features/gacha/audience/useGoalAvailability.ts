@@ -23,7 +23,8 @@ export function useGoalAvailability(active = true) {
       try {
         const { listVisibleManifestDecks } = await import('../../../content/visibleManifest');
         const entries = await listVisibleManifestDecks();
-        if (!cancelled) setManifest(entries);
+        // The repository also returns [] when both the network and cache are unavailable.
+        if (!cancelled && entries.length > 0) setManifest(entries);
       } catch {
         // The bundled release remains selectable when the first-run availability check is offline.
       }

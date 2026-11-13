@@ -56,6 +56,7 @@ vi.mock('../../src/features/gacha/draw/effectiveOwned', () => ({
 }));
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { invalidateAuthSession, setAuthIdentitySnapshot } from '../../src/auth/sessionBoundary';
 import {
   DONE_FOR_TODAY_TEXT,
   formatLastWrong,
@@ -158,6 +159,7 @@ function texts(node: renderer.ReactTestInstance): string[] {
     });
 }
 
+const mountedTrees: renderer.ReactTestRenderer[] = [];
 async function mount(params?: { slug?: string }) {
   const navigation = { navigate: vi.fn(), goBack: vi.fn(), addListener: vi.fn(() => () => {}) } as any;
   let tree!: renderer.ReactTestRenderer;
@@ -167,6 +169,7 @@ async function mount(params?: { slug?: string }) {
     );
   });
   await flush();
+  mountedTrees.push(tree);
   return { tree, navigation };
 }
 
@@ -182,7 +185,9 @@ describe('MistakeBookScreen', () => {
       slug === 'aws' ? AWS : slug === 'csharp' ? CSHARP : null) as any);
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    await act(async () => { for (const tree of mountedTrees.splice(0)) tree.unmount(); });
+    setAuthIdentitySnapshot({ status: 'anonymous', email: null });
     vi.useRealTimers();
     applyRemoteFeatures(null);
   });
@@ -204,6 +209,53 @@ describe('MistakeBookScreen', () => {
     expect(byTestID(tree, 'mistake-book-error')).toHaveLength(1);
     expect(byTestID(tree, 'mistake-book-empty')).toHaveLength(0);
     expect(store.get(BOOK_KEY)).toBe('not json');
+  });
+
+  it('replaces a previously empty display with an error when the next read fails', async () => {
+    const { tree, navigation } = await mount();
+    expect(byTestID(tree, 'mistake-book-empty')).toHaveLength(1);
+    seedBook([entry('aws', 's3-1', 's3', NOW - 1000)]);
+    vi.mocked(getCachedDeck).mockRejectedValueOnce(new Error('read failed'));
+    const focus = navigation.addListener.mock.calls.find((call: any[]) => call[0] === 'focus')[1];
+    await act(async () => focus());
+    await flush();
+    expect(byTestID(tree, 'mistake-book-error')).toHaveLength(1);
+    expect(byTestID(tree, 'mistake-book-empty')).toHaveLength(0);
+  });
+
+  it('does not let an older focus read replace the newest mistakes', async () => {
+    const { tree, navigation } = await mount();
+    let finish!: (deck: DeckExport) => void;
+    vi.mocked(getCachedDeck).mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
+    seedBook([entry('aws', 's3-1', 's3', NOW - 1000)]);
+    const focus = navigation.addListener.mock.calls.find((call: any[]) => call[0] === 'focus')[1];
+    await act(async () => focus());
+    await flush();
+    seedBook([entry('aws', 'iam-1', 'iam', NOW - 500)]);
+    await act(async () => focus());
+    await flush();
+    expect(byTestID(tree, 'mistake-row-iam-1')).toHaveLength(1);
+    await act(async () => finish(AWS));
+    await flush();
+    expect(byTestID(tree, 'mistake-row-iam-1')).toHaveLength(1);
+    expect(byTestID(tree, 'mistake-row-s3-1')).toHaveLength(0);
+  });
+
+  it('drops an old account read when the identity changes', async () => {
+    let finish!: (deck: DeckExport) => void;
+    vi.mocked(getCachedDeck).mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
+    seedBook([entry('aws', 's3-1', 's3', NOW - 1000)]);
+    const { tree } = await mount();
+    store.clear();
+    await act(async () => {
+      invalidateAuthSession();
+      setAuthIdentitySnapshot({ status: 'signed_in', email: 'qa@example.test' });
+    });
+    await flush();
+    await act(async () => finish(AWS));
+    await flush();
+    expect(byTestID(tree, 'mistake-row-s3-1')).toHaveLength(0);
+    expect(byTestID(tree, 'mistake-book-empty')).toHaveLength(1);
   });
 
   it('lists active mistakes for each deck with question, topic and wrong count', async () => {
