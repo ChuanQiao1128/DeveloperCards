@@ -126,6 +126,7 @@ vi.mock('../../src/content/activeDeck', () => ({
 }));
 
 vi.mock('../../src/review/storage', () => ({
+  getUserScopedKey: vi.fn(async (key: string, sub = 'anon') => `test:${sub}:${key}`),
   captureProgressUserSub: vi.fn(async () => 'anon'),
   updateDeckProgress: vi.fn(async (deck: any, update: any, sub?: string) => {
     const storage = await import('../../src/review/storage');

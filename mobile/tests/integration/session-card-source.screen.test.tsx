@@ -409,11 +409,16 @@ describe('SessionCardScreen source line (U3)', () => {
     expect(byTestID(tree, 'session-card-source')).toHaveLength(0);
     act(() => tree.unmount());
 
+    // These are separate source-read scenarios, each beginning with a closed answer.
+    await (await import('../../src/features/gacha/session/sessionCheckpoint')).clearSessionCheckpoint('anon', 'aws-saa-c03');
+
     vi.mocked(getCardSource).mockRejectedValue(new Error('no file'));
     ({ tree } = await mount('review-due'));
     await pressLabel(tree, 'Reveal answer');
     expect(byTestID(tree, 'session-card-source')).toHaveLength(0);
     act(() => tree.unmount());
+
+    await (await import('../../src/features/gacha/session/sessionCheckpoint')).clearSessionCheckpoint('anon', 'aws-saa-c03');
 
     vi.mocked(getCardSource).mockClear();
     featureFlagsMock.mockReturnValue(flags({ cardSource: false }));

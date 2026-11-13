@@ -373,6 +373,9 @@ export function SessionCardScreen({ navigation, route }: Props) {
       currentUid: current.card.StableUid, showAnswer, limit: sessionLimit, minimumGoal: plannedMinimumGoal ?? 1,
       focusRatedUids: [...focusRatedUidsRef.current], attempts: [...attemptIndexRef.current],
       mcqRun: { ...mcqRunRef.current }, picks: { ...picksRef.current }, loadForecast,
+      mcq: mcqState.mcq ? { stage: mcqState.stage, picks: mcqState.picks, firstPicks: mcqState.firstPicks,
+        changedPick: mcqState.changedPick, confidence: mcqState.confidence, verdict: mcqState.verdict,
+        mappedRating: mcqState.mappedRating, scheduleLine: mcqState.scheduleLine, attemptIndex: mcqState.attemptIndex } : null,
       session: { sessionId: state.sessionId, slug: state.slug, route: state.route, currentIndex: state.currentIndex,
         completedCount: state.completedCount, streakEarned: state.streakEarned,
         sessionRatings: state.sessionRatings, startedAt: state.startedAt, rewardOutcome: state.rewardOutcome },
@@ -383,7 +386,7 @@ export function SessionCardScreen({ navigation, route }: Props) {
     });
     return () => { cancelled = true; };
   }, [loading, reviewing, deck, current, progress, ownedSet, showAnswer, sessionDone, sessionLimit,
-    plannedMinimumGoal, studyContext, loadForecast, checkpointRetry]);
+    plannedMinimumGoal, studyContext, loadForecast, checkpointRetry, mcqState]);
   const openPrerequisite = useCallback((uid: string) => {
     if (commitBusyRef.current) return;
     prerequisiteReturn.current = { generation: getAuthSessionGeneration(), sessionId: useSessionStore.getState().sessionId, context: studyContext };
@@ -806,8 +809,17 @@ export function SessionCardScreen({ navigation, route }: Props) {
               mcqRunRef.current = checkpoint.mcqRun;
               picksRef.current = checkpoint.picks;
               setLoadForecast(checkpoint.loadForecast);
-              // Unsubmitted MCQ picks restart on the question; no verdict or rating is replayed.
-              if (resolveMcq(savedCard, getFeatureFlags()) === null) setShowAnswer(checkpoint.showAnswer);
+              const mcq = resolveMcq(savedCard, getFeatureFlags());
+              const saved = checkpoint.mcq;
+              if (mcq && saved && saved.picks.every(key => mcq.options.some(option => option.key === key)) &&
+                (saved.firstPicks === null || saved.firstPicks.every(key => mcq.options.some(option => option.key === key))) &&
+                saved.picks.length <= mcqRequiredCount(mcq) &&
+                (saved.stage !== 'verdict' || resolveMcqVerdict(saved.picks, mcq) === saved.verdict)) {
+                const { stage, picks, firstPicks, changedPick, confidence, verdict, mappedRating, scheduleLine, attemptIndex } = saved;
+                setMcqState(prev => ({ ...prev, stage, picks, firstPicks, changedPick, confidence, verdict,
+                  mappedRating, scheduleLine, attemptIndex }));
+                setShowAnswer(stage === 'verdict');
+              } else if (!mcq) setShowAnswer(checkpoint.showAnswer);
               setLoading(false);
               return;
             }

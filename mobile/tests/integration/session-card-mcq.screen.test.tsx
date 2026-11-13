@@ -126,6 +126,7 @@ vi.mock('../../src/content/activeDeck', () => ({
 }));
 
 vi.mock('../../src/review/storage', () => ({
+  getUserScopedKey: vi.fn(async (key: string, sub = 'anon') => `test:${sub}:${key}`),
   captureProgressUserSub: vi.fn(async () => 'anon'),
   updateDeckProgress: vi.fn(async (deck: any, update: any, sub?: string) => {
     const storage = await import('../../src/review/storage');
@@ -505,6 +506,34 @@ describe('SessionCardScreen MCQ branch', () => {
     expect(byTestID(tree, 'screen-session-card-primary-surface')).toHaveLength(1);
     expect(byTestID(tree, 'screen-session-card-root')).toHaveLength(1);
     expect(tree.root.findAll((n) => (n.type as any) === 'Pressable' && n.findAll((c) => (c.type as any) === 'Text' && c.props.children === 'Reveal answer').length > 0)).toHaveLength(0);
+  });
+
+  it.each(['options', 'verdict'])('restores MCQ %s without replaying the rating or reward', async stage => {
+    serve(CARD_1, DUE_PROGRESS(CARD_1.StableUid));
+    const first = await mount();
+    await press(first.tree, 'mcq-show-options');
+    await press(first.tree, 'mcq-option-b');
+    const order = renderedOrder(first.tree);
+    if (stage === 'verdict') await press(first.tree, 'mcq-submit-sure');
+    await flush();
+    expect(byTestID(first.tree, 'session-position-error')).toHaveLength(0);
+    const savedPosition = [...store].find(([key]) => key.includes('session-checkpoint:v1:'));
+    expect(savedPosition).toBeDefined();
+    await act(async () => first.tree.unmount());
+    const second = await mount();
+    expect(byTestID(second.tree, 'mcq-show-options')).toHaveLength(0);
+    if (stage === 'options') expect(renderedOrder(second.tree)).toEqual(order);
+    expect(recordReviewEvent).not.toHaveBeenCalled();
+    expect(settleRatingReward).not.toHaveBeenCalled();
+    if (stage === 'options') {
+      expect(byTestID(second.tree, 'mcq-submit-sure')[0].props.disabled).toBe(false);
+      await press(second.tree, 'mcq-submit-sure');
+    }
+    expect(byTestID(second.tree, 'mcq-next')).toHaveLength(1);
+    await press(second.tree, 'mcq-next');
+    expect(recordReviewEvent).toHaveBeenCalledTimes(1);
+    expect(settleRatingReward).toHaveBeenCalledTimes(1);
+    await act(async () => second.tree.unmount());
   });
 
   it('answers a single-choice card correctly and rates it good on first review', async () => {

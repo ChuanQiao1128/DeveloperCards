@@ -18,7 +18,7 @@ const expected = { deckVersion: 'r2', context: 'mixed', progressStamp: 'progress
 const value = (): SessionCheckpoint => ({
   v: 1, dateKey: checkpointDate(), ...expected, currentUid: 'next', showAnswer: true, limit: 2, minimumGoal: 1,
   focusRatedUids: [], attempts: [['next', 1]], mcqRun: { served: 0, lastNewKind: 'qa' },
-  picks: { landed: 0, answered: 0 }, loadForecast: null,
+  picks: { landed: 0, answered: 0 }, loadForecast: null, mcq: null,
   session: { sessionId: 'session', slug: 'aws', currentIndex: 1, completedCount: 1,
     startedAt: Date.now(), streakEarned: true, sessionRatings: [{ stableUid: 'previous', rating: 'hard' }],
     route: [1, 2].map(i => ({ id: String(i), role: 'normal', title: 'Study', subtitle: '' })),
