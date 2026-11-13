@@ -30,6 +30,11 @@ describe('spotlightPlan', () => {
     expect(proMax.width).toBeGreaterThanOrEqual(0.8 * 430);
   });
 
+  it('reserves space for the banner and controls in a shorter reveal container', () => {
+    const size = spotlightCardSize({ width: 402, height: 644 }, 270);
+    expect(size.height + 270).toBeLessThanOrEqual(645);
+  });
+
   it('scales the face fonts with the card width', () => {
     expect(revealFaceMetrics(260).questionFontSize).toBe(12);
     const spotlight = spotlightCardSize({ width: 393, height: 852 });
@@ -47,15 +52,15 @@ describe('spotlightPlan', () => {
     expect(resultFeaturedCardWidth(600)).toBe(380); // capped at 380
   });
 
-  it('plans the flip per rarity with a LEG shake and edge-on pause', () => {
+  it('plans the flip per rarity with a still LEG edge-on pause', () => {
     const com = spotlightFlipPlan('COM', false);
     const rar = spotlightFlipPlan('RAR', false);
     const leg = spotlightFlipPlan('LEG', false);
 
-    expect(com).toMatchObject({ entranceMs: 420, shakeMs: 0, flipStartMs: 0, flipMs: 350, midpointMs: 175, landMs: 350 });
-    expect(rar).toMatchObject({ entranceMs: 420, shakeMs: 0, flipStartMs: 0, flipMs: 450, midpointMs: 225, landMs: 450 });
-    expect(leg).toMatchObject({ entranceMs: 420, shakeMs: 300, flipStartMs: 300, flipMs: 500, edgePauseMs: 150, midpointMs: 700, landMs: 950 });
-    expect(SPOTLIGHT_ENTRANCE_MS).toBe(420);
+    expect(com).toMatchObject({ entranceMs: 260, shakeMs: 0, flipStartMs: 0, flipMs: 260, midpointMs: 130, landMs: 260 });
+    expect(rar).toMatchObject({ entranceMs: 260, shakeMs: 0, flipStartMs: 0, flipMs: 360, midpointMs: 180, landMs: 360 });
+    expect(leg).toMatchObject({ entranceMs: 260, shakeMs: 0, flipStartMs: 0, flipMs: 480, edgePauseMs: 90, midpointMs: 330, landMs: 570 });
+    expect(SPOTLIGHT_ENTRANCE_MS).toBe(260);
   });
 
   it('reduce motion plans a crossfade with no shake or pause', () => {
@@ -71,23 +76,24 @@ describe('spotlightPlan', () => {
     const leg = spotlightFlipCues('LEG', legPlan);
     // sorted ascending by `at`
     expect(leg.map((c) => c.at)).toEqual([...leg.map((c) => c.at)].sort((a, b) => a - b));
-    expect(leg[0]).toEqual({ at: 0, action: { kind: 'impact', style: 'soft' } });
+    expect(leg[0]).toEqual({ at: 0, action: { kind: 'hit', name: 'flip' } });
     expect(leg.find((c) => c.action.kind === 'hit' && c.action.name === 'flip')?.at).toBe(legPlan.flipStartMs);
     expect(leg.find((c) => c.action.kind === 'hit' && c.action.name === 'stinger-leg')?.at).toBe(legPlan.midpointMs);
     // At landing LEG fires the heavy impact BEFORE the success (limiter order).
     const landCues = leg.filter((c) => c.at === legPlan.landMs);
-    expect(landCues.map((c) => c.action.kind)).toEqual(['impact', 'success']);
+    expect(landCues).toEqual([]);
+    expect(leg.filter((c) => c.action.kind === 'impact')).toEqual([{ at: legPlan.midpointMs, action: { kind: 'impact', style: 'medium' } }]);
 
     const rarPlan = spotlightFlipPlan('RAR', false);
     const rar = spotlightFlipCues('RAR', rarPlan);
     expect(rar.find((c) => c.action.kind === 'hit' && c.action.name === 'stinger-rar')?.at).toBe(rarPlan.midpointMs);
-    expect(rar.find((c) => c.action.kind === 'success')?.at).toBe(rarPlan.landMs);
+    expect(rar.filter((c) => c.action.kind === 'impact')).toHaveLength(1);
 
     // COM now gets its own stinger at the midpoint (I06), but no success.
     const comPlan = spotlightFlipPlan('COM', false);
     const com = spotlightFlipCues('COM', comPlan);
     expect(com.find((c) => c.action.kind === 'hit' && c.action.name === 'flip')?.at).toBe(comPlan.flipStartMs);
-    expect(com.find((c) => c.action.kind === 'hit' && c.action.name === 'stinger-com')?.at).toBe(comPlan.midpointMs);
+    expect(com).toEqual([{ at: 0, action: { kind: 'hit', name: 'flip' } }]);
     expect(com.some((c) => c.action.kind === 'success')).toBe(false);
   });
 

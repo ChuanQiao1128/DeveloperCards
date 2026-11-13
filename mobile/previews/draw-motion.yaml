@@ -1,0 +1,45 @@
+appId: com.timeawake.recallsmith.motionpreview
+---
+- launchApp
+- assertVisible:
+    id: "draw-ceremony-swipe-pack"
+- startRecording: legendary-opening
+- swipe:
+    start: "38%,59%"
+    end: "76%,59%"
+    duration: 600
+- assertVisible: "Legendary"
+- waitForAnimationToEnd
+- takeScreenshot: legendary-revealed
+- stopRecording
+
+- tapOn: "COM"
+- assertVisible:
+    id: "draw-ceremony-swipe-pack"
+- startRecording: common-opening
+- swipe:
+    start: "38%,59%"
+    end: "76%,59%"
+    duration: 600
+- assertVisible:
+    id: "reveal-spotlight-read-full"
+- waitForAnimationToEnd
+- takeScreenshot: common-revealed
+- stopRecording
+- tapOn: "5 cards"
+- assertVisible:
+    id: "draw-ceremony-swipe-pack"
+- startRecording: batch-opening
+- swipe:
+    start: "38%,59%"
+    end: "76%,59%"
+    duration: 600
+- assertVisible: "Legendary"
+- waitForAnimationToEnd
+- takeScreenshot: batch-focus
+- tapOn:
+    id: "reveal-spotlight-skip-all"
+- assertVisible:
+    id: "draw-ceremony-summary-grid"
+- takeScreenshot: batch-summary
+- stopRecording

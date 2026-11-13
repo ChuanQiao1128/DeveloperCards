@@ -636,7 +636,7 @@ describe('DrawCeremonyScreen v9', () => {
       await Promise.resolve();
     });
     expect(tree.root.findByProps({ testID: 'draw-ceremony-reveal-flash' }).props.style[1].opacity).toBe(
-      0.85,
+      0,
     );
     expect(tree.root.findAllByProps({ testID: 'screen-draw-ceremony-primary-cta' })).toHaveLength(0);
 

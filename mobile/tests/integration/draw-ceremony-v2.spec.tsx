@@ -169,12 +169,12 @@ describe('DrawCeremony v2 ceremony', () => {
 
     // TEST_BASE single RAR: approach 300, hold 180, tearFlip 360 → flash-reveal at 840.
     advance(840);
-    expect(count('hit:burst')).toBe(1); // the full-screen burst at flash-reveal
-    expect(count('hit:flyout')).toBe(0);
+    expect(count('hit:burst')).toBe(0); // the full-screen burst at flash-reveal
+    expect(count('hit:flyout')).toBe(1);
 
     // The hero flies out SPOTLIGHT_FLYOUT_CUE_MS after entering.
     advance(SPOTLIGHT_FLYOUT_CUE_MS);
-    expect(count('hit:flyout')).toBe(1);
+    expect(count('hit:flyout')).toBe(2);
     expect(count('hit:flip')).toBe(0);
 
     // It flips by itself SPOTLIGHT_ENTRANCE_MS after entering.
@@ -214,7 +214,7 @@ describe('DrawCeremony v2 ceremony', () => {
     expect(count('hit:stinger-leg')).toBe(1);
   });
 
-  it('skip all plays only the highest remaining stinger', () => {
+  it('skip all respects the request for an immediate, silent summary', () => {
     const rarities: Rarity[] = ['LEG', 'RAR', 'COM'];
     const { tree } = renderScreen(rarities);
     reachTable(tree, rarities);
@@ -230,17 +230,17 @@ describe('DrawCeremony v2 ceremony', () => {
       tree.root.findByProps({ testID: 'reveal-spotlight-skip-all' }).props.onPress();
     });
     const stingers = rec.audio.filter((x) => x.startsWith('hit:stinger'));
-    expect(stingers).toEqual(['hit:stinger-leg']);
+    expect(stingers).toEqual([]);
     expect(gridPresent(tree)).toBe(true);
   });
 
-  it('dims the stage for every rarity from the charge', () => {
+  it('uses a lighter stage for Common and never flashes the screen', () => {
     // Timeline probe: every rarity dims to CHARGE_DIM from the charge (approach) through the hold,
     // and only 'swipe' is undimmed.
     for (const r of ['COM', 'RAR', 'LEG'] as const) {
       expect(timelineTargets({ phase: 'swipe', peakRarity: r, isMulti: false, reduceMotion: false }).dim).toBe(0);
-      expect(timelineTargets({ phase: 'approach', peakRarity: r, isMulti: false, reduceMotion: false }).dim).toBe(CHARGE_DIM);
-      expect(timelineTargets({ phase: 'hold', peakRarity: r, isMulti: false, reduceMotion: false }).dim).toBe(CHARGE_DIM);
+      expect(timelineTargets({ phase: 'approach', peakRarity: r, isMulti: false, reduceMotion: false }).dim).toBe(r === 'COM' ? 0.12 : r === 'RAR' ? 0.2 : 0.28);
+      expect(timelineTargets({ phase: 'hold', peakRarity: r, isMulti: false, reduceMotion: false }).dim).toBe(r === 'COM' ? 0.12 : r === 'RAR' ? 0.2 : 0.28);
     }
   });
 

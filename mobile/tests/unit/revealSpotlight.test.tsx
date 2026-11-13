@@ -82,6 +82,29 @@ describe('RevealSpotlight', () => {
     expect(tree.root.findByProps({ testID: 'reveal-spotlight-card' }).props.accessibilityLabel).toBe('Card 1 of 1, Rare revealed');
   });
 
+  it('keeps the measured card size stable when the continue footer appears', () => {
+    const { tree, props } = render();
+    act(() => tree.root.findByProps({ testID: REVEAL_SPOTLIGHT_TESTID }).props.onLayout({ nativeEvent: { layout: { width: 402, height: 644 } } }));
+    const before = tree.root.findByProps({ testID: 'reveal-spotlight-card' }).props.style[0];
+    const slotIds = ['reveal-spotlight-banner-slot', 'reveal-spotlight-read-slot', 'reveal-spotlight-footer-slot'];
+    const slotHeights = () => slotIds.map((id) => tree.root.findByProps({ testID: id }).props.style[1].height);
+    const beforeSlots = slotHeights();
+    act(() => tree.update(React.createElement(RevealSpotlight, { ...props, footer: React.createElement('Text' as any, null, 'Continue') })));
+    const after = tree.root.findByProps({ testID: 'reveal-spotlight-card' }).props.style[0];
+    expect(after).toEqual(before);
+    expect(slotHeights()).toEqual(beforeSlots);
+    expect(beforeSlots).toEqual([70, 64, 82]);
+    expect(after.height + 270).toBeLessThanOrEqual(645);
+  });
+
+  it('uses a small contact shadow instead of an opaque card behind the flip', () => {
+    const { tree } = render();
+    const cardHeight = tree.root.findByProps({ testID: 'reveal-spotlight-card' }).props.style[0].height;
+    const shadow = tree.root.findByProps({ testID: 'reveal-spotlight-contact-shadow' }).props.style[0];
+    expect(shadow.height).toBeLessThan(cardHeight / 10);
+    expect(shadow.bottom).toBeLessThan(0);
+  });
+
   it('flips by itself after the entrance when autoFlip is set', () => {
     vi.useFakeTimers();
     const onFlipStart = vi.fn();

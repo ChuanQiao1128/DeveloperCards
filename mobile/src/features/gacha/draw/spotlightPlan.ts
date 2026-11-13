@@ -12,8 +12,9 @@ import type { PeakRarity } from './ceremonyTimings';
  * The spotlight card size for a window: a 5:7 card that is at most 86 % of the width, at
  * most 62 % of the height, and never wider than 440 pt (so it does not balloon on a tablet).
  */
-export function spotlightCardSize(win: { width: number; height: number }): { width: number; height: number } {
-  const width = Math.floor(Math.min(0.86 * win.width, (0.62 * win.height) / 1.4, 440));
+export function spotlightCardSize(win: { width: number; height: number }, reservedHeight = 0): { width: number; height: number } {
+  const available = Math.max(140, win.height - reservedHeight);
+  const width = Math.floor(Math.min(0.86 * win.width, (0.62 * win.height) / 1.4, available / 1.4, 440));
   const height = Math.round(width * 1.4);
   return { width, height };
 }
@@ -38,13 +39,13 @@ export function resultFeaturedCardWidth(windowWidth: number): number {
   return Math.round(Math.min(Math.max(windowWidth * 0.78, 260), 380));
 }
 
-export const SPOTLIGHT_ENTRANCE_MS = 420;
-export const SPOTLIGHT_FLIP_MS = Object.freeze({ COM: 350, RAR: 450, LEG: 500 });
-export const SPOTLIGHT_LEG_SHAKE_MS = 300;
-export const SPOTLIGHT_LEG_EDGE_PAUSE_MS = 150;
+export const SPOTLIGHT_ENTRANCE_MS = 260;
+export const SPOTLIGHT_FLIP_MS = Object.freeze({ COM: 260, RAR: 360, LEG: 480 });
+export const SPOTLIGHT_LEG_SHAKE_MS = 0;
+export const SPOTLIGHT_LEG_EDGE_PAUSE_MS = 90;
 export const SPOTLIGHT_RM_FADE_MS = 180;
-export const SPOTLIGHT_SCRIM = '#08041A';
-export const SPOTLIGHT_SCRIM_OPACITY = 0.85;
+export const SPOTLIGHT_SCRIM = '#17151D';
+export const SPOTLIGHT_SCRIM_OPACITY = 0.82;
 export const SPOTLIGHT_COPY = Object.freeze({
   readFull: 'Tap to read full question',
   close: 'Close',
@@ -70,13 +71,13 @@ export function spotlightFlipPlan(rarity: PeakRarity, reduceMotion: boolean): Sp
     return { entranceMs: 180, shakeMs: 0, flipStartMs: 0, flipMs: 180, edgePauseMs: 0, midpointMs: 90, landMs: 180 };
   }
   if (rarity === 'LEG') {
-    // shake 300 → first half 250 to edge-on → 150 edge-on pause → face at 700 → second half 250 → land 950.
-    return { entranceMs: 420, shakeMs: 300, flipStartMs: 300, flipMs: 500, edgePauseMs: 150, midpointMs: 700, landMs: 950 };
+    // A single gold edge pause; stillness replaces the old pre-flip shake.
+    return { entranceMs: 260, shakeMs: 0, flipStartMs: 0, flipMs: 480, edgePauseMs: 90, midpointMs: 330, landMs: 570 };
   }
   if (rarity === 'RAR') {
-    return { entranceMs: 420, shakeMs: 0, flipStartMs: 0, flipMs: 450, edgePauseMs: 0, midpointMs: 225, landMs: 450 };
+    return { entranceMs: 260, shakeMs: 0, flipStartMs: 0, flipMs: 360, edgePauseMs: 0, midpointMs: 180, landMs: 360 };
   }
-  return { entranceMs: 420, shakeMs: 0, flipStartMs: 0, flipMs: 350, edgePauseMs: 0, midpointMs: 175, landMs: 350 };
+  return { entranceMs: 260, shakeMs: 0, flipStartMs: 0, flipMs: 260, edgePauseMs: 0, midpointMs: 130, landMs: 260 };
 }
 
 /** One flip sound/haptic cue, `at` ms after the flip request. */
@@ -101,14 +102,10 @@ export function spotlightEntranceCues(reduceMotion: boolean): SpotlightCue[] {
  */
 export function spotlightFlipCues(rarity: PeakRarity, plan: SpotlightFlipPlan): SpotlightCue[] {
   const cues: SpotlightCue[] = [];
-  cues.push({ at: 0, action: { kind: 'impact', style: 'soft' } });
   cues.push({ at: plan.flipStartMs, action: { kind: 'hit', name: 'flip' } });
-  cues.push({ at: plan.midpointMs, action: { kind: 'impact', style: 'rigid' } });
-  cues.push({ at: plan.midpointMs, action: { kind: 'hit', name: stingerForRarity(rarity) } });
-  if (rarity === 'RAR') cues.push({ at: plan.landMs, action: { kind: 'success' } });
-  if (rarity === 'LEG') {
-    cues.push({ at: plan.landMs, action: { kind: 'impact', style: 'heavy' } });
-    cues.push({ at: plan.landMs, action: { kind: 'success' } });
+  if (rarity !== 'COM') {
+    cues.push({ at: plan.midpointMs, action: { kind: 'impact', style: rarity === 'LEG' ? 'medium' : 'light' } });
+    cues.push({ at: plan.midpointMs, action: { kind: 'hit', name: stingerForRarity(rarity) } });
   }
   return cues
     .map((cue, index) => ({ cue, index }))

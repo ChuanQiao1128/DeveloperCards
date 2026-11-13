@@ -13,7 +13,6 @@ import { stingerForRarity } from '../../../components/ceremonyAudio';
 import type { CeremonyHitName } from '../../../components/ceremonyAudio';
 import type { HapticImpact } from '../../../components/ceremonyHaptics';
 import type { CeremonyPhase, PeakRarity, ResolvedCeremonyTimings } from './ceremonyTimings';
-import { CHARGE_PULSE_FRACTION_OF_HOLD } from './ceremonyTimings';
 
 /** One audio/haptic side effect. v2 has only one-shot hits, haptic impacts and the LEG success. */
 export type CeremonyCueAction =
@@ -36,7 +35,7 @@ export function buildCeremonyCues(input: {
   tapFlow: boolean;
   reduceMotion?: boolean;
 }): CeremonyCue[] {
-  const { peakRarity, isMulti, timings, tapFlow, reduceMotion = false } = input;
+  const { peakRarity, timings, tapFlow, reduceMotion = false } = input;
   const cues: CeremonyCue[] = [];
 
   // Reduce Motion is a parallel ceremony (§3.4): no charge / tear / burst. On the tap flow the
@@ -48,34 +47,13 @@ export function buildCeremonyCues(input: {
     return cues;
   }
 
-  // approach: the charge fires once (its three plucks land on the three pulse haptics) and the
-  // first, lightest pulse.
-  cues.push({ phase: 'approach', offsetMs: 0, action: { kind: 'hit', name: 'charge' } });
-  cues.push({ phase: 'approach', offsetMs: 0, action: { kind: 'impact', style: 'light' } });
-
-  // hold: the second (medium) pulse at the start, the third (heavy) at mid-hold — nothing else.
-  cues.push({ phase: 'hold', offsetMs: 0, action: { kind: 'impact', style: 'medium' } });
-  cues.push({
-    phase: 'hold',
-    offsetMs: Math.round(timings.hold * CHARGE_PULSE_FRACTION_OF_HOLD),
-    action: { kind: 'impact', style: 'heavy' },
-  });
-
-  // tear-flip: the tear and its light impact; the cards spill at the midpoint (multi only).
+  // A single tactile commit at the actual tear; no anticipation soundtrack or pulse train.
   cues.push({ phase: 'tear-flip', offsetMs: 0, action: { kind: 'hit', name: 'tear' } });
   cues.push({ phase: 'tear-flip', offsetMs: 0, action: { kind: 'impact', style: 'light' } });
-  if (isMulti) {
-    cues.push({ phase: 'tear-flip', offsetMs: Math.round(timings.tearFlip * 0.5), action: { kind: 'hit', name: 'flyout' } });
-  }
-
-  // flash-reveal: the burst, then — on the featured path only — the peak stinger (LEG Success
-  // BEFORE the heavy impact, G09 / MGACHA-08), then the heavy impact.
-  cues.push({ phase: 'flash-reveal', offsetMs: 0, action: { kind: 'hit', name: 'burst' } });
-  if (!tapFlow) {
+  cues.push({ phase: 'tear-flip', offsetMs: Math.round(timings.tearFlip * 0.5), action: { kind: 'hit', name: 'flyout' } });
+  if (!tapFlow && peakRarity !== 'COM') {
     cues.push({ phase: 'flash-reveal', offsetMs: 0, action: { kind: 'hit', name: stingerForRarity(peakRarity) } });
-    if (peakRarity === 'LEG') cues.push({ phase: 'flash-reveal', offsetMs: 0, action: { kind: 'success' } });
   }
-  cues.push({ phase: 'flash-reveal', offsetMs: 0, action: { kind: 'impact', style: 'heavy' } });
 
   // settle: no cues.
   return cues;
