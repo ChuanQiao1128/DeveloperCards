@@ -671,6 +671,22 @@ describe('SessionCardScreen learning step (R22 §6: teach before testing; 2026-1
     expect(byTestID(tree, 'session-card-report')).toHaveLength(0);
   });
 
+  it('teaches an owned later foundation before its earlier AWS dependent in the real session', async () => {
+    const child = { ...NEW_A, Teaching: { schema: 'teaching-v1', answer: 'Use the foundation.',
+      keyPoint: 'The foundation enables this choice.', mustAnswer: ['Use the foundation'], prerequisites: ['new-b'] } };
+    serve([child, NEW_B], [fresh('new-a'), fresh('new-b')], 2);
+    const served = await vi.mocked(resolveDeckBySlug).getMockImplementation()!('csharp');
+    vi.mocked(resolveDeckBySlug).mockResolvedValue({ ...served!, Slug: 'aws-saa-fundamentals' } as any);
+    const { tree } = await mount('learn-new');
+    expect(questionShown(tree)).toBe(NEW_B.Question);
+    await study(tree);
+    expect(questionShown(tree)).toBe(NEW_A.Question);
+    expect(subtitle(tree)).toBe('Card 2 of 2');
+    expect(recordReviewEvent).toHaveBeenCalledTimes(1);
+    expect(settleRatingReward).toHaveBeenCalledTimes(1);
+    await act(async () => tree.unmount());
+  });
+
   it('keeps the current card, revealed answer and completed count after a prerequisite round trip', async () => {
     const next = { ...NEW_B, Teaching: { schema: 'teaching-v1', answer: 'Use the topic.', keyPoint: 'Fan-out delivers copies.',
       mustAnswer: ['Use the topic'], prerequisites: ['new-a'] } };
