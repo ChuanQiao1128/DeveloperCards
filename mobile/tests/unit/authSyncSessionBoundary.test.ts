@@ -95,7 +95,8 @@ describe('sync identity session boundaries', () => {
     cleanup.release();
     await Promise.all([old, next]);
 
-    expect(state.store.get(TOKEN_KEY)).toBe('B-token');
+    expect(state.store.has(TOKEN_KEY)).toBe(false);
+    expect((await sync.getProgressSyncDebugState()).userSub).toBe('B');
     expect(state.store.get(SUB_KEY)).toBe('B');
     expect(storage.setActiveUserSubForStorage).toHaveBeenLastCalledWith('B');
   });
@@ -129,35 +130,40 @@ describe('sync identity session boundaries', () => {
     expect(storage.setActiveUserSubForStorage).toHaveBeenLastCalledWith('B');
   });
 
-  it('keeps B token when an old token write finishes after the switch', async () => {
-    const write = park('set', TOKEN_KEY);
-    const old = sync.setSyncAccessToken('A-token');
-    await write.started;
+  it('keeps B memory token when an old legacy cleanup finishes after the switch', async () => {
+    await sync.setActiveUserSub('A');
+    const cleanup = park('remove', TOKEN_KEY);
+    const old = sync.setSyncAccessToken(token('A'));
+    await cleanup.started;
     boundary.invalidateAuthSession();
-    const next = sync.setSyncAccessToken('B-token');
+    const next = (async () => {
+      await sync.setActiveUserSub('B');
+      await sync.setSyncAccessToken(token('B'));
+    })();
     await allowConcurrentWork();
-    write.release();
+    cleanup.release();
     await Promise.all([old, next]);
 
-    expect(state.store.get(TOKEN_KEY)).toBe('B-token');
-  });
-
-  it('does not cache or use an old persisted token read after B signs in', async () => {
-    state.store.set(TOKEN_KEY, token('A'));
-    state.store.set(SUB_KEY, 'A');
-    const read = park('get', TOKEN_KEY);
-    const pending = sync.getProgressSyncDebugState();
-    await read.started;
-    boundary.invalidateAuthSession();
-    await sync.setActiveUserSub('B');
-    await sync.setSyncAccessToken(token('B'));
-    read.release();
-
-    expect((await pending).userSub).toBeNull();
+    expect(state.store.has(TOKEN_KEY)).toBe(false);
     await vi.advanceTimersByTimeAsync(1);
     expect(vi.mocked(api.apiJson).mock.calls.length).toBeGreaterThan(0);
     expect(vi.mocked(api.apiJson).mock.calls.every(([, opts]) => opts.accessToken === token('B'))).toBe(true);
     expect((await sync.getProgressSyncDebugState()).userSub).toBe('B');
+  });
+
+  it('never reads a persisted A token before or after B signs in', async () => {
+    state.store.set(TOKEN_KEY, token('A'));
+    state.store.set(SUB_KEY, 'A');
+    expect((await sync.getProgressSyncDebugState()).userSub).toBeNull();
+    boundary.invalidateAuthSession();
+    await sync.setActiveUserSub('B');
+    await sync.setSyncAccessToken(token('B'));
+
+    await vi.advanceTimersByTimeAsync(1);
+    expect(vi.mocked(api.apiJson).mock.calls.length).toBeGreaterThan(0);
+    expect(vi.mocked(api.apiJson).mock.calls.every(([, opts]) => opts.accessToken === token('B'))).toBe(true);
+    expect((await sync.getProgressSyncDebugState()).userSub).toBe('B');
+    expect(state.store.has(TOKEN_KEY)).toBe(false);
   });
 
   it('does not cache an old persisted scope read after B signs in', async () => {

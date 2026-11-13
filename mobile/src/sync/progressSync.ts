@@ -154,7 +154,7 @@ export function getSchedulerVersion(): string {
  * Auth / user scope
  * ----------------------------
  */
-const ACCESS_TOKEN_KEY = 'devcards:auth:accessToken:v1';
+const LEGACY_ACCESS_TOKEN_KEY = 'devcards:auth:accessToken:v1';
 const ACTIVE_USER_SUB_KEY = 'devcards:auth:activeUserSub:v1';
 
 /**
@@ -732,24 +732,12 @@ async function progressQueueSize(userSub: string): Promise<number> {
  * ----------------------------
  */
 async function getSyncAccessToken(): Promise<string | null> {
-  const generation = getAuthSessionGeneration();
-  if (_accessTokenMem && _accessTokenMem.trim()) return _accessTokenMem;
-
-  try {
-    const raw = await AsyncStorage.getItem(ACCESS_TOKEN_KEY);
-    if (generation !== getAuthSessionGeneration()) return null;
-    if (_accessTokenMem && _accessTokenMem.trim()) return _accessTokenMem;
-    if (raw && raw.trim()) {
-      _accessTokenMem = raw;
-      return raw;
-    }
-  } catch {}
-
-  return null;
+  // Auth init/foreground refresh inject the SDK session; never revive a disk copy.
+  return _accessTokenMem;
 }
 
 /**
- * dev 模式注入 token
+ * Auth SDK session / dev 模式注入 token
  * ✅ 这里同时会尝试解析 userSub，用来做 “按用户分区”
  */
 // Token and scope writes share one lane so a delayed old native write cannot
@@ -773,8 +761,8 @@ async function applySyncAccessToken(token: string | null, generation: number): P
   _accessTokenMem = t;
 
   try {
-    if (t) await AsyncStorage.setItem(ACCESS_TOKEN_KEY, t);
-    else await AsyncStorage.removeItem(ACCESS_TOKEN_KEY);
+    // Upgrades may still carry the former duplicate. A cleanup failure must not fail auth.
+    await AsyncStorage.removeItem(LEGACY_ACCESS_TOKEN_KEY);
   } catch {}
 
   if (generation !== getAuthSessionGeneration()) return;
