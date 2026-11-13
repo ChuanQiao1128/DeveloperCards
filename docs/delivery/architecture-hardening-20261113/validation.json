@@ -25,8 +25,10 @@
     },
     "infraScripts": 287,
     "cdScripts": 234,
-    "maintenanceTools": 9,
-    "releaseGovernance": 4
+    "maintenanceTools": 10,
+    "releaseGovernance": 4,
+    "ingest": 39,
+    "evals": 345
   },
   "artifacts": {
     "sourceCommit": "a1fb7b238c7970483018405200aef92b0b175e8f",
@@ -150,6 +152,32 @@
       "name": "package-final.log.command.json",
       "exitCode": 0,
       "logSha256": "2db0b0185209a5577f7db20333c1c5c78efbbe501847c3da5980d123a481c254"
+    },
+    {
+      "name": "N10-ci-deps/mobile-export-watch-reset.log.command.json",
+      "exitCode": 0,
+      "logSha256": "bf20d1700b72559ac8f4572dadc7ec4e476963129bb4a109ccb0cda094a43b16"
+    },
+    {
+      "name": "N10-ci-deps/mobile-bundle-audit-final.log.command.json",
+      "exitCode": 0,
+      "logSha256": "7b5c516f2c0ee9f6ac37290aba45a443b505a6430ea8e7a67ec5ade8ea411109"
     }
-  ]
+  ],
+  "ciFollowup": {
+    "commit": "30ae95cd04360ec2cc5c4476bfecf634024fd174",
+    "nodeForge": "1.4.3",
+    "soupsieve": "4.0.1",
+    "changedRuntimeSourceTrees": "API/Worker and console trees unchanged from core code commit",
+    "mobileTestsAfterDependencyInstall": 3207,
+    "auditGateExemptionsAdded": 0,
+    "actualProductionPlan": "NOT_EXECUTED; anticipated six IAM creates only; operators remain break-glass",
+    "remoteCi": "See PR835; source/local review is separate",
+    "exportNote": "First normal/clear exports failed after npm reinstall. Existing Watchman reported UserDropped recrawls; reset only this existing worktree watch, then exact source --clear export succeeded. No source/dependency alteration for export.",
+    "lockHashes": {
+      "mobile/package-lock.json": "ad25b928407e38aedb54a562d918d8aadbe9682438118b567eae71e1214e43ec",
+      "tools/ingest/uv.lock": "fe8f55c63d5e07adeb892372a123a47f156996dfe2090547f555b71e0b61eb3f",
+      "evals/uv.lock": "0d64db2b1d6e925f059832b6b51d25d83919585e977befadd53fe464e9fba6a0"
+    }
+  }
 }
