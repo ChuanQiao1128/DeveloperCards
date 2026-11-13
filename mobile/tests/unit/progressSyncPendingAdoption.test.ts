@@ -266,7 +266,9 @@ describe('crash between copy and clear', () => {
     expect(queueIds()).toEqual([first, second]);
 
     await forceProgressSync('manual');
-    expect(queueIds()).toEqual([]);
+    // The same run resumes adoption after ACK. Failed source cleanup retains
+    // copies in the account queue, still owned by this account and retryable.
+    expect(queueIds()).toEqual([first, second]);
     expect(serverRows.size).toBe(2);
 
     // Absorber 2, server-side event_id: the copies are gone from the queue by
