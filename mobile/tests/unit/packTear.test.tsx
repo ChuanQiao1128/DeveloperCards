@@ -17,7 +17,7 @@ vi.mock('react-native', () => {
   };
 });
 
-const guardState = vi.hoisted(() => ({ skiaAvailable: true, useImage: (_s: unknown): unknown => null }));
+const guardState = vi.hoisted(() => ({ skiaAvailable: true, useImage: (_s: unknown): unknown => null, handlers: {} as Record<string, (event: any) => void>, spring: vi.fn() }));
 
 vi.mock('../../src/components/ceremony/reanimatedGuard', () => {
   const React = require('react');
@@ -26,6 +26,7 @@ vi.mock('../../src/components/ceremony/reanimatedGuard', () => {
   for (const name of [
     'enabled',
     'activeOffsetX',
+    'maxPointers',
     'failOffsetY',
     'onUpdate',
     'onEnd',
@@ -37,6 +38,8 @@ vi.mock('../../src/components/ceremony/reanimatedGuard', () => {
   ]) {
     inert[name] = () => inert;
   }
+  inert.onUpdate = (fn: any) => { guardState.handlers.update = fn; return inert; };
+  inert.onEnd = (fn: any) => { guardState.handlers.end = fn; return inert; };
   const SkiaModule = {
     Canvas: host('Canvas'), Group: host('Group'), Rect: host('Rect'), RoundedRect: host('RoundedRect'),
     Image: host('Image'), Path: host('Path'), Circle: host('Circle'),
@@ -50,6 +53,7 @@ vi.mock('../../src/components/ceremony/reanimatedGuard', () => {
     useSharedValue: (v: any) => ({ value: v }),
     useDerivedValue: (fn: () => any) => ({ value: fn() }),
     withTiming: (to: number) => to,
+    withSpring: (to: number, cfg: unknown) => { guardState.spring(to, cfg); return to; },
     runOnJS: (fn: any) => fn,
   };
   const GestureHandler = {
@@ -202,6 +206,37 @@ describe('PackTear', () => {
     expect(props.onTear).toHaveBeenCalledTimes(2);
   });
 
+  it('notifies React once per drag and commits a short fast flick exactly once', () => {
+    const onTear = vi.fn();
+    const onSeamProgress = vi.fn();
+    const { root } = renderPack({ onTear, onSeamProgress });
+    act(() => {
+      guardState.handlers.update({ translationX: 0 });
+      guardState.handlers.update({ translationX: 12 });
+      guardState.handlers.update({ translationX: 24 });
+      guardState.handlers.update({ translationX: 30 });
+    });
+    expect(onSeamProgress).toHaveBeenCalledTimes(1);
+    act(() => {
+      guardState.handlers.end({ translationX: 30, velocityX: 900 });
+      guardState.handlers.end({ translationX: 30, velocityX: 900 });
+    });
+    expect(onTear).toHaveBeenCalledTimes(1);
+    act(() => root.unmount());
+  });
+
+  it('returns a short slow drag with a clamped velocity-aware spring', () => {
+    const onTear = vi.fn();
+    const timeline = makeTimeline();
+    guardState.spring.mockClear();
+    const { root } = renderPack({ onTear, timeline });
+    act(() => guardState.handlers.end({ translationX: 20, velocityX: 100 }));
+    expect(onTear).not.toHaveBeenCalled();
+    expect(timeline.seam.value).toBe(0);
+    expect(guardState.spring).toHaveBeenCalledWith(0, expect.objectContaining({ duration: 400, dampingRatio: 0.8, overshootClamping: true, velocity: 100 / 72 }));
+    act(() => root.unmount());
+  });
+
   it('chooses the pack testID from phase and isMulti', () => {
     expect(packTestID('swipe', true)).toBe('draw-ceremony-swipe-pack');
     expect(packTestID('approach', true)).toBe('draw-ceremony-multi-flyin');
@@ -275,9 +310,10 @@ describe('PackTear', () => {
     const groups = byType(root, 'Skia.Group');
     const strip = groups.find((g) => g.props.transform?.value?.[0]?.perspective === 800)!;
     expect(strip.props.transform.value[0]).toEqual({ perspective: 800 });
-    expect(strip.props.transform.value[1]).toEqual({ translateY: -20 });
-    expect(strip.props.transform.value[2].rotateX).toBeCloseTo(PEEL_ROTATE_X_RAD * 0.5);
-    expect(strip.props.opacity.value).toBe(0.5);
+    expect(strip.props.transform.value[1]).toEqual({ translateX: 11 });
+    expect(strip.props.transform.value[2]).toEqual({ translateY: -20 });
+    expect(strip.props.transform.value[3].rotateX).toBeCloseTo(PEEL_ROTATE_X_RAD * 0.5);
+    expect(strip.props.opacity.value).toBe(0.65);
 
     const packGroup = groups[0];
     expect(packGroup.props.transform.value).toContainEqual({ scale: 1.12 });

@@ -50,19 +50,19 @@ describe('useCeremonyTimeline', () => {
 
     // approach: single anticipates to 1.12 / rays 0.22; multi to 1.10 / rays 0.26.
     const aSingle = timelineTargets({ phase: 'approach', peakRarity: 'RAR', isMulti: false, reduceMotion: false });
-    expect(aSingle.packScale).toBe(1.12);
-    expect(aSingle.rays).toBe(0.22);
+    expect(aSingle.packScale).toBe(1.04);
+    expect(aSingle.rays).toBe(0.1);
     const aMulti = timelineTargets({ phase: 'approach', peakRarity: 'RAR', isMulti: true, reduceMotion: false });
-    expect(aMulti.packScale).toBe(1.1);
-    expect(aMulti.rays).toBe(0.26);
+    expect(aMulti.packScale).toBe(1.04);
+    expect(aMulti.rays).toBe(0.1);
 
     // v2 (I06): every rarity dims to CHARGE_DIM from approach through the table; only swipe is 0.
     const dimmed: CeremonyPhase[] = ['approach', 'hold', 'tear-flip', 'flash-reveal', 'settle', 'cards-on-table'];
     for (const r of RARITIES) {
       expect(timelineTargets({ phase: 'swipe', peakRarity: r, isMulti: false, reduceMotion: false }).dim).toBe(0);
       for (const phase of dimmed) {
-        expect(timelineTargets({ phase, peakRarity: r, isMulti: false, reduceMotion: false }).dim).toBe(CHARGE_DIM);
-        expect(timelineTargets({ phase, peakRarity: r, isMulti: false, reduceMotion: true }).dim).toBe(CHARGE_DIM);
+        expect(timelineTargets({ phase, peakRarity: r, isMulti: false, reduceMotion: false }).dim).toBe(r === 'COM' ? 0.12 : r === 'RAR' ? 0.2 : 0.28);
+        expect(timelineTargets({ phase, peakRarity: r, isMulti: false, reduceMotion: true }).dim).toBe(r === 'COM' ? 0.12 : r === 'RAR' ? 0.2 : 0.28);
       }
     }
 
@@ -73,7 +73,7 @@ describe('useCeremonyTimeline', () => {
 
     // flash-reveal: flash blooms to 0.85, pack back to rest.
     const fr = timelineTargets({ phase: 'flash-reveal', peakRarity: 'RAR', isMulti: false, reduceMotion: false });
-    expect(fr.flash).toBe(0.85);
+    expect(fr.flash).toBe(0);
     expect(fr.packScale).toBe(1);
 
     // settle: rim is the tell for RAR/LEG (0.55), none for COM; halo 0.35, rays 0.10.
@@ -188,14 +188,14 @@ describe('useCeremonyTimeline', () => {
     });
     expectTargets('approach');
     // The hook took the cut over from the finger.
-    expect(tl.seam.value).toBe(SEAM_PRECUT);
+    expect(tl.seam.value).toBe(1);
 
     act(() => {
       root.update(React.createElement(Probe, { input: mk('hold'), onTimeline }));
     });
     expectTargets('hold');
-    expect(tl.shiver.value).toBe(-SHIVER_PX); // the beat's sequence collapses to its last member (px)
-    expect(tl.seam.value).toBe(SEAM_PRECUT);
+    expect(tl.shiver.value).toBe(0); // the beat's sequence collapses to its last member (px)
+    expect(tl.seam.value).toBe(1);
 
     act(() => {
       root.update(React.createElement(Probe, { input: mk('tear-flip'), onTimeline }));

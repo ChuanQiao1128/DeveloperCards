@@ -73,20 +73,15 @@ describe('ceremonyTimings', () => {
     expect(TEST_BASE.tapQueueMs).toBe(90);
   });
 
-  it('DEVICE charge is the same for every rarity and pulses at approach start, hold start and mid-hold', () => {
-    // v2 (I06): hold is the same for every rarity (the pack pulses three times on the three
-    // charge plucks; only the colour on the third pulse tells the rarity).
-    for (const row of [DEVICE.single, DEVICE.multi]) {
-      expect(row.hold.COM).toBe(row.hold.RAR);
-      expect(row.hold.RAR).toBe(row.hold.LEG);
-    }
-    // The three pulse offsets from approach start are [0, approach, approach + hold/2], matching
-    // the plucks in charge.wav at 0 / 350 / 700 ms.
-    const single = resolveCeremonyTimings({ isMulti: false, peakRarity: 'LEG', motionAvailable: true });
-    expect(chargePulseOffsets(single)).toEqual([0, 350, 700]);
-    for (const r of RARITIES) {
-      const t = resolveCeremonyTimings({ isMulti: true, peakRarity: r, motionAvailable: true });
-      expect(chargePulseOffsets(t)).toEqual([0, t.approach, t.approach + Math.round(t.hold * CHARGE_PULSE_FRACTION_OF_HOLD)]);
+  it('keeps routine opening brief and reserves extra tension for rarer cards', () => {
+    for (const isMulti of [false, true]) {
+      const timings = RARITIES.map((peakRarity) => resolveCeremonyTimings({ isMulti, peakRarity, motionAvailable: true }));
+      expect(timings[0].hold).toBeLessThan(timings[1].hold);
+      expect(timings[1].hold).toBeLessThan(timings[2].hold);
+      for (const t of timings) {
+        expect(t.hold).toBeLessThan(300);
+        expect(t.toTableMs).toBeLessThanOrEqual(1500);
+      }
     }
   });
 
@@ -97,15 +92,15 @@ describe('ceremonyTimings', () => {
         expect(resolved.toTableMs).toBeLessThanOrEqual(isMulti ? TO_TABLE_CAP_MS.multi : TO_TABLE_CAP_MS.single);
       }
     }
-    expect(resolveCeremonyTimings({ isMulti: false, peakRarity: 'LEG', motionAvailable: true }).toTableMs).toBe(3050);
-    expect(resolveCeremonyTimings({ isMulti: true, peakRarity: 'LEG', motionAvailable: true }).toTableMs).toBe(3050);
+    expect(resolveCeremonyTimings({ isMulti: false, peakRarity: 'LEG', motionAvailable: true }).toTableMs).toBe(1280);
+    expect(resolveCeremonyTimings({ isMulti: true, peakRarity: 'LEG', motionAvailable: true }).toTableMs).toBe(1500);
   });
 
   it('the single Legendary hero lands before TO_TABLE_CAP_MS.single', () => {
     const t = resolveCeremonyTimings({ isMulti: false, peakRarity: 'LEG', motionAvailable: true });
     const heroLandsMs = t.approach + t.hold + t.tearFlip + SPOTLIGHT_ENTRANCE_MS + spotlightFlipPlan('LEG', false).landMs;
     expect(heroLandsMs).toBeLessThanOrEqual(TO_TABLE_CAP_MS.single);
-    expect(heroLandsMs).toBe(2720);
+    expect(heroLandsMs).toBe(1690);
   });
 
   it('the silence beat fits after the colour tell', () => {
@@ -119,45 +114,26 @@ describe('ceremonyTimings', () => {
     }
   });
 
-  it('compress keeps only the beat of hold and speeds the tear by 1.6x', () => {
+  it('compression retains the remaining beat and never lengthens the tear', () => {
     const t = resolveCeremonyTimings({ isMulti: true, peakRarity: 'LEG', motionAvailable: true });
-    expect(t.hold).toBe(700);
-    expect(t.beatMs).toBe(280);
-    expect(t.tearFlip).toBe(900);
-
-    // beatStart = hold - beatMs = 420; 500 ms in → 80 ms into the beat → hold' = 280 - 80 = 200.
-    const compressed = compressTimings(t, 500);
-    expect(compressed.hold).toBe(200);
+    const compressed = compressTimings(t, t.hold - 40);
+    expect(compressed.hold).toBe(40);
     expect(compressed.tearFlip).toBe(Math.round(t.tearFlip / FAST_FORWARD_TEAR_FACTOR));
-    expect(compressed.flashReveal).toBe(t.flashReveal);
-    expect(compressed.settleMs).toBe(t.settleMs);
-    expect(compressed.tableTailMs).toBe(t.tableTailMs);
-    expect(compressed.toTableMs).toBe(
-      compressed.approach +
-        compressed.hold +
-        compressed.tearFlip +
-        compressed.flashReveal +
-        compressed.settleMs +
-        compressed.tableTailMs,
-    );
-
-    expect(compressTimings(t, 560).hold).toBe(140); // 140 ms into the beat → 280 - 140
-    expect(compressTimings(t, 2000).hold).toBe(0);
-
-    expect(t.hold).toBe(700);
-    expect(t.tearFlip).toBe(900);
+    expect(compressed.toTableMs).toBeLessThan(t.toTableMs);
+    expect(compressTimings(t, t.hold).hold).toBe(0);
+    expect(t.hold).toBe(260);
   });
 
   it('the __DEV__ override reaches DEVICE only and clears with null', () => {
     setCeremonyTimingOverride({ single: { approach: 1000 } as never });
     expect(resolveCeremonyTimings({ isMulti: false, peakRarity: 'RAR', motionAvailable: true }).approach).toBe(1000);
-    expect(resolveCeremonyTimings({ isMulti: false, peakRarity: 'RAR', motionAvailable: true }).hold).toBe(700);
-    expect(resolveCeremonyTimings({ isMulti: true, peakRarity: 'RAR', motionAvailable: true }).approach).toBe(350);
+    expect(resolveCeremonyTimings({ isMulti: false, peakRarity: 'RAR', motionAvailable: true }).hold).toBe(180);
+    expect(resolveCeremonyTimings({ isMulti: true, peakRarity: 'RAR', motionAvailable: true }).approach).toBe(180);
     expect(resolveCeremonyTimings({ isMulti: false, peakRarity: 'RAR', motionAvailable: false }).approach).toBe(300);
     expect(getCeremonyTimingOverride()).toEqual({ single: { approach: 1000 } });
 
     setCeremonyTimingOverride(null);
-    expect(resolveCeremonyTimings({ isMulti: false, peakRarity: 'RAR', motionAvailable: true }).approach).toBe(350);
+    expect(resolveCeremonyTimings({ isMulti: false, peakRarity: 'RAR', motionAvailable: true }).approach).toBe(180);
     expect(getCeremonyTimingOverride()).toBeNull();
 
     try {

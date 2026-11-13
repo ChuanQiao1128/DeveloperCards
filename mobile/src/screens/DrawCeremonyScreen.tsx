@@ -45,13 +45,13 @@ import {
 import { cancelCeremonyTimeline, playCeremonyTimeline, tableSlotLayout, useCeremonyTimeline } from '../components/ceremony/useCeremonyTimeline';
 import { buildCeremonyCues, cueTimesFromSchedule, type CeremonyCueAction } from '../features/gacha/draw/ceremonyCues';
 import { STAGE_TESTID, StageCanvas } from '../components/ceremony/StageCanvas';
-import { BurstCanvas } from '../components/ceremony/BurstCanvas';
 import { PackTear, seamProgressFromDelta } from '../components/ceremony/PackTear';
 import { TapCard, rarityLabel, type TapCardData } from '../components/ceremony/TapCard';
 import { RevealSpotlight } from '../components/ceremony/RevealSpotlight';
 import { DrawSummaryGrid } from '../components/ceremony/DrawSummaryGrid';
 import { spotlightEntranceCues, spotlightFlipCues, type SpotlightCue, type SpotlightFlipPlan } from '../features/gacha/draw/spotlightPlan';
 import {
+  batchSpotlightUid,
   INITIAL_SPOTLIGHT_QUEUE,
   SPOTLIGHT_AUTO_ADVANCE_MS,
   revealAllOrder,
@@ -699,7 +699,7 @@ export function DrawCeremonyScreen({ navigation, route }: Props) {
   const onSpotlightFinishEarly = useCallback(
     (rarity: PeakRarity) => {
       clearSpotCueTimers();
-      if (!stingFiredRef.current) {
+      if (!stingFiredRef.current && rarity !== 'COM') {
         stingFiredRef.current = true;
         audio.hit(stingerForRarity(rarity));
       }
@@ -725,9 +725,7 @@ export function DrawCeremonyScreen({ navigation, route }: Props) {
     }
   }, []);
 
-  // "Reveal all" (and the on-device auto path): flip every face-down card up front — lowest
-  // rarity first so the pull builds to its best card — and hand the whole ordered list to the
-  // spotlight queue to walk one at a time.
+  // Reveal the batch together, then give its highest rare card one focal moment.
   const revealAll = useCallback(() => {
     const uids = revealAllOrder(cards, flippedRef.current);
     if (uids.length === 0) return;
@@ -736,7 +734,8 @@ export function DrawCeremonyScreen({ navigation, route }: Props) {
       uids.forEach((u) => next.add(u));
       return next;
     });
-    dispatchSpot({ type: 'enqueueAll', uids });
+    const focusUid = batchSpotlightUid(cards.filter((card) => uids.includes(card.stableUid)));
+    if (focusUid) dispatchSpot({ type: 'enqueue', uid: focusUid });
   }, [cards]);
 
   // A landed COM/RAR spotlight card auto-advances after its hold; LEG waits for a tap. The timer
@@ -768,28 +767,13 @@ export function DrawCeremonyScreen({ navigation, route }: Props) {
     perfRef.current?.updateMeta({ skippedAll: true });
     clearSpotAdvance();
     clearSpotCueTimers();
-    // Play once the stinger of the highest rarity still owed a sting: the cards not yet revealed
-    // plus the current card if its own sting has not fired. No sound when there is none.
-    const remaining = cards.filter((c) => !spot.shown.includes(c.stableUid));
-    const current =
-      spot.current != null && !stingFiredRef.current
-        ? cards.find((c) => c.stableUid === spot.current) ?? null
-        : null;
-    const candidates = current ? [...remaining, current] : remaining;
-    if (candidates.length > 0) {
-      let peak: PeakRarity = 'COM';
-      for (const c of candidates) {
-        if (rarityRank(c.rarity) > rarityRank(peak)) peak = c.rarity;
-      }
-      audio.hit(stingerForRarity(peak));
-    }
     setFlippedSet((s) => {
       const next = new Set(s);
       cards.forEach((c) => next.add(c.stableUid));
       return next;
     });
     dispatchSpot({ type: 'skipAll' });
-  }, [cards, clearSpotAdvance, clearSpotCueTimers, spot.shown, spot.current, audio]);
+  }, [cards, clearSpotAdvance, clearSpotCueTimers]);
 
   // Auto reveal: on device, the sequence starts by itself the first time the table is reached.
   useEffect(() => {
@@ -1014,6 +998,7 @@ export function DrawCeremonyScreen({ navigation, route }: Props) {
                 width={240}
                 height={336}
                 coverImage={coverImage}
+                cardBackImage={cardBackImage}
                 palette={palette}
                 phase={phase}
                 isMulti={isMulti}
@@ -1104,7 +1089,7 @@ export function DrawCeremonyScreen({ navigation, route }: Props) {
           ) : null}
 
           <Text
-            style={[styles.footerRarity, !rarityVisible && styles.footerRarityHidden]}
+            style={[styles.footerRarity, (!rarityVisible || singleSpotlight || multiSpotlightMounted) && styles.footerRarityHidden]}
             testID="draw-ceremony-footer-rarity"
             numberOfLines={1}
           >
@@ -1113,18 +1098,6 @@ export function DrawCeremonyScreen({ navigation, route }: Props) {
 
           {!singleSpotlight && !multiSpotlightMounted ? primaryCta : null}
         </Reanimated.View>
-
-        {/* v2 (I06): the full-screen rarity-tinted burst owns the Skia-path flash. */}
-        {renderer === 'skia' && !reduceMotion && (phase === 'tear-flip' || phase === 'flash-reveal' || phase === 'settle') ? (
-          <BurstCanvas
-            width={win.width}
-            height={win.height}
-            peakRarity={peakRarity}
-            flash={timeline.flash}
-            reduceMotion={reduceMotion}
-            particleSheet={PARTICLE_SHEET}
-          />
-        ) : null}
 
         {singleSpotlight && spotlightCard && (tablePhase || tableWarm) ? (
           <RevealSpotlight
@@ -1161,7 +1134,7 @@ export function DrawCeremonyScreen({ navigation, route }: Props) {
             cardBackImage={cardBackImage}
             packArt={coverImage}
             packPaletteCover={palette.cover}
-            progressText={spot.mode === 'reveal' ? `${spot.shown.length} / ${cards.length}` : undefined}
+            progressText={spot.mode === 'reveal' ? `${flippedSet.size} / ${cards.length}` : undefined}
             footer={primaryCta}
             onEnter={onSpotlightEnter}
             onFlipStart={(plan) => scheduleSpotCues(spotlightFlipCues(spotCard.rarity, plan))}
@@ -1178,7 +1151,7 @@ export function DrawCeremonyScreen({ navigation, route }: Props) {
             styles.flash,
             {
               backgroundColor: flashColor(peakRarity),
-              opacity: phase === 'flash-reveal' && !reduceMotion ? 0.85 : 0,
+              opacity: 0,
             },
             renderer === 'skia' ? styles.flashHiddenBehindCanvas : null,
           ]}

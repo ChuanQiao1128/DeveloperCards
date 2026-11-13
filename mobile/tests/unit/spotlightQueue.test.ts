@@ -1,3 +1,4 @@
+import { batchSpotlightUid } from '../../src/features/gacha/draw/spotlightQueue';
 // I05 — pure-model coverage for the multi-pull spotlight queue, its reveal / summary orderings
 // and the grid layout. No React, no native mocks: the reducer maths and the sort/layout helpers
 // are pinned independently of the ceremony wiring.
@@ -160,5 +161,22 @@ describe('summary grid helpers', () => {
     expect(three.columns).toBe(3);
     expect(three.rows).toBe(1);
     expect(three.cellWidth).toBe(ten.cellWidth);
+  });
+});
+
+
+describe('batch focal card', () => {
+  it('needs no focal card for empty or common-only batches', () => {
+    expect(batchSpotlightUid([])).toBeNull();
+    expect(batchSpotlightUid([{ stableUid: 'a', rarity: 'COM' }])).toBeNull();
+  });
+  it('selects the highest real rarity and preserves stable order on ties', () => {
+    const cards = [
+      { stableUid: 'a', rarity: 'RAR' as const },
+      { stableUid: 'b', rarity: 'LEG' as const },
+      { stableUid: 'c', rarity: 'LEG' as const },
+    ];
+    expect(batchSpotlightUid(cards)).toBe('b');
+    expect(cards.map((c) => c.stableUid)).toEqual(['a', 'b', 'c']);
   });
 });

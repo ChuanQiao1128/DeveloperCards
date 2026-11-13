@@ -1,6 +1,6 @@
 // RevealSpotlight — the full-screen single-pull reveal (I04). A dark scrim, a big 5:7 card
 // that flips on tap (RevealCardFace on the front, the deck card back on the reverse), a
-// rarity glow / rays / particle burst (Skia, idle-safe), a "Rare"/"Legendary" banner, and a
+// local rarity light / finite particles (Skia, idle-safe), a "Rare"/"Legendary" banner, and a
 // read-full sheet. The screen renders it at its root and passes the CTA as the footer.
 //
 // The spotlight NEVER calls audio or haptics — the screen owns cues (spotlightFlipCues), so a
@@ -23,7 +23,6 @@ import {
   burstParticleElapsed,
   particlePose,
   poseToRSXform,
-  rayStops,
 } from './StageCanvas';
 import { rarityAccentColor, rarityHaloColor, PARTICLE_SHEET, type PackPalette } from '../../theme/packArt';
 import {
@@ -41,10 +40,8 @@ const {
   useAnimatedStyle,
   useDerivedValue,
   withTiming,
-  withSpring,
   withDelay,
   withSequence,
-  withRepeat,
   cancelAnimation,
   interpolate,
   Easing,
@@ -63,12 +60,10 @@ function readRN<T = any>(key: string, fallback: T): T {
 const RNImage: any = readRN('Image', null);
 const RNScrollView: any = readRN('ScrollView', View);
 
-const FLIP_EASING = [0.05, 0.7, 0.1, 1] as const;
+const FLIP_EASING = [0.77, 0, 0.175, 1] as const;
 const PARTICLE_SPRITE_SIZE = 64;
 const PARTICLE_SHEET_COLUMNS = 4;
 const MAX_PARTICLES = 120;
-const RAY_REVOLUTION_MS = 14000;
-const RAYS_CANCEL_AFTER_LAND_MS = 1500;
 
 export const REVEAL_SPOTLIGHT_TESTID = 'reveal-spotlight';
 
@@ -113,7 +108,9 @@ function RevealSpotlightImpl(props: RevealSpotlightProps): React.JSX.Element {
   } = props;
 
   const win = useWindowDimensions();
-  const size = spotlightCardSize(win);
+  const [viewport, setViewport] = React.useState({ width: win.width, height: win.height });
+  const reservedHeight = (270 + (onPressFaceUp ? 30 : 0)) * Math.max(1, win.fontScale);
+  const size = spotlightCardSize(viewport, reservedHeight);
   const plan = React.useMemo(() => spotlightFlipPlan(card.rarity, reduceMotion), [card.rarity, reduceMotion]);
   const accent = rarityAccentColor(card.rarity);
 
@@ -128,12 +125,11 @@ function RevealSpotlightImpl(props: RevealSpotlightProps): React.JSX.Element {
   const enteredRef = React.useRef(false);
 
   // Motion state.
-  const appear = useSharedValue(visible ? 1 : 0);
+  const appear = useSharedValue(initialFaceUp ? 1 : 0);
   const scale = useSharedValue(1);
   const shakeX = useSharedValue(0);
   const flip = useSharedValue(initialFaceUp ? 1 : 0);
   const glow = useSharedValue(initialFaceUp ? 1 : 0);
-  const raysAngle = useSharedValue(0);
 
   // Guard-fallback mirror: under the fallback useAnimatedStyle(fn) is fn() in place, so mirror
   // the controlled state onto the shared values synchronously (never runs under real Reanimated).
@@ -157,7 +153,7 @@ function RevealSpotlightImpl(props: RevealSpotlightProps): React.JSX.Element {
       );
       glow.value = withTiming(1, { duration: plan.shakeMs, easing: Easing.linear });
     } else {
-      glow.value = withDelay(plan.midpointMs, withTiming(1, { duration: Math.max(1, plan.flipMs - plan.midpointMs) }));
+      glow.value = withDelay(plan.midpointMs, withTiming(1, { duration: 180, easing: Easing.bezier(0.23, 1, 0.32, 1) }));
     }
     const flipEase = Easing.bezier(...FLIP_EASING);
     if (plan.edgePauseMs > 0) {
@@ -172,8 +168,8 @@ function RevealSpotlightImpl(props: RevealSpotlightProps): React.JSX.Element {
     } else {
       flip.value = withDelay(plan.flipStartMs, withTiming(1, { duration: plan.flipMs, easing: flipEase }));
     }
-    // Landing settle overshoot 1 → 1.04 → 1.
-    scale.value = withDelay(plan.landMs, withSequence(withTiming(1.04, { duration: 90 }), withTiming(1, { duration: 120 })));
+    // The card lands at its true size; the edge sweep provides the material accent.
+    scale.value = withDelay(plan.landMs, withTiming(1, { duration: 180, easing: Easing.bezier(0.23, 1, 0.32, 1) }));
   }, [reduceMotion, plan, flip, glow, shakeX, scale]);
 
   const requestFlip = React.useCallback(() => {
@@ -210,8 +206,9 @@ function RevealSpotlightImpl(props: RevealSpotlightProps): React.JSX.Element {
     if (reduceMotion) {
       appear.value = withTiming(1, { duration: SPOTLIGHT_RM_FADE_MS, easing: Easing.linear });
     } else {
-      appear.value = withTiming(1, { duration: 260 });
-      scale.value = withSequence(withTiming(1.1, { duration: 260 }), withSpring(1));
+      appear.value = withTiming(1, { duration: plan.entranceMs, easing: Easing.bezier(0.23, 1, 0.32, 1) });
+      scale.value = 0.96;
+      scale.value = withTiming(1, { duration: plan.entranceMs, easing: Easing.bezier(0.23, 1, 0.32, 1) });
     }
     if (autoFlip && faceRef.current === 'down' && !flipRequestedRef.current) {
       const id = setTimeout(() => requestFlipRef.current(), plan.entranceMs) as unknown as number;
@@ -219,18 +216,6 @@ function RevealSpotlightImpl(props: RevealSpotlightProps): React.JSX.Element {
     }
     // eslint rules satisfied: appear/scale are stable shared values, plan/autoFlip are the trigger.
   }, [visible, autoFlip, reduceMotion, plan.entranceMs, appear, scale]);
-
-  // Rays: one linear revolution per 14 s while lit, cancelled 1.5 s after landing (idle-safe).
-  React.useEffect(() => {
-    if (!visible || reduceMotion || !skiaAvailable) return;
-    raysAngle.value = withRepeat(withTiming(2 * Math.PI, { duration: RAY_REVOLUTION_MS, easing: Easing.linear }), -1, false);
-    return () => cancelAnimation(raysAngle);
-  }, [visible, reduceMotion, raysAngle]);
-  React.useEffect(() => {
-    if (face !== 'up') return;
-    const id = setTimeout(() => cancelAnimation(raysAngle), RAYS_CANCEL_AFTER_LAND_MS) as unknown as number;
-    timersRef.current.push(id);
-  }, [face, raysAngle]);
 
   React.useEffect(() => {
     return () => {
@@ -277,7 +262,7 @@ function RevealSpotlightImpl(props: RevealSpotlightProps): React.JSX.Element {
   // Animated styles (fallback: fn() in place, `with*` already at target).
   const columnStyle = useAnimatedStyle(() => ({
     opacity: appear.value,
-    transform: reduceMotion ? [] : [{ scale: scale.value }],
+    transform: reduceMotion ? [] : [{ translateY: interpolate(appear.value, [0, 1], [48, 0]) }, { scale: scale.value }],
   }));
   const cardMotionStyle = useAnimatedStyle(() => ({
     transform: reduceMotion ? [] : [{ translateX: shakeX.value }],
@@ -295,12 +280,22 @@ function RevealSpotlightImpl(props: RevealSpotlightProps): React.JSX.Element {
     transform: reduceMotion ? [] : [{ translateY: interpolate(flip.value, [0.5, 1], [-24, 0]) }],
   }));
 
+  const sheenStyle = useAnimatedStyle(() => ({
+    opacity: reduceMotion ? 0 : interpolate(flip.value, [0.5, 0.7, 1], [0, 0.32, 0]),
+    transform: reduceMotion ? [] : [{ translateX: interpolate(flip.value, [0.5, 1], [-size.width, size.width]) }, { rotate: '-18deg' }],
+  }));
+  const shadowStyle = useAnimatedStyle(() => ({ opacity: interpolate(appear.value, [0, 1], [0, 1]) }));
+
   const rootHidden = !visible;
   const showStaticHalo = revealed && card.rarity !== 'COM' && (!skiaAvailable || reduceMotion);
 
   return (
     <View
       testID={testID ?? REVEAL_SPOTLIGHT_TESTID}
+      onLayout={(event) => {
+        const { width, height } = event.nativeEvent.layout;
+        if (width > 0 && height > 0) setViewport((old) => old.width === width && old.height === height ? old : { width, height });
+      }}
       style={[styles.root, rootHidden ? styles.hidden : null]}
       pointerEvents={rootHidden ? 'none' : 'auto'}
       accessibilityElementsHidden={rootHidden}
@@ -316,19 +311,18 @@ function RevealSpotlightImpl(props: RevealSpotlightProps): React.JSX.Element {
 
       {onSkipAll ? (
         <Pressable testID="reveal-spotlight-skip-all" accessibilityRole="button" style={styles.skipAll} onPress={onSkipAll}>
-          <Text style={styles.skipAllText} numberOfLines={1}>Skip all</Text>
+          <Text style={styles.skipAllText} numberOfLines={1}>View all cards</Text>
         </Pressable>
       ) : null}
 
-      {skiaAvailable && SkiaModule && !reduceMotion ? (
+      {skiaAvailable && SkiaModule && !reduceMotion && card.rarity !== 'COM' ? (
         <SpotlightCanvas
-          width={win.width}
-          height={win.height}
+          width={viewport.width}
+          height={viewport.height}
           rarity={card.rarity}
           glow={glow}
-          raysAngle={raysAngle}
           revealed={revealed}
-          center={{ x: win.width / 2, y: win.height / 2 }}
+          center={{ x: viewport.width / 2, y: viewport.height / 2 }}
           cardWidth={size.width}
         />
       ) : null}
@@ -337,16 +331,14 @@ function RevealSpotlightImpl(props: RevealSpotlightProps): React.JSX.Element {
         <View pointerEvents="none" style={[styles.staticHalo, { width: size.width * 1.2, height: size.width * 1.2, borderRadius: size.width * 1.2, backgroundColor: rarityHaloColor(card.rarity) }]} />
       ) : null}
 
-      <Reanimated.View style={[styles.column, columnStyle]}>
-        {revealed ? (
-          <Reanimated.View style={bannerStyle}>
+      <Reanimated.View testID="reveal-spotlight-column" style={[styles.column, columnStyle]}>
+        <Reanimated.View testID="reveal-spotlight-banner-slot" style={[styles.bannerSlot, { height: 70 * Math.max(1, win.fontScale) }, bannerStyle]}>
+          {revealed ? (
             <Text testID="reveal-spotlight-banner" style={[styles.banner, { color: accent }]} numberOfLines={1}>
               {rarityLabel(card.rarity)}
             </Text>
-          </Reanimated.View>
-        ) : (
-          <View style={styles.bannerSpacer} />
-        )}
+          ) : null}
+        </Reanimated.View>
 
         <AnimatedPressable
           testID="reveal-spotlight-card"
@@ -356,6 +348,7 @@ function RevealSpotlightImpl(props: RevealSpotlightProps): React.JSX.Element {
           onPress={onCardPress}
           style={[{ width: size.width, height: size.height }, cardMotionStyle]}
         >
+          <Reanimated.View testID="reveal-spotlight-contact-shadow" pointerEvents="none" style={[styles.cardShadow, shadowStyle]} />
           {/* BACK */}
           <Reanimated.View style={[styles.side, backStyle]}>
             {cardBackImage && RNImage ? (
@@ -382,22 +375,31 @@ function RevealSpotlightImpl(props: RevealSpotlightProps): React.JSX.Element {
                 serialText={serialText}
               />
             ) : null}
+            <Reanimated.View testID="reveal-spotlight-foil-sweep" pointerEvents="none" style={[styles.foilSweep, sheenStyle]} />
           </Reanimated.View>
         </AnimatedPressable>
 
-        {face === 'up' && onPressFaceUp ? (
-          <Text testID="reveal-spotlight-continue-hint" style={styles.continueHint} numberOfLines={1}>
-            Tap to continue
-          </Text>
+        {onPressFaceUp ? (
+          <View testID="reveal-spotlight-hint-slot" style={{ height: 30 * Math.max(1, win.fontScale) }}>
+            {face === 'up' ? (
+              <Text testID="reveal-spotlight-continue-hint" style={styles.continueHint} numberOfLines={1}>
+                Tap to continue
+              </Text>
+            ) : null}
+          </View>
         ) : null}
 
-        {revealed ? (
-          <Pressable testID="reveal-spotlight-read-full" accessibilityRole="button" style={styles.readFull} onPress={() => setSheetOpen(true)}>
-            <Text style={styles.readFullText} numberOfLines={1}>{SPOTLIGHT_COPY.readFull}</Text>
-          </Pressable>
-        ) : null}
+        <View testID="reveal-spotlight-read-slot" style={[styles.actionSlot, { height: 64 * Math.max(1, win.fontScale) }]}>
+          {revealed ? (
+            <Pressable testID="reveal-spotlight-read-full" accessibilityRole="button" style={styles.readFull} onPress={() => setSheetOpen(true)}>
+              <Text style={styles.readFullText} numberOfLines={1}>{SPOTLIGHT_COPY.readFull}</Text>
+            </Pressable>
+          ) : null}
+        </View>
 
-        {footer ? <View style={styles.footer}>{footer}</View> : null}
+        <View testID="reveal-spotlight-footer-slot" style={[styles.footer, { height: 82 * Math.max(1, win.fontScale) }]}>
+          {footer}
+        </View>
       </Reanimated.View>
 
       {sheetOpen ? (
@@ -419,13 +421,12 @@ export const RevealSpotlight = React.memo(RevealSpotlightImpl);
 const AnimatedPressable = Reanimated.createAnimatedComponent(Pressable);
 
 // ── Skia light: one window-sized canvas behind the card (device only; never mounts under the
-// guard fallback or Reduce Motion). Radial glow + rotating rays + a one-shot particle burst. ──
+// guard fallback or Reduce Motion). Bounded local light and a finite particle accent. ──
 type SpotlightCanvasProps = {
   width: number;
   height: number;
   rarity: 'COM' | 'RAR' | 'LEG';
   glow: { value: number };
-  raysAngle: { value: number };
   revealed: boolean;
   center: { x: number; y: number };
   cardWidth: number;
@@ -433,18 +434,17 @@ type SpotlightCanvasProps = {
 
 function SpotlightCanvas(props: SpotlightCanvasProps): React.JSX.Element | null {
   if (!skiaAvailable || !SkiaModule) return null;
-  const { width, height, rarity, glow, raysAngle, revealed, center, cardWidth } = props;
-  const { Canvas, Rect, Atlas, SweepGradient, RadialGradient, LinearGradient, useImage, useRSXformBuffer, vec, rect } = SkiaModule;
+  const { width, height, rarity, glow, revealed, center, cardWidth } = props;
+  const { Canvas, Rect, Atlas, RadialGradient, LinearGradient, useImage, useRSXformBuffer, vec, rect } = SkiaModule;
 
   // The light pillar behind the hero: a vertical beam centred on the card, transparent → rarity
   // colour → transparent, fading in with the flip (glow rises to 1 across the flip midpoint).
   const pillar = SPOTLIGHT_PILLAR_COLORS[rarity];
   const pillarWidth = 0.6 * cardWidth;
 
-  const stops = rayStops();
-  const spread = width * 0.35;
+  const spread = cardWidth * 0.45;
   const life = PARTICLE_LIFE_MS[rarity];
-  const count = PARTICLE_COUNT[rarity];
+  const count = Math.min(PARTICLE_COUNT[rarity], rarity === 'LEG' ? 24 : 10);
 
   const burstElapsed = useSharedValue(-1);
   const firedRef = React.useRef(false);
@@ -459,9 +459,9 @@ function SpotlightCanvas(props: SpotlightCanvasProps): React.JSX.Element | null 
     'worklet';
     return [haloColorForTell(glow.value, rarity), 'rgba(255,247,236,0)'];
   });
-  const rayTransform = useDerivedValue(() => {
+  const lightOpacity = useDerivedValue(() => {
     'worklet';
-    return [{ rotate: raysAngle.value }];
+    return glow.value * (rarity === 'LEG' ? 0.28 : 0.16);
   });
 
   const transforms = useRSXformBuffer(MAX_PARTICLES, (val: { set: (a: number, b: number, c: number, d: number) => void }, i: number) => {
@@ -484,19 +484,16 @@ function SpotlightCanvas(props: SpotlightCanvasProps): React.JSX.Element | null 
   return (
     <Canvas style={{ position: 'absolute', left: 0, top: 0, width, height }} pointerEvents="none">
       {/* Light pillar behind the card (fades in with the flip). */}
-      <Rect testID="reveal-spotlight-pillar" x={center.x - pillarWidth / 2} y={0} width={pillarWidth} height={height} opacity={glow}>
+      <Rect testID="reveal-spotlight-pillar" x={center.x - pillarWidth / 2} y={center.y - cardWidth} width={pillarWidth} height={cardWidth * 2} opacity={lightOpacity}>
         <LinearGradient
-          start={vec(center.x, 0)}
-          end={vec(center.x, height)}
+          start={vec(center.x, center.y - cardWidth)}
+          end={vec(center.x, center.y + cardWidth)}
           colors={[`${pillar}00`, pillar, `${pillar}00`]}
           positions={[0, 0.5, 1]}
         />
       </Rect>
-      <Rect x={0} y={0} width={width} height={height} opacity={glow} transform={rayTransform} origin={vec(center.x, center.y)}>
-        <SweepGradient c={vec(center.x, center.y)} colors={stops.colors} positions={stops.positions} />
-      </Rect>
-      <Rect x={0} y={0} width={width} height={height} opacity={glow}>
-        <RadialGradient c={vec(center.x, center.y)} r={width * 0.6} colors={glowColors} />
+      <Rect x={center.x - cardWidth} y={center.y - cardWidth} width={cardWidth * 2} height={cardWidth * 2} opacity={lightOpacity}>
+        <RadialGradient c={vec(center.x, center.y)} r={cardWidth} colors={glowColors} />
       </Rect>
       {particleImage ? <Atlas image={particleImage} sprites={sprites} transforms={transforms} blendMode="plus" /> : null}
     </Canvas>
@@ -511,20 +508,23 @@ const styles = StyleSheet.create({
   scrim: { ...StyleSheet.absoluteFillObject },
   staticHalo: { position: 'absolute', opacity: 0.5 },
   column: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16 },
+  cardShadow: { position: 'absolute', left: 24, right: 24, bottom: -14, height: 18, borderRadius: 999, backgroundColor: 'rgba(0,0,0,0.16)', shadowColor: '#000000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.22, shadowRadius: 12, elevation: 4 },
+  foilSweep: { position: 'absolute', top: -40, bottom: -40, width: 56, backgroundColor: '#FFFFFF' },
   side: { ...StyleSheet.absoluteFillObject, borderRadius: 18, overflow: 'hidden', backfaceVisibility: 'hidden' },
   back: { flex: 1, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: 'rgba(218,180,90,0.55)', borderRadius: 18, overflow: 'hidden' },
   backImage: { width: '100%', height: '100%' },
   backInnerRing: { position: 'absolute', width: '70%', height: '70%', borderRadius: 999, borderWidth: 1, borderColor: 'rgba(218,180,90,0.30)' },
   backMonogram: { color: 'rgba(218,180,90,0.85)', fontSize: 64, fontWeight: '900', letterSpacing: 1, fontStyle: 'italic' },
   progress: { position: 'absolute', top: 24, left: 20, zIndex: 55, color: '#F5ECC4', fontSize: 16, fontWeight: '900', letterSpacing: 1, textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
-  skipAll: { position: 'absolute', top: 20, right: 20, zIndex: 55, minHeight: 40, paddingHorizontal: 16, borderRadius: 999, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.14)' },
+  skipAll: { position: 'absolute', top: 20, right: 20, zIndex: 55, minHeight: 44, paddingHorizontal: 16, borderRadius: 999, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.14)' },
   skipAllText: { color: '#F5ECC4', fontSize: 14, fontWeight: '800', letterSpacing: 0.3 },
   continueHint: { marginTop: 14, color: 'rgba(245,236,196,0.85)', fontSize: 13, fontWeight: '700', letterSpacing: 0.3, textAlign: 'center' },
   banner: { fontSize: 34, fontWeight: '900', letterSpacing: 1, marginBottom: 18, textAlign: 'center', textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 6 },
-  bannerSpacer: { height: 52, marginBottom: 18 },
+  bannerSlot: { alignItems: 'center', justifyContent: 'center' },
+  actionSlot: { alignItems: 'center', width: '100%' },
   readFull: { marginTop: 20, minHeight: 44, paddingHorizontal: 18, borderRadius: 999, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.12)' },
   readFullText: { color: '#F5ECC4', fontSize: 14, fontWeight: '800', letterSpacing: 0.3 },
-  footer: { marginTop: 22, width: '100%', alignItems: 'stretch' },
+  footer: { paddingTop: 22, width: '100%', alignItems: 'stretch' },
   sheet: { position: 'absolute', left: 20, right: 20, top: '18%', bottom: '18%', borderRadius: 20, backgroundColor: '#141024', padding: 20, zIndex: 60 },
   sheetScroll: { flex: 1 },
   sheetText: { color: '#F5ECC4', fontSize: 18, lineHeight: 26, fontWeight: '700' },

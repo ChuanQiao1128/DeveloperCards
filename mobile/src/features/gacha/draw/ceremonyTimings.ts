@@ -33,15 +33,13 @@ export const TEST_BASE: CeremonyTimingTable = Object.freeze({
   liftMs: 0, landMs: 0, tapQueueMs: 90,
 });
 
-// v2 (I06): the ceremony choreography is now charge ×3 → tear → full-screen burst → hero
-// flyout. The pack pulses three times on the three charge plucks, so hold is the same for
-// every rarity (the colour only turns true on the third pulse). toTableMs = 3050 for every
-// single and multi row, which keeps the single LEG hero landing inside TO_TABLE_CAP_MS.single.
+// Material opening: one grip, a short tension beat, tear and overlapping card flight.
+// Rarity adds a little anticipation; the focal reveal happens on the card itself.
 export const DEVICE: CeremonyTimingTable = Object.freeze({
-  single: { approach: 350, hold: { COM: 700, RAR: 700, LEG: 700 }, tearFlip: 300, flashReveal: 1000, settleMs: 500 },
-  multi:  { approach: 350, hold: { COM: 700, RAR: 700, LEG: 700 }, tearFlip: 900, flashReveal: 500, settleMs: 400 },
-  tableTailMs: 200,
-  beatMs: { COM: 280, RAR: 280, LEG: 280 },
+  single: { approach: 180, hold: { COM: 120, RAR: 180, LEG: 260 }, tearFlip: 420, flashReveal: 160, settleMs: 180 },
+  multi:  { approach: 180, hold: { COM: 120, RAR: 180, LEG: 260 }, tearFlip: 640, flashReveal: 160, settleMs: 180 },
+  tableTailMs: 80,
+  beatMs: { COM: 0, RAR: 0, LEG: 80 },
   flipMs: { COM: 380, RAR: 480, LEG: 640 },
   rimSettleMs: { COM: 800, RAR: 1000, LEG: 1200 },
   liftMs: 80, landMs: 200, tapQueueMs: 90,

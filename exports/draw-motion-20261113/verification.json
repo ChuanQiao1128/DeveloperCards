@@ -1,0 +1,62 @@
+{
+  "date": "2026-11-13",
+  "recordedAt": "2026-11-13T06:34:35.466196+00:00",
+  "branch": "codex/draw-motion-20261113",
+  "baseCommit": "db0f5e2973c0b7bdb01c57c3ff4875a738ea4828",
+  "scope": "Local draw ceremony implementation and simulator preview; product source remains uncommitted",
+  "skills": [
+    "https://github.com/emilkowalski/skills/blob/main/skills/animate-expo/SKILL.md",
+    "https://github.com/emilkowalski/skills/blob/main/skills/choreograph/SKILL.md"
+  ],
+  "sourceSnapshot": "review-source-sha256-v3.json",
+  "checks": {
+    "mobile": {
+      "passed": 3213,
+      "failed": 0
+    },
+    "typecheck": "PASS",
+    "productExports": {
+      "ios": "PASS",
+      "android": "PASS"
+    },
+    "diffCheck": "PASS"
+  },
+  "productBundles": {
+    "_expo/static/js/ios/index-b259904cfbd806d717044db46ab265f0.hbc": "a5c8309115cd89f5fed032060b024a0b1f7adb21c2a8cda118d057f1fa04224e",
+    "_expo/static/js/android/index-49646e6d3aeeaed13f4aff5ae5c2ddb8.hbc": "ff801c2a7666c1d4f7df6fef20eacfb2b8130f8554966c294f752e0a12221ffc"
+  },
+  "nativePreview": {
+    "device": "iPhone 17 Pro simulator",
+    "os": "iOS 26.5",
+    "appId": "com.timeawake.recallsmith.motionpreview",
+    "baseNativeShell": "Existing compatible 2.1.0 simulator app; updates disabled in preview clone",
+    "entry": "mobile/previews/drawMotion.tsx",
+    "bundleSha256": "5378c6d8837b0d6cd4ab1546d7daba517fefaa932ea086532aa9f259464c0a7e",
+    "captureDirectory": "exports/draw-motion-20261113/maestro/2026-11-13_192951/draw-motion",
+    "scenarios": [
+      "single LEG",
+      "single COM",
+      "five-card batch plus view-all summary"
+    ],
+    "result": "PASS"
+  },
+  "review": {
+    "status": "APPROVE",
+    "context": "Isolated source and simulator footage review",
+    "closedFindings": [
+      "Opaque full-card shadow during edge-on flip",
+      "Card dimensions changed when footer appeared",
+      "Centered card shifted when dynamic chrome entered layout"
+    ],
+    "physicalDeviceFeel": "UNVERIFIED"
+  },
+  "production": "NOT_DEPLOYED",
+  "commits": "NOT_CREATED",
+  "physicalDevicePerformance": "UNVERIFIED",
+  "preserved": [
+    "Actual draw result UIDs and ordering",
+    "Wallet/acquisition/sync code",
+    "Existing source worktree showcase edits"
+  ],
+  "snapshot": "Pre-merge validation snapshot; subsequent release receipt is authoritative for deployment status"
+}
