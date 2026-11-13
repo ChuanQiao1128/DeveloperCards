@@ -232,7 +232,7 @@ export function DrawResultScreen({ navigation, route }: Props) {
   const packComplete = params.packComplete === true;
   const canContinueDrawing = !isWalletLoading && remainingPulls > 0 && !packComplete;
   // Random packs offer another draw or the Library; courses continue into study.
-  const primaryLabel = isCourse ? 'Continue course in order' : isWalletLoading
+  const primaryLabel = isCourse ? 'Continue learning' : isWalletLoading
     ? 'Checking draws...'
     : canContinueDrawing
       ? `Continue drawing  ·  ${remainingPulls} draw${remainingPulls === 1 ? '' : 's'} left`
@@ -381,7 +381,7 @@ export function DrawResultScreen({ navigation, route }: Props) {
               testID="screen-draw-result-primary-cta"
               accessibilityRole="button"
               accessibilityLabel={
-                isCourse ? 'Continue course in order' : isWalletLoading
+                isCourse ? 'Continue learning' : isWalletLoading
                   ? 'Checking remaining draws'
                   : canContinueDrawing
                   ? `Continue drawing from ${deckLabel(params)}`
@@ -436,7 +436,7 @@ export function DrawResultScreen({ navigation, route }: Props) {
               </Text>
               {primaryAction}
               <Text testID="draw-result-course-order-note" style={{ color: colors.inkSecondary, fontSize: typography.bodySmall }}>
-                Continue from your earliest unlearned card, including cards unlocked earlier.
+                Study foundations before dependent new cards, including cards unlocked earlier.
               </Text>
             </View>
           ) : null}
