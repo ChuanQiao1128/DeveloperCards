@@ -8,7 +8,7 @@ const { createHash } = require('node:crypto');
 const { execFileSync } = require('node:child_process');
 const RUNTIME = '2.1.1';
 const BUILD = '26';
-const READER_SHA256 = 'c59b5f41f8962c6a5a9aa8dabf059dd3618d3ca9c8e1f101c9d599455a022299';
+const READER_SHA256 = '2411ae0ca317874c3dce1e7c15764d03afa3a9ea99c93fde4ec6cb66e118f7fa';
 const MARKERS = ['devcards:sync:pendingOwners:v1', 'PROGRESS_QUEUE_FULL'];
 const sha = value => createHash('sha256').update(value).digest('hex');
 const readJson = file => JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -82,11 +82,12 @@ function inspectIpa(ipa, app, run = execFileSync) {
     const updates = plist('Expo.plist');
     requireThat(info.CFBundleShortVersionString === RUNTIME && info.CFBundleVersion === BUILD && info.CFBundleIdentifier === app.ios.bundleIdentifier, 'baseline native identity/version mismatch');
     requireThat(updates.EXUpdatesRuntimeVersion === RUNTIME && updates.EXUpdatesURL === app.updates.url && updates.EXUpdatesEnabled !== false, 'baseline embedded runtime/update URL mismatch');
+    requireThat(updates.EXUpdatesRequestHeaders?.['expo-channel-name'] === 'production', 'baseline must embed the production update channel');
     const embeddedPath = path.join(bundle, 'main.jsbundle');
     requireThat(fs.statSync(embeddedPath).size <= 64 * 1024 * 1024, 'embedded baseline exceeds size limit');
     const embedded = fs.readFileSync(embeddedPath);
     requireThat(MARKERS.every(marker => embedded.includes(Buffer.from(marker))), 'baseline embedded bundle lacks the ownership reader or full-queue guard');
-    return { signedProvenance: info.RecallSmithBuildProvenance ?? null, runtime: RUNTIME, buildNumber: BUILD, bundleIdentifier: info.CFBundleIdentifier, appleTeamId: team, archiveSha256, embeddedBundleSha256: sha(embedded) };
+    return { signedProvenance: info.RecallSmithBuildProvenance ?? null, runtime: RUNTIME, channel: 'production', buildNumber: BUILD, bundleIdentifier: info.CFBundleIdentifier, appleTeamId: team, archiveSha256, embeddedBundleSha256: sha(embedded) };
   } finally {
     fs.rmSync(temp, { recursive: true, force: true });
   }

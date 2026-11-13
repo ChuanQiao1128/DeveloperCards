@@ -44,7 +44,7 @@ function writeIpa(output: string, app: any, provenance: any, embedded = hbc) {
   const files = {
     'Payload/STUB.app/Info.plist': Buffer.from(JSON.stringify({ CFBundleShortVersionString: '2.1.1', CFBundleVersion: '26',
       CFBundleIdentifier: app.ios.bundleIdentifier, RecallSmithBuildProvenance: provenance })).toString('base64'),
-    'Payload/STUB.app/Expo.plist': Buffer.from(JSON.stringify({ EXUpdatesRuntimeVersion: '2.1.1', EXUpdatesURL: app.updates.url })).toString('base64'),
+    'Payload/STUB.app/Expo.plist': Buffer.from(JSON.stringify({ EXUpdatesRuntimeVersion: '2.1.1', EXUpdatesURL: app.updates.url, EXUpdatesRequestHeaders: { 'expo-channel-name': 'production' } })).toString('base64'),
     'Payload/STUB.app/main.jsbundle': embedded.toString('base64'),
   };
   execFileSync('python3', ['-c', 'import json,sys,zipfile,base64\nwith zipfile.ZipFile(sys.argv[1],"x") as z:\n for k,v in json.loads(sys.argv[2]).items(): z.writestr(k,base64.b64decode(v))', output, JSON.stringify(files)]);
@@ -290,15 +290,19 @@ describe('Xcode final-bundle observer and config preservation', () => {
     const dir = temp(); const root = path.join(dir, 'mobile');
     for (const name of producer.PRODUCER_FILES) write(path.join(root, name), fs.readFileSync(path.join(mobile, name)));
     const config = JSON.parse(fs.readFileSync(path.join(mobile, 'app.json'), 'utf8')).expo;
+    config.updates.requestHeaders = { 'x-fixture': 'public-config' };
     const resolve = require(path.join(root, 'app.config.js'));
     expect(resolve({ config })).toBe(config);
     write(path.join(root, '.ownership-build.json'), '{}'); expect(() => resolve({ config })).toThrow('partial');
     const c = { schema: 2, sourceCommit: 'a'.repeat(40), sourceArchiveSha256: 'b'.repeat(64), buildNonce: 'c'.repeat(64), runDir: dir };
     write(path.join(root, '.ownership-build.json'), JSON.stringify(c));
     const built = resolve({ config });
+    expect(built.updates).toEqual({ ...config.updates, requestHeaders: { ...config.updates.requestHeaders, 'expo-channel-name': 'production' } });
     expect(built.extra).toEqual(config.extra); expect(built.plugins.slice(0, -1)).toEqual(config.plugins);
     expect(built.ios.infoPlist).toEqual({ ...config.ios.infoPlist, RecallSmithBuildProvenance: producer.signedContext(c) });
-    expect({ ...built, plugins: config.plugins, ios: config.ios }).toEqual(config);
+    expect({ ...built, plugins: config.plugins, ios: config.ios, updates: config.updates }).toEqual(config);
+    config.updates.requestHeaders['expo-channel-name'] = 'preview';
+    expect(() => resolve({ config })).toThrow('production update channel conflicts');
   });
   it('patches the known RN invocation within Sentry and rejects unknown/repeated hooks', () => {
     const { patchPhase } = require(path.join(mobile, 'plugins/withBuildProvenance.js'));

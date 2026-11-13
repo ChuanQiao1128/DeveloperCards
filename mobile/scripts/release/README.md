@@ -84,7 +84,10 @@ upload authorization, preserves the configured Sentry org/project checks, and ne
 upload token or a hash of it. EAS remote environment configuration cannot replace these inputs.
 
 The dynamic Expo config preserves the resolved normal config when no producer context exists. During
-production it merges only reserved signed native provenance and the observer plugin. The Xcode plugin
+production it merges reserved signed native provenance, the observer plugin and the explicit
+`expo-channel-name: production` update request header, preserving other update settings.
+The signed IPA inspector rejects a missing or different production channel; a locally built binary
+therefore cannot pass only on runtime/URL while silently losing production OTA delivery. The Xcode plugin
 accepts only its known RN bundling invocation. The observer runs Metro and Hermes in that same native
 build, refuses a pre-existing/skipped bundle, and retains the final Hermes bytes before signing.
 The producer requires their digest to match `main.jsbundle` in the newly signed IPA, and requires the

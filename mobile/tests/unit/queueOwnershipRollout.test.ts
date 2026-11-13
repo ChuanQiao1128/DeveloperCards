@@ -97,11 +97,11 @@ describe('ownership release gate', () => {
   });
 });
 
-function archiveFixture(opts: { runtime?: string; id?: string; markers?: string; unsafe?: string; symlink?: boolean } = {}) {
+function archiveFixture(opts: { runtime?: string; id?: string; markers?: string; unsafe?: string; symlink?: boolean; channel?: string | null } = {}) {
   const f = fixture();
   const files: Record<string, string> = {
     'Payload/STUB.app/Info.plist': JSON.stringify({ CFBundleShortVersionString: '2.1.1', CFBundleVersion: '26', CFBundleIdentifier: opts.id ?? f.app.ios.bundleIdentifier }),
-    'Payload/STUB.app/Expo.plist': JSON.stringify({ EXUpdatesRuntimeVersion: opts.runtime ?? '2.1.1', EXUpdatesURL: f.app.updates.url, EXUpdatesEnabled: true }),
+    'Payload/STUB.app/Expo.plist': JSON.stringify({ EXUpdatesRuntimeVersion: opts.runtime ?? '2.1.1', EXUpdatesURL: f.app.updates.url, EXUpdatesEnabled: true, EXUpdatesRequestHeaders: opts.channel === null ? undefined : { 'expo-channel-name': opts.channel ?? 'production' } }),
     'Payload/STUB.app/main.jsbundle': opts.markers ?? 'STUB devcards:sync:pendingOwners:v1 PROGRESS_QUEUE_FULL',
   };
   if (opts.unsafe) files[opts.unsafe] = 'unsafe';
@@ -116,6 +116,10 @@ function archiveFixture(opts: { runtime?: string; id?: string; markers?: string;
   return { ...f, run, calls };
 }
 describe('bounded IPA inspection with stubbed Apple signature/plist tools', () => {
+  it.each([null, '', 'preview'])('rejects a signed baseline outside production channel (%s)', channel => {
+    const f = archiveFixture({ channel });
+    expect(() => guard.inspectIpa(f.ipa, f.app, f.run)).toThrow('production update channel');
+  });
   it('reads actual archive/bundle bytes, passes Apple/team/bundle requirements, and removes extraction files', () => {
     const f = archiveFixture();
     const proof = guard.inspectIpa(f.ipa, f.app, f.run);
