@@ -1,6 +1,6 @@
 # 前置关系与奖励抽卡：2.1.0热更新
 
-已实现并完成本地验证，尚未发布。用户确认保留“学习→赚取抽卡次数→获得新卡”，未抽到的前置卡不能免费阅读；只通过现有2.1.0热更新交付。
+已发布至 production / iOS 2.1.0，线上更新清单及实际下载包校验通过。用户确认保留“学习→赚取抽卡次数→获得新卡”，未抽到的前置卡不能免费阅读；只通过现有2.1.0热更新交付。
 
 ## 最终行为
 
@@ -19,6 +19,15 @@
 
 ## 发布与范围
 
-发布前EAS production仍是更新组3fb8ba07-d454-4edf-a47e-95f080c1c63c，runtime2.1.0，源82f246db，dry-run通过。最终状态以verification.json及线上回读为准。发布必须使用mobile/scripts/release/ota.sh，不创建AppStore二进制，不部署后端，不替换卡包。
+发布前EAS production仍是更新组3fb8ba07-d454-4edf-a47e-95f080c1c63c，runtime2.1.0，源82f246db，dry-run通过。发布结果已写入verification.json、production-after.json及live-delivery.json。发布必须使用mobile/scripts/release/ota.sh，不创建AppStore二进制，不部署后端，不替换卡包。
 
 本轮原生证据是模拟器手工换JS，未声称签名embedded回退、真机接收、真实账号/购买/推送或学习效果验收。
+
+## 正式发布结果
+
+- [EAS更新组](https://expo.dev/accounts/timeawakes-organization/projects/recallsmith/updates/dd2ad2ee-7ca5-4cf7-9165-9fe9215e8975)：`dd2ad2ee-7ca5-4cf7-9165-9fe9215e8975`。
+- iOS update `01a1d65f-5762-7d7c-b1b2-587335c73f11`，源提交 `1b3605c61191ca158866060cf637ca6a82a1d606`，clean；2026-11-13 19:25:34 UTC，runtime2.1.0 / environment production。
+- 线上清单和按Expo协议授权下载均HTTP200；包6040300字节，SHA256 `3153a0c157e6aeb219f58586f14845e268dca25cebea4787a7b929f234e35fb8`，与清单及本地实际上传包一致。临时asset授权不显示、不提交，临时manifest已删除。
+- Sentry源码映射因本机无token而skipped-no-token；热更新已经上线。未发布原生二进制、未部署后端、未替换卡包、未push Git。
+
+手机联网，回到Home后切到后台再打开，现有更新检查会在安全页面下载并应用；正在进行的学习保留当前位置。

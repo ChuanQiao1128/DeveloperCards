@@ -1,0 +1,87 @@
+ota: runtime=2.1.0 channel=production environment=production
+Environment variables with visibility "Plain text" and "Sensitive" loaded from the "production" environment on EAS: EXPO_PUBLIC_API_BASE, EXPO_PUBLIC_API_BASE_URL, EXPO_PUBLIC_AWS_REGION, EXPO_PUBLIC_COGNITO_USER_POOL_CLIENT_ID, EXPO_PUBLIC_COGNITO_USER_POOL_ID, EXPO_PUBLIC_CONTENT_BASE_URL, EXPO_PUBLIC_ENV, EXPO_PUBLIC_RC_ALLOW_SANDBOX, EXPO_PUBLIC_RC_ALLOW_SANDBOXEXPO_PUBLIC_DEV_BYPASS_PREMIUM_URL, EXPO_PUBLIC_RC_ENTITLEMENT_ID, EXPO_PUBLIC_RC_IOS_API_KEY, EXPO_PUBLIC_RC_MONTHLY_PRODUCT_ID, EXPO_PUBLIC_SENTRY_DSN.
+
+- Exporting...
+[expo-cli] --non-interactive is not supported, use $CI=1 instead
+[expo-cli] [33m› [1m[@sentry/react-native/expo][22m Missing config for [1morganization, project[22m. Environment variables will be used as a fallback during the build. https://docs.sentry.io/platforms/react-native/manual-setup/[0m
+[expo-cli] Starting Metro Bundler
+[expo-cli] | (node:87075) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[expo-cli] | (Use `node --trace-warnings ...` to show where the warning was created)
+[expo-cli] | (node:87076) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[expo-cli] | (Use `node --trace-warnings ...` to show where the warning was created)
+[expo-cli] | (node:87077) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[expo-cli] | (Use `node --trace-warnings ...` to show where the warning was created)
+[expo-cli] | (node:87078) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[expo-cli] | (Use `node --trace-warnings ...` to show where the warning was created)
+[expo-cli] iOS ./index.ts ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 99.9% (3019/3019)
+[expo-cli] iOS Bundled 7793ms index.ts (3019 modules)
+[expo-cli] iOS ./index.ts ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 99.9% (3019/3019)
+[expo-cli] Creating asset map
+[expo-cli] 
+[expo-cli] › Assets (46):
+[expo-cli] assets/packs/ai-back.png (60.9 kB)
+[expo-cli] assets/packs/ai.png (305 kB)
+[expo-cli] assets/packs/aws-back.png (189 kB)
+[expo-cli] assets/packs/aws-basics-back.png (197 kB)
+[expo-cli] assets/packs/aws-basics.png (583 kB)
+[expo-cli] assets/packs/aws.png (557 kB)
+[expo-cli] assets/packs/claude-back.png (182 kB)
+[expo-cli] assets/packs/claude.png (478 kB)
+[expo-cli] assets/packs/cloud-back.png (58.9 kB)
+[expo-cli] assets/packs/cloud.png (305 kB)
+[expo-cli] assets/packs/csharp-back.png (1.06 MB)
+[expo-cli] assets/packs/csharp.png (944 kB)
+[expo-cli] assets/packs/default-back.png (59.5 kB)
+[expo-cli] assets/packs/default.png (312 kB)
+[expo-cli] assets/packs/premium-deck-back.png (59.8 kB)
+[expo-cli] assets/packs/premium-deck.png (283 kB)
+[expo-cli] assets/sfx/v2/burst.wav (65.9 kB)
+[expo-cli] assets/sfx/v2/charge.wav (81.4 kB)
+[expo-cli] assets/sfx/v2/flip.wav (40.3 kB)
+[expo-cli] assets/sfx/v2/flyout.wav (53.1 kB)
+[expo-cli] assets/sfx/v2/stinger-com.wav (43.7 kB)
+[expo-cli] assets/sfx/v2/stinger-leg.wav (137 kB)
+[expo-cli] assets/sfx/v2/stinger-rar.wav (82.4 kB)
+[expo-cli] assets/sfx/v2/tear.wav (82.8 kB)
+[expo-cli] assets/ui/foil-lut.png (313 B)
+[expo-cli] assets/ui/frame-com.png (120 kB)
+[expo-cli] assets/ui/frame-leg.png (140 kB)
+[expo-cli] assets/ui/frame-rar.png (141 kB)
+[expo-cli] assets/ui/glow-9slice.png (2.98 kB)
+[expo-cli] assets/ui/particles.png (3.83 kB)
+[expo-cli] node_modules/@react-navigation/elements/lib/module/assets/back-icon-mask.png (653 B)
+[expo-cli] node_modules/@react-navigation/elements/lib/module/assets/back-icon.png (4 variations | 566 B)
+[expo-cli] node_modules/@react-navigation/elements/lib/module/assets/clear-icon.png (4 variations | 425 B)
+[expo-cli] node_modules/@react-navigation/elements/lib/module/assets/close-icon.png (4 variations | 235 B)
+[expo-cli] node_modules/@react-navigation/elements/lib/module/assets/search-icon.png (3 variations | 582 B)
+[expo-cli] 
+[expo-cli] › ios bundles (2):
+[expo-cli] _expo/static/js/ios/index-cc1a5de31088f8a8e04a86d1f17cca14.hbc (6.04 MB)
+[expo-cli] _expo/static/js/ios/index-cc1a5de31088f8a8e04a86d1f17cca14.hbc.map (18.2 MB)
+[expo-cli] 
+[expo-cli] › Files (2):
+[expo-cli] assetmap.json (20.9 kB)
+[expo-cli] metadata.json (3.23 kB)
+[expo-cli] 
+[expo-cli] Exported: dist
+✔ Exported bundle(s)
+- Uploading...
+- Uploading assetmap.json (0 / 20.4 KB)
+✔ Uploaded assetmap.json 
+✔ Uploaded 1 app bundle
+✔ Uploading assets skipped - no new assets found
+ℹ 50 iOS assets (maximum: 2000 total per update). Learn more about asset limits: https://expo.fyi/eas-update-asset-limits
+- Computing project fingerprints
+✔ Computed project fingerprints
+- Publishing...
+✔ Published!
+Branch           production
+Runtime version  2.1.0
+Platform         ios
+Update group ID  dd2ad2ee-7ca5-4cf7-9165-9fe9215e8975
+iOS update ID    01a1d65f-5762-7d7c-b1b2-587335c73f11
+Message          Prerequisite-first earned cards and new learning
+Commit           1b3605c61191ca158866060cf637ca6a82a1d606
+EAS Dashboard    https://expo.dev/accounts/timeawakes-organization/projects/recallsmith/updates/dd2ad2ee-7ca5-4cf7-9165-9fe9215e8975
+
+SENTRY_UPLOAD=skipped-no-token
