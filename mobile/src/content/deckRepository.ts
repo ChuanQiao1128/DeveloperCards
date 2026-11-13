@@ -1108,6 +1108,10 @@ async function tryPatchUpdate(args: {
       if (String(delta.toVersion).trim() !== String(edge.toVersion).trim()) return { ok: false, hops: 0 };
 
       deck = applyDelta(deck!, delta);
+      // A patch must not publish an unsupported teaching shape over a working install.
+      if (deck.cards.some((c) => c.teaching != null && !supportedTeaching(c.teaching))) {
+        return { ok: false, hops: 0 };
+      }
       cur = delta.toVersion;
     }
 
@@ -1208,7 +1212,7 @@ function isDeckDelta(x: any): x is DeckDelta {
     typeof x.slug === 'string' &&
     typeof x.fromVersion === 'string' &&
     typeof x.toVersion === 'string' &&
-    (typeof x.schemaVersion === 'number' || typeof x.schemaVersion === 'string')
+    x.schemaVersion === 2
   );
 }
 
