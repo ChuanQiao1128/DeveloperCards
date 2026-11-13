@@ -12,16 +12,16 @@ public static class DbUtil
     IReadOnlyList<object?> parameters)
   {
     await using var cmd = CreateCommand(conn, tx, sql, parameters);
-    await using var reader = await cmd.ExecuteReaderAsync();
+    await using var reader = await cmd.ExecuteReaderAsync(RequestBudget.Token);
 
     var rows = new List<Dictionary<string, object?>>();
-    while (await reader.ReadAsync())
+    while (await reader.ReadAsync(RequestBudget.Token))
     {
       var row = new Dictionary<string, object?>(StringComparer.Ordinal);
       for (var i = 0; i < reader.FieldCount; i++)
       {
         var name = reader.GetName(i);
-        row[name] = await reader.IsDBNullAsync(i) ? null : reader.GetValue(i);
+        row[name] = await reader.IsDBNullAsync(i, RequestBudget.Token) ? null : reader.GetValue(i);
       }
       rows.Add(row);
     }
@@ -36,7 +36,7 @@ public static class DbUtil
     IReadOnlyList<object?> parameters)
   {
     await using var cmd = CreateCommand(conn, tx, sql, parameters);
-    return await cmd.ExecuteNonQueryAsync();
+    return await cmd.ExecuteNonQueryAsync(RequestBudget.Token);
   }
 
   public static async Task<object?> ExecuteScalarAsync(
@@ -46,7 +46,7 @@ public static class DbUtil
     IReadOnlyList<object?> parameters)
   {
     await using var cmd = CreateCommand(conn, tx, sql, parameters);
-    var r = await cmd.ExecuteScalarAsync();
+    var r = await cmd.ExecuteScalarAsync(RequestBudget.Token);
     return r is DBNull ? null : r;
   }
 
@@ -56,7 +56,7 @@ public static class DbUtil
     string sql,
     IReadOnlyList<object?> parameters)
   {
-    var cmd = conn.CreateCommand();
+    var cmd = RequestBudget.Command(conn.CreateCommand());
     cmd.CommandText = SqlUtil.ToNpgsql(sql);
     if (tx is not null) cmd.Transaction = tx;
 

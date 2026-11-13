@@ -72,7 +72,7 @@ public static class WebhookEvents
   /// </summary>
   private static CancellationTokenSource Deadline(CancellationToken ct)
   {
-    var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+    var cts = CancellationTokenSource.CreateLinkedTokenSource(RecallSmith.Lambda.Common.RequestBudget.Combine(ct));
     cts.CancelAfter(SendDeadline);
     return cts;
   }
@@ -423,7 +423,7 @@ public static class WebhookEvents
 
       var newId = Guid.NewGuid();
       int superseded;
-      await using (var tx = await conn.BeginTransactionAsync(ct))
+      await using (var tx = await conn.BeginTransactionAsync(RecallSmith.Lambda.Common.RequestBudget.Combine(ct)))
       {
         await DbUtil.ExecuteAsync(conn, tx,
           "insert into webhook_deliveries (delivery_id, event_id, event, subscription_id, status, attempts, body) values ($1, $2, $3, $4, 'queued', 0, $5)",
@@ -435,7 +435,7 @@ public static class WebhookEvents
           where d.delivery_id = $1 and {SupersedablePredicate}
           """,
           [deliveryId, $"superseded by redelivery {newId:D}"]);
-        await tx.CommitAsync(ct);
+        await tx.CommitAsync(RecallSmith.Lambda.Common.RequestBudget.Combine(ct));
       }
 
       using var deadline = Deadline(ct);
@@ -571,10 +571,10 @@ public static class WebhookEvents
 
     try
     {
-      // WaitAsync enforces the deadline even on a send that does not observe the token itself.
+      // Await the SDK cancellation; never detach a send whose acceptance may be ambiguous.
       var seam = TestSendSeam;
-      if (seam is not null) await seam(request).WaitAsync(ct);
-      else await SQS().SendMessageAsync(request, ct).WaitAsync(ct);
+      if (seam is not null) await seam(request).WaitAsync(ct); // Test-only seam has no remote side effect.
+      else await SQS().SendMessageAsync(request, RecallSmith.Lambda.Common.RequestBudget.Combine(ct));
     }
     catch (Exception ex)
     {

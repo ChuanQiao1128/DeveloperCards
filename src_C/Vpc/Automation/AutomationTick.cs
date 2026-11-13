@@ -229,7 +229,7 @@ public static class AutomationTick
   {
     var failed = new List<(long ItemId, string Url, string LastError)>();
     var partial = new List<(long ItemId, string Url, string LastError, Guid RunId)>();
-    await using (var tx = await conn.BeginTransactionAsync())
+    await using (var tx = await conn.BeginTransactionAsync(RecallSmith.Lambda.Common.RequestBudget.Token))
     {
       var items = await DbUtil.QueryAsync(conn, tx,
         """
@@ -281,7 +281,7 @@ public static class AutomationTick
           [itemId]);
         a.LeasesExpired++;
       }
-      await tx.CommitAsync();
+      await tx.CommitAsync(RecallSmith.Lambda.Common.RequestBudget.Token);
     }
 
     foreach (var (itemId, url, lastError, runId) in partial)
@@ -330,7 +330,7 @@ public static class AutomationTick
       var mode = await AutomationMode.EffectiveAsync(conn);
       string decisionMode;
       long deckId;
-      await using (var tx = await conn.BeginTransactionAsync())
+      await using (var tx = await conn.BeginTransactionAsync(RecallSmith.Lambda.Common.RequestBudget.Token))
       {
         var locked = await DbUtil.QueryAsync(conn, tx,
           """
@@ -343,7 +343,7 @@ public static class AutomationTick
         // The ledger follows the mode this transition applied (R18C backend-design-16).
         decisionMode = await DraftDecisions.TransitionAsync(conn, tx, draftId, DraftDecisions.QaQueued, DraftDecisions.Human, "QA_TIMEOUT", null,
           DraftDecisions.AutomationEventActor, mode.Effective, new { timeoutMinutes = AutomationEnv.QaTimeoutMinutes() }, CancellationToken.None);
-        await tx.CommitAsync();
+        await tx.CommitAsync(RecallSmith.Lambda.Common.RequestBudget.Token);
       }
       a.QaTimedOut++;
       if (decisionMode == AutomationMode.Live)
@@ -370,7 +370,7 @@ public static class AutomationTick
       var mode = await AutomationMode.EffectiveAsync(conn);
       string decisionMode;
       long deckId;
-      await using (var tx = await conn.BeginTransactionAsync())
+      await using (var tx = await conn.BeginTransactionAsync(RecallSmith.Lambda.Common.RequestBudget.Token))
       {
         var locked = await DbUtil.QueryAsync(conn, tx,
           """
@@ -384,7 +384,7 @@ public static class AutomationTick
         decisionMode = await DraftDecisions.TransitionAsync(conn, tx, draftId, DraftDecisions.QaPending, DraftDecisions.Human, "ENQUEUE_FAILED",
           $"draft QA could not be enqueued for {pendingMinutes} minutes", DraftDecisions.AutomationEventActor, mode.Effective,
           new { pendingMinutes }, CancellationToken.None);
-        await tx.CommitAsync();
+        await tx.CommitAsync(RecallSmith.Lambda.Common.RequestBudget.Token);
       }
       a.QaTimedOut++;
       Log.Event("warn", new { tag = "automation", outcome = "qa_pending_timed_out", draftId, pendingMinutes });

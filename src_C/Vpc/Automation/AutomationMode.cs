@@ -59,13 +59,13 @@ public static class AutomationMode
     if (configured == Off) return new EffectiveMode(Off, Off, null, null, null);
 
     bool tableExists, authorColumn;
-    await using (var probe = new NpgsqlCommand(
+    await using (var probe = RecallSmith.Lambda.Common.RequestBudget.Command(new NpgsqlCommand(
       "select to_regclass('public.automation_eval_gates') is not null, " +
       "exists (select 1 from pg_attribute where attrelid = to_regclass('public.automation_eval_gates') " +
-      "and attname = 'author_config_id' and not attisdropped)", conn))
-    await using (var probeReader = await probe.ExecuteReaderAsync(ct))
+      "and attname = 'author_config_id' and not attisdropped)", conn)))
+    await using (var probeReader = await probe.ExecuteReaderAsync(RecallSmith.Lambda.Common.RequestBudget.Combine(ct)))
     {
-      await probeReader.ReadAsync(ct);
+      await probeReader.ReadAsync(RequestBudget.Combine(ct));
       tableExists = probeReader.GetBoolean(0);
       authorColumn = probeReader.GetBoolean(1);
     }
@@ -74,13 +74,13 @@ public static class AutomationMode
     long? gateId = null;
     GateReviewer? reviewer = null;
     string? gateAuthor = null;
-    await using (var cmd = new NpgsqlCommand(
+    await using (var cmd = RecallSmith.Lambda.Common.RequestBudget.Command(new NpgsqlCommand(
       $"select id, reviewer_provider, reviewer_model, prompt_version, {GateAuthorSql(authorColumn)} as author_config_id, " +
       $"{GateEffortSql} as effective_effort " +
-      $"from ({EvalGate.NewestGateSql}) g where passed and revoked_at is null", conn))
-    await using (var reader = await cmd.ExecuteReaderAsync(ct))
+      $"from ({EvalGate.NewestGateSql}) g where passed and revoked_at is null", conn)))
+    await using (var reader = await cmd.ExecuteReaderAsync(RecallSmith.Lambda.Common.RequestBudget.Combine(ct)))
     {
-      if (await reader.ReadAsync(ct))
+      if (await reader.ReadAsync(RequestBudget.Combine(ct)))
       {
         gateId = reader.GetInt64(0);
         reviewer = new GateReviewer(reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.IsDBNull(5) ? null : reader.GetString(5));

@@ -158,7 +158,7 @@ public static class EvalGate
       await using var conn = await Pg.OpenConnectionOrNullAsync();
       if (conn is null) return Helpers.ConfigError(res, "Missing PG env vars (PGHOST/PGDATABASE/PGUSER/PGPASSWORD)");
 
-      await using var tx = await conn.BeginTransactionAsync();
+      await using var tx = await conn.BeginTransactionAsync(RecallSmith.Lambda.Common.RequestBudget.Token);
       // One recording at a time, so the freshness check below and the insert see the same newest row.
       await DbUtil.ExecuteAsync(conn, tx, "select pg_advisory_xact_lock($1)", [RecordLockKey]);
 
@@ -204,7 +204,7 @@ public static class EvalGate
         authorColumn
           ? [report.Provider, report.Model, report.PromptVersion, passed, metrics, sha, raw, auth.UserSub, report.AuthorConfigId]
           : [report.Provider, report.Model, report.PromptVersion, passed, metrics, sha, raw, auth.UserSub]);
-      await tx.CommitAsync();
+      await tx.CommitAsync(RecallSmith.Lambda.Common.RequestBudget.Token);
       if (!passed)
       {
         Log.Event("info", new { tag = "automation", reason = "eval_gate_failed_recorded", gateId = RunnerRoutes.Long(rows[0]["id"]), failures });

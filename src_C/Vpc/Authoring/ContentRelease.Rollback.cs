@@ -16,7 +16,7 @@ public static partial class ContentRelease
       var release=Required(body,"releaseId");var action=Required(body,"actionId");var target=Required(body,"buildId");
       var expected=Required(body,"expectedCurrent");var targetHash=HashField(body,"expectedRestoreHash");var hash=PayloadHash(body);
       APIGatewayProxyResponse result;
-      await using(var tx=await conn.BeginTransactionAsync())
+      await using(var tx=await conn.BeginTransactionAsync(RecallSmith.Lambda.Common.RequestBudget.Token))
       {
         await Lock(conn,tx,id);
         var replay=await Replay(conn,tx,id,release,action,hash);if(replay is not null)return replay;
@@ -37,7 +37,7 @@ public static partial class ContentRelease
           await DbUtil.ExecuteAsync(conn,tx,"update deck_publishes set status='FAILED',error_message='RELEASE_ROLLED_BACK',updated_at=now() where deck_id=$1 and status in('PENDING','PROCESSING')",[id]);
         }
         result=res.Ok(new{deckId=id,liveBuildId=target,previousBuildId=current,rollbackCommitted=true,alreadyRestored=current==target,editingDatabaseRestored=false,manifestVerified=false});
-        await Save(conn,tx,id,release,action,"rollback",hash,result);await tx.CommitAsync();
+        await Save(conn,tx,id,release,action,"rollback",hash,result);await tx.CommitAsync(RecallSmith.Lambda.Common.RequestBudget.Token);
       }
       await rebuild(conn);return result;
     }

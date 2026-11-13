@@ -151,7 +151,19 @@ public static class Pg
   {
     var conn = ConnectionOrNull();
     if (conn is null) return null;
-    await conn.OpenAsync(cancellationToken);
-    return conn;
+    try
+    {
+      var token = RequestBudget.Combine(cancellationToken);
+      // A warm pooled OpenAsync can complete synchronously without checking an already-cancelled token.
+      token.ThrowIfCancellationRequested();
+      await conn.OpenAsync(token);
+      token.ThrowIfCancellationRequested();
+      return conn;
+    }
+    catch
+    {
+      await conn.DisposeAsync();
+      throw;
+    }
   }
 }

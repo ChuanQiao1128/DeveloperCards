@@ -56,7 +56,7 @@ public static class Permissions
         AdminAuditEntry? auditEntry = null;
         var persisted = false;
 
-        await using var tx = await conn.BeginTransactionAsync();
+        await using var tx = await conn.BeginTransactionAsync(RecallSmith.Lambda.Common.RequestBudget.Token);
         try
         {
           // Audit the state before the mutation so a mis-click leaves a record of what was revoked.
@@ -100,7 +100,7 @@ public static class Permissions
           auditEntry = AdminAudit.Entry(auth, res, action, target, before, after);
           persisted = await AdminAudit.RecordAsync(conn, tx, auditEntry);
 
-          await tx.CommitAsync();
+          await tx.CommitAsync(RecallSmith.Lambda.Common.RequestBudget.Token);
         }
         catch
         {
@@ -215,7 +215,7 @@ public static class Permissions
         bool persisted;
         object after;
 
-        await using var tx = await conn.BeginTransactionAsync();
+        await using var tx = await conn.BeginTransactionAsync(RecallSmith.Lambda.Common.RequestBudget.Token);
         try
         {
           var beforeRows = await DbUtil.QueryAsync(conn, tx,
@@ -235,7 +235,7 @@ public static class Permissions
           auditEntry = AdminAudit.Entry(auth, res, "permissions.upsert", $"admin:{adminSub.Trim()}", before, after);
           persisted = await AdminAudit.RecordAsync(conn, tx, auditEntry);
 
-          await tx.CommitAsync();
+          await tx.CommitAsync(RecallSmith.Lambda.Common.RequestBudget.Token);
         }
         catch
         {
@@ -270,7 +270,7 @@ public static class Permissions
         AdminAuditEntry auditEntry;
         bool persisted;
 
-        await using var tx = await conn.BeginTransactionAsync();
+        await using var tx = await conn.BeginTransactionAsync(RecallSmith.Lambda.Common.RequestBudget.Token);
         try
         {
           var beforeRows = await DbUtil.QueryAsync(conn, tx,
@@ -283,7 +283,7 @@ public static class Permissions
           auditEntry = AdminAudit.Entry(auth, res, "permissions.delete", $"admin:{adminSub}", before, null);
           persisted = await AdminAudit.RecordAsync(conn, tx, auditEntry);
 
-          await tx.CommitAsync();
+          await tx.CommitAsync(RecallSmith.Lambda.Common.RequestBudget.Token);
         }
         catch
         {

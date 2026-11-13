@@ -207,9 +207,7 @@ public static class Migrate
       return res.BadRequest("CONFIG_ERROR", "Missing PG env vars (PGHOST/PGDATABASE/PGUSER/PGPASSWORD)");
     }
 
-    var scalar = await ExecuteScalarAsync(conn, null, "select 1 as ok;", []);
-    var ok = scalar is not null && Convert.ToInt32(scalar, CultureInfo.InvariantCulture) == 1;
-    return res.Ok(new { ok });
+    return await Readiness.Check(conn, res);
   }
 
   public static async Task<Amazon.Lambda.APIGatewayEvents.APIGatewayProxyResponse> HandleDbMigrate(

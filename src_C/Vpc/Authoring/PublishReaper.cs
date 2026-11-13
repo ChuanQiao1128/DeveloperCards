@@ -71,7 +71,7 @@ public static class PublishReaper
     AdminAuditEntry auditEntry;
     bool persisted;
 
-    await using (var tx = await conn.BeginTransactionAsync())
+    await using (var tx = await conn.BeginTransactionAsync(RecallSmith.Lambda.Common.RequestBudget.Token))
     {
       try
       {
@@ -80,7 +80,7 @@ public static class PublishReaper
         auditEntry = AdminAudit.Entry(auth, res, "publish.reap", "deck_publishes", null,
           new { pending = r.Pending, processing = r.Processing, jobIds = r.JobIds });
         persisted = await AdminAudit.RecordAsync(conn, tx, auditEntry);
-        await tx.CommitAsync();
+        await tx.CommitAsync(RecallSmith.Lambda.Common.RequestBudget.Token);
       }
       catch
       {

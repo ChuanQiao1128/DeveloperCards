@@ -114,7 +114,7 @@ public static class AnonymousCardReports
 
       long reportId, deckId;
       object? createdAt;
-      await using (var tx = await conn.BeginTransactionAsync())
+      await using (var tx = await conn.BeginTransactionAsync(RecallSmith.Lambda.Common.RequestBudget.Token))
       {
         // Migration 046 lets user_sub be null and adds the per-day unique index; without it nothing is written.
         if (await DbUtil.ExecuteScalarAsync(conn, tx, "select to_regclass('uq_card_reports_anonymous_day') is not null", []) is not true)
@@ -149,7 +149,7 @@ public static class AnonymousCardReports
           """, [input.DeckSlug, input.StableUid, input.Reason]);
         if (existing is not null)
         {
-          await tx.CommitAsync();
+          await tx.CommitAsync(RecallSmith.Lambda.Common.RequestBudget.Token);
           Log.Event("info", new { tag = "card_reports", outcome = "duplicate", anonymous = true, reportId = RunnerRoutes.Long(existing) });
           return Received(res);
         }
@@ -173,7 +173,7 @@ public static class AnonymousCardReports
           """, withLocale ? [.. values, input.DisplayLocale] : values))[0];
         reportId = RunnerRoutes.Long(inserted["id"]);
         createdAt = inserted["created_at"];
-        await tx.CommitAsync();
+        await tx.CommitAsync(RecallSmith.Lambda.Common.RequestBudget.Token);
       }
 
       Log.Event("info", new { tag = "card_reports", outcome = "created", anonymous = true, reportId, deckId, reason = input.Reason });

@@ -573,7 +573,7 @@ public static class LedgerRoutes
       bool persisted;
       Dictionary<string, object?> updated;
 
-      await using (var tx = await conn.BeginTransactionAsync())
+      await using (var tx = await conn.BeginTransactionAsync(RecallSmith.Lambda.Common.RequestBudget.Token))
       {
         var current = await DbUtil.QueryAsync(conn, tx, BaselineSelect + " where automation = $1 for update", [automation]);
         if (current.Count == 0)
@@ -602,7 +602,7 @@ public static class LedgerRoutes
           AuditState(current[0]), AuditState(updated));
         persisted = await AdminAudit.RecordAsync(conn, tx, entry);
 
-        await tx.CommitAsync();
+        await tx.CommitAsync(RecallSmith.Lambda.Common.RequestBudget.Token);
       }
 
       AdminAudit.Emit(entry, persisted);
@@ -702,7 +702,7 @@ public static class LedgerRoutes
       AdminAuditEntry entry;
       bool persisted;
 
-      await using (var tx = await conn.BeginTransactionAsync())
+      await using (var tx = await conn.BeginTransactionAsync(RecallSmith.Lambda.Common.RequestBudget.Token))
       {
         var (publishNew, publishPresent) = await CountCandidatesAsync(conn, tx, PublishCandidates, PublishPresent);
         var (importNew, importPresent) = await CountCandidatesAsync(conn, tx, importCandidates, ImportPresent);
@@ -733,7 +733,7 @@ public static class LedgerRoutes
         entry = AdminAudit.Entry(auth, res, "automation.backfill", "automation_events", null, counts);
         persisted = await AdminAudit.RecordAsync(conn, tx, entry);
 
-        await tx.CommitAsync();
+        await tx.CommitAsync(RecallSmith.Lambda.Common.RequestBudget.Token);
       }
 
       AdminAudit.Emit(entry, persisted);

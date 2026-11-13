@@ -135,7 +135,7 @@ public static class UsageAnalytics
     var from = today.AddDays(-RecomputeDays);
     var to = today.AddDays(-1);
     var excluded = ExcludedSubs();
-    await using var tx = await conn.BeginTransactionAsync();
+    await using var tx = await conn.BeginTransactionAsync(RecallSmith.Lambda.Common.RequestBudget.Token);
     try
     {
       // Each statement reads the whole review history: bounded, so a slow rollup fails fast instead of holding the tick.
@@ -187,7 +187,7 @@ public static class UsageAnalytics
         where ev.day between $1::date and $2::date
         group by ev.day, ev.deck_slug
         """, [from, to, today, excluded]);
-      await tx.CommitAsync();
+      await tx.CommitAsync(RecallSmith.Lambda.Common.RequestBudget.Token);
     }
     catch (PostgresException ex) when (ex.SqlState is "42P01" or "42703")
     {

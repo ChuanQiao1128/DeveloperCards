@@ -65,7 +65,7 @@ public static class CardEmbeddings
 
     await using var cmd = DbUtil.CreateCommand(conn, tx,
       "select exists(select 1 from pg_extension where extname = 'vector') and to_regclass('public.card_embeddings') is not null", []);
-    var ready = await cmd.ExecuteScalarAsync(ct) is true;
+    var ready = await cmd.ExecuteScalarAsync(RecallSmith.Lambda.Common.RequestBudget.Combine(ct)) is true;
 
     Volatile.Write(ref _readyCache, new ReadyCache(ready, DateTime.UtcNow));
     Log.Event("info", new { tag = "embeddings", reason = "vector_detected", ready });
@@ -151,9 +151,9 @@ public static class CardEmbeddings
 
     var matches = new List<SimilarityMatch>();
     await using (var cmd = DbUtil.CreateCommand(conn, null, sql, parameters))
-    await using (var reader = await cmd.ExecuteReaderAsync(ct))
+    await using (var reader = await cmd.ExecuteReaderAsync(RecallSmith.Lambda.Common.RequestBudget.Combine(ct)))
     {
-      while (await reader.ReadAsync(ct))
+      while (await reader.ReadAsync(RequestBudget.Combine(ct)))
       {
         var cosine = Round(reader.GetDouble(5));
         matches.Add(new SimilarityMatch(reader.GetInt64(0), reader.GetInt64(1), reader.GetString(2), reader.GetString(3), reader.GetString(4),
@@ -208,7 +208,7 @@ public static class CardEmbeddings
       var upserted = 0;
       AdminAuditEntry entry;
       bool persisted;
-      await using (var tx = await conn.BeginTransactionAsync())
+      await using (var tx = await conn.BeginTransactionAsync(RecallSmith.Lambda.Common.RequestBudget.Token))
       {
         if (ids.Count > 0)
         {
@@ -226,7 +226,7 @@ public static class CardEmbeddings
         entry = AdminAudit.Entry(auth, res, "card_embeddings.upsert", "card_embeddings", null,
           new { model = Model, dim = Dim, items = items.Count, upserted, unknownCards = unknown.Count, staleText = stale.Count });
         persisted = await AdminAudit.RecordAsync(conn, tx, entry);
-        await tx.CommitAsync();
+        await tx.CommitAsync(RecallSmith.Lambda.Common.RequestBudget.Token);
       }
       AdminAudit.Emit(entry, persisted);
 

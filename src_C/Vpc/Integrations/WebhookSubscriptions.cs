@@ -54,7 +54,7 @@ public static class WebhookSubscriptions
       var (fields, error) = ParseFields(doc.RootElement, res, requireAll: true);
       if (error is not null) return error;
 
-      await using var tx = await conn.BeginTransactionAsync();
+      await using var tx = await conn.BeginTransactionAsync(RecallSmith.Lambda.Common.RequestBudget.Token);
       var inserted = await DbUtil.QueryAsync(conn, tx,
         $"insert into webhook_subscriptions (name, url, events, is_active, created_by_sub) values ($1, $2, $3, $4, $5) returning {SelectColumns}",
         [fields!.Name, fields.Url, fields.Events, fields.IsActive ?? true, auth.UserSub]);
@@ -63,7 +63,7 @@ public static class WebhookSubscriptions
 
       var entry = AdminAudit.Entry(auth, res, "webhook.subscription.create", Target(id), null, AuditState(created));
       var persisted = await AdminAudit.RecordAsync(conn, tx, entry);
-      await tx.CommitAsync();
+      await tx.CommitAsync(RecallSmith.Lambda.Common.RequestBudget.Token);
       AdminAudit.Emit(entry, persisted);
 
       return res.Ok(ToWire(created));
@@ -100,7 +100,7 @@ public static class WebhookSubscriptions
         fields = parsed;
       }
 
-      await using var tx = await conn.BeginTransactionAsync();
+      await using var tx = await conn.BeginTransactionAsync(RecallSmith.Lambda.Common.RequestBudget.Token);
       var existing = await DbUtil.QueryAsync(conn, tx,
         $"select {SelectColumns} from webhook_subscriptions where id = $1 and deleted_at is null for update", [id]);
       if (existing.Count == 0) return NotFound(res, id);
@@ -134,7 +134,7 @@ public static class WebhookSubscriptions
 
       var entry = AdminAudit.Entry(auth, res, action, Target(id), AuditState(before), AuditState(after[0]));
       var persisted = await AdminAudit.RecordAsync(conn, tx, entry);
-      await tx.CommitAsync();
+      await tx.CommitAsync(RecallSmith.Lambda.Common.RequestBudget.Token);
       AdminAudit.Emit(entry, persisted);
 
       return isPut ? res.Ok(ToWire(after[0])) : res.Ok(new { id, deleted = true });

@@ -57,10 +57,10 @@ public static class AdminManifest
         key = ManifestKey,
       }));
 
-      using var obj = await S3().GetObjectAsync(new GetObjectRequest { BucketName = ContentBucket, Key = ManifestKey });
+      using var obj = await S3().GetObjectAsync(new GetObjectRequest { BucketName = ContentBucket, Key = ManifestKey }, RecallSmith.Lambda.Common.RequestBudget.Token);
       string text;
       using var sr = new StreamReader(obj.ResponseStream);
-      text = await sr.ReadToEndAsync();
+      text = await sr.ReadToEndAsync(RequestBudget.Token);
 
       using var jsonDoc = JsonDocument.Parse(text);
 

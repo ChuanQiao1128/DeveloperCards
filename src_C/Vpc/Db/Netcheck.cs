@@ -6,7 +6,7 @@ namespace RecallSmith.Lambda.Vpc.Db;
 
 public static class Netcheck
 {
-  private static Task Sleep(int ms) => Task.Delay(ms);
+  private static Task Sleep(int ms) => Task.Delay(ms, RequestBudget.Token);
 
   private static async Task<Dictionary<string, object?>> TcpCheck(string host, int port, int timeoutMs)
   {
@@ -14,7 +14,7 @@ public static class Netcheck
     try
     {
       using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(timeoutMs));
-      await tcp.ConnectAsync(host, port, cts.Token);
+      await tcp.ConnectAsync(host, port, RequestBudget.Combine(cts.Token));
       return new Dictionary<string, object?> { ["ok"] = true, ["detail"] = "connected" };
     }
     catch (OperationCanceledException)
@@ -51,7 +51,7 @@ public static class Netcheck
     string? dnsErr = null;
     try
     {
-      var addrs = await Dns.GetHostAddressesAsync(host);
+      var addrs = await Dns.GetHostAddressesAsync(host, RequestBudget.Token);
       ips = addrs.Select(a => new { address = a.ToString(), family = a.AddressFamily == AddressFamily.InterNetwork ? 4 : 6 }).Cast<object>().ToList();
     }
     catch (Exception ex)

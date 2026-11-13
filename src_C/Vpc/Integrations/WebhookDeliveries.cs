@@ -219,13 +219,13 @@ public static class WebhookDeliveries
       AdminAuditEntry entry;
       bool persisted;
 
-      await using (var tx = await conn.BeginTransactionAsync())
+      await using (var tx = await conn.BeginTransactionAsync(RecallSmith.Lambda.Common.RequestBudget.Token))
       {
         claimed = await WebhookEvents.ClaimStrandedAsync(conn, tx, limit);
         entry = AdminAudit.Entry(auth, res, "webhook.deliveries.sweep", "webhook_deliveries", null,
           new { limit, swept = claimed.Count, deliveryIds = claimed.Select(d => d.DeliveryId).ToArray() });
         persisted = await AdminAudit.RecordAsync(conn, tx, entry);
-        await tx.CommitAsync();
+        await tx.CommitAsync(RecallSmith.Lambda.Common.RequestBudget.Token);
       }
 
       AdminAudit.Emit(entry, persisted);

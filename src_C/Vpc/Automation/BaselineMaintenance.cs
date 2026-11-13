@@ -49,7 +49,7 @@ public static class BaselineMaintenance
         if (string.IsNullOrEmpty(queue)) throw new InvalidOperationException("Missing PUBLISH_JOB_QUEUE_URL");
         var message = new SendMessageRequest { QueueUrl=queue, MessageBody=body };
         if (Publish.TestEnqueueSeam is not null) await Publish.TestEnqueueSeam.Send(message).WaitAsync(deadline.Token);
-        else await Publish.SqsForWarmup().SendMessageAsync(message,deadline.Token);
+        else await Publish.SqsForWarmup().SendMessageAsync(message,RecallSmith.Lambda.Common.RequestBudget.Combine(deadline.Token));
       }, Stop));
       await Step("publish_manifest", async () => manifest = await PublishDelivery.RecoverManifest(conn, async () =>
       {

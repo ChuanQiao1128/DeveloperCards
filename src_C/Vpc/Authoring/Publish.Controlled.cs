@@ -18,7 +18,7 @@ public static partial class Publish
     var expectedLive=liveEl.ValueKind==JsonValueKind.Null?null:liveEl.GetString();
     var hash=ContentRelease.PayloadHash(body);
     APIGatewayProxyResponse result;
-    await using(var tx=await conn.BeginTransactionAsync())
+    await using(var tx=await conn.BeginTransactionAsync(RecallSmith.Lambda.Common.RequestBudget.Token))
     {
       await ContentRelease.Lock(conn,tx,deckId);
       var replay=await ContentRelease.Replay(conn,tx,deckId,release,action,hash);
@@ -54,7 +54,7 @@ public static partial class Publish
         result=res.Ok(new{outcome="committed",jobId=job,buildId=build,releaseId=release,snapshotSha256=snapshot,manifestVerified=false});
         await ContentRelease.Save(conn,tx,deckId,release,action,"publish",hash,result);
       }
-      await tx.CommitAsync();
+      await tx.CommitAsync(RecallSmith.Lambda.Common.RequestBudget.Token);
     }
     using var committed=JsonDocument.Parse(result.Body);
     var data=committed.RootElement.GetProperty("data");var jobId=data.GetProperty("jobId").GetString()!;

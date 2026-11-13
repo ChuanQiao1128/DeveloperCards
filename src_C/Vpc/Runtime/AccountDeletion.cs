@@ -53,7 +53,7 @@ public static class AccountDeletion
   /// </summary>
   public static async Task<AccountDeletionResult> DeleteUserDataAsync(NpgsqlConnection conn, string userSub)
   {
-    await using var tx = await conn.BeginTransactionAsync();
+    await using var tx = await conn.BeginTransactionAsync(RecallSmith.Lambda.Common.RequestBudget.Token);
 
     // Deletion must fail closed until the persistent barrier is available.
     if (await DbUtil.ExecuteScalarAsync(conn, tx, "select to_regclass('account_deletions') is not null", []) is not true)
@@ -87,7 +87,7 @@ public static class AccountDeletion
       "delete from users where user_sub = $1",
       [userSub]);
 
-    await tx.CommitAsync();
+    await tx.CommitAsync(RecallSmith.Lambda.Common.RequestBudget.Token);
 
     return new AccountDeletionResult(outboxRows, premiumStateRows, webhookEventRows, userRows, cardReportRows, revenueCatQueued);
   }

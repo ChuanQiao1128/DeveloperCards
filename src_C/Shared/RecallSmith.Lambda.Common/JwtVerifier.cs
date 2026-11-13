@@ -34,9 +34,9 @@ public sealed class HttpJwksProvider : IJwksProvider
   public async Task<string> FetchAsync(string issuer, CancellationToken ct)
   {
     var url = issuer.TrimEnd('/') + "/.well-known/jwks.json";
-    using var response = await Client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct);
+    using var response = await Client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, RequestBudget.Combine(ct));
     response.EnsureSuccessStatusCode();
-    return await response.Content.ReadAsStringAsync(ct);
+    return await response.Content.ReadAsStringAsync(RequestBudget.Combine(ct));
   }
 }
 
@@ -321,7 +321,7 @@ public sealed class CognitoJwtVerifier
   {
     if (_cache.TryGetValue(issuer, out var cached) && cached.ByKid.TryGetValue(kid, out var hit)) return hit;
 
-    await _fetchGate.WaitAsync(ct);
+    await _fetchGate.WaitAsync(RequestBudget.Combine(ct));
     try
     {
       // Re-check under the gate: a request that queued behind a fetch for the same issuer

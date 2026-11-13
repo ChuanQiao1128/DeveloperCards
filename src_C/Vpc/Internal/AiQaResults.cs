@@ -138,7 +138,7 @@ public static class AiQaResults
       var transitions = new List<(long CardId, string Status)>();
       var flagged = new List<(long CardId, string StableUid, List<ReportFinding> Findings)>();
 
-      await using (var tx = await conn.BeginTransactionAsync())
+      await using (var tx = await conn.BeginTransactionAsync(RecallSmith.Lambda.Common.RequestBudget.Token))
       {
         var runRows = await DbUtil.QueryAsync(conn, tx,
           "select id, deck_id, status, chunk_count, prompt_version from ai_qa_runs where id = $1 for update", [report.RunId]);
@@ -314,7 +314,7 @@ public static class AiQaResults
         cardsDone = Convert.ToInt32(recomputed[0]["cards_done"], CultureInfo.InvariantCulture);
         cardCount = Convert.ToInt32(recomputed[0]["card_count"], CultureInfo.InvariantCulture);
 
-        await tx.CommitAsync();
+        await tx.CommitAsync(RecallSmith.Lambda.Common.RequestBudget.Token);
       }
 
       // core-vpc does not pin a prompt version (backend-design-12): the run records what the Lambda reports. A

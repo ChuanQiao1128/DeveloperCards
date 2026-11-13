@@ -90,13 +90,13 @@ public static class DeckRollback
         new { liveBuildId = previousBuildId }, new { liveBuildId = buildId });
       bool persisted;
 
-      await using (var tx = await conn.BeginTransactionAsync())
+      await using (var tx = await conn.BeginTransactionAsync(RecallSmith.Lambda.Common.RequestBudget.Token))
       {
         try
         {
           await DbUtil.ExecuteAsync(conn, tx, "update decks set live_build_id = $2 where id = $1", [deckId.Value, buildId]);
           persisted = await AdminAudit.RecordAsync(conn, tx, auditEntry);
-          await tx.CommitAsync();
+          await tx.CommitAsync(RecallSmith.Lambda.Common.RequestBudget.Token);
         }
         catch
         {

@@ -463,7 +463,7 @@ public static class ManifestBuilder
 
       try
       {
-        var putResponse = await s3.PutObjectAsync(put, ct);
+        var putResponse = await s3.PutObjectAsync(put, RecallSmith.Lambda.Common.RequestBudget.Combine(ct));
         return new ManifestBuildResult(body.DeckCount, body.PatchEdgeCount, key, putResponse.ETag ?? string.Empty, generatedAtMs);
       }
       catch (AmazonS3Exception ex) when (ex.StatusCode is HttpStatusCode.PreconditionFailed or HttpStatusCode.Conflict)

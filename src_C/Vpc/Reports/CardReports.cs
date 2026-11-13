@@ -136,7 +136,7 @@ public static class CardReports
       long reportId;
       long deckId, cardId;
       object? createdAt;
-      await using (var tx = await conn.BeginTransactionAsync())
+      await using (var tx = await conn.BeginTransactionAsync(RecallSmith.Lambda.Common.RequestBudget.Token))
       {
         // One report at a time per learner: the duplicate check, the daily count and the insert see the same rows.
         await DbUtil.ExecuteAsync(conn, tx, "select pg_advisory_xact_lock(hashtext('card_reports:' || $1))", [userSub]);
@@ -167,7 +167,7 @@ public static class CardReports
           "select id from card_reports where user_sub = $1 and stable_uid = $2 and status = 'open'", [userSub, input.StableUid]);
         if (open is not null)
         {
-          await tx.CommitAsync();
+          await tx.CommitAsync(RecallSmith.Lambda.Common.RequestBudget.Token);
           var existingId = RunnerRoutes.Long(open);
           Log.Event("info", new { tag = "card_reports", outcome = "duplicate", reportId = existingId });
           return res.Ok(new { reportId = existingId, status = "open", duplicate = true });
@@ -193,7 +193,7 @@ public static class CardReports
           """, withLocale ? [.. values, input.DisplayLocale] : values))[0];
         reportId = RunnerRoutes.Long(inserted["id"]);
         createdAt = inserted["created_at"];
-        await tx.CommitAsync();
+        await tx.CommitAsync(RecallSmith.Lambda.Common.RequestBudget.Token);
       }
 
       Log.Event("info", new { tag = "card_reports", outcome = "created", reportId, deckId, reason = input.Reason });

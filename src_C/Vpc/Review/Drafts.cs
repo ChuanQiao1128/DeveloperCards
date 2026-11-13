@@ -125,7 +125,7 @@ public static class Drafts
 
       var batchId = Guid.NewGuid();
       var created = new List<long>();
-      await using (var tx = await conn.BeginTransactionAsync())
+      await using (var tx = await conn.BeginTransactionAsync(RecallSmith.Lambda.Common.RequestBudget.Token))
       {
         foreach (var (entry, card, similarJson) in valid)
         {
@@ -154,7 +154,7 @@ public static class Drafts
           created.Add(draftId);
         }
 
-        await tx.CommitAsync();
+        await tx.CommitAsync(RecallSmith.Lambda.Common.RequestBudget.Token);
       }
 
       if (created.Count > 0)
@@ -516,7 +516,7 @@ public static class Drafts
       long cardId;
       string action;
       string stableUid;
-      await using (var tx = await conn.BeginTransactionAsync())
+      await using (var tx = await conn.BeginTransactionAsync(RecallSmith.Lambda.Common.RequestBudget.Token))
       {
         DraftAcceptance.Accepted accepted;
         try
@@ -537,7 +537,7 @@ public static class Drafts
         action = accepted.Action;
         stableUid = accepted.StableUid;
 
-        await tx.CommitAsync();
+        await tx.CommitAsync(RecallSmith.Lambda.Common.RequestBudget.Token);
       }
 
       await AutomationLedger.RecordAsync(conn, new AutomationEvent(
@@ -609,7 +609,7 @@ public static class Drafts
       var denyDeck = await Helpers.RequireDeckWrite(conn, auth.UserSub, deckId.Value, auth.IsSuperAdmin, res);
       if (denyDeck is not null) return denyDeck;
 
-      await using (var tx = await conn.BeginTransactionAsync())
+      await using (var tx = await conn.BeginTransactionAsync(RecallSmith.Lambda.Common.RequestBudget.Token))
       {
         var draftRows = await DbUtil.QueryAsync(conn, tx, "select status from ai_drafts where id = $1 for update", [id.Value]);
         if (draftRows.Count == 0) return DraftNotFound(res);
@@ -630,7 +630,7 @@ public static class Drafts
           """,
           [id.Value, auth.UserSub, reason, note, reviewMs]);
 
-        await tx.CommitAsync();
+        await tx.CommitAsync(RecallSmith.Lambda.Common.RequestBudget.Token);
       }
 
       // Every reject charges its review time to the automation (units 0), so the ledger's savings carry the

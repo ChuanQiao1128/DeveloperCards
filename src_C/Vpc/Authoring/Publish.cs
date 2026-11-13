@@ -605,7 +605,7 @@ public static partial class Publish
       values ($1, $2, $3, $4, $5, 'PENDING', $6, $7, $8::text, $9::timestamptz,
         (select coalesce(array_agg(c.id order by c.id), '{}'::bigint[]) from cards c where c.deck_id = $4 and c.is_deleted = 0))
       """;
-    await using var tx = durable ? await conn.BeginTransactionAsync(ct) : null;
+    await using var tx = durable ? await conn.BeginTransactionAsync(RecallSmith.Lambda.Common.RequestBudget.Combine(ct)) : null;
     if (tx is not null)
     {
       await DbUtil.QueryAsync(conn, tx, "select id from decks where id=$1 for update", [deckId]);
@@ -614,7 +614,7 @@ public static partial class Publish
         var replay = await ReplayOrdinary(conn, tx, deckId, actionId, requestHash);
         if (replay is not null)
         {
-          await tx.CommitAsync(ct);
+          await tx.CommitAsync(RecallSmith.Lambda.Common.RequestBudget.Combine(ct));
           return replay.Outcome == Resumed ? await DispatchPublishAsync(conn, replay, deckId, deckSlug, actorSub, note, queueUrl, ct) : replay;
         }
       }
@@ -638,7 +638,7 @@ public static partial class Publish
     {
       await DbUtil.ExecuteAsync(conn, tx, "update deck_publishes set publish_editing_snapshot=$2 where job_id=$1", [jobId, editingSnapshot]);
       await PublishDelivery.Stage(conn, tx, jobId, actorSuperadmin, actionId, requestHash);
-      await tx.CommitAsync(ct);
+      await tx.CommitAsync(RecallSmith.Lambda.Common.RequestBudget.Combine(ct));
     }
     return await DispatchPublishAsync(conn, new PublishStart(Queued, 200, null, null, jobId, buildId, qaSnapshot, null),
       deckId, deckSlug, actorSub, note, queueUrl, ct);
@@ -680,7 +680,7 @@ public static partial class Publish
       {
         sendMessageRequest.MessageBody = body;
         if (TestEnqueueSeam is not null) await TestEnqueueSeam.Send(sendMessageRequest);
-        else await SQS().SendMessageAsync(sendMessageRequest, ct);
+        else await SQS().SendMessageAsync(sendMessageRequest, RecallSmith.Lambda.Common.RequestBudget.Combine(ct));
       }
       var durable = await PublishDelivery.Ready(conn) && await DbUtil.ExecuteScalarAsync(conn, null,
         "select exists(select 1 from publish_dispatch where job_id=$1)", [start.JobId]) is true;
