@@ -12,6 +12,7 @@ beforeEach(() => {
 });
 
 const announceMock = vi.hoisted(() => vi.fn());
+const lifecycle = vi.hoisted(() => ({ state: 'active', listeners: new Set<(state: string) => void>() }));
 
 vi.mock('react-native', () => {
   const React = require('react');
@@ -46,6 +47,13 @@ vi.mock('react-native', () => {
     },
     useWindowDimensions: () => ({ width: 390, height: 844 }),
     Alert: { alert: vi.fn() },
+    AppState: {
+      get currentState() { return lifecycle.state; },
+      addEventListener: (_event: string, listener: (state: string) => void) => {
+        lifecycle.listeners.add(listener);
+        return { remove: () => lifecycle.listeners.delete(listener) };
+      },
+    },
     StyleSheet: { create: (styles: any) => styles },
     // Read through readRN('AccessibilityInfo', null) at module level, so it must exist at import time.
     AccessibilityInfo: { announceForAccessibility: (text: string) => announceMock(text) },
@@ -445,6 +453,8 @@ describe('SessionCardScreen MCQ branch', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    lifecycle.state = 'active';
+    lifecycle.listeners.clear();
     store.clear();
     resetSessionStore();
     featureFlagsMock.mockReturnValue(flags());
@@ -534,6 +544,49 @@ describe('SessionCardScreen MCQ branch', () => {
     expect(recordReviewEvent).toHaveBeenCalledTimes(1);
     expect(settleRatingReward).toHaveBeenCalledTimes(1);
     await act(async () => second.tree.unmount());
+  });
+
+  it.each([true, false])('preserves active response time across restart with recallFirst=%s', async recallFirst => {
+    featureFlagsMock.mockReturnValue(flags({ recallFirst }));
+    serve(CARD_1, REPEAT_PROGRESS(CARD_1.StableUid));
+    const first = await mount();
+    if (recallFirst) await press(first.tree, 'mcq-show-options');
+    vi.setSystemTime(FIXED_NOW_MS + 1000);
+    await press(first.tree, 'mcq-option-b');
+    const raw = [...store].find(([key]) => key.includes('session-checkpoint:v1:'))![1];
+    expect(JSON.parse(raw).mcq.responseElapsedMs).toBe(1000);
+    await act(async () => first.tree.unmount());
+    vi.setSystemTime(FIXED_NOW_MS + 60000);
+    const second = await mount();
+    vi.setSystemTime(FIXED_NOW_MS + 62000);
+    await press(second.tree, 'mcq-submit-sure');
+    await press(second.tree, 'mcq-next');
+    expect(recordReviewEvent).toHaveBeenCalledWith(expect.objectContaining({ rating: 'easy' }));
+    expect(recordReviewEvent).toHaveBeenCalledTimes(1);
+    await act(async () => second.tree.unmount());
+  });
+
+  it('saves at backgrounding and excludes inactive time from MCQ response timing', async () => {
+    serve(CARD_1, REPEAT_PROGRESS(CARD_1.StableUid));
+    const first = await mount();
+    await press(first.tree, 'mcq-show-options');
+    await press(first.tree, 'mcq-option-b');
+    vi.setSystemTime(FIXED_NOW_MS + 1000);
+    await act(async () => {
+      lifecycle.state = 'background';
+      for (const listener of lifecycle.listeners) listener('background');
+    });
+    expect(JSON.parse([...store].find(([key]) => key.includes('session-checkpoint:v1:'))![1]).mcq.responseElapsedMs).toBe(1000);
+    vi.setSystemTime(FIXED_NOW_MS + 61000);
+    await act(async () => {
+      lifecycle.state = 'active';
+      for (const listener of lifecycle.listeners) listener('active');
+    });
+    vi.setSystemTime(FIXED_NOW_MS + 63000);
+    await press(first.tree, 'mcq-submit-sure');
+    await press(first.tree, 'mcq-next');
+    expect(recordReviewEvent).toHaveBeenCalledWith(expect.objectContaining({ rating: 'easy' }));
+    await act(async () => first.tree.unmount());
   });
 
   it('answers a single-choice card correctly and rates it good on first review', async () => {

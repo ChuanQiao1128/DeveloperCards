@@ -17,6 +17,7 @@ export type McqCheckpoint = {
   mappedRating: ReviewRating | null;
   scheduleLine: string | null;
   attemptIndex: number;
+  responseElapsedMs: number;
 };
 export type SessionCheckpoint = {
   v: 1;
@@ -74,6 +75,7 @@ function valid(raw: any): raw is SessionCheckpoint {
   const validMcq = m === null || (!!m && ['stem', 'options', 'verdict'].includes(m.stage) &&
     optionKeys(m.picks) && (m.firstPicks === null || optionKeys(m.firstPicks)) &&
     typeof m.changedPick === 'boolean' && count(m.attemptIndex) &&
+    Number.isFinite(m.responseElapsedMs) && m.responseElapsedMs >= 0 && m.responseElapsedMs <= 86400000 &&
     (m.stage === 'verdict'
       ? ['sure', 'unsure'].includes(m.confidence) && ['correct', 'partial', 'wrong'].includes(m.verdict) &&
         ['again', 'hard', 'good', 'easy'].includes(m.mappedRating) && text(m.scheduleLine)

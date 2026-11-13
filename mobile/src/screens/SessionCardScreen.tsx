@@ -367,7 +367,11 @@ export function SessionCardScreen({ navigation, route }: Props) {
     const state = useSessionStore.getState();
     if (!state.sessionId || state.slug !== deck.Slug) return;
     let cancelled = false;
-    void saveSessionCheckpoint(owner.sub, deck.Slug, {
+    const appState = readRN<any>('AppState', null);
+    let inactiveAt: number | null = appState?.currentState && appState.currentState !== 'active' ? Date.now() : null;
+    const persist = () => {
+      if (owner.generation !== getAuthSessionGeneration()) return;
+      void saveSessionCheckpoint(owner.sub, deck.Slug, {
       v: 1, dateKey: checkpointDate(new Date(state.startedAt ?? Date.now())),
       deckVersion: deck.Version, context: studyContext, progressStamp: checkpointProgressStamp(progress, ownedSet),
       currentUid: current.card.StableUid, showAnswer, limit: sessionLimit, minimumGoal: plannedMinimumGoal ?? 1,
@@ -375,7 +379,9 @@ export function SessionCardScreen({ navigation, route }: Props) {
       mcqRun: { ...mcqRunRef.current }, picks: { ...picksRef.current }, loadForecast,
       mcq: mcqState.mcq ? { stage: mcqState.stage, picks: mcqState.picks, firstPicks: mcqState.firstPicks,
         changedPick: mcqState.changedPick, confidence: mcqState.confidence, verdict: mcqState.verdict,
-        mappedRating: mcqState.mappedRating, scheduleLine: mcqState.scheduleLine, attemptIndex: mcqState.attemptIndex } : null,
+        mappedRating: mcqState.mappedRating, scheduleLine: mcqState.scheduleLine, attemptIndex: mcqState.attemptIndex,
+        responseElapsedMs: optionsShownAtRef.current > 0
+          ? Math.min(86400000, Math.max(0, (mcqState.stage === 'verdict' ? submittedAtRef.current : inactiveAt ?? Date.now()) - optionsShownAtRef.current)) : 0 } : null,
       session: { sessionId: state.sessionId, slug: state.slug, route: state.route, currentIndex: state.currentIndex,
         completedCount: state.completedCount, streakEarned: state.streakEarned,
         sessionRatings: state.sessionRatings, startedAt: state.startedAt, rewardOutcome: state.rewardOutcome },
@@ -384,7 +390,18 @@ export function SessionCardScreen({ navigation, route }: Props) {
     }).catch(() => {
       if (!cancelled && owner.generation === getAuthSessionGeneration()) setCheckpointFailed(true);
     });
-    return () => { cancelled = true; };
+    };
+    persist();
+    const subscription = appState?.addEventListener?.('change', (next: string) => {
+      if (next !== 'active') {
+        if (inactiveAt === null) inactiveAt = Date.now();
+      } else if (inactiveAt !== null) {
+        if (mcqState.stage === 'options' && optionsShownAtRef.current > 0) optionsShownAtRef.current += Date.now() - inactiveAt;
+        inactiveAt = null;
+      }
+      persist();
+    });
+    return () => { cancelled = true; subscription?.remove(); };
   }, [loading, reviewing, deck, current, progress, ownedSet, showAnswer, sessionDone, sessionLimit,
     plannedMinimumGoal, studyContext, loadForecast, checkpointRetry, mcqState]);
   const openPrerequisite = useCallback((uid: string) => {
@@ -816,6 +833,8 @@ export function SessionCardScreen({ navigation, route }: Props) {
                 saved.picks.length <= mcqRequiredCount(mcq) &&
                 (saved.stage !== 'verdict' || resolveMcqVerdict(saved.picks, mcq) === saved.verdict)) {
                 const { stage, picks, firstPicks, changedPick, confidence, verdict, mappedRating, scheduleLine, attemptIndex } = saved;
+                optionsShownAtRef.current = Date.now() - saved.responseElapsedMs;
+                if (stage === 'verdict') submittedAtRef.current = Date.now();
                 setMcqState(prev => ({ ...prev, stage, picks, firstPicks, changedPick, confidence, verdict,
                   mappedRating, scheduleLine, attemptIndex }));
                 setShowAnswer(stage === 'verdict');
