@@ -42,7 +42,7 @@ public static class AutomationLedger
         on conflict (dedupe_key) do nothing
         """,
         [e.Automation, occurredAt, e.Units, e.Outcome, e.ActualMinutes, e.DefectsCaught, e.DeckId, reference, e.Source, e.DedupeKey, details]);
-      await cmd.ExecuteNonQueryAsync(ct);
+      await cmd.ExecuteNonQueryAsync(RecallSmith.Lambda.Common.RequestBudget.Combine(ct));
     }
     catch (PostgresException pg) when (pg.SqlState is "42P01" or "42703")
     {

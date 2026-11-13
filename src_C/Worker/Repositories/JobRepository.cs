@@ -123,7 +123,7 @@ public class JobRepository : IJobRepository
 
     await using var tx = await conn.BeginTransactionAsync();
     // Lock deck before job so final validation, rollback, revocation and card writes serialize.
-    await DbUtil.QueryAsync(conn, tx, "select d.id from decks d join deck_publishes p on p.deck_id=d.id where p.job_id=$1 and d.slug='aws-saa-fundamentals' for update of d", [jobId]);
+    await DbUtil.QueryAsync(conn, tx, "select d.id from decks d join deck_publishes p on p.deck_id=d.id where p.job_id=$1 for update of d", [jobId]);
     List<Dictionary<string, object?>> done;
     await tx.SaveAsync("complete");
     try
@@ -147,6 +147,7 @@ public class JobRepository : IJobRepository
 
     if (done.Count > 0)
     {
+      if (await PublishDelivery.Ready(conn)) await PublishDelivery.StageManifest(conn, tx, jobId);
       var row = done[0];
       var now = DateTimeOffset.UtcNow;
       await WebhookEvents.StageAsync(conn, tx, "deck.published", PublishedEventId(jobId), now, new

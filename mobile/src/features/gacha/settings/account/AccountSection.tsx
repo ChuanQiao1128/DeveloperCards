@@ -22,6 +22,9 @@ export const ACCOUNT_COPY = {
   deleteConfirmCta: 'Delete my account',
   deleteCancel: 'Keep my account',
   deleting: 'Deleting...',
+  deletionPending: 'Account deletion is in progress. Sync is paused. Continue deleting your account or sign out.',
+  continueDeletion: 'Continue account deletion',
+  pendingExit: 'If your sign-in is no longer available, sign out to clear this account’s saved data from this device once server deletion is confirmed.',
   deleteError: 'Could not delete your account. Check your connection and try again.',
   retry: 'Try again',
   deletedNotice: 'Your account was deleted and you are signed out.',
@@ -31,6 +34,7 @@ export const DELETE_CONFIRM_TOKEN = 'DELETE';
 
 export function AccountSection(props: {
   signedIn: boolean;
+  deletionPending?: boolean;
   email: string | null;
   onSignIn: () => void;
   onSignOut: () => void;
@@ -43,6 +47,7 @@ export function AccountSection(props: {
 }) {
   const {
     signedIn,
+    deletionPending = false,
     email,
     onSignIn,
     onSignOut,
@@ -59,7 +64,7 @@ export function AccountSection(props: {
   const armed = confirmText.trim() === DELETE_CONFIRM_TOKEN;
 
   async function onConfirmDelete() {
-    if (deleting || confirmText.trim() !== DELETE_CONFIRM_TOKEN) return;
+    if (deleting || (!deletionPending && confirmText.trim() !== DELETE_CONFIRM_TOKEN)) return;
     setDeleting(true);
     setDeleteError(null);
     try {
@@ -91,7 +96,7 @@ export function AccountSection(props: {
         </Text>
       </View>
 
-      {syncSummary ? (
+      {syncSummary && !deletionPending ? (
         <View style={styles.syncSummaryBox} testID="settings-account-sync-summary">
           <Text style={styles.syncSummaryLine}>{syncSummary.sessionsLine}</Text>
           <Text style={styles.syncSummaryMeta}>{syncSummary.reminderLine}</Text>
@@ -119,6 +124,21 @@ export function AccountSection(props: {
 
       {deleted ? (
         <Text style={styles.noticeText}>{ACCOUNT_COPY.deletedNotice}</Text>
+      ) : deletionPending ? (
+        <>
+          <Text style={styles.sectionBody} testID="settings-deletion-pending">{ACCOUNT_COPY.deletionPending}</Text>
+          <Text style={styles.sectionBody}>{ACCOUNT_COPY.pendingExit}</Text>
+          <Pressable
+            style={styles.dangerButton}
+            accessibilityRole="button"
+            onPress={onConfirmDelete}
+            disabled={deleting}
+            testID="settings-delete-account-retry"
+          >
+            <Text style={styles.dangerButtonText}>{deleting ? ACCOUNT_COPY.deleting : ACCOUNT_COPY.continueDeletion}</Text>
+          </Pressable>
+          {deleteError ? <Text style={styles.errorText}>{deleteError}</Text> : null}
+        </>
       ) : signedIn && !confirmOpen ? (
         <View style={styles.collapsedDeleteRow}>
           <Text style={styles.collapsedDeleteLabel} numberOfLines={1}>

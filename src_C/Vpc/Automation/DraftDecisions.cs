@@ -106,7 +106,7 @@ public static class DraftDecisions
     var state = reason is null ? QaPending : Human;
 
     bool inserted;
-    await using (var tx = await conn.BeginTransactionAsync(ct))
+    await using (var tx = await conn.BeginTransactionAsync(RecallSmith.Lambda.Common.RequestBudget.Combine(ct)))
     {
       var rows = await DbUtil.QueryAsync(conn, tx,
         """
@@ -121,7 +121,7 @@ public static class DraftDecisions
       {
         await AppendEventAsync(conn, tx, draftId, null, state, reason, AutomationEventActor, mode, new { runId }, ct);
       }
-      await tx.CommitAsync(ct);
+      await tx.CommitAsync(RecallSmith.Lambda.Common.RequestBudget.Combine(ct));
     }
     if (!inserted) return false;
 
@@ -173,7 +173,7 @@ public static class DraftDecisions
       var runId = (Guid)draft["run_id"]!;
       const string reason = "ENQUEUE_FAILED";
       bool inserted;
-      await using (var tx = await conn.BeginTransactionAsync(ct))
+      await using (var tx = await conn.BeginTransactionAsync(RecallSmith.Lambda.Common.RequestBudget.Combine(ct)))
       {
         var rows = await DbUtil.QueryAsync(conn, tx,
           """
@@ -188,7 +188,7 @@ public static class DraftDecisions
         {
           await AppendEventAsync(conn, tx, draftId, null, Human, reason, AutomationEventActor, mode.Effective, new { runId, swept = true }, ct);
         }
-        await tx.CommitAsync(ct);
+        await tx.CommitAsync(RecallSmith.Lambda.Common.RequestBudget.Combine(ct));
       }
       if (!inserted) continue;
       created++;
@@ -280,7 +280,7 @@ public static class DraftDecisions
       (string Slug, string Title) deck;
       var capReached = false;
 
-      await using (var tx = await conn.BeginTransactionAsync(ct))
+      await using (var tx = await conn.BeginTransactionAsync(RecallSmith.Lambda.Common.RequestBudget.Combine(ct)))
       {
         var rows = await DbUtil.QueryAsync(conn, tx,
           """
@@ -299,7 +299,7 @@ public static class DraftDecisions
         if (await Authoring.ContentRelease.Applies(conn, deckId, tx))
         {
           await TransitionAsync(conn, tx, draftId, QaPending, Human, "QA_UNAVAILABLE", "CLOUD_QA_RETIRED: aws-codex-bilingual-v1", AutomationEventActor, mode.Effective, null, ct);
-          await tx.CommitAsync(ct);
+          await tx.CommitAsync(RecallSmith.Lambda.Common.RequestBudget.Combine(ct));
           return Human;
         }
         stableUid = (string)row["stable_uid"]!;
@@ -307,13 +307,13 @@ public static class DraftDecisions
         if ((string)row["draft_status"]! != "pending")
         {
           await TransitionAsync(conn, tx, draftId, QaPending, Superseded, "DECIDED_BY_HUMAN", null, AutomationEventActor, mode.Effective, null, ct);
-          await tx.CommitAsync(ct);
+          await tx.CommitAsync(RecallSmith.Lambda.Common.RequestBudget.Combine(ct));
           return Superseded;
         }
         if (!QaAvailable())
         {
           var applied = await TransitionAsync(conn, tx, draftId, QaPending, Human, "QA_UNAVAILABLE", null, AutomationEventActor, mode.Effective, null, ct);
-          await tx.CommitAsync(ct);
+          await tx.CommitAsync(RecallSmith.Lambda.Common.RequestBudget.Combine(ct));
           routedReason = "QA_UNAVAILABLE";
           // The ledger follows the mode this transition applied (R18C backend-design-16), not the mode of the submit.
           if (applied == AutomationMode.Live) await AutomationLedger.RecordAsync(conn, RouteLedgerEvent(draftId, deckId, routedReason, null), ct);
@@ -357,7 +357,7 @@ public static class DraftDecisions
             [draftId, jobId, contentSha256]);
           await AppendEventAsync(conn, tx, draftId, QaPending, QaQueued, null, AutomationEventActor, mode.Effective, new { qaJobId = jobId }, ct);
         }
-        await tx.CommitAsync(ct);
+        await tx.CommitAsync(RecallSmith.Lambda.Common.RequestBudget.Combine(ct));
       }
 
       if (capReached)
@@ -406,7 +406,7 @@ public static class DraftDecisions
       try
       {
         if (QaRuns.TestSendSeam is not null) await QaRuns.TestSendSeam(request);
-        else await SQS().SendMessageAsync(request, ct);
+        else await SQS().SendMessageAsync(request, RecallSmith.Lambda.Common.RequestBudget.Combine(ct));
         Log.Event("info", new { tag = "automation", outcome = "draft_qa_enqueued", draftId, qaJobId = jobId });
         return QaQueued;
       }
@@ -440,7 +440,7 @@ public static class DraftDecisions
     var mode = await AutomationMode.EffectiveAsync(conn, ct);
     string to;
     string applied;
-    await using (var tx = await conn.BeginTransactionAsync(ct))
+    await using (var tx = await conn.BeginTransactionAsync(RecallSmith.Lambda.Common.RequestBudget.Combine(ct)))
     {
       var rows = await DbUtil.QueryAsync(conn, tx,
         "select state, qa_job_id, qa_attempts from automation_draft_decisions where draft_id = $1 for update", [draftId]);
@@ -456,7 +456,7 @@ public static class DraftDecisions
         "update automation_draft_decisions set qa_enqueued_at = null where draft_id = $1", [draftId]);
       applied = await TransitionAsync(conn, tx, draftId, QaQueued, to, reason, null, AutomationEventActor, mode.Effective,
         new { qaJobId = jobId, attempts }, ct);
-      await tx.CommitAsync(ct);
+      await tx.CommitAsync(RecallSmith.Lambda.Common.RequestBudget.Combine(ct));
     }
 
     if (to == Human && applied == AutomationMode.Live)
@@ -515,7 +515,7 @@ public static class DraftDecisions
       }
 
       var mode = await AutomationMode.EffectiveAsync(conn, ct);
-      await using var tx = await conn.BeginTransactionAsync(ct);
+      await using var tx = await conn.BeginTransactionAsync(RecallSmith.Lambda.Common.RequestBudget.Combine(ct));
       var rows = await DbUtil.QueryAsync(conn, tx, "select state from automation_draft_decisions where draft_id = $1 for update", [draftId]);
       if (rows.Count == 0) return;
       var state = (string)rows[0]["state"]!;
@@ -540,7 +540,7 @@ public static class DraftDecisions
         await AppendEventAsync(conn, tx, draftId, state, state, AutomationReasons.HumanAction, actor, mode.Effective,
           new { humanAction = action, humanReason = reason, verdictShown, blinded }, ct);
       }
-      await tx.CommitAsync(ct);
+      await tx.CommitAsync(RecallSmith.Lambda.Common.RequestBudget.Combine(ct));
     }
     catch (PostgresException pg) when (pg.SqlState is "42P01" or "42703")
     {

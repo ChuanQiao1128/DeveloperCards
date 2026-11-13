@@ -135,7 +135,7 @@ public static class QueueRoutes
       if (conn is null) return Helpers.ConfigError(res, "Missing PG env vars (PGHOST/PGDATABASE/PGUSER/PGPASSWORD)");
 
       long itemId;
-      await using (var tx = await conn.BeginTransactionAsync())
+      await using (var tx = await conn.BeginTransactionAsync(RecallSmith.Lambda.Common.RequestBudget.Token))
       {
         var deck = await DbUtil.ExecuteScalarAsync(conn, tx, "select id from decks where id = $1 and is_deleted = 0", [deckId]);
         if (deck is null)
@@ -159,7 +159,7 @@ public static class QueueRoutes
           values ('manual', $1, $2, $3, $4, $5, $6)
           returning id
           """, [url, deckId, title, note, $"manual:{Guid.NewGuid()}", $"owner:{auth.UserSub}"]));
-        await tx.CommitAsync();
+        await tx.CommitAsync(RecallSmith.Lambda.Common.RequestBudget.Token);
       }
 
       return res.Ok(await LoadItemAsync(conn, null, itemId));
@@ -187,7 +187,7 @@ public static class QueueRoutes
       await using var conn = await Pg.OpenConnectionOrNullAsync();
       if (conn is null) return Helpers.ConfigError(res, "Missing PG env vars (PGHOST/PGDATABASE/PGUSER/PGPASSWORD)");
 
-      await using (var tx = await conn.BeginTransactionAsync())
+      await using (var tx = await conn.BeginTransactionAsync(RecallSmith.Lambda.Common.RequestBudget.Token))
       {
         var status = await DbUtil.ExecuteScalarAsync(conn, tx, "select status from authoring_queue_items where id = $1 for update", [id]);
         if (status is null)
@@ -203,7 +203,7 @@ public static class QueueRoutes
 
         await DbUtil.ExecuteAsync(conn, tx,
           "update authoring_queue_items set status = 'skipped', finished_at = now(), updated_at = now() where id = $1", [id]);
-        await tx.CommitAsync();
+        await tx.CommitAsync(RecallSmith.Lambda.Common.RequestBudget.Token);
       }
 
       return res.Ok(await LoadItemAsync(conn, null, id));

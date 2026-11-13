@@ -282,6 +282,8 @@ public class ContentArtifactsGenerator : IContentArtifactsGenerator
         Source = c.Source,
         Translations = c.Translations,
         FrontHelp = c.FrontHelp,
+        Teaching = c.Teaching,
+        Tags = c.Tags,
       });
     }
 
@@ -314,5 +316,7 @@ public class ContentArtifactsGenerator : IContentArtifactsGenerator
     public JsonElement? Source { get; set; }
     public JsonElement? Translations { get; set; }
     public JsonElement? FrontHelp { get; set; }
+    public JsonElement? Teaching { get; set; }
+    public JsonElement? Tags { get; set; }
   }
 }

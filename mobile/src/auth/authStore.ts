@@ -21,16 +21,17 @@ import { AuthFlowError, AUTH_ERROR_COPY, friendlyAuthError } from './authErrors'
 import { isPasswordValid } from './passwordPolicy';
 import { normEmail } from './emailPolicy';
 import { deleteServerAccountData } from './deleteServerAccount';
-import { getAuthSessionGeneration, invalidateAuthSession, setAuthIdentitySnapshot } from './sessionBoundary';
+import { accessTokenSubject, getAuthSessionGeneration, invalidateAuthSession, setAuthIdentitySnapshot } from './sessionBoundary';
 
-import { setSyncAccessToken, forceProgressSync, setActiveUserSub } from '../sync/progressSync';
+import { setSyncAccessToken, forceProgressSync, setActiveUserSub, purgeClaimedPendingProgressEvents } from '../sync/progressSync';
 import { adoptAnonGachaState } from '../sync/drawStateSync';
-import { unblockSync } from '../sync/syncGuard';
+import { blockSync, unblockSync } from '../sync/syncGuard';
+import { clearActiveDeletion, clearDeletionPending, persistDeletionPending, readActiveDeletionPending, readDeletionPending } from './accountDeletionPending';
 import { resumeSyncAfterFailedDeletion, stopSyncForDeletion } from '../sync/stopSyncForDeletion';
 import { invalidateProgressQueueCache } from '../sync/progressQueueCache';
 import { invalidateDrawStateCache } from '../features/gacha/draw/drawStateCache';
 
-type AuthStatus = 'unknown' | 'anonymous' | 'signed_in';
+type AuthStatus = 'unknown' | 'anonymous' | 'signed_in' | 'deletion_pending';
 
 // Persisted the first time we ever see a signed-in session. Lets a later
 // tokenless init distinguish "this user's refresh token expired" (show the
@@ -88,24 +89,17 @@ type AuthState = {
 };
 
 const DEVICE_STREAK_PREFIX = 'recallsmith:streaks:';
-export async function purgeUserScopedStorage(userSub: string | null): Promise<string[]> {
+export async function purgeUserScopedStorage(userSub: string | null, purgeDeviceStreaks = true): Promise<string[]> {
   const generation = getAuthSessionGeneration();
+  if (userSub) await purgeClaimedPendingProgressEvents(userSub);
+  if (generation !== getAuthSessionGeneration()) return [];
   const scoped = userSub ? `devcards:u:${userSub}:` : null;
-  let keys: readonly string[] = [];
-  try {
-    keys = await AsyncStorage.getAllKeys();
-  } catch {
-    return [];
-  }
+  const keys = await AsyncStorage.getAllKeys();
   if (generation !== getAuthSessionGeneration()) return [];
   const doomed = keys.filter(
-    (k) => (scoped !== null && k.startsWith(scoped)) || k.startsWith(DEVICE_STREAK_PREFIX),
+    (k) => (scoped !== null && k.startsWith(scoped)) || (purgeDeviceStreaks && k.startsWith(DEVICE_STREAK_PREFIX)),
   );
-  if (doomed.length > 0) {
-    try {
-      await AsyncStorage.multiRemove(doomed);
-    } catch {}
-  }
+  if (doomed.length > 0) await AsyncStorage.multiRemove(doomed);
   if (generation !== getAuthSessionGeneration()) return [];
   invalidateProgressQueueCache(userSub ?? undefined);
   invalidateDrawStateCache();
@@ -151,10 +145,6 @@ async function applySessionToState(set: any, generation: number): Promise<boolea
   const at = tokenToString(accessTokObj) ?? null;
   const it = tokenToString(idTokObj) ?? null;
 
-  // A new session ends the sync block a completed account deletion left on
-  // (syncGuard.ts), before anything below schedules this account's first sync.
-  if (at) unblockSync();
-
   // ✅ Prefer claims from idToken (real email attribute)
   const claims: any =
     idTokObj && typeof idTokObj === 'object' && 'payload' in idTokObj
@@ -166,7 +156,8 @@ async function applySessionToState(set: any, generation: number): Promise<boolea
     safeStr(claims?.['cognito:username']) ??
     null;
 
-  let userSub: string | null = safeStr(claims?.sub) ?? null;
+  let userSub: string | null = safeStr(claims?.sub) ??
+    safeStr((accessTokObj as any)?.payload?.sub) ?? (at ? accessTokenSubject(at) : null);
 
   // ✅ Optional fallback: getCurrentUser for userSub if needed (do NOT override email)
   try {
@@ -176,6 +167,21 @@ async function applySessionToState(set: any, generation: number): Promise<boolea
     // ignore
   }
   if (!isCurrent()) return false;
+
+  // Read the durable intent before adopting local data or injecting a sync token.
+  // A storage read failure also fails closed; init can retry without bootstrapping.
+  if (userSub && await readDeletionPending(userSub)) {
+    if (!isCurrent()) return false;
+    blockSync();
+    await setSyncAccessToken(null);
+    if (!isCurrent()) return false;
+    set({ status: 'deletion_pending', userId: userSub, userSub, email,
+      accessToken: at, idToken: it, lastError: null, sessionExpired: false,
+      initRetryPending: false, loading: false });
+    return true;
+  }
+  if (!isCurrent()) return false;
+  if (at) unblockSync();
 
   // ✅ 关键：立刻设置 activeUserSub（让 Home 读取正确的 user-scoped progress）
   await setActiveUserSub(userSub);
@@ -245,6 +251,8 @@ async function applySessionToState(set: any, generation: number): Promise<boolea
   return true;
 }
 
+let accountDeletionInFlight = false;
+
 export const useAuthStore = create<AuthState>((set, get) => ({
   status: 'unknown',
   userId: null,
@@ -262,10 +270,24 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   initRetryPending: false,
 
   init: async () => {
+    // Stored sync credentials must stay dormant until the durable deletion check finishes.
+    blockSync();
     invalidateAuthSession();
     const generation = getAuthSessionGeneration();
     set({ loading: true, lastError: null });
     try {
+      // Cognito may already be gone when the process died before local cleanup.
+      // Recover this intent independently of tokens; only recovery/exit controls mount.
+      const pending = await readActiveDeletionPending();
+      if (generation !== getAuthSessionGeneration()) return;
+      if (pending) {
+        await setSyncAccessToken(null);
+        if (generation !== getAuthSessionGeneration()) return;
+        set({ status: 'deletion_pending', userId: pending.sub, userSub: pending.sub,
+          accessToken: null, idToken: null, loading: false, lastError: null,
+          sessionExpired: false, initRetryPending: false });
+        return;
+      }
       await applySessionToState(set, generation);
     } catch (err) {
       if (generation !== getAuthSessionGeneration()) return;
@@ -554,16 +576,45 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   signOutNow: async () => {
+    const deletingSub = get().status === 'deletion_pending' ? get().userSub : null;
+    let anotherSdkUser = false;
     invalidateAuthSession();
     const generation = getAuthSessionGeneration();
     set({ loading: true, lastError: null });
     try {
-      await signOut();
+      if (deletingSub) {
+        try {
+          const sdkUser = await getCurrentUser();
+          anotherSdkUser = !!sdkUser?.userId && sdkUser.userId !== deletingSub;
+        } catch {}
+        if (generation !== getAuthSessionGeneration()) return;
+      }
+      if (!anotherSdkUser) await signOut();
     } finally {
       // ✅ 关键：先清 sync token / activeUserSub，再更新 UI（避免 Home reload 还读旧 scope）
       if (generation !== getAuthSessionGeneration()) return;
       await setSyncAccessToken(null);
       if (generation !== getAuthSessionGeneration()) return;
+
+      if (deletingSub) {
+        const stage = await readDeletionPending(deletingSub);
+        if (generation !== getAuthSessionGeneration()) return;
+        // Server erasure is confirmed. A vanished Cognito session must not strand
+        // local data: explicit exit clears this device without claiming identity deletion.
+        if (stage === 'identity_pending' || stage === 'local_pending') {
+          await purgeUserScopedStorage(deletingSub, !anotherSdkUser);
+          if (generation !== getAuthSessionGeneration()) return;
+        }
+        if (stage === 'local_pending') await clearDeletionPending(deletingSub);
+        else await clearActiveDeletion(deletingSub);
+        if (generation !== getAuthSessionGeneration()) return;
+      }
+
+      if (anotherSdkUser) {
+        // Finishing A's local recovery must not sign B out or log B out of purchases.
+        await get().init();
+        return;
+      }
 
       // Explicit sign-out clears the was-signed-in flag so the session-expired
       // banner never shows after a deliberate sign-out.
@@ -592,96 +643,121 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   deleteAccountNow: async () => {
-    const sub = get().userSub;
-    let generation = getAuthSessionGeneration();
-    const assertCurrent = () => {
-      if (generation !== getAuthSessionGeneration()) throw new Error('Session changed. Please try again.');
-    };
-    set({ lastError: null });
-
-    // (0) Stop and block every sync path (progress, draw state, outbox flush,
-    // foreground) BEFORE the token refresh: handing the refreshed token to the
-    // sync layer would otherwise start a sync that writes rows back after the
-    // DELETE. The block stays on after a successful delete until the next
-    // sign-in; a failed delete lifts it and re-runs the sync it suppressed,
-    // since the account still exists. A sync still on the wire when the wait
-    // ends fails the deletion here, before any DELETE is sent.
+    if (accountDeletionInFlight) throw new Error('Account deletion is already in progress.');
+    accountDeletionInFlight = true;
     try {
-      await stopSyncForDeletion();
-    } catch (err: any) {
+      const sub = get().userSub;
+      if (!sub) throw new Error('Sign in to finish deleting your account.');
+      let generation = getAuthSessionGeneration();
+      const assertCurrent = () => {
+        if (generation !== getAuthSessionGeneration()) throw new Error('Session changed. Please try again.');
+      };
+      const wasPending = get().status === 'deletion_pending';
+      set({ lastError: null });
+
+      try {
+        await stopSyncForDeletion();
+      } catch (err: any) {
+        assertCurrent();
+        if (wasPending) blockSync();
+        set({ lastError: err?.message ?? 'Delete account failed' });
+        throw err;
+      }
       assertCurrent();
-      set({ lastError: err?.message ?? 'Delete account failed' });
-      throw err;
-    }
-    assertCurrent();
 
-    // (a) Get a fresh access token for the authenticated server delete. Prefer
-    // getFreshAccessToken (G05) — loaded lazily to avoid a static import cycle —
-    // and fall back to the token already in the store when it returns null.
-    let token: string | null = null;
-    try {
-      const { getFreshAccessToken } = await import('./freshToken');
+      let stage;
+      try {
+        stage = await readDeletionPending(sub);
+        assertCurrent();
+        // Persist before the request: a crash or lost response must not resume sync.
+        if (!stage) await persistDeletionPending(sub, 'server_pending');
+      } catch (err) {
+        assertCurrent();
+        if (!wasPending) resumeSyncAfterFailedDeletion();
+        throw err;
+      }
       assertCurrent();
-      token = await getFreshAccessToken({ forceRefresh: true });
-    } catch {
-      token = null;
-    }
-    assertCurrent();
-    if (!token) token = get().accessToken;
+      set({ status: 'deletion_pending' });
+      generation = getAuthSessionGeneration();
 
-    // (b) Delete the user's server-side data BEFORE Cognito deleteUser. A 404/405/501
-    // ("F15 not deployed") resolves and deletion continues; a 5xx/401/403/network
-    // throws — keep the session, surface the error, do NOT call deleteUser or purge.
-    try {
-      await deleteServerAccountData(token);
-    } catch (err: any) {
+      try {
+        if (stage !== 'identity_pending' && stage !== 'local_pending') {
+          // Read directly: normal freshToken deliberately excludes deletion_pending.
+          // Never hand a deletion credential to the normal sync layer.
+          let token = get().accessToken;
+          let session;
+          try {
+            session = await fetchAuthSession({ forceRefresh: true });
+          } catch (err) {
+            assertCurrent();
+            // The cached credential can still authorize an idempotent server retry.
+            if (!token) throw err;
+          }
+          assertCurrent();
+          token = tokenToString(session?.tokens?.accessToken) ?? token;
+          const tokenSub = accessTokenSubject(token ?? '') ?? safeStr((session?.tokens?.accessToken as any)?.payload?.sub);
+          if (tokenSub && tokenSub !== sub) throw new Error('Session changed. Please try again.');
+          assertCurrent();
+          await deleteServerAccountData(token);
+          assertCurrent();
+          await persistDeletionPending(sub, 'identity_pending');
+          assertCurrent();
+        }
+        if (stage !== 'local_pending') {
+          const sdkUser = await getCurrentUser();
+          assertCurrent();
+          if (sdkUser.userId !== sub) throw new Error('The signed-in account changed. Sign out to finish clearing this device.');
+          await deleteUser();
+          assertCurrent();
+          // Resume local erasure without Cognito credentials after a crash.
+          await persistDeletionPending(sub, 'local_pending');
+          assertCurrent();
+        }
+      } catch (err: any) {
+        assertCurrent();
+        blockSync();
+        const message = err?.message ?? 'Delete account failed';
+        set({ lastError: message });
+        throw err;
+      }
+
+      invalidateAuthSession();
+      generation = getAuthSessionGeneration();
+      set({ loading: true });
+      let anotherSdkUser = false;
+      try {
+        const sdkUser = await getCurrentUser();
+        anotherSdkUser = !!sdkUser?.userId && sdkUser.userId !== sub;
+      } catch {}
       assertCurrent();
-      resumeSyncAfterFailedDeletion();
-      set({ lastError: err?.message ?? 'Delete account failed' });
-      throw err;
-    }
-    assertCurrent();
-
-    // (c) Delete the Cognito user.
-    try {
-      await deleteUser();
-    } catch (err: any) {
+      if (!anotherSdkUser) {
+        try { await signOut(); } catch {}
+      }
       assertCurrent();
-      // Account still exists: keep the session, surface the error, purge nothing.
-      resumeSyncAfterFailedDeletion();
-      const msg = err?.message ?? 'Delete account failed';
-      set({ lastError: msg });
-      throw new Error(msg);
+      await setSyncAccessToken(null);
+      assertCurrent();
+      await purgeUserScopedStorage(sub, !anotherSdkUser);
+      assertCurrent();
+      await clearDeletionPending(sub);
+      assertCurrent();
+      if (anotherSdkUser) {
+        await get().init();
+        return;
+      }
+      try { await AsyncStorage.removeItem(AUTH_WAS_SIGNED_IN_KEY); } catch {}
+      assertCurrent();
+      set({ status: 'anonymous', userId: null, email: null, userSub: null, accessToken: null, idToken: null, loading: false, lastError: null, sessionExpired: false, initRetryPending: false });
+      await logoutRevenueCat();
+    } finally {
+      accountDeletionInFlight = false;
+      if (get().status === 'deletion_pending') set({ loading: false });
     }
-    assertCurrent();
-    // The account is gone: invalidate outstanding reads before local sign-out cleanup.
-    invalidateAuthSession();
-    generation = getAuthSessionGeneration();
-    set({ loading: true });
-    // (d) Sign out, clear the sync token, purge this account's device storage.
-    try {
-      await signOut();
-    } catch {}
-    assertCurrent();
-    await setSyncAccessToken(null);
-    assertCurrent();
-    await purgeUserScopedStorage(sub);
-    assertCurrent();
-    // Deleting the account is an explicit sign-out too: never show the banner.
-    try {
-      await AsyncStorage.removeItem(AUTH_WAS_SIGNED_IN_KEY);
-    } catch {}
-    assertCurrent();
-    set({ status: 'anonymous', userId: null, email: null, userSub: null, accessToken: null, idToken: null, loading: false, lastError: null, sessionExpired: false, initRetryPending: false });
-
-    // (e) Drop the deleted user's RevenueCat identity.
-    await logoutRevenueCat();
   },
 }));
 
 useAuthStore.subscribe((state, previous) => {
   setAuthIdentitySnapshot({
-    status: state.status,
+    status: state.status === 'deletion_pending' ? 'anonymous' : state.status,
     email: state.email,
     sessionExpired: state.sessionExpired,
   });

@@ -74,7 +74,9 @@ public static class DeckDiff
       || !McqEquals(a.Mcq, b.Mcq)
       || !McqEquals(a.Source, b.Source)
       || !McqEquals(a.Translations, b.Translations)
-      || !McqEquals(a.FrontHelp, b.FrontHelp);
+      || !McqEquals(a.FrontHelp, b.FrontHelp)
+      || !McqEquals(a.Teaching, b.Teaching)
+      || !McqEquals(a.Tags, b.Tags);
   }
 
   /// <summary>

@@ -47,12 +47,21 @@ public static class AccountDeletion
   /// user_entitlements, user_subscriptions, user_progress_events, user_progress, user_draw_owned,
   /// user_draw_meta, user_wallet and user_deck_wallet. The learner's card reports (R20 V05, migration 037) go too;
   /// before 037 the table does not exist and that step is skipped. The sub is queued for the RevenueCat customer
-  /// deletion (R25X F04, <see cref="RevenueCatDeletions"/>) in the same transaction; before migration 044 that step is
-  /// skipped. A failure rolls the whole thing back, so the phone keeps the account, nothing is queued and it can retry.
+  /// deletion (R25X F04, <see cref="RevenueCatDeletions"/>) in the same transaction. Migration 052 is required
+  /// before any erasure. Repeated deletion retains the barrier without recreating a completed external obligation.
+  /// A failure rolls everything back; the phone can retry.
   /// </summary>
   public static async Task<AccountDeletionResult> DeleteUserDataAsync(NpgsqlConnection conn, string userSub)
   {
-    await using var tx = await conn.BeginTransactionAsync();
+    await using var tx = await conn.BeginTransactionAsync(RecallSmith.Lambda.Common.RequestBudget.Token);
+
+    // Deletion must fail closed until the persistent barrier is available.
+    if (await DbUtil.ExecuteScalarAsync(conn, tx, "select to_regclass('account_deletions') is not null", []) is not true)
+      throw new InvalidOperationException("Account deletion requires migration 052");
+    await DbUtil.ExecuteAsync(conn, tx,
+      "select pg_advisory_xact_lock(hashtextextended($1, 520052))", [userSub]);
+    var firstRequest = await DbUtil.ExecuteAsync(conn, tx,
+      "insert into account_deletions(sub) values($1) on conflict(sub) do nothing", [userSub]);
 
     // Checked first so the usual post-045 call never raises 42P01; the savepoint covers 045 committing in between.
     var outboxRows = await DbUtil.ExecuteScalarAsync(conn, tx, "select to_regclass('analytics_event_outbox') is not null", []) is true
@@ -72,13 +81,13 @@ public static class AccountDeletion
       ? await DbUtil.ExecuteAsync(conn, tx, "delete from card_reports where user_sub = $1", [userSub])
       : 0;
 
-    var revenueCatQueued = await RevenueCatDeletions.EnqueueAsync(conn, tx, userSub);
+    var revenueCatQueued = firstRequest > 0 ? await RevenueCatDeletions.EnqueueAsync(conn, tx, userSub) : 0;
 
     var userRows = await DbUtil.ExecuteAsync(conn, tx,
       "delete from users where user_sub = $1",
       [userSub]);
 
-    await tx.CommitAsync();
+    await tx.CommitAsync(RecallSmith.Lambda.Common.RequestBudget.Token);
 
     return new AccountDeletionResult(outboxRows, premiumStateRows, webhookEventRows, userRows, cardReportRows, revenueCatQueued);
   }
@@ -123,7 +132,12 @@ public static class AccountDeletion
       return res.BadRequest("CONFIG_ERROR", "Missing PG env vars (PGHOST/PGDATABASE/PGUSER/PGPASSWORD)");
     }
 
-    var r = await DeleteUserDataAsync(conn, auth.UserSub!);
+    AccountDeletionResult r;
+    try { r = await DeleteUserDataAsync(conn, auth.UserSub!); }
+    catch (InvalidOperationException ex) when (ex.Message == "Account deletion requires migration 052")
+    {
+      return res.Raw(503, new { success = false, error = new { code = "SERVER_NOT_READY", message = ex.Message } });
+    }
 
     Log.Event("info", new
     {

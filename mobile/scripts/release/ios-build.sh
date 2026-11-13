@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
-# ios-build.sh [profile] — production iOS build on EAS, non-interactive.
+# ios-build.sh [profile] — iOS build, non-interactive; ownership baseline requires LOCAL_BUILD=1.
 # Prints "BUILD_ID=<id>" and "ARTIFACT=<url>" on success; exits non-zero otherwise.
 # DRY_RUN=1 prints the command without running it (the production checks still run).
 # Exit codes: 0 ok · 1 build failed · 2 eas-cli missing or not logged in · 3 production is missing
-# EXPO_PUBLIC_SENTRY_DSN / SENTRY_AUTH_TOKEN in the EAS production environment · 5 Sentry org/project placeholders.
+# EXPO_PUBLIC_SENTRY_DSN / SENTRY_AUTH_TOKEN in the EAS production environment · 5 Sentry org/project placeholders · 7 ownership/local-build gate.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"; MOBILE="$(cd "$HERE/../.." && pwd)"; cd "$MOBILE"
 PROFILE="${1:-production}"
+# Fail before even EAS whoami/env:list: this baseline authorizes local builds only.
+node "$HERE/queueOwnershipRollout.cjs" check-build
 VERSION=$(node -p "require('./app.json').expo.version")
 BUILD=$(node -p "require('./app.json').expo.ios.buildNumber")
 echo "app.json: version=$VERSION buildNumber=$BUILD profile=$PROFILE"
@@ -40,6 +42,17 @@ if [ "$PROFILE" = production ]; then
     echo "ios-build: missing name(s) in the EAS production environment: ${MISSING[*]} (eas env:create --environment production)" >&2
     exit 3
   fi
+fi
+if [ "${LOCAL_BUILD:-0}" = 1 ]; then
+  OUTPUT="${IOS_LOCAL_ARTIFACT:-${TMPDIR:-/tmp}/recallsmith-$VERSION-$BUILD.ipa}"
+  if [ "${DRY_RUN:-0}" = 1 ]; then
+    echo "DRY: eas build --platform ios --profile $PROFILE --local --non-interactive --output $OUTPUT"; exit 0
+  fi
+  # Ownership builds are handled only by the producer; this branch is retained
+  # for explicitly legacy format-0 release checkouts and never mints proof.
+  eas build --platform ios --profile "$PROFILE" --local --non-interactive --output "$OUTPUT"
+  echo "ARTIFACT=$OUTPUT"; echo "VERSION=$VERSION"; echo "BUILD_NUMBER=$BUILD"
+  exit 0
 fi
 if [ "${DRY_RUN:-0}" = 1 ]; then
   echo "DRY: eas build --platform ios --profile $PROFILE --non-interactive --json --wait"; exit 0

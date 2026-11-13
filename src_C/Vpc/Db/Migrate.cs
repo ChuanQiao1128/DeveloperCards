@@ -207,9 +207,7 @@ public static class Migrate
       return res.BadRequest("CONFIG_ERROR", "Missing PG env vars (PGHOST/PGDATABASE/PGUSER/PGPASSWORD)");
     }
 
-    var scalar = await ExecuteScalarAsync(conn, null, "select 1 as ok;", []);
-    var ok = scalar is not null && Convert.ToInt32(scalar, CultureInfo.InvariantCulture) == 1;
-    return res.Ok(new { ok });
+    return await Readiness.Check(conn, res);
   }
 
   public static async Task<Amazon.Lambda.APIGatewayEvents.APIGatewayProxyResponse> HandleDbMigrate(
@@ -217,6 +215,7 @@ public static class Migrate
     Res res,
     AuthContext auth)
   {
+    if (DbSafety.RuntimeIsolated) return res.NotFound("Route not found");
     var deny = Auth.RequireSuperAdmin(auth, res);
     if (deny is not null) return deny;
 
@@ -230,15 +229,18 @@ public static class Migrate
       return res.BadRequest("CONFIG_ERROR", "Missing PG env vars (PGHOST/PGDATABASE/PGUSER/PGPASSWORD)");
     }
 
-    var migrations = LoadMigrations();
-    if (migrations.Count == 0)
-    {
-      return res.BadRequest("MIGRATIONS_EMPTY", "No migrations found in Db/Migrations");
-    }
+    return await RunMigrationsAsync(conn, res,
+      string.Equals(req.Query.TryGetValue("dryRun", out var d) ? d : null, "true", StringComparison.OrdinalIgnoreCase),
+      req.Query.TryGetValue("confirmDestructive", out var c) ? c : null,
+      auth.UserSub, auth.Username);
+  }
 
-    var dryRun = string.Equals(req.Query.TryGetValue("dryRun", out var d) ? d : null, "true", StringComparison.OrdinalIgnoreCase);
-    // Unlocks exactly one destructive migration: the value must equal its version as dryRun prints it (e.g. "45").
-    var confirmDestructive = req.Query.TryGetValue("confirmDestructive", out var c) ? c : null;
+  // Both entry points use the same lock, destructive confirmation, transaction and audit path.
+  internal static async Task<Amazon.Lambda.APIGatewayEvents.APIGatewayProxyResponse> RunMigrationsAsync(
+    NpgsqlConnection conn, Res res, bool dryRun, string? confirmDestructive, string? actorSub, string? actorName)
+  {
+    var migrations = LoadMigrations();
+    if (migrations.Count == 0) return res.BadRequest("MIGRATIONS_EMPTY", "No migrations found in Db/Migrations");
 
     var result = await WithMigrationLock<object>(conn, async () =>
     {
@@ -267,8 +269,8 @@ public static class Migrate
           break;
         }
 
-        var audit = RecallSmith.Lambda.Vpc.Authoring.AdminAudit.Entry(
-          auth, res, "db.migrate", $"migration:{m.Version}", null, new { version = m.Version, name = m.Name, file = m.File });
+        var audit = new RecallSmith.Lambda.Vpc.Authoring.AdminAuditEntry(
+          actorSub, actorName, "db.migrate", $"migration:{m.Version}", null, new { version = m.Version, name = m.Name, file = m.File }, res.TraceId);
         var persisted = await ApplyOne(conn, m, audit);
         RecallSmith.Lambda.Vpc.Authoring.AdminAudit.Emit(audit, persisted);
         appliedNow.Add(new { version = m.Version, name = m.Name, file = m.File });
@@ -313,8 +315,10 @@ public static class Migrate
 
     var migrations = LoadMigrations();
 
-    await EnsureMigrationsTable(conn, null);
-    var rows = await QueryAsync(conn, null, "select version, name, applied_at from schema_migrations order by version asc;", []);
+    var ready = await ExecuteScalarAsync(conn, null, "select to_regclass('public.schema_migrations') is not null", []);
+    var rows = ready is true
+      ? await QueryAsync(conn, null, "select version, name, applied_at from schema_migrations order by version asc;", [])
+      : new List<Dictionary<string, object?>>();
 
     var applied = rows.Select(x => new
     {
@@ -364,6 +368,7 @@ public static class Migrate
     Res res,
     AuthContext auth)
   {
+    if (DbSafety.RuntimeIsolated) return res.NotFound("Route not found");
     // First, before any role check: a production caller cannot tell this route from an unregistered path.
     if (!DbSafety.DestructiveRoutesEnabled()) return res.NotFound("Route not found");
 
@@ -400,6 +405,7 @@ public static class Migrate
     Res res,
     AuthContext auth)
   {
+    if (DbSafety.RuntimeIsolated) return res.NotFound("Route not found");
     // First, before any role check: a production caller cannot tell this route from an unregistered path.
     if (!DbSafety.DestructiveRoutesEnabled()) return res.NotFound("Route not found");
 

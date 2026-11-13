@@ -45,6 +45,7 @@ public static class PublishStatus
       return res.NotFound("Job not found");
     }
 
+    await PublishDelivery.Annotate(conn,rows);
     return res.Ok(rows[0]);
   }
 }

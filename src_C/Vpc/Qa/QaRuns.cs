@@ -203,7 +203,7 @@ public static class QaRuns
     var id = Guid.NewGuid();
     try
     {
-      await using var tx = await conn.BeginTransactionAsync();
+      await using var tx = await conn.BeginTransactionAsync(RecallSmith.Lambda.Common.RequestBudget.Token);
       // The cap is a reservation, not an admission check on reported spend alone (backend-design-6,
       // cloud-security-resilience-3, ai-agent-8): today's reported spend, plus the estimate for the unfinished
       // cards of every open run, plus this run's estimate must fit. The lock makes concurrent starts on
@@ -236,7 +236,7 @@ public static class QaRuns
         """,
         [id, cards.Select(c => c.CardId).ToArray(), cards.Select(c => c.StableUid).ToArray(), cards.Select(c => c.ContentSha256).ToArray()]);
 
-      await tx.CommitAsync();
+      await tx.CommitAsync(RecallSmith.Lambda.Common.RequestBudget.Token);
     }
     catch (PostgresException pg) when (pg is { SqlState: "23505", ConstraintName: "uq_ai_qa_runs_active" })
     {
@@ -276,7 +276,7 @@ public static class QaRuns
       try
       {
         if (TestSendSeam is not null) await TestSendSeam(request);
-        else await SQS().SendMessageAsync(request);
+        else await SQS().SendMessageAsync(request, RecallSmith.Lambda.Common.RequestBudget.Token);
       }
       catch (Exception ex)
       {

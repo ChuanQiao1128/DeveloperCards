@@ -1,0 +1,183 @@
+{
+  "scope": "Local implementation and frozen-source review only",
+  "codeCommit": "a1fb7b238c7970483018405200aef92b0b175e8f",
+  "productionActions": "NOT_EXECUTED",
+  "checks": {
+    "backend": {
+      "passed": 3275,
+      "failed": 0,
+      "skipped": 0
+    },
+    "mobile": {
+      "unit": 2441,
+      "integration": 765,
+      "smoke": 1,
+      "total": 3207,
+      "typecheck": "PASS",
+      "iosAndroidExport": "PASS",
+      "bundlePackageAudit": "PASS"
+    },
+    "frontend": {
+      "passed": 1820,
+      "lint": "PASS",
+      "build": "PASS",
+      "sourceTree": "0ce6895e41df9a885727760525575a2a37a12978"
+    },
+    "infraScripts": 287,
+    "cdScripts": 234,
+    "maintenanceTools": 10,
+    "releaseGovernance": 4,
+    "ingest": 39,
+    "evals": 345
+  },
+  "artifacts": {
+    "sourceCommit": "a1fb7b238c7970483018405200aef92b0b175e8f",
+    "sourceTree": "3f5c86a04a9ab053936fb6da339a880771d2940a",
+    "workingTreeCleanAtBuild": true,
+    "packages": [
+      {
+        "name": "vpc",
+        "bytes": 2572797,
+        "sha256": "a0a0b5a980a5736e3cb7a9687cd3bca037e07d773c86fea87b66feb8b799b95d",
+        "awsCodeSha256": "oKC1qYClc248t6lofNO8oDfgfXc8hv6oe2b+uLeZuV0="
+      },
+      {
+        "name": "worker",
+        "bytes": 1799081,
+        "sha256": "3e08e991a4efcedf65e559a86ee8dff869607b688638017bc7599721a4c1962c",
+        "awsCodeSha256": "PgjpkaTvzt9l5Vmobujf+Glge2iGOAF7x1mXIaTBliw="
+      }
+    ],
+    "officialCaSha256": "d73890748b5a95551800df8a6f07c9c800e32ed34da7e6c9505918bf8ac2398b",
+    "artifactManifestSha256": "ddfb7f65d9db3ce7398db5b782b8b962fa6633a81c58577d73e941fcdf30c2c3",
+    "committedSafeConfiguration": {
+      "API_ENV": "production",
+      "PGSSLMODE": "verify-full",
+      "PGSSLROOTCERT": "Certificates/ap-southeast-2-bundle.pem",
+      "AUTOMATION_MODE": "off",
+      "AI_QA_ENABLED": "0"
+    },
+    "supportedSchema": {
+      "legacyMinimum": 55,
+      "isolatedMinimum": 56,
+      "includedMaximum": 56
+    },
+    "intendedRuntime": "2.1.1",
+    "intendedContentBuild": "20261109T004729Z-3b73803a",
+    "live": "UNKNOWN",
+    "deployment": "NOT_EXECUTED",
+    "nativeBuild": "NOT_EXECUTED; reviewed Podfile.lock missing"
+  },
+  "nativeReleaseGate": "CLOSED: reviewed native Podfile.lock and real signed/device acceptance absent",
+  "liveEvidence": "UNKNOWN",
+  "evidenceControlDirectory": "/Users/qc/.local/share/codex-workflows/developercards/architecture-hardening-20261113",
+  "rawCommandHistoryIncludesEarlierFailures": true,
+  "rawCommandRecords": [
+    {
+      "name": "artifact-readback.log.command.json",
+      "exitCode": 0,
+      "logSha256": "e276fe28f0d006470ac44abeab96afaf4a2e89e4c2f40064a8d84c32646adf9e"
+    },
+    {
+      "name": "backend-final.log.command.json",
+      "exitCode": 0,
+      "logSha256": "cca707705781408f26f04b20fa332d64f6fe287535677fee596bc1b31e1bc3c5"
+    },
+    {
+      "name": "cd-scripts-final.log.command.json",
+      "exitCode": 0,
+      "logSha256": "cbcfc4e0f61cb2d7b40c3edf23223f2917e89543c168b6cbbe62693ffe92848f"
+    },
+    {
+      "name": "db-tools-final.log.command.json",
+      "exitCode": 0,
+      "logSha256": "ab3dc457c27888fbfdf50f53cd0cb2c8c85eb1e66cc3bd2a0829d08d1110b558"
+    },
+    {
+      "name": "frontend-build-final.log.command.json",
+      "exitCode": 0,
+      "logSha256": "f97de4894a083087e617a37414a4ba314300fe363c61d28828d405037e10b7ff"
+    },
+    {
+      "name": "frontend-build-release.log.command.json",
+      "exitCode": 0,
+      "logSha256": "11163efc77a6bdc5a1004af77fe347f7336000c5794d8dbeb68dfb85a8e5eef7"
+    },
+    {
+      "name": "frontend-bundle-repair.log.command.json",
+      "exitCode": 0,
+      "logSha256": "2c791e8e780432e6847027b89d1de4e79ff47bb79d7774c54fb263e61bf201ec"
+    },
+    {
+      "name": "frontend-lint.log.command.json",
+      "exitCode": 0,
+      "logSha256": "440f03aaf355ec310af5f8d96a455d82f6b0b36ec49b7ea51dc500fa8a653ef8"
+    },
+    {
+      "name": "frontend-tests-final.log.command.json",
+      "exitCode": 0,
+      "logSha256": "f593dd977c7d099668ecbe4a15faf07e9d5fba4de4082b7d6f8f56c718f3e207"
+    },
+    {
+      "name": "frontend-tests.log.command.json",
+      "exitCode": 1,
+      "logSha256": "bd597f58664d17d9b77f699a6b0357a9134e73bc01bce678db6de91b9773da8d"
+    },
+    {
+      "name": "governance-final.log.command.json",
+      "exitCode": 0,
+      "logSha256": "d90ea8b5b133675740f77bee18039bad73bb2b96630b9fa73e4af29e81337a7a"
+    },
+    {
+      "name": "infra-final.log.command.json",
+      "exitCode": 0,
+      "logSha256": "b1672fdd41a5f4594a1816b786c5a337be6adaae39b595f96b0c8d49fcc29902"
+    },
+    {
+      "name": "mobile-bundle-audit-final.log.command.json",
+      "exitCode": 0,
+      "logSha256": "7b5c516f2c0ee9f6ac37290aba45a443b505a6430ea8e7a67ec5ade8ea411109"
+    },
+    {
+      "name": "mobile-export-final.log.command.json",
+      "exitCode": 0,
+      "logSha256": "40231593868ddd115c8911b47205ec2c29e79bb24e47b257eac48e7ac2c85a1c"
+    },
+    {
+      "name": "mobile-final.log.command.json",
+      "exitCode": 0,
+      "logSha256": "5b68a31d468ced9c0779c9e3aae8542ce516abed6858d2fd2f2f00bcdf3187ab"
+    },
+    {
+      "name": "package-final.log.command.json",
+      "exitCode": 0,
+      "logSha256": "2db0b0185209a5577f7db20333c1c5c78efbbe501847c3da5980d123a481c254"
+    },
+    {
+      "name": "N10-ci-deps/mobile-export-watch-reset.log.command.json",
+      "exitCode": 0,
+      "logSha256": "bf20d1700b72559ac8f4572dadc7ec4e476963129bb4a109ccb0cda094a43b16"
+    },
+    {
+      "name": "N10-ci-deps/mobile-bundle-audit-final.log.command.json",
+      "exitCode": 0,
+      "logSha256": "7b5c516f2c0ee9f6ac37290aba45a443b505a6430ea8e7a67ec5ade8ea411109"
+    }
+  ],
+  "ciFollowup": {
+    "commit": "30ae95cd04360ec2cc5c4476bfecf634024fd174",
+    "nodeForge": "1.4.3",
+    "soupsieve": "4.0.1",
+    "changedRuntimeSourceTrees": "API/Worker and console trees unchanged from core code commit",
+    "mobileTestsAfterDependencyInstall": 3207,
+    "auditGateExemptionsAdded": 0,
+    "actualProductionPlan": "NOT_EXECUTED; anticipated six IAM creates only; operators remain break-glass",
+    "remoteCi": "See PR835; source/local review is separate",
+    "exportNote": "First normal/clear exports failed after npm reinstall. Existing Watchman reported UserDropped recrawls; reset only this existing worktree watch, then exact source --clear export succeeded. No source/dependency alteration for export.",
+    "lockHashes": {
+      "mobile/package-lock.json": "ad25b928407e38aedb54a562d918d8aadbe9682438118b567eae71e1214e43ec",
+      "tools/ingest/uv.lock": "fe8f55c63d5e07adeb892372a123a47f156996dfe2090547f555b71e0b61eb3f",
+      "evals/uv.lock": "0d64db2b1d6e925f059832b6b51d25d83919585e977befadd53fe464e9fba6a0"
+    }
+  }
+}

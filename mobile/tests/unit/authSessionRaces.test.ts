@@ -13,6 +13,7 @@ vi.mock('@react-native-async-storage/async-storage', () => ({ default: {
 vi.mock('../../src/sync/progressSync', () => ({
   setSyncAccessToken: vi.fn(async () => {}), setActiveUserSub: vi.fn(async () => {}),
   forceProgressSync: vi.fn(async () => {}), scheduleProgressSync: vi.fn(),
+  purgeClaimedPendingProgressEvents: vi.fn(async () => {}),
 }));
 vi.mock('../../src/sync/drawStateSync', () => ({ adoptAnonGachaState: vi.fn(async () => {}) }));
 vi.mock('../../src/premium/revenuecat', () => ({ rcLogout: vi.fn(async () => {}) }));
@@ -354,6 +355,7 @@ describe('session initialization operation boundaries', () => {
     const result = deferred<any>();
     vi.mocked(fetchAuthSession).mockReturnValue(result.promise);
     const pending = useAuthStore.getState().init();
+    await vi.waitFor(() => expect(fetchAuthSession).toHaveBeenCalled());
     signedIn('B');
     useAuthStore.setState({ loading: true, lastError: 'B operation pending' });
     if (outcome === 'success') result.resolve(session('A'));
@@ -398,13 +400,14 @@ describe('session initialization operation boundaries', () => {
     vi.mocked(setSyncAccessToken).mockReturnValueOnce(cleanup.promise);
     const pending = useAuthStore.getState().init();
     await vi.waitFor(() => expect(setSyncAccessToken).toHaveBeenCalledWith(null));
+    const readsBeforeSwitch = vi.mocked(AsyncStorage.getItem).mock.calls.length;
     signedIn('B');
     useAuthStore.setState({ loading: true });
     cleanup.resolve();
     await pending;
 
     expect(useAuthStore.getState()).toMatchObject({ userSub: 'B', accessToken: token('B'), loading: true });
-    expect(AsyncStorage.getItem).not.toHaveBeenCalled();
+    expect(AsyncStorage.getItem).toHaveBeenCalledTimes(readsBeforeSwitch);
   });
 
   it('does not apply a sign-in result from before the account switched', async () => {

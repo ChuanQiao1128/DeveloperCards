@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import * as FileSystem from 'expo-file-system/legacy';
 
 /**
  * Content Delivery v3 wiring tests for deckRepository.installDeckFromUrl:
@@ -113,7 +115,7 @@ vi.mock('../../src/premium/premiumStore', () => ({
   getIsPremiumUser: vi.fn(async () => true),
 }));
 
-import { installDeckFromUrl } from '../../src/content/deckRepository';
+import { installDeckFromUrl, resolveDeckBySlug } from '../../src/content/deckRepository';
 import { readStoredDeckProgress, saveDeckProgress, setActiveUserSubForStorage } from '../../src/review/storage';
 import { loadDrawState, saveDrawState } from '../../src/features/gacha/draw/drawStateStore';
 import { invalidateDrawStateCache } from '../../src/features/gacha/draw/drawStateCache';
@@ -510,5 +512,93 @@ describe('installDeckFromUrl (content delivery v3)', () => {
       expect(files.get(FINAL_PATH)).toBe(deckText);
       await expectUntouched(before);
     });
+  });
+});
+
+
+// The backend test compares actual ContentArtifactsGenerator output to this shared fixture.
+const deltaFixture = JSON.parse(readFileSync(new URL('../../../contracts/content-v1/samples/delta-v2.json', import.meta.url), 'utf8'));
+const oldBuild = deltaFixture.previous.version;
+const deltaRel = `decks/${SLUG}/patches/${oldBuild}-${VERSION}.json`;
+function seedDeltaInstall(previous: string, deltaText: string) {
+  seedManifest({ patches: [{ fromVersion: oldBuild, toVersion: VERSION, path: deltaRel, sha256: sha(deltaText) }] });
+  fetchRegistry.set(`${BASE}/content/${deltaRel}`, deltaText);
+  files.set(FINAL_PATH, previous);
+  const meta = JSON.stringify({ slug: SLUG, buildId: oldBuild, installedAtMs: 1, fileUri: FINAL_PATH, cardCount: JSON.parse(previous).cards.length });
+  store.set(META_KEY, meta);
+  return meta;
+}
+
+describe('teaching/tags delta generation-to-install contract', () => {
+  for (const test of deltaFixture.cases) {
+    it(`installs Worker v2 ${test.name} without revising card identity or fetching full deck`, async () => {
+      const previous = structuredClone(deltaFixture.previous);
+      if (test.previousCard) previous.cards[1] = test.previousCard;
+      const output = process.env.N5_DELTA_OUTPUT_DIR;
+      const previousText = output ? readFileSync(`${output}/${test.name}.previous.json`, 'utf8') : JSON.stringify(previous);
+      // In evidence runs these are the exact bytes emitted by the real C# generator.
+      const deltaText = output ? readFileSync(`${output}/${test.name}.patch.json`, 'utf8') : JSON.stringify(test.patch);
+      seedDeltaInstall(previousText, deltaText);
+      expect(await installDeckFromUrl(SLUG, DECK_URL, VERSION, null)).toBe(true);
+      expect(fetchCalls).not.toContain(DECK_URL);
+      const installed = JSON.parse(files.get(FINAL_PATH)!);
+      expect(installed.cards[1]).toEqual(test.nextCard);
+      expect(installed.cards[1].revision).toBe(7);
+      const mapped = (await resolveDeckBySlug(SLUG))!.Cards[1];
+      expect(mapped.Teaching).toEqual(test.nextCard.teaching);
+      expect(mapped.Tags).toEqual(test.nextCard.tags);
+      expect(installed.cards[0]).toEqual(previous.cards[0]);
+      expect(installed.cards[2]).toEqual(previous.cards[2]);
+      expect(installed.version).toBe(VERSION);
+      expect(JSON.parse(store.get(META_KEY)!).buildId).toBe(VERSION);
+      if (output) expect(installed).toEqual(JSON.parse(readFileSync(`${output}/${test.name}.next.json`, 'utf8')));
+    });
+  }
+
+  it.each([999, '999', 1, '1', '2'])('rejects unsupported delta schema %j and retains installed bytes/buildId when fallback fails', async (schemaVersion) => {
+    const previous = JSON.stringify(deltaFixture.previous);
+    const delta = { ...deltaFixture.cases[0].patch, schemaVersion, deleted: ['fixture-choice'] };
+    const meta = seedDeltaInstall(previous, JSON.stringify(delta));
+    vi.mocked(FileSystem.deleteAsync).mockClear();
+    vi.mocked(FileSystem.moveAsync).mockClear();
+    expect(await installDeckFromUrl(SLUG, DECK_URL, VERSION, null)).toBe(false);
+    expect(fetchCalls).toContain(DECK_URL);
+    expect(files.get(FINAL_PATH)).toBe(previous);
+    expect(store.get(META_KEY)).toBe(meta);
+    expect(vi.mocked(FileSystem.deleteAsync).mock.calls.some(([path]) => path === FINAL_PATH)).toBe(false);
+    expect(vi.mocked(FileSystem.moveAsync)).not.toHaveBeenCalled();
+  });
+
+  it('falls back from an authentic future-schema patch to the verified full deck', async () => {
+    seedDeltaInstall(JSON.stringify(deltaFixture.previous), JSON.stringify({ ...deltaFixture.cases[0].patch, schemaVersion: 999, deleted: ['fixture-choice'] }));
+    const full = JSON.stringify({ ...deltaFixture.previous, version: VERSION });
+    fetchRegistry.set(DECK_URL, full);
+    expect(await installDeckFromUrl(SLUG, DECK_URL, VERSION, sha(full))).toBe(true);
+    expect(fetchCalls).toContain(DECK_URL);
+    expect(files.get(FINAL_PATH)).toBe(full);
+  });
+
+  it.each(['updated', 'added'])('rejects unsupported teaching in delta %s before publication and retains prior install', async (field) => {
+    const previous = JSON.stringify(deltaFixture.previous);
+    const unknown = structuredClone(deltaFixture.cases[2].nextCard);
+    unknown.teaching.schema = 'teaching-v999';
+    if (field === 'added') unknown.stableUid = 'future-card';
+    const delta = { ...deltaFixture.cases[0].patch, [field]: [unknown], deleted: ['fixture-base'] };
+    const meta = seedDeltaInstall(previous, JSON.stringify(delta));
+    expect(await installDeckFromUrl(SLUG, DECK_URL, VERSION, null)).toBe(false);
+    expect(fetchCalls).toContain(DECK_URL);
+    expect(files.get(FINAL_PATH)).toBe(previous);
+    expect(store.get(META_KEY)).toBe(meta);
+  });
+
+  it('falls back from unsupported delta teaching to supported full content', async () => {
+    const unknown = structuredClone(deltaFixture.cases[2].nextCard);
+    unknown.teaching.schema = 'teaching-v999';
+    seedDeltaInstall(JSON.stringify(deltaFixture.previous), JSON.stringify({ ...deltaFixture.cases[0].patch, updated: [unknown] }));
+    const full = JSON.stringify({ ...deltaFixture.previous, version: VERSION });
+    fetchRegistry.set(DECK_URL, full);
+    expect(await installDeckFromUrl(SLUG, DECK_URL, VERSION, sha(full))).toBe(true);
+    expect(fetchCalls).toContain(DECK_URL);
+    expect(files.get(FINAL_PATH)).toBe(full);
   });
 });

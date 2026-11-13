@@ -58,3 +58,65 @@ says 1.9.0) and push it. `ota.sh` reads the runtime from `app.json`, so running 
 publishes for runtime 2.0.0 only.
 
 Add `DRY_RUN=1` (shell scripts) or omit `--apply` (node script) to see the plan without touching anything.
+
+## Queue ownership rollout: 2.1.1 (26)
+
+The ownership reader requires a **new native 2.1.1 / build 26 baseline**, retaining
+`runtimeVersion.policy: appVersion`. This repository change is not a signed IPA or an App Store release.
+Do not send it to 2.1.0: that embedded fallback can drop events or reassign ownership.
+Use the existing Apple account and a reviewed full Git commit with the producer:
+
+```sh
+OWNERSHIP_APPLE_TEAM_ID=<existing-10-character-team-id> node scripts/release/queueOwnershipRollout.cjs produce --commit <full-reviewed-SHA> --output-dir /absolute/new-private-run
+```
+
+This is a fixed local Xcode Release/store build using the production profile, never a cloud build.
+The commit must contain this producer/config/plugin version and the reviewed reader. Dirty and untracked
+caller files are excluded by a retained full Git archive; submodules, symlinks, LFS placeholders,
+archive filters and archived dotenv/generated native/dependency trees are refused. The run owns
+its nonce, snapshot, build tree, temporary/cache/DerivedData paths and output. npm installs offline
+from the integrity-checked lock into a fresh tree. Missing cached inputs fail rather than resolving new
+versions. Native resolution also requires a reviewed `native-build-inputs/Podfile.lock`; **this
+repository currently has no such lock, so an actual production build remains closed**. Existing
+signing/provisioning must already be available locally; the producer never registers credentials or
+uses `-allowProvisioningUpdates`. It requires the existing public production settings and Sentry
+upload authorization, preserves the configured Sentry org/project checks, and never records the
+upload token or a hash of it. EAS remote environment configuration cannot replace these inputs.
+
+The dynamic Expo config preserves the resolved normal config when no producer context exists. During
+production it merges reserved signed native provenance, the observer plugin and the explicit
+`expo-channel-name: production` update request header, preserving other update settings.
+The signed IPA inspector rejects a missing or different production channel; a locally built binary
+therefore cannot pass only on runtime/URL while silently losing production OTA delivery. The Xcode plugin
+accepts only its known RN bundling invocation. The observer runs Metro and Hermes in that same native
+build, refuses a pre-existing/skipped bundle, and retains the final Hermes bytes before signing.
+The producer requires their digest to match `main.jsbundle` in the newly signed IPA, and requires the
+signed source commit/archive/nonce to match its in-memory expectations. Unsupported hooks/toolchains,
+missing observations, stale IPA replay, source/overlay/receipt mutations and mismatched JS fail closed.
+
+Only `completed.json` in the retained run is accepted (schema v2). Keep the **whole run directory** at
+its original absolute path, including source archive/manifests, build inputs, staged bundle/observation,
+native inputs and signed `baseline.ipa`. Do not move or edit it. `record` and schema-v1 proofs are
+rejected; `inspect <absolute IPA>` is diagnostic only and cannot mint acceptance. On failure a run
+remains incomplete; retry uses a new output directory. No dry-run operation creates proof.
+
+After the separately authorized native rollout, use:
+
+```sh
+OWNERSHIP_BASELINE_PROOF=/absolute/new-private-run/completed.json OTA_RUNTIME_VERSION=2.1.1 bash scripts/release/ota.sh "message"
+# Or read-only:
+node scripts/release/queueOwnershipRollout.cjs check --proof /absolute/new-private-run/completed.json --runtime 2.1.1
+```
+
+The checker rehashes retained inputs, native-stage evidence and signed IPA and checks source ancestry
+before any OTA EAS call. A valid completed baseline may support later compatible descendant OTAs;
+its original commit/nonce is never relabelled as a new build. `ios-build.sh` rejects ownership builds,
+even with `LOCAL_BUILD=1`, before any external call and points to the producer.
+
+This is trusted local producer process provenance. It does not prove reproducible compilation or defend
+against a privileged dishonest builder. Local tests use explicitly labelled fake build/signature tools
+through internal dependency injection; no production flag or environment variable selects them.
+A real authorized signed build must still demonstrate the hook timing, metadata signature coverage,
+bundle equality and checker acceptance. Store/TestFlight availability, distribution, device fallback
+and queue behavior remain separate unverified obligations. Until that evidence exists, do not claim
+this source change has opened the live release gate.

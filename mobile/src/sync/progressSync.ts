@@ -154,7 +154,7 @@ export function getSchedulerVersion(): string {
  * Auth / user scope
  * ----------------------------
  */
-const ACCESS_TOKEN_KEY = 'devcards:auth:accessToken:v1';
+const LEGACY_ACCESS_TOKEN_KEY = 'devcards:auth:accessToken:v1';
 const ACTIVE_USER_SUB_KEY = 'devcards:auth:activeUserSub:v1';
 
 /**
@@ -473,14 +473,6 @@ async function readDroppedCount(userSub: string): Promise<number> {
   }
 }
 
-async function addDroppedCount(userSub: string, n: number): Promise<void> {
-  if (!Number.isFinite(n) || n <= 0) return;
-  try {
-    const prev = await readDroppedCount(userSub);
-    await AsyncStorage.setItem(kDropped(userSub), String(prev + Math.floor(n)));
-  } catch {}
-}
-
 /**
  * ----------------------------
  * Write-through queue cache
@@ -615,92 +607,97 @@ function withQueueLock<T>(fn: () => Promise<T>): Promise<T> {
 // a network call would block rating for the length of a request. Re-delivering
 // an already-pushed event is safe (eventId is the server-side idempotency key);
 // dropping a never-pushed one is not.
-async function enqueueProgressEvent(userSub: string, ev: ProgressEvent): Promise<void> {
+async function enqueueProgressEvent(userSub: string, ev: ProgressEvent, generation: number): Promise<void> {
   return withQueueLock(async () => {
-    // Append in place on the cached array and write that same array back. This
-    // is the one caller allowed to mutate what readQueue returned (see its
-    // contract note), and it is why the common case is an O(1) push instead of
-    // parse-copy-serialise.
-    const q = [...await readQueue(userSub)];
+    if (generation !== getAuthSessionGeneration()) throw new Error('Review account changed');
+    const q = await readQueue(userSub);
+    if (generation !== getAuthSessionGeneration()) throw new Error('Review account changed');
     if (q.some((item) => item.eventId === ev.eventId)) return;
-    q.push(ev);
-
-    // 保护上限：最多保留 3000 条（避免极端情况下 AsyncStorage 膨胀）
-    const out = q.length > MAX_QUEUE_EVENTS ? q.slice(q.length - MAX_QUEUE_EVENTS) : q;
-
-    await writeQueue(userSub, out);
-    // Count what the slice above threw away. Written inside the lock with the
-    // queue, so the counter can never disagree with what was actually dropped.
-    await addDroppedCount(userSub, q.length - out.length);
+    if (q.length >= MAX_QUEUE_EVENTS) {
+      throw Object.assign(new Error('Offline review queue is full. Sync first, then retry.'), { code: 'PROGRESS_QUEUE_FULL' });
+    }
+    await writeQueue(userSub, [...q, ev]);
   });
 }
 
-/**
- * Move every signed-out event into the queue of the account that just signed in.
- *
- * Merge policy (this is the decision the old known-limitation comment was
- * waiting on): the next account to sign in on this device adopts ALL pending
- * events. Rationale: on a personal device, the person who reviewed before
- * signing in and the person who then signs in are the same person. The shared
- * device case can mis-attribute reviews, and that risk is accepted and recorded
- * here: events are UUID-keyed idempotent facts, so a mis-adoption cannot break
- * a server invariant, it only files those reviews under the adopter.
- *
- * Local progress from the anonymous period is NOT migrated: only the events
- * move. The adopter's projection realigns through push, server merge and pull,
- * which is this system's whole thesis in one code path, facts come first and the
- * projection is rebuildable from them.
- *
- * Crash safety: copy first, clear second, never the other way around. A crash
- * between the two leaves duplicates, not losses, and duplicates are absorbed
- * twice over: this function skips eventIds already in the user queue, and the
- * server keys events by event_id (already-pushed ones come back in
- * duplicateEventIds). The reverse order would trade a recoverable duplicate for
- * an unrecoverable loss.
- */
-async function adoptPendingProgressEvents(userSub: string): Promise<number> {
-  if (!userSub || userSub === PENDING_SUB) return 0;
-
-  const adopted = await withQueueLock(async () => {
-    const pending = await readQueue(PENDING_SUB);
-    if (pending.length === 0) return 0;
-
-    const own = await readQueue(userSub);
-    const seen = new Set(own.map((ev) => String(ev?.eventId ?? '')));
-
-    // Append rather than interleave: order inside each partition is preserved,
-    // and the server orders by reviewedAtMs anyway, so queue order only decides
-    // push batching.
-    const merged = own.slice();
-    let added = 0;
-
-    for (const ev of pending) {
-      const id = String(ev?.eventId ?? '');
-      if (!id || seen.has(id)) continue;
-      seen.add(id);
-      merged.push(ev);
-      added += 1;
-    }
-
-    const out =
-      merged.length > MAX_QUEUE_EVENTS ? merged.slice(merged.length - MAX_QUEUE_EVENTS) : merged;
-
-    await writeQueue(userSub, out);
-    // Adoption is the other way past the cap, so it counts its losses too, and
-    // it counts them against the account that ended up owning the events.
-    await addDroppedCount(userSub, merged.length - out.length);
-    await writeQueue(PENDING_SUB, []);
-
-    return added;
-  });
-
-  if (adopted > 0) {
-    // The adopted events are only durable locally so far, so ask for a push now
-    // instead of waiting for the next focus event.
-    scheduleProgressSync({ delayMs: 0, reason: 'pending_adopted' });
+// Rollback must preserve these claims and refuse full queues; pre-ownership OTA
+// bundles cannot safely take over a partially adopted anonymous queue.
+const PENDING_OWNERS_KEY = 'devcards:sync:pendingOwners:v1';
+async function readPendingOwners(): Promise<Record<string, string>> {
+  const raw = await AsyncStorage.getItem(PENDING_OWNERS_KEY);
+  const parsed: unknown = raw ? JSON.parse(raw) : {};
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('Invalid pending review owners');
+  const owners: Record<string, string> = Object.create(null);
+  for (const [id, sub] of Object.entries(parsed)) {
+    if (!id || typeof sub !== 'string' || !sub.trim() || sub === PENDING_SUB) throw new Error('Invalid pending review owner');
+    owners[id] = sub;
   }
+  return owners;
+}
+async function writePendingOwners(owners: Record<string, string>): Promise<void> {
+  await AsyncStorage.setItem(PENDING_OWNERS_KEY, JSON.stringify(owners));
+}
 
-  return adopted;
+/** Claim before copying; remove the source only after the destination is durable.
+ * Claims left by a crash are never reassigned to a later account. */
+async function adoptPendingProgressEvents(userSub: string, claimUnowned = true): Promise<number> {
+  if (!userSub || userSub === PENDING_SUB) return 0;
+  const generation = getAuthSessionGeneration();
+  const current = () => generation === getAuthSessionGeneration() && _userSubMem === userSub && !isSyncBlocked();
+  return withQueueLock(async () => {
+    if (!current()) return 0;
+    const pending = await readQueue(PENDING_SUB);
+    if (!pending.length || !current()) return 0;
+    const owners = await readPendingOwners();
+    if (!current()) return 0;
+    let claimed = false;
+    for (const ev of pending) {
+      if (claimUnowned && !owners[ev.eventId]) {
+        owners[ev.eventId] = userSub;
+        claimed = true;
+      }
+    }
+    if (claimed) await writePendingOwners(owners);
+    if (!current()) return 0;
+    const own = await readQueue(userSub);
+    if (!current()) return 0;
+    const seen = new Set(own.map(ev => ev.eventId));
+    const merged = own.slice();
+    const copied = new Set<string>();
+    for (const ev of pending) {
+      if (owners[ev.eventId] !== userSub) continue;
+      if (!seen.has(ev.eventId)) {
+        if (merged.length >= MAX_QUEUE_EVENTS) continue;
+        seen.add(ev.eventId);
+        merged.push(ev);
+      }
+      copied.add(ev.eventId);
+    }
+    if (!copied.size) return 0;
+    if (merged.length !== own.length) await writeQueue(userSub, merged);
+    if (!current()) return 0;
+    await writeQueue(PENDING_SUB, pending.filter(ev => !copied.has(ev.eventId)));
+    // Cleanup after source removal: a failed cleanup only leaves stale claims,
+    // while doing it first would let another account claim surviving copies.
+    for (const id of copied) delete owners[id];
+    await writePendingOwners(owners);
+    return merged.length - own.length;
+  });
+}
+
+/** Explicit account deletion only; ordinary sign-out must retain these facts. */
+export async function purgeClaimedPendingProgressEvents(userSub: string): Promise<void> {
+  if (!userSub || userSub === PENDING_SUB) return;
+  await withQueueLock(async () => {
+    const owners = await readPendingOwners();
+    const pending = await readQueue(PENDING_SUB);
+    const out = pending.filter(ev => owners[ev.eventId] !== userSub);
+    if (out.length !== pending.length) await writeQueue(PENDING_SUB, out);
+    for (const [id, sub] of Object.entries(owners)) {
+      if (sub === userSub) delete owners[id];
+    }
+    await writePendingOwners(owners);
+  });
 }
 
 async function peekProgressEvents(userSub: string, limit: number): Promise<ProgressEvent[]> {
@@ -735,24 +732,12 @@ async function progressQueueSize(userSub: string): Promise<number> {
  * ----------------------------
  */
 async function getSyncAccessToken(): Promise<string | null> {
-  const generation = getAuthSessionGeneration();
-  if (_accessTokenMem && _accessTokenMem.trim()) return _accessTokenMem;
-
-  try {
-    const raw = await AsyncStorage.getItem(ACCESS_TOKEN_KEY);
-    if (generation !== getAuthSessionGeneration()) return null;
-    if (_accessTokenMem && _accessTokenMem.trim()) return _accessTokenMem;
-    if (raw && raw.trim()) {
-      _accessTokenMem = raw;
-      return raw;
-    }
-  } catch {}
-
-  return null;
+  // Auth init/foreground refresh inject the SDK session; never revive a disk copy.
+  return _accessTokenMem;
 }
 
 /**
- * dev 模式注入 token
+ * Auth SDK session / dev 模式注入 token
  * ✅ 这里同时会尝试解析 userSub，用来做 “按用户分区”
  */
 // Token and scope writes share one lane so a delayed old native write cannot
@@ -776,8 +761,8 @@ async function applySyncAccessToken(token: string | null, generation: number): P
   _accessTokenMem = t;
 
   try {
-    if (t) await AsyncStorage.setItem(ACCESS_TOKEN_KEY, t);
-    else await AsyncStorage.removeItem(ACCESS_TOKEN_KEY);
+    // Upgrades may still carry the former duplicate. A cleanup failure must not fail auth.
+    await AsyncStorage.removeItem(LEGACY_ACCESS_TOKEN_KEY);
   } catch {}
 
   if (generation !== getAuthSessionGeneration()) return;
@@ -829,7 +814,9 @@ async function applyActiveUserSub(userSub: string | null, generation: number): P
     // the user signed back in as themselves), which is precisely when there is
     // something to adopt. Adoption is idempotent, so running it on every
     // same-sub call is cheap and cannot double-count.
-    if (next) await adoptPendingProgressEvents(next);
+    if (next && await adoptPendingProgressEvents(next) > 0) {
+      scheduleProgressSync({ delayMs: 0, reason: 'pending_adopted' });
+    }
     return;
   }
 
@@ -868,7 +855,8 @@ async function ensureUserSubReady(accessToken: string): Promise<string | null> {
     if (current) {
       if (!compatible(current)) return null;
       _userSubMem = current;
-      return _userSubMem;
+      await adoptPendingProgressEvents(current);
+      return generation === getAuthSessionGeneration() ? _userSubMem : null;
     }
   } catch {}
 
@@ -971,6 +959,7 @@ async function onUserChanged(prevSub: string | null, nextSub: string | null): Pr
  * ----------------------------
  */
 export async function recordReviewEvent(...args: any[]): Promise<string | null> {
+  const generation = getAuthSessionGeneration();
   // No token (signed out), or a token we cannot read a sub out of: the event is
   // still produced, it just goes to the PENDING_SUB partition instead of a
   // user's. It rides the same withQueueLock serializer and the same cap, because
@@ -1057,7 +1046,7 @@ export async function recordReviewEvent(...args: any[]): Promise<string | null> 
     schedulerVersion: getSchedulerVersion(),
   };
 
-  await enqueueProgressEvent(queueSub, ev);
+  await enqueueProgressEvent(queueSub, ev, generation);
   return ev.eventId;
 }
 
@@ -1622,9 +1611,16 @@ async function syncProgressOnce(
 
   for (let round = 0; round < 20; round++) {
     if (!isCurrent() || isSyncBlocked()) return stopped(pushed);
-    const batch = await peekProgressEvents(userSub, BATCH);
+    let batch = await peekProgressEvents(userSub, BATCH);
     if (!isCurrent()) return stopped(pushed);
-    if (batch.length === 0) break;
+    // A prior copy failure can leave claims with an empty destination queue.
+    // Retry those in the existing run as well as after ACK frees capacity.
+    if (batch.length === 0) {
+      await adoptPendingProgressEvents(userSub, false);
+      if (!isCurrent() || isSyncBlocked()) return stopped(pushed);
+      batch = await peekProgressEvents(userSub, BATCH);
+      if (!isCurrent() || batch.length === 0) break;
+    }
 
     const resp = await apiJson<ApiOk<PushResp>>('/api/v1/sync/push', {
       method: 'POST',
@@ -1676,8 +1672,10 @@ async function syncProgressOnce(
 
     await removeProgressEventsById(userSub, ackIds);
     pushed += ackIds.length;
-
-    if (batch.length < BATCH) break;
+    if (!isCurrent() || isSyncBlocked() || _userSubMem !== userSub) return stopped(pushed);
+    const adopted = await adoptPendingProgressEvents(userSub, false);
+    if (!isCurrent()) return stopped(pushed);
+    if (batch.length < BATCH && adopted === 0) break;
   }
 
   // An empty queue is not a new upload. Moving this stamp on every startup

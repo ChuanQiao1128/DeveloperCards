@@ -196,7 +196,7 @@ public static class RunnerRoutes
       }
 
       var claimed = new List<ClaimedItem>();
-      await using (var tx = await conn.BeginTransactionAsync())
+      await using (var tx = await conn.BeginTransactionAsync(RecallSmith.Lambda.Common.RequestBudget.Token))
       {
         // Touch the runner; a first claim without a heartbeat registers it. Another owner's runner id returns no row.
         var touched = await DbUtil.QueryAsync(conn, tx,
@@ -303,7 +303,7 @@ public static class RunnerRoutes
             Convert.ToInt32(updated[0]["attempts"], CultureInfo.InvariantCulture), (DateTime)updated[0]["lease_expires_at"]!));
         }
 
-        await tx.CommitAsync();
+        await tx.CommitAsync(RecallSmith.Lambda.Common.RequestBudget.Token);
       }
 
       var items = claimed.Select(c => new
@@ -360,7 +360,7 @@ public static class RunnerRoutes
       long itemId;
       string runStatus;
       string itemStatus;
-      await using (var tx = await conn.BeginTransactionAsync())
+      await using (var tx = await conn.BeginTransactionAsync(RecallSmith.Lambda.Common.RequestBudget.Token))
       {
         var runs = await DbUtil.QueryAsync(conn, tx,
           "select queue_item_id, runner_id, status, outcome from automation_runs where run_id = $1 for update", [runId]);
@@ -388,7 +388,7 @@ public static class RunnerRoutes
               "update automation_runs set error = coalesce($2, error), summary = coalesce($3, summary), updated_at = now() where run_id = $1",
               [runId, error, summary]);
             var abandonedItem = await DbUtil.ExecuteScalarAsync(conn, tx, "select status from authoring_queue_items where id = $1", [itemId]);
-            await tx.CommitAsync();
+            await tx.CommitAsync(RecallSmith.Lambda.Common.RequestBudget.Token);
             Log.Event("info", new { tag = "automation", reason = "abandoned_run_complete_kept", runId, itemId, outcome });
             await AutomationRuns.TryFinalizeAsync(conn, runId);
             return res.Ok(await CompleteResponseAsync(conn, runId, "abandoned", (string)abandonedItem!, replayed: true));
@@ -399,7 +399,7 @@ public static class RunnerRoutes
             return Helpers.ErrorEnvelope(res, 409, "RUN_NOT_RUNNING", "The run already completed with a different outcome");
           }
           var currentItem = await DbUtil.ExecuteScalarAsync(conn, tx, "select status from authoring_queue_items where id = $1", [itemId]);
-          await tx.CommitAsync();
+          await tx.CommitAsync(RecallSmith.Lambda.Common.RequestBudget.Token);
           return res.Ok(await CompleteResponseAsync(conn, runId, (string)run["status"]!, (string)currentItem!, replayed: true));
         }
 
@@ -516,7 +516,7 @@ public static class RunnerRoutes
           where runner_id = $1
           """, [runnerId, runId, outcome, error]);
 
-        await tx.CommitAsync();
+        await tx.CommitAsync(RecallSmith.Lambda.Common.RequestBudget.Token);
       }
 
       await AfterCompleteAsync(conn, runId, itemId, outcome, itemStatus);

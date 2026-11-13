@@ -424,7 +424,7 @@ public class AutomationRound2Tests
   // =============================================================================================
 
   [Fact]
-  public async Task Tick_CardAcceptedWhileTheBuildRan_IsPublishedByTheNextJob()
+  public async Task Tick_CardAcceptedWhileTheBuildRan_RejectsOldCommitThenPublishesBoth()
   {
     await using var scope = new A04Kit.Scope(AutomationMode.Live);
     await InScratchAsync(scope, async sql =>
@@ -446,17 +446,17 @@ public class AutomationRound2Tests
       var cardB = await AutoAcceptAsync(sql, sub, deck.Id, runB, "What does a synthetic level crossing gate protect?");
       await sql.QueryAsync("update cards set updated_at = (select created_at - interval '1 second' from deck_publishes where job_id = $1) where id = $2",
         jobA, cardB);
-      await WorkerSucceedsAsync(sql, jobA);
+      await Assert.ThrowsAsync<PostgresException>(()=>WorkerSucceedsAsync(sql,jobA));
+      await sql.QueryAsync("update deck_publishes set status='FAILED',error_message='AI_QA_STALE: content changed' where job_id=$1",jobA);
+      var data=await TickDataAsync();
+      Assert.Equal(1,Action(data,"publishesStarted"));
+      var next=await A04Kit.PublishRowAsync(sql,A04Kit.Long(rowA["id"]));
+      Assert.Equal("publishing",next["state"]);Assert.NotEqual(jobA,next["job_id"]);
+      // The automation row retains A's ownership; the retried immutable build records both current cards.
+      Assert.Equal(new[]{cardA},(long[])next["card_ids"]!);
+      Assert.Contains(cardB,(long[])(await sql.ScalarAsync("select card_ids from deck_publishes where job_id=$1",(string)next["job_id"]!))!);
+      Assert.Equal(2,scope.PublishSent.Count);
 
-      var data = await TickDataAsync();
-
-      Assert.Equal(1, Action(data, "publishesStarted"));
-      Assert.Equal(new[] { cardA }, (long[])(await A04Kit.PublishRowAsync(sql, A04Kit.Long(rowA["id"])))["card_ids"]!);
-      var next = (await sql.QueryAsync("select * from automation_publishes where deck_id = $1 and id <> $2", deck.Id, A04Kit.Long(rowA["id"]))).Single();
-      Assert.Equal(("publishing", runB), ((string)next["state"]!, (Guid)next["run_id"]!));
-      Assert.Equal(new[] { cardB }, (long[])next["card_ids"]!);
-      Assert.Contains(cardB, (long[])(await sql.ScalarAsync("select card_ids from deck_publishes where job_id = $1", (string)next["job_id"]!))!);
-      Assert.Equal(2, scope.PublishSent.Count);
     });
   }
 
@@ -557,7 +557,7 @@ public class AutomationRound2Tests
       var uploader = new CapturingUploader();
       var processor = new PublishJobProcessor(new JobRepository(), uploader, new NoopArtifacts());
       var ex = await Assert.ThrowsAsync<BusinessException>(() => processor.ProcessAsync(jobId, 1));
-      Assert.StartsWith($"{PublishSnapshot.StaleErrorCode}: deck settings changed", ex.Message);
+      Assert.StartsWith($"{PublishSnapshot.StaleErrorCode}:", ex.Message);
       Assert.Null(uploader.Captured);
       await processor.FailAsync(jobId, ex.Message);
 

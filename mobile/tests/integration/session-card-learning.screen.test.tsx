@@ -415,9 +415,15 @@ describe('SessionCardScreen learning step (R22 §6: teach before testing; 2026-1
     warnSpy.mockRestore();
   });
 
-  it('keeps the revealed card on enqueue failure and retries the same event id', async () => {
+  it.each([
+    ['storage failure', new Error('private storage diagnostic'), 'Could not finish saving',
+      'Keep this card open and try the same action again. Your answer has been kept.'],
+    ['full queue', Object.assign(new Error('private diagnostic'), { code: 'PROGRESS_QUEUE_FULL' }),
+      'Offline review queue is full',
+      'Sync your saved reviews first, then try this action again. Your answer has been kept.'],
+  ])('keeps the revealed card after %s and retries the same event id', async (_kind, error, title, message) => {
     serve([NEW_A], [fresh('new-a')], 1);
-    vi.mocked(recordReviewEvent).mockRejectedValueOnce(new Error('storage full'));
+    vi.mocked(recordReviewEvent).mockRejectedValueOnce(error as Error);
     const { tree, navigation } = await mount();
     await press(tree, 'Show answer');
     await press(tree, 'Got it');
@@ -425,6 +431,8 @@ describe('SessionCardScreen learning step (R22 §6: teach before testing; 2026-1
     expect(settleRatingReward).not.toHaveBeenCalled();
     expect(navigation.replace).not.toHaveBeenCalled();
     expect(pressables(tree, 'Got it')).toHaveLength(1);
+    expect(Alert.alert).toHaveBeenCalledWith(title, message);
+    expect([...store.keys()].some(key => key.includes('review-intent:v1:csharp:new-a'))).toBe(true);
     await press(tree, 'Got it');
     const calls = vi.mocked(recordReviewEvent).mock.calls;
     expect((calls[0][0] as any).eventId).toBe((calls[1][0] as any).eventId);

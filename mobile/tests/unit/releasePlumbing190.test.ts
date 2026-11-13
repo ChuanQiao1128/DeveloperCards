@@ -12,7 +12,7 @@ import { PROBE, waitUntilExecutable } from '../setup/execProbe';
 // The budget is explicit per spawn-heavy suite; every assertion is unchanged.
 const SPAWN_TIMEOUT_MS = 30_000;
 
-// 1.9.0 release plumbing (M04): eas.json Sentry env per profile, the version pins (2.1.0 (25) since 2026-10-18), the CI
+// 1.9.0 release plumbing (M04): eas.json Sentry env per profile, the version pins (2.1.1 (26) since 2026-11-13), the CI
 // expo export step and the ios-build.sh placeholder guard. ios-build.sh only ever runs from a temp
 // copy with fixture files, a fake eas first on PATH and DRY_RUN=1.
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -103,22 +103,22 @@ describe('eas.json Sentry env (1.9.0)', () => {
   });
 });
 
-// R24B R01: 2.0.0 (24) replaced the 1.9.0 (23) pins; 2.1.0 (25) replaces those (2026-10-18). The photo-library
+// R24B R01: 2.0.0 (24) replaced the 1.9.0 (23) pins; 2.1.1 (26) replaces those (2026-11-13). The photo-library
 // text drops "pull" (contract §1).
-describe('version 2.1.0 (25)', () => {
-  it('app.json is 2.1.0 build 25 with the Sentry plugin and the appVersion runtime policy', () => {
+describe('version 2.1.1 (26)', () => {
+  it('app.json is 2.1.1 build 26 with the Sentry plugin and the appVersion runtime policy', () => {
     const app = readJson('app.json').expo;
-    expect(app.version).toBe('2.1.0');
-    expect(app.ios.buildNumber).toBe('25');
+    expect(app.version).toBe('2.1.1');
+    expect(app.ios.buildNumber).toBe('26');
     expect(app.runtimeVersion.policy).toBe('appVersion');
     expect(JSON.stringify(app.plugins)).toContain('@sentry/react-native/expo');
   });
 
-  it('package.json and the lockfile root say 2.1.0', () => {
-    expect(readJson('package.json').version).toBe('2.1.0');
+  it('package.json and the lockfile root say 2.1.1', () => {
+    expect(readJson('package.json').version).toBe('2.1.1');
     const lock = readJson('package-lock.json');
-    expect(lock.version).toBe('2.1.0');
-    expect(lock.packages[''].version).toBe('2.1.0');
+    expect(lock.version).toBe('2.1.1');
+    expect(lock.packages[''].version).toBe('2.1.1');
   });
 
   it('the photo-library permission text says "a card image", not "a pull card image"', () => {
@@ -149,13 +149,24 @@ const MARKER = 'secret-value-do-not-print';
 const SENTRY_NAMES = ['EXPO_PUBLIC_SENTRY_DSN', 'SENTRY_AUTH_TOKEN'];
 const OTHER_NAMES = ['EXPO_PUBLIC_API_BASE', 'EXPO_PUBLIC_RC_IOS_API_KEY'];
 
-function runIosBuild(opts: { org: string; project: string; profile?: string; names?: string[]; bold?: boolean }) {
+function runIosBuild(opts: { org: string; project: string; profile?: string; names?: string[]; bold?: boolean; local?: boolean; ownership?: boolean }) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ios-build-tree-'));
   const mobile = path.join(root, 'mobile');
   const release = path.join(mobile, 'scripts', 'release');
   fs.mkdirSync(release, { recursive: true });
   fs.copyFileSync(IOS_BUILD, path.join(release, 'ios-build.sh'));
-  fs.writeFileSync(path.join(mobile, 'app.json'), JSON.stringify({ expo: { version: '1.9.0', ios: { buildNumber: '23' } } }));
+  fs.copyFileSync(path.join(MOBILE, 'scripts/release/queueOwnershipRollout.cjs'), path.join(release, 'queueOwnershipRollout.cjs'));
+  fs.mkdirSync(path.join(mobile, 'src/sync'), { recursive: true });
+  if (opts.ownership) {
+    for (const file of ['app.json', 'package.json', 'package-lock.json', 'src/sync/progressSync.ts']) {
+      fs.copyFileSync(path.join(MOBILE, file), path.join(mobile, file));
+    }
+  } else {
+    fs.writeFileSync(path.join(mobile, 'app.json'), JSON.stringify({ expo: { version: '1.9.0', ios: { buildNumber: '23' },
+      runtimeVersion: { policy: 'appVersion' }, extra: { progressQueueOwnershipFormat: 0 } } }));
+    fs.writeFileSync(path.join(mobile, 'src/sync/progressSync.ts'),
+      'export async function recordReviewEvent() {}\nasync function enqueueProgressEvent() {}');
+  }
   fs.writeFileSync(
     path.join(mobile, 'eas.json'),
     JSON.stringify({ build: { production: { ios: { env: { SENTRY_ALLOW_FAILURE: 'true', SENTRY_ORG: opts.org, SENTRY_PROJECT: opts.project } } } } }),
@@ -189,6 +200,8 @@ function runIosBuild(opts: { org: string; project: string; profile?: string; nam
   for (const k of Object.keys(env)) if (k.startsWith('SENTRY_') || k === 'EXPO_PUBLIC_SENTRY_DSN') delete env[k];
   env.PATH = `${bin}:${process.env.PATH ?? ''}`;
   env.DRY_RUN = '1';
+  delete env.LOCAL_BUILD;
+  if (opts.local) env.LOCAL_BUILD = '1';
   env.FAKE_EAS_NAMES = (opts.names ?? [...OTHER_NAMES, ...SENTRY_NAMES]).join(' ');
   if (opts.bold) env.FAKE_EAS_BOLD = '1';
   const args = [path.join(release, 'ios-build.sh')];
@@ -226,6 +239,28 @@ describe('ios-build.sh Sentry placeholder guard', { timeout: SPAWN_TIMEOUT_MS },
     const { res, diag } = runIosBuild({ org: 'example-org', project: 'example-project' });
     expect(res.status, diag).toBe(0);
     expect(res.stdout).toContain('DRY: eas build --platform ios --profile production');
+  });
+
+  it('rejects the ownership default cloud path before any EAS call', () => {
+    const { res, log, diag } = runIosBuild({ org: 'example-org', project: 'example-project', ownership: true });
+    expect(res.status, diag).toBe(7);
+    expect(res.stderr).toContain('trusted local producer');
+    expect(log).toBe('');
+  });
+
+  it('refuses the old LOCAL_BUILD ownership path before any EAS call', () => {
+    const { res, log, diag } = runIosBuild({ org: 'example-org', project: 'example-project', ownership: true, local: true });
+    expect(res.status, diag).toBe(7);
+    expect(res.stderr).toContain('trusted local producer');
+    expect(log).toBe('');
+  });
+
+  it('plans a local build without the paid remote build command', () => {
+    const { res, log, diag } = runIosBuild({ org: 'example-org', project: 'example-project', local: true });
+    expect(res.status, diag).toBe(0);
+    expect(res.stdout).toContain('--local --non-interactive --output');
+    expect(res.stdout).not.toContain('--json --wait');
+    expect(log).not.toMatch(/^build /m);
   });
 
   it('does not apply the guard to a non-production profile', () => {

@@ -117,6 +117,21 @@ public sealed class RevenuecatWebhookTests : IDisposable
     return Convert.ToInt32(n, CultureInfo.InvariantCulture);
   }
 
+  [Fact]
+  public async Task Post_LateCallbackForDeletedAccount_IsAcknowledgedWithoutRetainingPayloadOrPremium()
+  {
+    var sub = NewId("deleted-user");
+    await using var conn = await _db.OpenAsync();
+    await RecallSmith.Lambda.Vpc.Runtime.AccountDeletion.DeleteUserDataAsync(conn, sub);
+    var eventId = NewId("late");
+    var response = await CallAsync(Event("POST", DevPath, "Bearer test-secret-dev", Payload(eventId, appUserId: sub)));
+    Assert.Equal(200, response.StatusCode);
+    Assert.False(Root(response).GetProperty("accepted").GetBoolean());
+    Assert.Equal("account_deletion_pending", Root(response).GetProperty("reason").GetString());
+    Assert.Equal(0, await RcCountAsync(eventId));
+    Assert.Equal(0, await PremiumCountForEventAsync(eventId));
+  }
+
   // ------------------------------------------------------------------ auth
 
   [Fact]

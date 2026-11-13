@@ -110,7 +110,15 @@ public static class AutomationTick
       var sink = new AutomationFailures.TickSink();
       var mode = await AutomationMode.EffectiveAsync(conn);
       if (mode.LiveBlockedReason == AutomationMode.ServerNotReady) return RunnerRoutes.NotReady(res);
-      if (mode.Effective == AutomationMode.Off) return Answer(res, tickId, mode, "off", actions, sink);
+      if (mode.Effective == AutomationMode.Off)
+      {
+        // Preserve the historical zero-work default. The notifier body cannot opt into manual work.
+        if (!BaselineMaintenance.Enabled) return Answer(res, tickId, mode, "off", actions, sink);
+        var maintenanceLock = await DbUtil.ExecuteScalarAsync(conn,null,"select pg_try_advisory_lock($1)",[LockKey]) is true;
+        if (!maintenanceLock) return Answer(res,tickId,mode,"locked",actions,sink);
+        try { return res.Ok(new { tickId, effectiveMode=mode.Effective, maintenance=await BaselineMaintenance.Run(conn,Budget,BaselineMaintenance.RecoveryEnabled) }); }
+        finally { await DbUtil.ExecuteAsync(conn,null,"select pg_advisory_unlock($1)",[LockKey]); }
+      }
 
       // A digest job whose Monday slot collides with a running tick still sends the digest (R18D
       // cloud-security-resilience-13): the digest is idempotent on its own dedupe key and needs no single-flight, so
@@ -179,6 +187,13 @@ public static class AutomationTick
       }
     }
 
+    // Previously enabled modes keep their housekeeping; new recovery requires its own explicit switches.
+    if (tickSteps)
+    {
+      var maintenance = await BaselineMaintenance.Run(conn, Budget-clock.Elapsed,
+        BaselineMaintenance.Enabled && BaselineMaintenance.RecoveryEnabled);
+      foreach (var failed in maintenance.FailedSteps) sink.Add(failed);
+    }
     if (job == "digest") await Step("digest", async () => a.Digest = await DigestAsync(conn, mode.Effective));
     if (!tickSteps) return;
     await Step("leases", () => ExpireLeasesAsync(conn, a, Spent));
@@ -197,15 +212,7 @@ public static class AutomationTick
     await Step("eval_gate", () => EvalGateAsync(conn, mode, a));
     await Step("live_quality", () => LiveQualityAsync(conn, a));
     await Step("resend", async () => a.NotificationsResent = await Notifications.ResendAsync(conn, StepBatch));
-    // R24 A01 / R24X F05: every tick, a capped delete (own statement_timeout) of anonymous funnel rows received more
-    // than 400 days ago; its own step, so a failing or deferred rollup never stops the retention, and a failing delete
-    // is recorded as this step. Before the rollup, which may use most of the remaining budget.
-    await Step("anon_funnel_retention", () => Analytics.AnonFunnel.DeleteExpiredAsync(conn));
-    // R25X F04: every tick, drop RevenueCat deletion rows requested more than 30 days ago (skips before 044).
-    await Step("revenuecat_deletions_retention", () => Runtime.RevenueCatDeletions.DeleteExpiredAsync(conn));
-    // R20 V08: once per UTC day, the usage rollups of the last 8 complete days (skips with a log line before 040).
-    // R20X F02 (§10.8): deferred to the next tick when less than half the budget remains; statement_timeout inside.
-    await Step("analytics_daily", () => Analytics.UsageAnalytics.RunIfDueAsync(conn, Budget - clock.Elapsed, Budget));
+
   }
 
   private static string UtcDate() => DateTime.UtcNow.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
@@ -222,7 +229,7 @@ public static class AutomationTick
   {
     var failed = new List<(long ItemId, string Url, string LastError)>();
     var partial = new List<(long ItemId, string Url, string LastError, Guid RunId)>();
-    await using (var tx = await conn.BeginTransactionAsync())
+    await using (var tx = await conn.BeginTransactionAsync(RecallSmith.Lambda.Common.RequestBudget.Token))
     {
       var items = await DbUtil.QueryAsync(conn, tx,
         """
@@ -274,7 +281,7 @@ public static class AutomationTick
           [itemId]);
         a.LeasesExpired++;
       }
-      await tx.CommitAsync();
+      await tx.CommitAsync(RecallSmith.Lambda.Common.RequestBudget.Token);
     }
 
     foreach (var (itemId, url, lastError, runId) in partial)
@@ -323,7 +330,7 @@ public static class AutomationTick
       var mode = await AutomationMode.EffectiveAsync(conn);
       string decisionMode;
       long deckId;
-      await using (var tx = await conn.BeginTransactionAsync())
+      await using (var tx = await conn.BeginTransactionAsync(RecallSmith.Lambda.Common.RequestBudget.Token))
       {
         var locked = await DbUtil.QueryAsync(conn, tx,
           """
@@ -336,7 +343,7 @@ public static class AutomationTick
         // The ledger follows the mode this transition applied (R18C backend-design-16).
         decisionMode = await DraftDecisions.TransitionAsync(conn, tx, draftId, DraftDecisions.QaQueued, DraftDecisions.Human, "QA_TIMEOUT", null,
           DraftDecisions.AutomationEventActor, mode.Effective, new { timeoutMinutes = AutomationEnv.QaTimeoutMinutes() }, CancellationToken.None);
-        await tx.CommitAsync();
+        await tx.CommitAsync(RecallSmith.Lambda.Common.RequestBudget.Token);
       }
       a.QaTimedOut++;
       if (decisionMode == AutomationMode.Live)
@@ -363,7 +370,7 @@ public static class AutomationTick
       var mode = await AutomationMode.EffectiveAsync(conn);
       string decisionMode;
       long deckId;
-      await using (var tx = await conn.BeginTransactionAsync())
+      await using (var tx = await conn.BeginTransactionAsync(RecallSmith.Lambda.Common.RequestBudget.Token))
       {
         var locked = await DbUtil.QueryAsync(conn, tx,
           """
@@ -377,7 +384,7 @@ public static class AutomationTick
         decisionMode = await DraftDecisions.TransitionAsync(conn, tx, draftId, DraftDecisions.QaPending, DraftDecisions.Human, "ENQUEUE_FAILED",
           $"draft QA could not be enqueued for {pendingMinutes} minutes", DraftDecisions.AutomationEventActor, mode.Effective,
           new { pendingMinutes }, CancellationToken.None);
-        await tx.CommitAsync();
+        await tx.CommitAsync(RecallSmith.Lambda.Common.RequestBudget.Token);
       }
       a.QaTimedOut++;
       Log.Event("warn", new { tag = "automation", outcome = "qa_pending_timed_out", draftId, pendingMinutes });

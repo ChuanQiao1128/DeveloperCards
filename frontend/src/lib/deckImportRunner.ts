@@ -147,6 +147,8 @@ function cardInputFor(action: ImportAction): ImportCardInput {
     mcq: card.mcq ?? null,
     source: card.source ?? null,
     ...(card.frontHelp !== undefined ? { frontHelp: card.frontHelp } : {}),
+    ...(card.teaching !== undefined ? { teaching: card.teaching } : {}),
+    ...(card.tags !== undefined ? { tags: card.tags } : {}),
     translations: card.translations ?? null,
     difficulty: card.difficulty,
     orderInDeck: card.orderInDeck,

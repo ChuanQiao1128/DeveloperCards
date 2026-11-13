@@ -34,7 +34,7 @@ public static class AutomationRuns
       if (mode.Effective == AutomationMode.Off) return false;
 
       List<Dictionary<string, object?>> decks;
-      await using (var tx = await conn.BeginTransactionAsync(ct))
+      await using (var tx = await conn.BeginTransactionAsync(RecallSmith.Lambda.Common.RequestBudget.Combine(ct)))
       {
         var runs = await DbUtil.QueryAsync(conn, tx,
           "select status, finalized_at from automation_runs where run_id = $1 for update", [runId]);
@@ -61,7 +61,7 @@ public static class AutomationRuns
         {
           await AutoPublisher.OpenRunRowAsync(conn, tx, Convert.ToInt64(deck["deck_id"], CultureInfo.InvariantCulture), runId, mode.Effective, ct);
         }
-        await tx.CommitAsync(ct);
+        await tx.CommitAsync(RecallSmith.Lambda.Common.RequestBudget.Combine(ct));
       }
       if (TestAfterCommitSeam is { } seam) await seam(runId);
 

@@ -291,7 +291,7 @@ public static class CardsImport
 
     try
     {
-      await using var tx = await conn.BeginTransactionAsync();
+      await using var tx = await conn.BeginTransactionAsync(RecallSmith.Lambda.Common.RequestBudget.Token);
 
       await DbUtil.ExecuteAsync(conn, tx, "set constraints uq_cards_deck_order deferred", []);
 
@@ -519,7 +519,7 @@ public static class CardsImport
           cards = cards.Select(c => new { stableUid = c.StableUid, id = ids[c.StableUid], action = actions[c.StableUid] }).ToArray() });
         await ContentRelease.Save(conn, tx, deckId, releaseId, actionId!, "import", payloadHash!, releaseResult);
       }
-      await tx.CommitAsync();
+      await tx.CommitAsync(RecallSmith.Lambda.Common.RequestBudget.Token);
     }
     catch (PostgresException pg) when (pg is { SqlState: "42809" })
     {

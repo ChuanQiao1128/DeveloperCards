@@ -90,6 +90,8 @@ Any non-blank line before the first card header that is not the deck header →
 | `Q:` | `question` | **yes** | multi-line stem. Empty → `MISSING_QUESTION` (card dropped). |
 | `OPT: <a-f>` / `OPT: <a-f> *` | `mcq.options[]` | MCQ | opens option body; `*` = correct. Payload must be exactly one letter a–f (upper accepted, stored lowercase) plus optional `*`, nothing else. Anything else → `MCQ_BAD_OPT_LINE` and the **whole card is dropped**. |
 | `WHY:` | `mcq.options[last].why` | for every wrong option | explains the `OPT:` directly above. Before any `OPT:` → `MCQ_WHY_WITHOUT_OPTION`. Second `WHY:` for the same option → `DUPLICATE_SECTION`. |
+| `TEACHING:` | `teaching` | no | JSON object or explicit `null`; body may span lines. Unsupported explicit teaching schema → `TEACHING_BAD_SHAPE`. Preserves prerequisites and the Chinese teaching mirror. Missing marker preserves stored teaching during import. |
+| `TAGS:` | `tags` | no | JSON object or explicit `null`; malformed JSON → `TAGS_BAD_SHAPE`. Missing marker preserves stored tags. Server canonicalizers enforce the existing field shapes; complete prerequisite/domain checks run at publish, allowing partial drafts. |
 | `A:` | `explanation` | **yes** | multi-line. Empty → `MISSING_ANSWER` (card dropped). For MCQ it is the letter-free answer sentence old clients show as the card back. |
 | `CODE: <language>` | `codeSnippet` + `codeLanguage` | no | language is the rest of the marker line (`CODE: python`, `CODE: json`, `CODE: bash`; bare `CODE:` = no language). Body is the snippet. A `CODE:` with no body is dropped entirely (no snippet, no language). |
 | `USAGE:` | `realWorldUsage` | no | multi-line. |
@@ -102,11 +104,11 @@ Any non-blank line before the first card header that is not the deck header →
 | `USAGE_ZH:` | `translations["zh-CN"].realWorldUsage` | iff `USAGE:` | the Chinese usage line. |
 
 - A *section* is a marker line plus every following non-blank line up to the next column-0
-  marker or card header. A card may contain each of `Q:`, `A:`, `CODE:`, `USAGE:`, `SOURCE:` once; a repeat
+  marker or card header. A card may contain each of `Q:`, `A:`, `CODE:`, `USAGE:`, `SOURCE:`, `TEACHING:`, `TAGS:` once; a repeat
   → `DUPLICATE_SECTION`, the first copy is kept and the repeat's body is swallowed.
 - Lines after the header but before the first section marker → `TEXT_BEFORE_SECTION`.
 - Sections may appear in any order; the round-trip (canonical) order is
-  `header, TOPIC:, QUALIFIER:, QUALIFIER_ZH:, Q:, Q_ZH:, (OPT:, OPT_ZH:, WHY:, WHY_ZH:) …, A:, A_ZH:,
+  `header, TOPIC:, QUALIFIER:, QUALIFIER_ZH:, Q:, Q_ZH:, (OPT:, OPT_ZH:, WHY:, WHY_ZH:) …, TEACHING:, TAGS:, A:, A_ZH:,
   CODE:, USAGE:, USAGE_ZH:, SOURCE:` (the `_ZH` lines only on a translated card). Write them in that
   order.
 - A card is MCQ as soon as it has one `OPT:`, `WHY:` or `QUALIFIER:` line; `shuffle` is always

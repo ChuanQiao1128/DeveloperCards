@@ -51,9 +51,6 @@ public static class Pg
       var portRaw = Environment.GetEnvironmentVariable("PGPORT");
       var port = int.TryParse(portRaw, out var p) ? p : 5432;
 
-      var sslModeRaw = (Environment.GetEnvironmentVariable("PGSSLMODE") ?? string.Empty).Trim().ToLowerInvariant();
-      var disableSsl = sslModeRaw == "disable";
-
       var maxRaw = Environment.GetEnvironmentVariable("PG_MAX");
       var max = int.TryParse(maxRaw, out var m) ? m : 1;
 
@@ -70,7 +67,6 @@ public static class Pg
         Database = database.Trim(),
         Username = user.Trim(),
         Password = password,
-        SslMode = disableSsl ? SslMode.Disable : SslMode.Require,
 
         Pooling = true,
         MaxPoolSize = max,
@@ -84,6 +80,7 @@ public static class Pg
         Options = RecallSmith.Lambda.Db.PgSessionTimeouts.Current.ConnectionOptions,
       };
 
+      RecallSmith.Lambda.Db.PgConnectionSecurity.Apply(csb);
       _dataSource = new NpgsqlDataSourceBuilder(csb.ConnectionString).Build();
       return _dataSource;
     }
@@ -100,11 +97,23 @@ public static class Pg
     return ds?.CreateConnection();
   }
 
-  public static async Task<NpgsqlConnection?> OpenConnectionOrNullAsync()
+  public static async Task<NpgsqlConnection?> OpenConnectionOrNullAsync(CancellationToken cancellationToken = default)
   {
     var conn = ConnectionOrNull();
     if (conn is null) return null;
-    await conn.OpenAsync();
-    return conn;
+    try
+    {
+      var token = RequestBudget.Combine(cancellationToken);
+      // A warm pooled OpenAsync can complete synchronously without checking an already-cancelled token.
+      token.ThrowIfCancellationRequested();
+      await conn.OpenAsync(token);
+      token.ThrowIfCancellationRequested();
+      return conn;
+    }
+    catch
+    {
+      await conn.DisposeAsync();
+      throw;
+    }
   }
 }

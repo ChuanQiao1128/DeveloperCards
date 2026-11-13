@@ -1,0 +1,9 @@
+{
+  "contractVersion": 1,
+  "teachingSchema": "teaching-v1",
+  "translationVersion": 1,
+  "chunkPackageVersion": 1,
+  "manifestVersion": 2,
+  "note": "Shared current producer/consumer behavior, wired into publish/worker; no content rewrite.",
+  "tagsOnlyHashSchema": "tags-only-v1"
+}

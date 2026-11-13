@@ -86,7 +86,7 @@ public static class CardSimilarity
     if (cached is not null && DateTime.UtcNow - cached.DetectedAtUtc < EngineCacheTtl) return cached.Engine;
 
     await using var cmd = DbUtil.CreateCommand(conn, tx, "select exists(select 1 from pg_extension where extname = 'pg_trgm')", []);
-    var installed = await cmd.ExecuteScalarAsync(ct) is true;
+    var installed = await cmd.ExecuteScalarAsync(RecallSmith.Lambda.Common.RequestBudget.Combine(ct)) is true;
     var engine = installed ? EnginePgTrgm : EngineFallback;
 
     Volatile.Write(ref _engineCache, new EngineCache(engine, DateTime.UtcNow));
@@ -153,24 +153,24 @@ public static class CardSimilarity
     // set_config(..., true) lasts until the end of this transaction, so the threshold never leaks into a pooled
     // connection's next use. A caller that passes its own open transaction gets the setting until that transaction
     // ends; otherwise this method owns a short transaction of its own.
-    await using var ownTx = callerTx is null ? await conn.BeginTransactionAsync(ct) : null;
+    await using var ownTx = callerTx is null ? await conn.BeginTransactionAsync(RecallSmith.Lambda.Common.RequestBudget.Combine(ct)) : null;
     var tx = callerTx ?? ownTx!;
     if (usesIndex)
     {
       await using var set = DbUtil.CreateCommand(conn, tx, "select set_config('pg_trgm.similarity_threshold', $1, true)", [ThresholdSetting(threshold)]);
-      await set.ExecuteScalarAsync(ct);
+      await set.ExecuteScalarAsync(RecallSmith.Lambda.Common.RequestBudget.Combine(ct));
     }
     await using (var cmd = DbUtil.CreateCommand(conn, tx, sql, parameters))
-    await using (var reader = await cmd.ExecuteReaderAsync(ct))
+    await using (var reader = await cmd.ExecuteReaderAsync(RecallSmith.Lambda.Common.RequestBudget.Combine(ct)))
     {
-      while (await reader.ReadAsync(ct))
+      while (await reader.ReadAsync(RequestBudget.Combine(ct)))
       {
         matches.Add(ToMatch(
           reader.GetInt64(0), reader.GetInt64(1), reader.GetString(2), reader.GetString(3), reader.GetString(4),
           reader.GetFloat(5)));
       }
     }
-    if (ownTx is not null) await ownTx.CommitAsync(ct);
+    if (ownTx is not null) await ownTx.CommitAsync(RecallSmith.Lambda.Common.RequestBudget.Combine(ct));
     return matches;
   }
 
@@ -192,9 +192,9 @@ public static class CardSimilarity
 
     var scored = new List<(long Id, long DeckId, string Slug, string Uid, string Question, float Score)>();
     await using (var cmd = DbUtil.CreateCommand(conn, tx, sql, parameters))
-    await using (var reader = await cmd.ExecuteReaderAsync(ct))
+    await using (var reader = await cmd.ExecuteReaderAsync(RecallSmith.Lambda.Common.RequestBudget.Combine(ct)))
     {
-      while (await reader.ReadAsync(ct))
+      while (await reader.ReadAsync(RequestBudget.Combine(ct)))
       {
         var question = reader.GetString(4);
         var score = Trigram.Similarity(question, text);

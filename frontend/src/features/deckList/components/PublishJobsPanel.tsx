@@ -30,6 +30,7 @@
 
 import type { PublishJob } from '../../../api/authoring';
 import { safeDateTime } from '../deckListManifest';
+import { publishJobStage } from '../publishJobStage';
 
 export interface PublishJobsPanelProps {
   jobs: PublishJob[];
@@ -56,12 +57,9 @@ export function PublishJobsPanel({ jobs, onRefresh }: PublishJobsPanelProps) {
                 <table className="min-w-full text-sm">
                   <thead className="bg-slate-50 text-xs uppercase text-slate-500 font-medium">
                     <tr>
-                      <th className="px-4 py-3 text-left">Job ID</th>
-                      <th className="px-4 py-3 text-left">Deck</th>
-                      <th className="px-4 py-3 text-left">Status</th>
-                      <th className="px-4 py-3 text-left">Error</th>
-                      <th className="px-4 py-3 text-left">Note</th>
-                      <th className="px-4 py-3 text-left">Time</th>
+                      {['Job ID', 'Deck', 'Status', 'Error', 'Note', 'Time'].map(label => (
+                        <th key={label} className="px-4 py-3 text-left">{label}</th>
+                      ))}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -76,7 +74,7 @@ export function PublishJobsPanel({ jobs, onRefresh }: PublishJobsPanelProps) {
                             job.status === 'PROCESSING' ? 'bg-blue-100 text-blue-700' :
                             'bg-amber-100 text-amber-700'
                           }`}>
-                            {job.status}
+                            {publishJobStage(job)}
                           </span>
                         </td>
                         <td className="px-4 py-3 text-xs">

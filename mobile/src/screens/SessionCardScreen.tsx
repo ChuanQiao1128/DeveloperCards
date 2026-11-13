@@ -1078,8 +1078,12 @@ export function SessionCardScreen({ navigation, route }: Props) {
       }
     } catch (error) {
       console.warn('[SessionCard] local review commit failed');
-      Alert.alert('Could not finish saving',
-        'Keep this card open and try the same action again. Your answer has been kept.');
+      const queueFull = error != null && typeof error === 'object' &&
+        'code' in error && error.code === 'PROGRESS_QUEUE_FULL';
+      Alert.alert(queueFull ? 'Offline review queue is full' : 'Could not finish saving',
+        queueFull
+          ? 'Sync your saved reviews first, then try this action again. Your answer has been kept.'
+          : 'Keep this card open and try the same action again. Your answer has been kept.');
     } finally {
       commitBusyRef.current = false;
       setReviewing(false);

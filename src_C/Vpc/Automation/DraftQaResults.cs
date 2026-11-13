@@ -57,7 +57,7 @@ internal static class DraftQaResults
   private static async Task<ItemOutcome?> ApplyItemAsync(NpgsqlConnection conn, AiQaResults.Report report,
     AiQaResults.ReportItem item, CancellationToken ct)
   {
-    await using var tx = await conn.BeginTransactionAsync(ct);
+    await using var tx = await conn.BeginTransactionAsync(RecallSmith.Lambda.Common.RequestBudget.Combine(ct));
     var mode = await AutomationMode.EffectiveAsync(conn, ct);
 
     // 0. the decision this job was sent for
@@ -87,7 +87,7 @@ internal static class DraftQaResults
         return null;
       }
       await RecordSpendAsync(conn, tx, report.RunId, item, ct);
-      await tx.CommitAsync(ct);
+      await tx.CommitAsync(RecallSmith.Lambda.Common.RequestBudget.Combine(ct));
       Log.Event("info", new { tag = "automation", reason = "draft_qa_late_spend", qaJobId = report.RunId, draftId = item.CardId });
       return null;
     }
@@ -98,7 +98,7 @@ internal static class DraftQaResults
     if ((string)decision["state"]! != DraftDecisions.QaQueued)
     {
       await RecordSpendAsync(conn, tx, report.RunId, item, ct);
-      await tx.CommitAsync(ct);
+      await tx.CommitAsync(RecallSmith.Lambda.Common.RequestBudget.Combine(ct));
       return null;
     }
 
@@ -147,7 +147,7 @@ internal static class DraftQaResults
     {
       await DraftDecisions.TransitionAsync(conn, tx, draftId, DraftDecisions.QaQueued, to, reason, detail,
         DraftDecisions.AutomationEventActor, mode.Effective, details, ct);
-      await tx.CommitAsync(ct);
+      await tx.CommitAsync(RecallSmith.Lambda.Common.RequestBudget.Combine(ct));
       return new ItemOutcome(draftId, deckId, runId, to, reason, detail, qaCostUsd, null, draftUid, minor, mode.Effective);
     }
 
@@ -264,7 +264,7 @@ internal static class DraftQaResults
       [draftId, accepted.CardId, cardHash, mode.GateId, mode.Effective]);
     await DraftDecisions.AppendEventAsync(conn, tx, draftId, DraftDecisions.QaQueued, DraftDecisions.AutoAccepted, null,
       DraftDecisions.AutomationEventActor, mode.Effective, new { cardId = accepted.CardId, gateId = mode.GateId }, ct);
-    await tx.CommitAsync(ct);
+    await tx.CommitAsync(RecallSmith.Lambda.Common.RequestBudget.Combine(ct));
 
     return new ItemOutcome(draftId, deckId, runId, DraftDecisions.AutoAccepted, null, null, qaCostUsd, accepted.CardId, accepted.StableUid,
       minor, mode.Effective);

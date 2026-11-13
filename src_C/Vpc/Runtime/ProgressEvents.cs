@@ -1,3 +1,4 @@
+using Npgsql;
 using System.Diagnostics;
 using System.Globalization;
 using System.Text.Json;
@@ -671,6 +672,10 @@ public static class ProgressEvents
         rejectedEventIds,
         rejected,
       });
+    }
+    catch (PostgresException ex) when (AccountDeletionBarrier.IsRejection(ex))
+    {
+      return AccountDeletionBarrier.Rejected(res);
     }
     catch (Exception ex) when (ex is ValidationError)
     {

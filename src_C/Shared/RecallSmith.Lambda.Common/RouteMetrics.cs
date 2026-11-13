@@ -237,6 +237,13 @@ public static class RouteMetrics
     "/api/v1/internal/revenuecat-deletions/report",
   ];
 
+  // Both operations are bounded administrator housekeeping. Reuse the existing series;
+  // the maintenance operation itself remains a plain log field, never a metric dimension.
+  public static IReadOnlyDictionary<string,string> RouteAliases { get; } = new Dictionary<string,string>(StringComparer.OrdinalIgnoreCase)
+  {
+    ["/api/v1/admin/maintenance/run"] = "/api/v1/admin/publish/reap",
+  };
+
   // Longest first, so the table stays order-independent: appending an entry to the arrays
   // above cannot change which label an existing path gets. (With EndsWith the specific
   // routes do not currently collide with the general ones -- "/a/b/page" does not end with
@@ -253,7 +260,7 @@ public static class RouteMetrics
     ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"];
 
   /// <summary>
-  /// Every label this class can produce apart from <see cref="UnmatchedRoute"/>.
+  /// Every routed pattern, including aliases that reuse an existing metric label.
   /// </summary>
   /// <remarks>
   /// Exposed so that a test can hold this list against the route literals in the dispatcher
@@ -262,7 +269,7 @@ public static class RouteMetrics
   /// forgotten here would silently report as "unmatched", and no behavioural test can notice,
   /// because the function still works perfectly.
   /// </remarks>
-  public static IReadOnlyList<string> KnownRoutes { get; } = [.. StaticRoutes, .. TemplateRoutes];
+  public static IReadOnlyList<string> KnownRoutes { get; } = [.. StaticRoutes, .. TemplateRoutes, .. RouteAliases.Keys];
 
   // ------------------------------------------------------------------ normalisation
 
@@ -284,6 +291,9 @@ public static class RouteMetrics
       }
       return UnmatchedRoute;
     }
+
+    foreach (var alias in RouteAliases)
+      if (p.EndsWith(alias.Key,StringComparison.OrdinalIgnoreCase)) return alias.Value;
 
     foreach (var route in StaticRoutesLongestFirst)
     {

@@ -57,6 +57,9 @@ public static class CardContentHash
         tags = Node(Cell(row, "tags")) is { } tags ? JsonNode.Parse(PublishSnapshot.CanonicalJson(tags.ToJsonString())) : null,
       });
 
+    else if (Node(Cell(row, "tags")) is { } tagsOnly)
+      payload.Add(new { schema = "tags-only-v1", tags = JsonNode.Parse(PublishSnapshot.CanonicalJson(tagsOnly.ToJsonString())) });
+
     var json = JsonSerializer.Serialize(payload);
     var hash = SHA256.HashData(Encoding.UTF8.GetBytes(json));
     return Convert.ToHexString(hash).ToLowerInvariant();
@@ -64,7 +67,7 @@ public static class CardContentHash
 
   public static string Schema(IReadOnlyDictionary<string, object?> row) =>
     PublishSnapshot.HasFrontHelp(Node(Cell(row, "translations"))?.ToJsonString(), Node(Cell(row, "frontHelp"))?.ToJsonString())
-      ? "front-help-v1" : "legacy-v1";
+      ? "front-help-v1" : Node(Cell(row, "teaching")) is null && Node(Cell(row, "tags")) is not null ? "tags-only-v1" : "legacy-v1";
 
   private static object? Cell(IReadOnlyDictionary<string, object?> row, string key) =>
     row.TryGetValue(key, out var v) ? v : null;

@@ -119,11 +119,17 @@ public class WorkerFunction
         // Step 6: 发布成功后在进程内重建 Manifest（completedAtMs 用于 metadata 证据判定）
         var completedAtMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
         LogWithJobId(jobId, "Triggering manifest rebuild");
-        await _rebuildManifest(completedAtMs);
+        var manifestDelivered = true;
+        if (replayOutcome != PublishReplayOutcome.FailedOrAbsent)
+        {
+          if (_processor is IPublishManifestDelivery durable)
+            manifestDelivered = await durable.DeliverManifestAsync(jobId, () => _rebuildManifest(completedAtMs));
+          else await _rebuildManifest(completedAtMs);
+        }
 
         LogWithJobId(jobId, "Processing completed successfully");
         // A replay of a job that was already terminal (or absent) is acknowledged, not counted (R18I Q4).
-        if (replayOutcome == PublishReplayOutcome.None)
+        if (replayOutcome == PublishReplayOutcome.None && manifestDelivered)
         {
           RouteMetrics.EmitGauge(PublishSucceededMetric, 1);
         }

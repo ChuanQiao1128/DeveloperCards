@@ -728,6 +728,8 @@ export interface PublishJob {
   jobId: string;
   deckSlug: string;
   status: 'PENDING' | 'PROCESSING' | 'SUCCESS' | 'FAILED';
+  manifestState?: 'pending' | 'delivered' | 'needs_attention' | null;
+  recoveryDurable?: boolean;
   note?: string;
   errorMessage?: string;
   createdAt: number;

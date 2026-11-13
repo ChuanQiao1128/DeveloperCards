@@ -238,7 +238,7 @@ public static class PremiumDeckUrl
         using var getCts = new CancellationTokenSource(TimeSpan.FromMilliseconds(s3GetTimeoutMs));
         using var obj = await s3.GetObjectAsync(
           new GetObjectRequest { BucketName = contentBucket, Key = manifestKey },
-          getCts.Token);
+          RecallSmith.Lambda.Common.RequestBudget.Combine(getCts.Token));
 
         Log.Info(JsonSerializer.Serialize(new { traceId, impl = PremiumUrlImpl, step = "s3_get_manifest_done" }));
 
@@ -247,7 +247,7 @@ public static class PremiumDeckUrl
 
         using var bodyCts = new CancellationTokenSource(TimeSpan.FromMilliseconds(s3BodyTimeoutMs));
         using var sr = new StreamReader(obj.ResponseStream);
-        manifestText = await sr.ReadToEndAsync(bodyCts.Token);
+        manifestText = await sr.ReadToEndAsync(RecallSmith.Lambda.Common.RequestBudget.Combine(bodyCts.Token));
       }
 
       Log.Info(JsonSerializer.Serialize(new { traceId, impl = PremiumUrlImpl, step = "manifest_read_done", bytes = manifestText.Length }));

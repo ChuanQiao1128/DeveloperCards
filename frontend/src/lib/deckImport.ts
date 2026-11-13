@@ -43,6 +43,7 @@
 //    code snippet is dropped rather than preserved. Paying that price here
 //    keeps "insert a blank line to make it readable" a safe edit for authors.
 
+import { canonicalizeJson } from './canonicalJson';
 import type { Card, CardSource } from '../types/card';
 import type { McqBlob } from '../types/mcq';
 import type { CardTranslation, CardTranslations, TranslatedMcq } from '../types/translation';
@@ -71,6 +72,8 @@ import { parseFrontHelp, parseFrontHelpJson, normalizeFrontHelpForCompare, type 
 /** Card content as it exists in a markdown document, before ordering. */
 export interface DeckCardContent {
   frontHelp?: FrontHelpEntry[] | null;
+  teaching?: Record<string, unknown> | null;
+  tags?: Record<string, unknown> | null;
   stableUid: string;
   difficulty: number;
   question: string;
@@ -96,6 +99,8 @@ export interface ParsedCard extends DeckCardContent {
 }
 
 export type ImportIssueCode =
+  | 'TEACHING_BAD_SHAPE'
+  | 'TAGS_BAD_SHAPE'
   | 'EMPTY_DOCUMENT'
   | 'MISSING_DECK_HEADER'
   | 'DUPLICATE_DECK_HEADER'
@@ -163,7 +168,9 @@ export type ComparableField =
   | 'mcq'
   | 'source'
   | 'translations'
-  | 'frontHelp';
+  | 'frontHelp'
+  | 'teaching'
+  | 'tags';
 
 export interface ImportCreate {
   kind: 'create';
@@ -268,7 +275,7 @@ const RESERVED_ZH_EXACT = /^[A-Z]+_ZH:/;
 const SLUG_PATTERN = /^[a-z0-9]+(?:[-_][a-z0-9]+)*$/;
 
 type SectionKind =
-  | 'help' | 'help_zh' | 'question' | 'answer' | 'code' | 'usage' | 'source' | `option:${string}` | `why:${string}`
+  | 'teaching' | 'tags' | 'help' | 'help_zh' | 'question' | 'answer' | 'code' | 'usage' | 'source' | `option:${string}` | `why:${string}`
   | 'question_zh' | 'answer_zh' | 'usage_zh' | `option_zh:${string}` | `why_zh:${string}`;
 
 /** The marker a zh section kind is written with, for messages; English kinds keep their old wording. */
@@ -422,6 +429,21 @@ export function parseDeckMarkdown(text: string): ParsedDeck {
       }
     }
 
+    const structured: Pick<DeckCardContent, 'teaching' | 'tags'> = {};
+    for (const kind of ['teaching', 'tags'] as const) {
+      const section = d.sections[kind];
+      if (!section) continue;
+      try {
+        const value: unknown = JSON.parse(sectionText(section));
+        if (value !== null && (typeof value !== 'object' || Array.isArray(value))) throw new Error('Expected a JSON object or null.');
+        if (kind === 'teaching' && value && 'schema' in value && value.schema !== 'teaching-v1') throw new Error('Unsupported teaching schema.');
+        structured[kind] = value as Record<string, unknown> | null;
+      } catch (error) {
+        pushIssue(kind === 'teaching' ? 'TEACHING_BAD_SHAPE' : 'TAGS_BAD_SHAPE', section.line, error instanceof Error ? error.message : 'Invalid JSON.', d.stableUid);
+        return;
+      }
+    }
+
     // A translated card must translate every section its English card has
     // (contract §3): a half-translated card would show mixed languages, so it
     // is dropped like a card without Q:, one issue per missing section.
@@ -497,6 +519,7 @@ export function parseDeckMarkdown(text: string): ParsedDeck {
     }
 
     cards.push({
+      ...structured,
       stableUid: d.stableUid,
       ...(frontHelp !== undefined ? { frontHelp } : {}),
       difficulty: d.difficulty,
@@ -805,6 +828,12 @@ export function parseDeckMarkdown(text: string): ParsedDeck {
       const alreadySeen = draft.sections.code !== undefined;
       currentSection = openSection('code', lineNo, '');
       if (!alreadySeen) draft.codeLanguage = language || null;
+      continue;
+    }
+
+    const structuredMatch = /^(TEACHING|TAGS):[ \t]?(.*)$/.exec(raw);
+    if (structuredMatch) {
+      currentSection = openSection(structuredMatch[1] === 'TEACHING' ? 'teaching' : 'tags', lineNo, structuredMatch[2]);
       continue;
     }
 
@@ -1181,6 +1210,8 @@ const COMPARABLE_FIELDS: readonly ComparableField[] = [
   'source',
   'translations',
   'frontHelp',
+  'teaching',
+  'tags',
 ];
 
 /**
@@ -1201,6 +1232,11 @@ function fieldsThatDiffer(card: ParsedCard, existing: Card): ComparableField[] {
     }
     if (field === 'frontHelp') {
       if (card.frontHelp !== undefined && normalizeFrontHelpForCompare(card.frontHelp) !== normalizeFrontHelpForCompare(existing.frontHelp)) changed.push(field);
+      continue;
+    }
+    if (field === 'teaching' || field === 'tags') {
+      // Old Markdown omits these fields; absence preserves the stored payload on import.
+      if (card[field] !== undefined && JSON.stringify(canonicalizeJson(card[field])) !== JSON.stringify(canonicalizeJson(existing[field] ?? null))) changed.push(field);
       continue;
     }
     if (field === 'mcq') {
@@ -1487,6 +1523,8 @@ export function serializeDeckMarkdown(
         }
       }
     }
+    if (card.teaching !== undefined) out.push('TEACHING:', JSON.stringify(card.teaching));
+    if (card.tags !== undefined) out.push('TAGS:', JSON.stringify(card.tags));
     out.push('A:');
     out.push(card.explanation);
     if (zh && zh.explanation !== undefined) {

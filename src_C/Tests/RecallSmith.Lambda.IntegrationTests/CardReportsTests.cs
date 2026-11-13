@@ -752,9 +752,9 @@ public sealed class CardReportsTests
 
       Assert.Equal(new CardReports.Counts(0, 0), await CardReports.CountsAsync(conn));
       Assert.Equal(0L, await CardReports.CreatedBetweenAsync(conn, DateTime.UtcNow.AddDays(-7), DateTime.UtcNow));
-      // Account deletion skips the missing table instead of failing its transaction.
-      var deleted = await RecallSmith.Lambda.Vpc.Runtime.AccountDeletion.DeleteUserDataAsync(conn, Sub("nr-delete"));
-      Assert.Equal(0, deleted.CardReportRows);
+      // Pre-barrier schemas reject deletion before erasing any data (migration 052).
+      await Assert.ThrowsAsync<InvalidOperationException>(() =>
+        RecallSmith.Lambda.Vpc.Runtime.AccountDeletion.DeleteUserDataAsync(conn, Sub("nr-delete")));
     }
 
     var savedDb = Environment.GetEnvironmentVariable("PGDATABASE");

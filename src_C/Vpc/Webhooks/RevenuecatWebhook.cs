@@ -1,3 +1,4 @@
+using RecallSmith.Lambda.Vpc.Runtime;
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
@@ -349,6 +350,10 @@ public static class RevenuecatWebhook
           expirationAtMs: expMs,
           rawJson: req.RawBody);
       }
+      catch (PostgresException ex) when (AccountDeletionBarrier.IsRejection(ex))
+      {
+        return res.Raw(200, new { ok = true, accepted = false, reason = "account_deletion_pending", mode, impl = ImplVersion });
+      }
       catch (Exception ex)
       {
         Log.Event("error", new { tag = "rc-webhook", reason = "db_insert_failed", mode, eventId, error = ex.Message });
@@ -414,6 +419,10 @@ public static class RevenuecatWebhook
             lastEventId: eventId,
             lastEventType: typeUpper,
             lastEventTsMs: eventTsMs);
+        }
+        catch (PostgresException ex) when (AccountDeletionBarrier.IsRejection(ex))
+        {
+          return res.Raw(200, new { ok = true, accepted = false, reason = "account_deletion_pending", mode, impl = ImplVersion });
         }
         catch (Exception ex)
         {

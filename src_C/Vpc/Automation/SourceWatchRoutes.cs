@@ -76,7 +76,7 @@ public static class SourceWatchRoutes
 
       var targets = new List<object>();
       int synced;
-      await using (var tx = await conn.BeginTransactionAsync())
+      await using (var tx = await conn.BeginTransactionAsync(RecallSmith.Lambda.Common.RequestBudget.Token))
       {
         synced = await DbUtil.ExecuteAsync(conn, tx,
           """
@@ -133,7 +133,7 @@ public static class SourceWatchRoutes
             quotes,
           });
         }
-        await tx.CommitAsync();
+        await tx.CommitAsync(RecallSmith.Lambda.Common.RequestBudget.Token);
       }
 
       Log.Event("info", new { tag = "source_watch", outcome = "targets", watchRunId, mode = mode.Effective, synced, leased = targets.Count });
@@ -196,7 +196,7 @@ public static class SourceWatchRoutes
       var pageEvents = new List<PageEvent>();
       var feedImpacts = new List<ChangeImpact.FeedItemImpact>();
       var failingEvents = new List<(long EventId, long TargetId, string Url, string? ErrorCode)>();
-      await using (var tx = await conn.BeginTransactionAsync())
+      await using (var tx = await conn.BeginTransactionAsync(RecallSmith.Lambda.Common.RequestBudget.Token))
       {
         var ids = observations.Select(o => o.TargetId).Distinct().ToArray();
         var targets = (await DbUtil.QueryAsync(conn, tx,
@@ -214,7 +214,7 @@ public static class SourceWatchRoutes
           }
           await ApplyAsync(conn, tx, watchRunId, o, t, counts, pageEvents, feedImpacts, failingEvents);
         }
-        await tx.CommitAsync();
+        await tx.CommitAsync(RecallSmith.Lambda.Common.RequestBudget.Token);
       }
 
       // After the commit, best effort: re-checks, webhooks, exception emails, the ledger row.

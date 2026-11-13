@@ -5,7 +5,7 @@ export interface ReleaseCardReview {
   stableUid: string;
   verdict: 'PASS';
   cardContentHash: string;
-  schema: 'legacy-v1' | 'front-help-v1';
+  schema: 'legacy-v1' | 'front-help-v1' | 'tags-only-v1';
   revision: number;
   orderInDeck: number;
   blockers: [];

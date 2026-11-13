@@ -1,0 +1,64 @@
+{
+  "slug": "fixture-contract",
+  "title": "Contract fixture",
+  "locale": "en-US",
+  "deckType": 1,
+  "version": "fixture-v1",
+  "totalCards": 2,
+  "cards": [
+    {
+      "stableUid": "fixture-base",
+      "orderInDeck": 1,
+      "difficulty": 1,
+      "question": "What is kept?",
+      "explanation": "The value.",
+      "codeLanguage": null,
+      "codeSnippet": "",
+      "realWorldUsage": "",
+      "revision": 1
+    },
+    {
+      "stableUid": "fixture-choice",
+      "orderInDeck": 2,
+      "difficulty": 2,
+      "question": "Which choice keeps the value?",
+      "explanation": "Choose A because it preserves the value.",
+      "codeLanguage": null,
+      "codeSnippet": "",
+      "realWorldUsage": "",
+      "revision": 2,
+      "topic": "Fixture",
+      "translations": {
+        "zh-CN": {
+          "v": 1,
+          "question": "哪个选项保留该值？",
+          "explanation": "选择 A，因为它保留该值。"
+        }
+      },
+      "teaching": {
+        "schema": "teaching-v1",
+        "answer": "Choose A.",
+        "keyPoint": "A keeps the required value.",
+        "watchOut": "B drops it.",
+        "mustAnswer": [
+          "Choose A",
+          "Explain preservation"
+        ],
+        "prerequisites": [
+          "fixture-base"
+        ],
+        "goal": "Preserve a value.",
+        "zh-CN": {
+          "answer": "选择 A。",
+          "keyPoint": "A 保留所需的值。",
+          "watchOut": "B 丢弃该值。",
+          "goal": "保留一个值。"
+        }
+      },
+      "tags": {
+        "domain": "1",
+        "examTask": "1.2"
+      }
+    }
+  ]
+}

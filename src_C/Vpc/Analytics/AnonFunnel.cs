@@ -313,7 +313,7 @@ public static class AnonFunnel
     try
     {
       long deleted;
-      await using (var tx = await conn.BeginTransactionAsync())
+      await using (var tx = await conn.BeginTransactionAsync(RecallSmith.Lambda.Common.RequestBudget.Token))
       {
         var timeoutMs = Math.Max(1, (long)RetentionStatementTimeout.TotalMilliseconds).ToString(CultureInfo.InvariantCulture);
         await DbUtil.ExecuteAsync(conn, tx, $"set local statement_timeout = {timeoutMs}", []);
@@ -324,7 +324,7 @@ public static class AnonFunnel
           )
           """,
           [UtcNow().ToUniversalTime().AddDays(-RetentionDays), RetentionBatch]);
-        await tx.CommitAsync();
+        await tx.CommitAsync(RecallSmith.Lambda.Common.RequestBudget.Token);
       }
       Log.Event("info", new { tag = "analytics", outcome = "anon_funnel_retention", deleted });
       return deleted;

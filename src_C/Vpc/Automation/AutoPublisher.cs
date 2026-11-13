@@ -167,8 +167,8 @@ public static class AutoPublisher
       try
       {
         var start = await Publish.StartPublishAsync(conn, deckId, Actor, $"auto-publish run {runId?.ToString("D") ?? "unknown"}",
-          bindSnapshot: true, expectedSnapshot: verdict.Snapshot, allowResume: false, expectedDeckUpdatedAt: verdict.DeckUpdatedAt, ct: ct);
-        if (start.Outcome is Publish.Queued or Publish.Resumed)
+          bindSnapshot: true, expectedSnapshot: verdict.Snapshot, allowResume: false, expectedDeckUpdatedAt: verdict.DeckUpdatedAt, ct: ct, actorSuperadmin: true);
+        if (start.Outcome is Publish.Queued or Publish.Resumed or Publish.DispatchUnconfirmed)
         {
           (state, reason, detail, jobId, buildId, snapshot) = (Publishing, null, null, start.JobId, start.BuildId, start.SnapshotSha256);
         }
@@ -258,7 +258,7 @@ public static class AutoPublisher
   /// </summary>
   private static async Task<Verdict> RunChecksAsync(NpgsqlConnection conn, long deckId, string mode, CancellationToken ct)
   {
-    await using var tx = await conn.BeginTransactionAsync(IsolationLevel.RepeatableRead, ct);
+    await using var tx = await conn.BeginTransactionAsync(IsolationLevel.RepeatableRead, RequestBudget.Combine(ct));
     var decks = await DbUtil.QueryAsync(conn, tx,
       """
       select d.slug, d.is_deleted, d.live_build_id, d.updated_at,
@@ -344,7 +344,7 @@ public static class AutoPublisher
     // The export rows the publish will be bound to (A00 §6.2 check 9, §6.3).
     var export = await DbUtil.QueryAsync(conn, tx, Publish.CardsSql, [deckId]);
     var snapshot = PublishSnapshot.Digest(export.Select(PublishSnapshot.FromRow));
-    await tx.CommitAsync(ct);
+    await tx.CommitAsync(RecallSmith.Lambda.Common.RequestBudget.Combine(ct));
 
     // 7. dry run stops here, after the publish gates check 9 would meet, evaluated read-only (automation-6): a gate
     // refusal is the human route live would take, so dry run is not optimistic about it.
@@ -610,7 +610,7 @@ public static class AutoPublisher
   private static async Task<(long? NextId, long[] Uncovered)?> PublishedAsync(NpgsqlConnection conn, long publishId, long deckId, string jobId,
     string mode, CancellationToken ct)
   {
-    await using var tx = await conn.BeginTransactionAsync(ct);
+    await using var tx = await conn.BeginTransactionAsync(RecallSmith.Lambda.Common.RequestBudget.Combine(ct));
     var locked = await DbUtil.QueryAsync(conn, tx,
       "select deferred_card_ids from automation_publishes where id = $1 and state = 'publishing' for update", [publishId]);
     if (locked.Count == 0)
@@ -654,7 +654,7 @@ public static class AutoPublisher
         """, [uncovered]);
       (nextId, _) = await OpenRowAsync(conn, tx, deckId, owner as Guid?, mode, uncovered, ct);
     }
-    await tx.CommitAsync(ct);
+    await tx.CommitAsync(RecallSmith.Lambda.Common.RequestBudget.Combine(ct));
     return (nextId, uncovered);
   }
 

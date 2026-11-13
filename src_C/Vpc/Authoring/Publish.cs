@@ -271,6 +271,17 @@ public static partial class Publish
     order by order_in_deck asc, id asc
     """;
 
+  internal static async Task<PublishStart?> ReferenceGateAsync(NpgsqlConnection conn, NpgsqlTransaction? tx, long deckId, string slug,
+    IReadOnlyList<Dictionary<string, object?>> rows)
+  {
+    var cards = rows.Select(row => new DeckReferenceCard(Convert.ToString(row["stableUid"], CultureInfo.InvariantCulture) ?? "",
+      Helpers.JsonbElement(row, "teaching"), Helpers.JsonbElement(row, "tags"))).ToList();
+    foreach (var row in await DbUtil.QueryAsync(conn, tx, "select stable_uid from cards where deck_id=$1 and is_deleted<>0 order by id", [deckId]))
+      cards.Add(new(Convert.ToString(row["stable_uid"], CultureInfo.InvariantCulture) ?? "", Deleted: true));
+    var result = DeckReferenceValidation.Validate(slug, cards);
+    return result.IsValid ? null : Refuse(400, "CONTENT_REFERENCE_GATE", string.Join("; ", result.Errors.Select(e => $"{e.StableUid}: {e.Code}" + (e.ReferenceUid is null ? "" : $" ({e.ReferenceUid})"))) + (result.Truncated ? "; additional errors omitted" : ""));
+  }
+
   public static async Task<APIGatewayProxyResponse> HandleAuthoringPublish(LambdaRequest req, Res res, AuthContext auth)
   {
     var deny = Auth.RequireAdmin(auth, res);
@@ -312,13 +323,16 @@ public static partial class Publish
         if (await ContentRelease.Applies(conn, deckIdInt))
           return await StartControlledAsync(conn, deckIdInt, body, auth, note, res);
         var start = await StartPublishAsync(conn, deckIdInt, adminSub!, note, bindSnapshot: Qa.QaGate.IsEnforced(), expectedSnapshot: null,
-          allowResume: true);
+          allowResume: true, actionId: OptionalAction(body), requestHash: ContentRelease.PayloadHash(body), actorSuperadmin: auth.IsSuperAdmin);
         return StartResponse(start, res);
       }
 
       var loaded = await LoadDeckAsync(conn, deckIdInt);
       if (loaded.Refusal is not null) return StartResponse(loaded.Refusal, res);
       var (deck, deckSlug, cardRows, deckType, tier) = (loaded.Deck!, loaded.DeckSlug!, loaded.CardRows!, loaded.DeckType, loaded.Tier!);
+
+      var referenceGate = await ReferenceGateAsync(conn, null, deckIdInt, deckSlug, cardRows);
+      if (referenceGate is not null) return StartResponse(referenceGate, res);
 
       var baseCards = cardRows.Select(c =>
       {
@@ -376,6 +390,10 @@ public static partial class Publish
     {
       return Helpers.MapUniqueViolation409(pg, res) ?? res.Error500(pg);
     }
+    catch (TranslationValidationError ex)
+    {
+      return res.BadRequest(ex.Code,ex.Message);
+    }
     catch (Exception ex) when (ex is ValidationError)
     {
       return Helpers.ErrorEnvelope(res, ex.Message.StartsWith("IDEMPOTENCY_CONFLICT") ? 409 : 400, "VALIDATION_ERROR", ex.Message);
@@ -389,14 +407,15 @@ public static partial class Publish
 
   /// <summary>
   /// What <see cref="StartPublishAsync"/> did: <c>queued</c> (a new job was inserted and sent), <c>resumed</c> (a
-  /// recent active job was returned) or <c>refused</c> (<see cref="HttpStatus"/>/<see cref="Code"/>/<see cref="Message"/>
+  /// recent active job was returned, redelivering it when still PENDING), <c>dispatch_unconfirmed</c> (the job
+  /// remains committed but the send result is unknown), or <c>refused</c> (<see cref="HttpStatus"/>/<see cref="Code"/>/<see cref="Message"/>
   /// as the console answers them). <see cref="ErrorExtras"/> is the chained QA run (<see cref="Qa.QaRuns.ChainedRun"/>)
   /// of an <c>AI_QA_REQUIRED</c> refusal, which the console answers as <c>error.runId</c>/<c>error.qaRun</c>.
   /// </summary>
-  public sealed record PublishStart(string Outcome /* queued | resumed | refused */, int HttpStatus, string? Code, string? Message,
+  public sealed record PublishStart(string Outcome /* queued | resumed | dispatch_unconfirmed | refused */, int HttpStatus, string? Code, string? Message,
     string? JobId, string? BuildId, string? SnapshotSha256, object? ErrorExtras);
 
-  public const string Queued = "queued", Resumed = "resumed", Refused = "refused";
+  public const string Queued = "queued", Resumed = "resumed", DispatchUnconfirmed = "dispatch_unconfirmed", Refused = "refused";
 
   private const string PublishInProgressMessage =
     "A publish for this deck is still PENDING or PROCESSING. Wait for the worker, or run POST /api/v1/admin/publish/reap and retry.";
@@ -417,11 +436,12 @@ public static partial class Publish
   /// (the automation's check 5 value) that is no longer the deck's <c>updated_at</c> is refused <c>AI_QA_STALE</c> too,
   /// and is stored on the job so the Worker refuses to build after a later settings edit (R18C, backend-design-11). Every
   /// job records the ids of the deck's live cards at its insert in <c>card_ids</c> (backend-design-12). Validation
-  /// errors, a <c>23505</c> on <c>uq_deck_publishes_active</c> and SQS failures (after the job is marked
-  /// <c>FAILED</c>) propagate as exceptions.
+  /// errors and a <c>23505</c> on <c>uq_deck_publishes_active</c> propagate as exceptions. An ambiguous SQS
+  /// result returns <c>dispatch_unconfirmed</c> with the committed identity and never changes the worker status.
   /// </summary>
   internal static async Task<PublishStart> StartPublishAsync(NpgsqlConnection conn, long deckId, string actorSub, string? note,
-    bool bindSnapshot, string? expectedSnapshot, bool allowResume, DateTime? expectedDeckUpdatedAt = null, CancellationToken ct = default)
+    bool bindSnapshot, string? expectedSnapshot, bool allowResume, DateTime? expectedDeckUpdatedAt = null, CancellationToken ct = default,
+    string? actionId = null, string? requestHash = null, bool actorSuperadmin = false)
   {
     ct.ThrowIfCancellationRequested();
     var queueUrl = TestEnqueueSeam?.QueueUrl ?? PublishJobQueueUrl;
@@ -429,8 +449,18 @@ public static partial class Publish
     if (string.IsNullOrEmpty(queueUrl)) return Refuse(503, "CONFIG_ERROR", "Missing env PUBLISH_JOB_QUEUE_URL");
 
     if (await ContentRelease.Applies(conn, deckId)) return Refuse(409, "CODEX_REVIEW_REQUIRED", "Use the controlled Codex release publish with receipt, snapshot and expectedLive");
+    var durable = await PublishDelivery.Ready(conn);
+    if (actionId is not null && !durable) return Refuse(503, "PUBLISH_RECOVERY_NOT_READY", "actionId requires migration 053; legacy publication remains available");
+    if (actionId is not null)
+    {
+      var replay = await ReplayOrdinary(conn, null, deckId, actionId, requestHash);
+      if (replay is not null) return replay.Outcome == Resumed
+        ? await DispatchPublishAsync(conn, replay, deckId, "", actorSub, note, queueUrl, ct) : replay;
+    }
+    var editingSnapshot = durable ? (string?)await DbUtil.ExecuteScalarAsync(conn, null, "select content_editing_snapshot($1)", [deckId]) : null;
     var loaded = await LoadDeckAsync(conn, deckId);
     if (loaded.Refusal is not null) return loaded.Refusal;
+    bindSnapshot |= durable;
     var (deckSlug, cardRows, tier) = (loaded.DeckSlug!, loaded.CardRows!, loaded.Tier!);
 
     // The automation checked exactly these cards; anything else changed since (A00 §6.3).
@@ -444,6 +474,17 @@ public static partial class Publish
         await DbUtil.ExecuteScalarAsync(conn, null, "select updated_at is distinct from $2 from decks where id = $1", [deckId, checkedAt]) is not false)
     {
       return StaleRefusal(deckId);
+    }
+
+    var referenceGate = await ReferenceGateAsync(conn, null, deckId, deckSlug, cardRows);
+    if (referenceGate is not null) return referenceGate;
+
+    // Optional teaching/help/tag structure is checked even when cloud QA is disabled.
+    foreach (var card in cardRows)
+    {
+      if (Helpers.JsonbElement(card,"frontHelp") is { } help) FrontHelpValidation.Canonicalize(help);
+      if (Helpers.JsonbElement(card,"teaching") is { } teaching) TeachingValidation.Canonicalize(teaching);
+      if (Helpers.JsonbElement(card,"tags") is { } tags) TagsValidation.Canonicalize(tags);
     }
 
     // Pre-enqueue gate (publish only — the preview above has already returned). A stored MCQ
@@ -485,10 +526,12 @@ public static partial class Publish
     // --- ASYNC PUBLISH LOGIC ---
 
     // 💡 核心防御：防重复并发提交（幂等性）。
-    // 如果用户在 15 分钟内重复点击（或 F5 刷新后再次点击），直接返回正在处理的 jobId，让前端顺滑接管轮询。
+    // A recent PENDING job is redelivered with the same identity; PROCESSING only resumes polling.
     // The automation (allowResume = false) never takes over a job: any active job of the deck refuses it.
     const string checkDuplicateSql = """
-      select job_id as "jobId"
+      select job_id as "jobId", status, build_id as "buildId",
+        to_jsonb(deck_publishes) ->> 'qa_snapshot_sha256' as "snapshotSha256",
+        published_by_admin_sub as "adminSub", note
       from deck_publishes 
       where deck_id = $1 
         and status in ('PENDING', 'PROCESSING') 
@@ -505,12 +548,25 @@ public static partial class Publish
     if (existingRows.Count > 0)
     {
       var existingJobId = Convert.ToString(existingRows[0]["jobId"], CultureInfo.InvariantCulture);
-      if (!allowResume)
+      if (actionId is not null)
+      {
+        var replay=await ReplayOrdinary(conn,null,deckId,actionId,requestHash);
+        if (replay is not null) return replay.Outcome==Resumed
+          ? await DispatchPublishAsync(conn,replay,deckId,deckSlug,actorSub,note,queueUrl,ct) : replay;
+      }
+      if (!allowResume || actionId is not null)
       {
         Log.Event("info", new { tag = "publish", outcome = "refused", code = "PUBLISH_IN_PROGRESS", jobId = existingJobId, deckId, deckSlug });
         return Refuse(409, "PUBLISH_IN_PROGRESS", PublishInProgressMessage);
       }
       Log.Event("info", new { tag = "publish", outcome = "resumed", jobId = existingJobId, deckId, deckSlug });
+      if (existingRows[0]["status"] as string == "PENDING")
+      {
+        var resumed = new PublishStart(Resumed, 200, null, null, existingJobId,
+          existingRows[0]["buildId"] as string, existingRows[0]["snapshotSha256"] as string, null);
+        return await DispatchPublishAsync(conn, resumed, deckId, deckSlug, existingRows[0]["adminSub"] as string,
+          existingRows[0]["note"] as string, queueUrl, ct);
+      }
       return new PublishStart(Resumed, 200, null, null, existingJobId, null, null, null);
     }
 
@@ -549,9 +605,25 @@ public static partial class Publish
       values ($1, $2, $3, $4, $5, 'PENDING', $6, $7, $8::text, $9::timestamptz,
         (select coalesce(array_agg(c.id order by c.id), '{}'::bigint[]) from cards c where c.deck_id = $4 and c.is_deleted = 0))
       """;
+    await using var tx = durable ? await conn.BeginTransactionAsync(RecallSmith.Lambda.Common.RequestBudget.Combine(ct)) : null;
+    if (tx is not null)
+    {
+      await DbUtil.QueryAsync(conn, tx, "select id from decks where id=$1 for update", [deckId]);
+      if (actionId is not null)
+      {
+        var replay = await ReplayOrdinary(conn, tx, deckId, actionId, requestHash);
+        if (replay is not null)
+        {
+          await tx.CommitAsync(RecallSmith.Lambda.Common.RequestBudget.Combine(ct));
+          return replay.Outcome == Resumed ? await DispatchPublishAsync(conn, replay, deckId, deckSlug, actorSub, note, queueUrl, ct) : replay;
+        }
+      }
+      if (!Equals(editingSnapshot, await DbUtil.ExecuteScalarAsync(conn, tx, "select content_editing_snapshot($1)", [deckId])))
+        return StaleRefusal(deckId);
+    }
     try
     {
-      await DbUtil.ExecuteAsync(conn, null, insertRecordedJobSql,
+      await DbUtil.ExecuteAsync(conn, tx, insertRecordedJobSql,
         [jobId, buildId, s3Key, deckId, deckSlug, actorSub, note, qaSnapshot, expectedDeckUpdatedAt]);
     }
     catch (PostgresException pg) when (pg.SqlState == "42703" && expectedDeckUpdatedAt is null)
@@ -562,39 +634,72 @@ public static partial class Publish
       else await DbUtil.ExecuteAsync(conn, null, insertGatedJobSql, [jobId, buildId, s3Key, deckId, deckSlug, actorSub, note, qaSnapshot]);
     }
 
-    // 3. Create the SQS message payload
-    var messageBody = JsonSerializer.Serialize(new
+    if (tx is not null)
     {
-      jobId,
-      deckId,
-      // 💡 最佳实践：把 Worker 需要的所有信息都放进消息体
-      adminSub = actorSub,
-      note
-    });
+      await DbUtil.ExecuteAsync(conn, tx, "update deck_publishes set publish_editing_snapshot=$2 where job_id=$1", [jobId, editingSnapshot]);
+      await PublishDelivery.Stage(conn, tx, jobId, actorSuperadmin, actionId, requestHash);
+      await tx.CommitAsync(RecallSmith.Lambda.Common.RequestBudget.Combine(ct));
+    }
+    return await DispatchPublishAsync(conn, new PublishStart(Queued, 200, null, null, jobId, buildId, qaSnapshot, null),
+      deckId, deckSlug, actorSub, note, queueUrl, ct);
+  }
 
-    // 4. Send the message to the SQS queue
+  private static string? OptionalAction(JsonElement body)
+  {
+    if (!body.TryGetProperty("actionId", out var value) || value.ValueKind == JsonValueKind.Null) return null;
+    if (value.ValueKind != JsonValueKind.String || value.GetString() is not { Length: > 0 and <= 100 } action)
+      throw new ValidationError("actionId must be a string of 1..100 characters", "actionId");
+    return action;
+  }
+
+  private static async Task<PublishStart?> ReplayOrdinary(NpgsqlConnection conn, NpgsqlTransaction? tx, long deckId, string action, string? hash)
+  {
+    var rows = await PublishDelivery.Replay(conn, tx, deckId, action);
+    if (rows.Count == 0) return null;
+    var row = rows[0];
+    if (!Equals(hash, row["request_hash"])) return Refuse(409, "IDEMPOTENCY_CONFLICT", "actionId already identifies a different publish payload");
+    return new PublishStart(Resumed, 200, null, null, (string)row["job_id"]!, row["build_id"] as string, row["qa_snapshot_sha256"] as string, null);
+  }
+
+  private static async Task<PublishStart> DispatchPublishAsync(NpgsqlConnection conn, PublishStart start, long deckId, string deckSlug,
+    string? actorSub, string? note, string queueUrl, CancellationToken ct)
+  {
+    var metadata = await DbUtil.QueryAsync(conn,null,"select status,published_by_admin_sub,note from deck_publishes where job_id=$1",[start.JobId]);
+    if (metadata.Count == 0 || metadata[0]["status"] as string != "PENDING") return start;
+    actorSub = metadata[0]["published_by_admin_sub"] as string;
+    note = metadata[0]["note"] as string;
     var sendMessageRequest = new SendMessageRequest
     {
       QueueUrl = queueUrl,
-      MessageBody = messageBody
+      MessageBody = JsonSerializer.Serialize(new { jobId = start.JobId, deckId, adminSub = actorSub, note })
     };
 
     try
     {
-      if (TestEnqueueSeam is not null) await TestEnqueueSeam.Send(sendMessageRequest);
-      else await SQS().SendMessageAsync(sendMessageRequest, ct);
-      Log.Event("info", new { tag = "publish", outcome = "enqueued", jobId, deckId, deckSlug, buildId });
+      async Task Send(string body)
+      {
+        sendMessageRequest.MessageBody = body;
+        if (TestEnqueueSeam is not null) await TestEnqueueSeam.Send(sendMessageRequest);
+        else await SQS().SendMessageAsync(sendMessageRequest, RecallSmith.Lambda.Common.RequestBudget.Combine(ct));
+      }
+      var durable = await PublishDelivery.Ready(conn) && await DbUtil.ExecuteScalarAsync(conn, null,
+        "select exists(select 1 from publish_dispatch where job_id=$1)", [start.JobId]) is true;
+      if (durable)
+      {
+        var sent = await PublishDelivery.Dispatch(conn, start.JobId!, Send);
+        if (sent is false) throw new TimeoutException("SQS delivery is unconfirmed; short dispatch lease retained");
+      }
+      else await Send(sendMessageRequest.MessageBody);
+      Log.Event("info", new { tag = "publish", outcome = "enqueued", jobId = start.JobId, deckId, deckSlug, buildId = start.BuildId });
+      return start;
     }
     catch (Exception ex)
     {
-      // 💡 核心防御：双写失败回退
-      // 如果 SQS 网络抖动发送失败，立刻将数据库任务状态标为 FAILED，防止产生永远等不到 Worker 的孤儿订单
-      Log.Event("error", new { tag = "publish", outcome = "sqs_failed", jobId, deckId, error = ex.Message });
-      await DbUtil.ExecuteAsync(conn, null, "UPDATE deck_publishes SET status = 'FAILED', updated_at = now() WHERE job_id = $1", [jobId]);
-      throw;
+      // SQS may have accepted the message; the worker owns status after the committed insert.
+      Log.Event("warn", new { tag = "publish", outcome = DispatchUnconfirmed, jobId = start.JobId, deckId, error = ex.Message });
+      return start with { Outcome = DispatchUnconfirmed, HttpStatus = 503, Code = "PUBLISH_DISPATCH_UNCONFIRMED",
+        Message = "Publish job committed; delivery is unconfirmed. Poll this job or retry publish to deliver the same pending job." };
     }
-
-    return new PublishStart(Queued, 200, null, null, jobId, buildId, qaSnapshot, null);
   }
 
   private static PublishStart StaleRefusal(long deckId)
@@ -607,6 +712,13 @@ public static partial class Publish
   /// <summary>The console response of a <see cref="PublishStart"/>: exactly what the handler answered before the extraction.</summary>
   private static APIGatewayProxyResponse StartResponse(PublishStart start, Res res)
   {
+    if (start.Outcome == DispatchUnconfirmed)
+      return res.Raw(start.HttpStatus, new
+      {
+        success = false,
+        data = new { mode = "async", outcome = start.Outcome, jobId = start.JobId, buildId = start.BuildId },
+        error = new { code = start.Code, message = start.Message }, traceId = res.TraceId, version = "v1"
+      }, new Dictionary<string, string> { ["retry-after"] = "1" });
     if (start.Outcome == Queued) return res.Ok(new { mode = "async", jobId = start.JobId });
     if (start.Outcome == Resumed) return res.Ok(new { mode = "async", jobId = start.JobId, note = "Resumed existing job" });
     if (start.ErrorExtras is Qa.QaRuns.ChainedRun chained)

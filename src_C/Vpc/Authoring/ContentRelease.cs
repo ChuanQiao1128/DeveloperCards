@@ -63,7 +63,7 @@ public static partial class ContentRelease
       await using var conn=await Pg.OpenConnectionOrNullAsync(); if(conn is null)return Helpers.ConfigError(res,"Missing PG configuration");
       deny=await Helpers.RequireDeckWrite(conn,auth.UserSub,id,auth.IsSuperAdmin,res); if(deny is not null)return deny;
       if(!await Applies(conn,id))return res.BadRequest("RELEASE_POLICY_SCOPE","This policy is restricted to aws-saa-fundamentals");
-      await using var tx=await conn.BeginTransactionAsync();
+      await using var tx=await conn.BeginTransactionAsync(RecallSmith.Lambda.Common.RequestBudget.Token);
       await Lock(conn,tx,id);
       if(req.Method=="GET" && req.Path.EndsWith("/snapshot",StringComparison.OrdinalIgnoreCase))
       {
@@ -131,7 +131,7 @@ public static partial class ContentRelease
         result=res.Ok(new{receiptId=receipt,releaseId,editingSnapshot=expected,publishSnapshot=publish,reviewedBy="codex",humanPerCardReview=false,expiresAt=expires});
       }
       else return Helpers.ErrorEnvelope(res,404,"NOT_FOUND","Unknown release endpoint");
-      await Save(conn,tx,id,releaseId,actionId,req.Path,hash,result);await tx.CommitAsync();return result;
+      await Save(conn,tx,id,releaseId,actionId,req.Path,hash,result);await tx.CommitAsync(RecallSmith.Lambda.Common.RequestBudget.Token);return result;
     }
     catch(ValidationError e){return Helpers.ErrorEnvelope(res,e.Message.StartsWith("IDEMPOTENCY_CONFLICT")?409:400,"RELEASE_VALIDATION",e.Message);}
     catch(Exception e) when(e is KeyNotFoundException or InvalidOperationException or FormatException){return res.BadRequest("RELEASE_VALIDATION",e.Message);}

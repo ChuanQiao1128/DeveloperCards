@@ -94,11 +94,11 @@ test_ssm_to_env_unmapped_beside_skipped() {
   grep -Fq 'unmapped SSM parameter' <<<"$err" || fail "(h) missing 'unmapped SSM parameter' message"
 }
 
-# (i) the worker projection carries the webhook events queue URL.
+# (i) the worker projection carries the webhook queue and production TLS policy.
 test_worker_file_keys_webhook_queue() {
   local out
-  out="$(pick_keys '{"PGUSER":"a","WEBHOOK_EVENTS_QUEUE_URL":"u","API_ENV":"production"}' "$WORKER_FILE_KEYS")"
-  jq -e '. == {"PGUSER":"a","WEBHOOK_EVENTS_QUEUE_URL":"u"}' <<<"$out" >/dev/null || fail "(i) worker projection lacks WEBHOOK_EVENTS_QUEUE_URL"
+  out="$(pick_keys '{"PGUSER":"a","WEBHOOK_EVENTS_QUEUE_URL":"u","API_ENV":"production","PGSSLMODE":"verify-full","PGSSLROOTCERT":"Certificates/ap-southeast-2-bundle.pem"}' "$WORKER_FILE_KEYS")"
+  jq -e '. == {"PGUSER":"a","WEBHOOK_EVENTS_QUEUE_URL":"u","API_ENV":"production","PGSSLMODE":"verify-full","PGSSLROOTCERT":"Certificates/ap-southeast-2-bundle.pem"}' <<<"$out" >/dev/null || fail "(i) worker projection lacks queue or production TLS settings"
 }
 
 # (j) during a signing-secret rotation the path also holds webhook-signing-secret-previous: the three

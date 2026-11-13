@@ -18,7 +18,7 @@ public static partial class Publish
     var expectedLive=liveEl.ValueKind==JsonValueKind.Null?null:liveEl.GetString();
     var hash=ContentRelease.PayloadHash(body);
     APIGatewayProxyResponse result;
-    await using(var tx=await conn.BeginTransactionAsync())
+    await using(var tx=await conn.BeginTransactionAsync(RecallSmith.Lambda.Common.RequestBudget.Token))
     {
       await ContentRelease.Lock(conn,tx,deckId);
       var replay=await ContentRelease.Replay(conn,tx,deckId,release,action,hash);
@@ -34,6 +34,10 @@ public static partial class Publish
         var receipts=await DbUtil.QueryAsync(conn,tx,"select publish_snapshot from content_review_receipts r where id=$1 and deck_id=$2 and release_id=$3 and editing_snapshot=$4 and expires_at>clock_timestamp() and not exists(select 1 from content_review_revocations where receipt_id=r.id)",[receipt,deckId,release,expected]);
         if(receipts.Count!=1)return Helpers.ErrorEnvelope(res,409,"CODEX_REVIEW_REQUIRED","A current unrevoked Codex receipt is required");
         var snapshot=(string)receipts[0]["publish_snapshot"]!;
+        var candidateRows=await DbUtil.QueryAsync(conn,tx,CardsSql,[deckId]);
+        var referenceGate=await ReferenceGateAsync(conn,tx,deckId,slug,candidateRows);
+        if(referenceGate is not null)return StartResponse(referenceGate,res);
+
         // Replacing an attempt revokes its generation, including workers already uploading.
         await DbUtil.ExecuteAsync(conn,tx,"update decks set release_generation=release_generation+1 where id=$1",[deckId]);
         await DbUtil.ExecuteAsync(conn,tx,"update deck_publishes set status='FAILED',error_message='RELEASE_SUPERSEDED',updated_at=now() where deck_id=$1 and status in('PENDING','PROCESSING')",[deckId]);
@@ -46,10 +50,11 @@ public static partial class Publish
           select $1,$2,$3,id,slug,'PENDING',$5,$6,$7,release_generation,$8,$9,$10,
             (select array_agg(c.id order by c.id) from cards c where c.deck_id=$4 and c.is_deleted=0) from decks where id=$4
           """,[job,build,key,deckId,auth.UserSub,note,snapshot,receipt,expected,expectedLive]);
+        if (await PublishDelivery.Ready(conn)) await PublishDelivery.Stage(conn,tx,job,auth.IsSuperAdmin);
         result=res.Ok(new{outcome="committed",jobId=job,buildId=build,releaseId=release,snapshotSha256=snapshot,manifestVerified=false});
         await ContentRelease.Save(conn,tx,deckId,release,action,"publish",hash,result);
       }
-      await tx.CommitAsync();
+      await tx.CommitAsync(RecallSmith.Lambda.Common.RequestBudget.Token);
     }
     using var committed=JsonDocument.Parse(result.Body);
     var data=committed.RootElement.GetProperty("data");var jobId=data.GetProperty("jobId").GetString()!;
@@ -57,17 +62,11 @@ public static partial class Publish
     var status=(string?)await DbUtil.ExecuteScalarAsync(conn,null,"select status from deck_publishes where deck_id=$1 and job_id=$2",[deckId,jobId]);
     if(status is null)return Helpers.ErrorEnvelope(res,409,"RELEASE_JOB_NOT_FOUND","Committed publish job is missing; query the release action");
     if(status!="PENDING")return Outcome(status.ToLowerInvariant());
-    // Retrying a committed PENDING job may duplicate SQS delivery; worker acquisition/generation fences make that safe.
-    try
-    {
-      var message=new SendMessageRequest{QueueUrl=TestEnqueueSeam?.QueueUrl??PublishJobQueueUrl,MessageBody=JsonSerializer.Serialize(new{jobId,deckId,adminSub=auth.UserSub,note})};
-      if(TestEnqueueSeam is not null)await TestEnqueueSeam.Send(message);else await SQS().SendMessageAsync(message);
-    }
-    catch(Exception ex)
-    {
-      Log.Event("warn",new{tag="controlled-publish",jobId,reason="send_response_uncertain",error=ex.Message});
-      return res.ServiceUnavailable("PUBLISH_DISPATCH_UNCONFIRMED","Publish job committed; delivery is unconfirmed. Query the release action, then retry the identical publish action to deliver the same job.",1);
-    }
+    // Use the committed actor/note; a replaying administrator cannot replace message identity.
+    var sent = await DispatchPublishAsync(conn, new PublishStart(Queued,200,null,null,jobId,
+      data.GetProperty("buildId").GetString(),data.GetProperty("snapshotSha256").GetString(),null),deckId,"",auth.UserSub,note,
+      TestEnqueueSeam?.QueueUrl??PublishJobQueueUrl!,default);
+    if(sent.Outcome==DispatchUnconfirmed)return StartResponse(sent,res);
     return Outcome("queued");
   }
 }

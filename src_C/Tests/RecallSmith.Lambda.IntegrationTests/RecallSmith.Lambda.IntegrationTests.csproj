@@ -30,4 +30,7 @@
     <ProjectReference Include="..\..\Worker\RecallSmith.Lambda.Worker.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="../../../scripts/db/isolate-runtime.sql" Link="Db/isolate-runtime.sql" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

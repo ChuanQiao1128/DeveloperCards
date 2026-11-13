@@ -239,7 +239,7 @@ public static class Notifications
     try
     {
       if (TestSendSeam is not null) await TestSendSeam(request);
-      else await SQS().SendMessageAsync(request, ct);
+      else await SQS().SendMessageAsync(request, RecallSmith.Lambda.Common.RequestBudget.Combine(ct));
     }
     catch (Exception ex)
     {

@@ -12,7 +12,7 @@ namespace RecallSmith.Lambda.Worker.Services;
 /// 发布任务处理器
 /// 执行 5-Step 流水线：抢占 -> 数据准备 -> S3上传 -> 完成
 /// </summary>
-public class PublishJobProcessor : IPublishJobProcessor, IReplayOutcome
+public class PublishJobProcessor : IPublishJobProcessor, IReplayOutcome, IPublishManifestDelivery
 {
   private readonly IJobRepository _jobRepository;
   private readonly IS3DeckUploader _s3Uploader;
@@ -78,6 +78,8 @@ public class PublishJobProcessor : IPublishJobProcessor, IReplayOutcome
       throw new BusinessException("Deck has no cards");
     }
 
+    await ValidateCandidateReferencesAsync(job.DeckId, deckData);
+
     Console.WriteLine($"[JobId={jobId}] Loaded {deckData.Cards.Count} cards");
 
     // The AI QA publish gate passed a specific set of cards (backend-design-16): never build anything else. A card
@@ -87,6 +89,14 @@ public class PublishJobProcessor : IPublishJobProcessor, IReplayOutcome
     {
       RouteMetrics.EmitGauge(PublishSnapshot.StaleMetric, 1);
       throw new BusinessException($"{PublishSnapshot.StaleErrorCode}: cards changed after the AI QA publish gate passed; publish again");
+    }
+
+    await using (var snapshotConn = await Pg.OpenConnectionOrNullAsync())
+    {
+      if (snapshotConn is null) throw new InvalidOperationException("Failed to open database connection");
+      if (await PublishDelivery.Ready(snapshotConn) && await DbUtil.ExecuteScalarAsync(snapshotConn,null,
+        "select publish_editing_snapshot is not null and publish_editing_snapshot is distinct from content_editing_snapshot(deck_id) from deck_publishes where job_id=$1",[jobId]) is true)
+        throw new BusinessException($"{PublishSnapshot.StaleErrorCode}: content or settings changed after validation; publish again");
     }
 
     // An automation publish checked the deck's settings too (R18C, backend-design-11): a settings edit since then is a
@@ -126,8 +136,12 @@ public class PublishJobProcessor : IPublishJobProcessor, IReplayOutcome
     await _contentArtifacts.GenerateAsync(job, deckData, uploadResult);
 
     // Step 5: 最终一致性提交
-    await _jobRepository.CompleteJobAsync(jobId, deckData.Cards.Count);
-    if (job.DeckSlug == "aws-saa-fundamentals" && (await _jobRepository.GetJobAsync(jobId))?.Status != "SUCCESS")
+    try { await _jobRepository.CompleteJobAsync(jobId, deckData.Cards.Count); }
+    catch (PostgresException ex) when (ex.SqlState=="P0001" && ex.MessageText=="PUBLISH_SNAPSHOT_STALE")
+    {
+      throw new BusinessException($"{PublishSnapshot.StaleErrorCode}: content or settings changed during upload; publish again");
+    }
+    if ((await _jobRepository.GetJobAsync(jobId))?.Status != "SUCCESS")
       throw new BusinessException("RELEASE_GENERATION_CANCELLED: no live build was committed");
     await AfterPublishSucceededAsync(job);
 
@@ -160,6 +174,19 @@ public class PublishJobProcessor : IPublishJobProcessor, IReplayOutcome
     }
   }
 
+  public async Task<bool> DeliverManifestAsync(string jobId, Func<Task> rebuild)
+  {
+    await using var conn = await Pg.OpenConnectionOrNullAsync();
+    if (conn is null) throw new InvalidOperationException("Failed to open database connection");
+    if (await PublishDelivery.Ready(conn))
+    {
+      await PublishDelivery.DeliverManifest(conn, jobId, rebuild);
+      return await DbUtil.ExecuteScalarAsync(conn,null,"select state='delivered' from publish_manifest_delivery where job_id=$1",[jobId]) is true;
+    }
+    await rebuild(); // Pre-053: current-pointer rebuild only; no durable delivery guarantee.
+    return true;
+  }
+
   public async Task FailAsync(string jobId, string errorMessage)
   {
     await _jobRepository.FailJobAsync(jobId, errorMessage);
@@ -189,6 +216,33 @@ public class PublishJobProcessor : IPublishJobProcessor, IReplayOutcome
     var error = errorMessage.Length > 300 ? errorMessage[..300] : errorMessage;
     await AutomationLedger.RecordAsync(conn, new AutomationEvent("publish_pipeline", 0, "failure",
       DeckId: deckId, Ref: jobId, DedupeKey: $"publish-fail:{jobId}", Details: new { error }));
+  }
+
+  private static async Task ValidateCandidateReferencesAsync(int deckId, DeckExportData deck)
+  {
+    var cards = new List<CandidateDeckCard>(deck.Cards.Count);
+    foreach (var card in deck.Cards)
+    {
+      try
+      {
+        var teaching = card.Teaching;
+        if (teaching is { } value && value.TryGetProperty("schema", out var schema) && schema.GetString() != "teaching-v1")
+          throw new BusinessException($"CONTENT_REFERENCE_GATE: {card.StableUid}: TEACHING_BAD_SHAPE");
+        var refs = teaching?.TryGetProperty("prerequisites", out var p) == true && p.ValueKind != JsonValueKind.Null
+          ? p.EnumerateArray().Select(r => r.GetString()!.Trim()).ToArray() : null;
+        var domain = card.Tags?.TryGetProperty("domain", out var d) == true ? d.GetString()?.Trim() : null;
+        var task = card.Tags?.TryGetProperty("examTask", out var t) == true ? t.GetString()?.Trim() : null;
+        cards.Add(new(card.StableUid, refs, domain, task));
+      }
+      catch (Exception error) when (error is InvalidOperationException or NullReferenceException)
+      { throw new BusinessException($"CONTENT_REFERENCE_GATE: {card.StableUid}: BAD_SHAPE"); }
+    }
+    await using var conn = await Pg.OpenConnectionOrNullAsync();
+    if (conn is null) throw new InvalidOperationException("Failed to open database connection");
+    foreach (var row in await DbUtil.QueryAsync(conn, null, "select stable_uid from cards where deck_id=$1 and is_deleted<>0 order by id", [deckId]))
+      cards.Add(new(Convert.ToString(row["stable_uid"], CultureInfo.InvariantCulture) ?? "", Deleted: true));
+    var result = CandidateDeckValidation.Validate(deck.Slug, cards);
+    if (!result.IsValid) throw new BusinessException("CONTENT_REFERENCE_GATE: " + string.Join("; ", result.Errors.Select(e => $"{e.StableUid}: {e.Code}")) + (result.Truncated ? "; additional errors omitted" : ""));
   }
 
   /// <summary>The <see cref="PublishSnapshot"/> digest of the cards this job is about to build.</summary>

@@ -223,7 +223,7 @@ public sealed class AnalyticsOutboxRetiredTests
   // ---------------------------------------------------------------- account deletion
 
   [Fact]
-  public async Task AccountDeletion_BeforeMigration045_StillDeletesTheCallersOutboxRows()
+  public async Task AccountDeletion_BeforeBarrierMigration_RejectsWithoutDeletingOutboxRows()
   {
     var cs = await Pre045DatabaseAsync("r26s01_delete");
     await using var conn = new NpgsqlConnection(cs);
@@ -242,13 +242,11 @@ public sealed class AnalyticsOutboxRetiredTests
         "insert into analytics_event_outbox (event_id, event_type, aggregate_type, aggregate_id, payload) values ($1, 'card_reviewed', 'card', 'd:u', '{}'::jsonb)", [e]);
     }
 
-    var r = await AccountDeletion.DeleteUserDataAsync(conn, sub);
+    await Assert.ThrowsAsync<InvalidOperationException>(() => AccountDeletion.DeleteUserDataAsync(conn, sub));
 
-    Assert.Equal(1, r.OutboxRows);
-    Assert.Equal(1, r.UserRows);
-    Assert.Equal(0, await CountAsync(conn, "select count(*) from analytics_event_outbox where event_id = $1", mine));
+    Assert.Equal(1, await CountAsync(conn, "select count(*) from analytics_event_outbox where event_id = $1", mine));
     Assert.Equal(1, await CountAsync(conn, "select count(*) from analytics_event_outbox where event_id = $1", theirs));
-    Assert.Equal(0, await CountAsync(conn, "select count(*) from users where user_sub = $1", sub));
+    Assert.Equal(1, await CountAsync(conn, "select count(*) from users where user_sub = $1", sub));
   }
 
   [Fact]
@@ -294,7 +292,7 @@ public sealed class AnalyticsOutboxRetiredTests
   [Theory]
   [InlineData("/api/v1/me")]
   [InlineData("/api/v1/user/me")]
-  public async Task DeleteMeRoute_BeforeMigration045_Is204_AndDeletesTheCallersOutboxRows(string path)
+  public async Task DeleteMeRoute_BeforeBarrierMigration_Is503_AndPreservesData(string path)
   {
     // R26X F01 (s-tests-2): the route itself, through VpcFunction.Handler, on a database frozen at 044.
     var name = path.EndsWith("/user/me", StringComparison.Ordinal) ? "r26xf01_delroute_user" : "r26xf01_delroute_me";
@@ -323,7 +321,8 @@ public sealed class AnalyticsOutboxRetiredTests
     try
     {
       var resp = await new VpcFunction().Handler(Event("DELETE", path, sub, groups: []));
-      Assert.Equal(204, resp.StatusCode);
+      Assert.Equal(503, resp.StatusCode);
+      Assert.Contains("SERVER_NOT_READY", resp.Body);
     }
     finally
     {
@@ -335,9 +334,9 @@ public sealed class AnalyticsOutboxRetiredTests
     await using (var conn = new NpgsqlConnection(cs))
     {
       await conn.OpenAsync();
-      Assert.Equal(0, await CountAsync(conn, "select count(*) from analytics_event_outbox where event_id = $1", mine));
+      Assert.Equal(1, await CountAsync(conn, "select count(*) from analytics_event_outbox where event_id = $1", mine));
       Assert.Equal(1, await CountAsync(conn, "select count(*) from analytics_event_outbox where event_id = $1", theirs));
-      Assert.Equal(0, await CountAsync(conn, "select count(*) from users where user_sub = $1", sub));
+      Assert.Equal(1, await CountAsync(conn, "select count(*) from users where user_sub = $1", sub));
       Assert.Equal(1, await CountAsync(conn, "select count(*) from users where user_sub = $1", other));
     }
   }

@@ -38,7 +38,7 @@ SSM_NOT_ENV='["webhook-signing-secret","webhook-signing-secret-previous","anthro
 # pattern; any other unmapped leaf is still a hard error.
 SSM_NOT_ENV_PATTERN='^(.+-previous|webhook-signing-secret-sub-[0-9]+(-previous)?)$'
 # R18A A10: AUTOMATION_NOTIFY_QUEUE_URL stays core-vpc only (only core-vpc enqueues emails), so it is not here.
-WORKER_FILE_KEYS='["PGUSER","PGSSLMODE","PG_MAX","LOG_LEVEL","WEBHOOK_EVENTS_QUEUE_URL"]'
+WORKER_FILE_KEYS='["PGUSER","API_ENV","PGSSLMODE","PGSSLROOTCERT","PG_MAX","LOG_LEVEL","WEBHOOK_EVENTS_QUEUE_URL"]'
 WORKER_SECRET_KEYS='["PGPASSWORD"]'
 
 # merge_env CURRENT_JSON FILE_JSON SECRETS_JSON

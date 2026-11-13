@@ -47,13 +47,21 @@ public sealed class VpcFunction
     Warmup.RunOnce();
   }
 
-  public async Task<APIGatewayProxyResponse> Handler(JsonElement evt)
+  public async Task<APIGatewayProxyResponse> Handler(JsonElement evt, Amazon.Lambda.Core.ILambdaContext? context = null)
   {
     var req = new LambdaRequest(evt);
+    // Maintenance retains its existing Lambda/SQL budget until runtime isolation is enabled.
+    var path = req.Path.TrimEnd('/');
+    var maintenance = path.EndsWith("/api/v1/admin/db/migrate", StringComparison.OrdinalIgnoreCase)
+      || path.EndsWith("/api/v1/admin/db/create", StringComparison.OrdinalIgnoreCase)
+      || path.EndsWith("/api/v1/admin/db/recreate", StringComparison.OrdinalIgnoreCase)
+      || path.EndsWith("/api/v1/admin/db/bootstrap-roles", StringComparison.OrdinalIgnoreCase);
+    using var budget = maintenance ? null : RequestBudget.BeginOnline(context?.RemainingTime);
     // The origin travels with the response builder, not with a route: every response this
     // function can produce -- including the OPTIONS preflight and the 500 from the catch
     // below -- has to carry the same CORS answer, or the browser reports the wrong failure.
     var res = new Res(req.TraceId, req.Origin);
+    if (Vpc.Db.DbSafety.MaintenanceOnly) return res.NotFound("Route not found");
 
     // The whole dispatch, wrapped once. Deliberately the only statement in this method that
     // can produce a response: there is no early return above it and no route below it, so a
@@ -236,6 +244,10 @@ public sealed class VpcFunction
       if (p.EndsWith("/builds", StringComparison.OrdinalIgnoreCase) && p.Contains("/api/v1/admin/decks/", StringComparison.OrdinalIgnoreCase))
       {
         return await Vpc.Authoring.DeckBuilds.HandleDeckBuilds(req, res, auth);
+      }
+      if (p.EndsWith("/api/v1/admin/maintenance/run", StringComparison.OrdinalIgnoreCase))
+      {
+        return await Vpc.Automation.BaselineMaintenance.Handle(req, res, auth);
       }
       if (p.EndsWith("/api/v1/admin/publish/reap", StringComparison.OrdinalIgnoreCase))
       {
@@ -558,6 +570,11 @@ public sealed class VpcFunction
       }
 
       return res.NotFound("Route not found");
+    }
+    catch (Exception) when (RequestBudget.Expired)
+    {
+      Log.Event("warn", new { tag = "request_deadline", traceId = req.TraceId, lambda = ServiceName });
+      return res.Raw(503, new { error = "REQUEST_DEADLINE", retryable = true });
     }
     catch (Exception ex)
     {

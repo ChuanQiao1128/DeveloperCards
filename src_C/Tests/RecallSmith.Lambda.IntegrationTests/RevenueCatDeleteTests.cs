@@ -13,7 +13,7 @@ namespace RecallSmith.Lambda.IntegrationTests;
 /// revenuecat_deletions (migration 044) inside the deletion's own transaction; the notifier reads the queue through
 /// GET /api/v1/internal/revenuecat-deletions and reports each RevenueCat status through
 /// POST /api/v1/internal/revenuecat-deletions/report (both HMAC-signed with INTERNAL_SECRET_NOTIFIER); the tick's
-/// retention step drops rows older than 30 days. Real Postgres; no network.
+/// retention step escalates exhausted/old work without removing unfinished obligations. Real Postgres; no network.
 /// </summary>
 /// <remarks>
 /// In the postgres collection because these tests redirect Console, set process-wide env vars and read the whole queue
@@ -241,6 +241,7 @@ public class RevenueCatDeleteTests
 
     Assert.Equal(1, await UserRowsAsync(sub));
     Assert.Null(await RowAsync(sub));
+    Assert.Equal(0L, Convert.ToInt64(await _db.ScalarAsync("select count(*) from account_deletions where sub=$1", sub)));
   }
 
   // ---------------------------------------------------------------- GET pending
@@ -408,10 +409,59 @@ public class RevenueCatDeleteTests
     Assert.Equal(400, run.Value.StatusCode);
   }
 
+  [Fact]
+  public async Task RevenueCatDelete_TenthFailureEscalates_BoundsMetadata_AndTrustedSuccessResolves()
+  {
+    await ClearQueueAsync();
+    var sub = NewSub();
+    await SeedAsync(sub, attempts: 9);
+    var failure = JsonSerializer.Serialize(new[] { new { sub, status = 500 } });
+    for (var i = 0; i < 3; i++)
+      Assert.Equal(200, (await WithEnvAsync(() => ReportAsync(Internal("POST", RevenueCatDeletions.ReportPath, failure)))).Value.StatusCode);
+    var row = (await RowAsync(sub))!;
+    Assert.Equal(10, Convert.ToInt32(row["attempts"]));
+    Assert.Equal("needs_attention", row["state"]);
+    Assert.Empty(Subs((await WithEnvAsync(() => PendingAsync(Internal("GET", RevenueCatDeletions.PendingPath)))).Value));
+    var success = JsonSerializer.Serialize(new[] { new { sub, status = 204 } });
+    await WithEnvAsync(() => ReportAsync(Internal("POST", RevenueCatDeletions.ReportPath, success)));
+    Assert.Null(await RowAsync(sub));
+  }
+
+  [Fact]
+  public async Task RevenueCatDelete_Pre052RetentionNeverDropsAnUnfinishedObligation()
+  {
+    var cs = await _db.CreateScratchDatabaseAsync("rc_deletion_pre052");
+    await using var conn = new Npgsql.NpgsqlConnection(cs);
+    await conn.OpenAsync();
+    await PostgresFixture.ApplyMigrationsAsync(conn, 51);
+    var sub = NewSub();
+    await DbUtil.ExecuteAsync(conn, null,
+      "insert into revenuecat_deletions(sub, requested_at, attempts) values($1, now()-interval '40 days', 10)", [sub]);
+    Assert.Equal(0, await RevenueCatDeletions.DeleteExpiredAsync(conn));
+    Assert.Equal(1L, Convert.ToInt64(await DbUtil.ExecuteScalarAsync(conn, null, "select count(*) from revenuecat_deletions where sub=$1", [sub])));
+    var pendingSub = NewSub();
+    await DbUtil.ExecuteAsync(conn, null, "insert into revenuecat_deletions(sub) values($1)", [pendingSub]);
+    var previous = Environment.GetEnvironmentVariable("PGDATABASE");
+    Environment.SetEnvironmentVariable("PGDATABASE", "rc_deletion_pre052");
+    Pg.Reset();
+    try
+    {
+      Assert.Equal([pendingSub], Subs((await WithEnvAsync(() => PendingAsync(Internal("GET", RevenueCatDeletions.PendingPath)))).Value));
+      var body = JsonSerializer.Serialize(new[] { new { sub = pendingSub, status = 500 } });
+      Assert.Equal(200, (await WithEnvAsync(() => ReportAsync(Internal("POST", RevenueCatDeletions.ReportPath, body)))).Value.StatusCode);
+      Assert.Equal(1, Convert.ToInt32(await DbUtil.ExecuteScalarAsync(conn, null, "select attempts from revenuecat_deletions where sub=$1", [pendingSub])));
+    }
+    finally
+    {
+      Environment.SetEnvironmentVariable("PGDATABASE", previous);
+      Pg.Reset();
+    }
+  }
+
   // ---------------------------------------------------------------- 30-day retention
 
   [Fact]
-  public async Task RevenueCatDelete_Retention_DropsRowsOlderThan30Days()
+  public async Task RevenueCatDelete_Retention_RetainsUnfinishedRowsAndEscalates()
   {
     await ClearQueueAsync();
     var fresh = NewSub();
@@ -426,20 +476,22 @@ public class RevenueCatDeleteTests
     await using var conn = await _db.OpenAsync();
     var run = await WithEnvAsync(() => RevenueCatDeletions.DeleteExpiredAsync(conn));
 
-    Assert.Equal(2, run.Value);
-    Assert.NotNull(await RowAsync(fresh));
-    Assert.NotNull(await RowAsync(exhausted));
-    Assert.Null(await RowAsync(old));
-    Assert.Null(await RowAsync(oldExhausted));
+    Assert.Equal(3, run.Value);
+    Assert.Equal("pending", (await RowAsync(fresh))!["state"]);
+    Assert.Equal("needs_attention", (await RowAsync(exhausted))!["state"]);
+    Assert.Equal("needs_attention", (await RowAsync(old))!["state"]);
+    Assert.Equal("needs_attention", (await RowAsync(oldExhausted))!["state"]);
     AssertNoSub(run.Output, old);
   }
 
   [Fact]
   public void RevenueCatDelete_RetentionIsATickStep()
   {
-    var source = File.ReadAllText(Path.Combine(SrcC(), "Vpc", "Automation", "AutomationTick.cs"));
+    var source = File.ReadAllText(Path.Combine(SrcC(), "Vpc", "Automation", "BaselineMaintenance.cs"));
     Assert.Contains("Step(\"revenuecat_deletions_retention\", () => Runtime.RevenueCatDeletions.DeleteExpiredAsync(conn))", source,
       StringComparison.Ordinal);
+    var tick=File.ReadAllText(Path.Combine(SrcC(),"Vpc","Automation","AutomationTick.cs"));
+    Assert.Contains("BaselineMaintenance.Run(conn",tick,StringComparison.Ordinal);
   }
 
   [Fact]

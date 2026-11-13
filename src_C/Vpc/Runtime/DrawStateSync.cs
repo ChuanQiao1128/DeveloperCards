@@ -201,7 +201,7 @@ public static class DrawStateSync
         wallet = new WalletSnapshot(available, reserve, ts);
       }
 
-      await using var tx = await conn.BeginTransactionAsync();
+      await using var tx = await conn.BeginTransactionAsync(RecallSmith.Lambda.Common.RequestBudget.Token);
       try
       {
         // user_draw_* all reference users(user_sub), and a fresh install can
@@ -452,7 +452,7 @@ public static class DrawStateSync
           deckWalletRows = await DbUtil.QueryAsync(conn, tx, selectDeckWallet, [userSub]);
         }
 
-        await tx.CommitAsync();
+        await tx.CommitAsync(RecallSmith.Lambda.Common.RequestBudget.Token);
 
         var ownedByDeck = new Dictionary<string, List<string>>(StringComparer.Ordinal);
         foreach (var row in ownedRows)
@@ -531,6 +531,10 @@ public static class DrawStateSync
         try { await tx.RollbackAsync(); } catch { /* ignore */ }
         throw;
       }
+    }
+    catch (PostgresException ex) when (AccountDeletionBarrier.IsRejection(ex))
+    {
+      return AccountDeletionBarrier.Rejected(res);
     }
     catch (Exception ex) when (ex is ValidationError)
     {
