@@ -45,6 +45,18 @@ public sealed class PgTlsTests(PgTlsFixture fixture)
   [Theory]
   [InlineData(false, "production")]
   [InlineData(true, "production")]
+  [InlineData(false, "prod")]
+  [InlineData(true, "prod")]
+  public void ProductionRequireIsRejected(bool vpc, string apiEnv)
+  {
+    using var env = new PgEnvironment("require", apiEnv);
+    var exception = Assert.Throws<InvalidOperationException>(() => DataSource(vpc));
+    Assert.Contains("does not verify the server hostname and CA", exception.Message);
+  }
+
+  [Theory]
+  [InlineData(false, "production")]
+  [InlineData(true, "production")]
   [InlineData(false, " PROD ")]
   [InlineData(true, " PROD ")]
   public void ProductionDefaultsToVerifyFullWithBundledCa(bool vpc, string apiEnv)

@@ -15,7 +15,8 @@ public static class PgConnectionSecurity
     options.SslMode = raw switch
     {
       "" => production ? SslMode.VerifyFull : SslMode.Require,
-      "require" => SslMode.Require,
+      "require" when !production => SslMode.Require,
+      "require" => throw new InvalidOperationException("PGSSLMODE=require is forbidden in production because it does not verify the server hostname and CA; use verify-full."),
       "verify-full" => SslMode.VerifyFull,
       "disable" when !production => SslMode.Disable,
       "disable" => throw new InvalidOperationException("PGSSLMODE=disable is forbidden in production."),
