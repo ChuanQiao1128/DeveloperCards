@@ -1,7 +1,7 @@
 {
   "schema": "recallsmith-ota210-verification-v1",
   "date": "2026-11-14",
-  "status": "verified_not_published",
+  "status": "published_delivery_verified",
   "productionBaseline": "ce9ea8c116502d4724cc8ba05cd2258d8b3e57b2",
   "codeCommit": "5fc63b3404316d1c35dfcf5837046408663d6722",
   "finalTestCommit": "f1c8e87cdbc82189ab0f3dca35f444b96b8aa03d",
@@ -159,15 +159,49 @@
     "metadataSha256": "cfcaaeaee93f7d08a6881532e6e29f7c1283e5b22ace0e26e08f167f5997a0c6"
   },
   "publication": {
-    "otaPublished": false,
+    "otaPublished": true,
     "nativeBuildSubmitted": false,
     "backendDeployed": false,
-    "contentPackReplaced": false
+    "contentPackReplaced": false,
+    "channel": "production",
+    "releaseCommit": "82f246db778a8942bee41c0f2086f3c2788a4c83",
+    "updateId": "01a1d63e-64b8-72b5-a564-d8225d02114e",
+    "group": "3fb8ba07-d454-4edf-a47e-95f080c1c63c",
+    "createdAt": "2026-11-13T18:49:35.672Z",
+    "dashboardUrl": "https://expo.dev/accounts/timeawakes-organization/projects/recallsmith/updates/3fb8ba07-d454-4edf-a47e-95f080c1c63c",
+    "sentrySourceMaps": "skipped-no-token",
+    "gitPushed": false
   },
   "limits": [
     "QA uses manual JS bundle swaps in the same simulator shell; this does not prove EAS download/selection or signed App Store embedded fallback.",
     "No physical device, real account, purchase, or push notification validation in this run.",
     "2.1.1 queue ownership and account-deletion rollout not backported; legacy baseline limitations remain.",
     "Checkpoint restoration requires the same device, account, day, deck version, scheduling parameters and progress/ownership signature."
-  ]
+  ],
+  "liveDelivery": {
+    "status": "PASS",
+    "channel": "production",
+    "runtimeVersion": "2.1.0",
+    "updateId": "01a1d63e-64b8-72b5-a564-d8225d02114e",
+    "group": "3fb8ba07-d454-4edf-a47e-95f080c1c63c",
+    "gitCommitHash": "82f246db778a8942bee41c0f2086f3c2788a4c83",
+    "manifestHttpStatus": 200,
+    "bundleHttpStatus": 200,
+    "bundleBytes": 6037500,
+    "bundleSha256": "d4835180efb1abbe7b20e319bd1fdb1be48329dcb35cb72239c33814ab5c5507",
+    "manifestHashMatched": true,
+    "localPublishedBundleMatched": true,
+    "bundleContentType": "application/javascript",
+    "createdAt": "2026-11-13T18:49:35.672Z"
+  },
+  "evidenceHashes": {
+    "evidence/01-chinese-and-save-commands.json": "63cb0031e16960586fe4308f9efb60ef10a314fe557ddafe47e9f1ba1278fee9",
+    "evidence/02-restore-commands.json": "b030b1cd1181927c239fba3a5798ec1da0a5171de7aaf88e26dfe38afafbdf81",
+    "evidence/03-complete-commands.json": "eb141ad14dfbacb39ae691e3af6c1f34be9eeec1712e95079dbe36c19ed38c4e",
+    "evidence/04-baseline-fallback-commands.json": "852c54e33634ecf427a19b701caf13f3a39b2b6d3b76a8a3691043f570a8fd34",
+    "evidence/checklist-tests.txt": "c3bde6b72bb0e243fa9971dd1676a3d780f2116fd9293d9344e54e42be3e5641",
+    "evidence/mobile-full.txt": "62957efdf5386b183f96fb5ce6db4d2460fb696cc1b88b579a58dd6b379b4c3d",
+    "evidence/ota-dry-run.txt": "fa375e2281ab4bbdfa58a953ce26d8b63a71dbc8fc5b6398080a6826a4df17fd",
+    "evidence/ota-publish.txt": "a11f9afeab227bb92c1daa7e79579d40bb234f63ae428f650d488183d03851fb"
+  }
 }
