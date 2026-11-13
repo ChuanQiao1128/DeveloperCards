@@ -161,7 +161,8 @@ export function MistakeBookScreen({ navigation, route }: Props) {
       request += 1;
       setGroups(null);
       setLoadFailed(false);
-      if (focused) void load();
+      // authStore increments its generation after the synchronous identity broadcast.
+      void Promise.resolve().then(() => { if (!cancelled && focused) void load(); });
     });
     return () => {
       cancelled = true;

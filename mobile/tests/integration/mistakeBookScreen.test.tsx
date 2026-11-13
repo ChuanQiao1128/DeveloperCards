@@ -248,8 +248,9 @@ describe('MistakeBookScreen', () => {
     const { tree } = await mount();
     store.clear();
     await act(async () => {
-      invalidateAuthSession();
+      // authStore broadcasts synchronously before incrementing the session generation.
       setAuthIdentitySnapshot({ status: 'signed_in', email: 'qa@example.test' });
+      invalidateAuthSession();
     });
     await flush();
     await act(async () => finish(AWS));
