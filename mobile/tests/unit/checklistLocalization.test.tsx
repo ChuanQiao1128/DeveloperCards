@@ -76,7 +76,7 @@ describe('Chinese checklist bundled with the 2.1.0 OTA', () => {
     let tree!: renderer.ReactTestRenderer;
     await act(async () => { tree = renderer.create(<CardTextLangContext.Provider value="zh-CN">{node}</CardTextLangContext.Provider>); });
     const list = tree.root.findAll(n => typeof n.type === 'string' && n.props.testID === 'teaching-self-check-list')[0];
-    const rendered = list.findAll(n => typeof n.type === 'string' && n.type === 'Text').map(n => String(n.props.children)).join('\n');
+    const rendered = list.findAll(n => (n.type as any) === 'Text').map(n => String(n.props.children)).join('\n');
     expect(rendered).toContain(candidate.cards[0].teaching['zh-CN'].mustAnswer[0]);
     expect(tree.root.findAll(n => typeof n.type === 'string' && n.props.testID === 'teaching-english-checklist-toggle')).toHaveLength(0);
     await act(async () => tree.unmount());
