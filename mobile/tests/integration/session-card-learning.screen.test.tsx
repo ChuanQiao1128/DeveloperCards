@@ -421,6 +421,52 @@ describe('SessionCardScreen learning step (R22 §6: teach before testing; 2026-1
     warnSpy.mockRestore();
   });
 
+  it('restores the unfinished card and revealed answer after remount without replaying a rating or reward', async () => {
+    serve([NEW_A, NEW_B], [fresh('new-a'), fresh('new-b')], 2);
+    const first = await mount();
+    await study(first.tree);
+    await press(first.tree, 'Show answer');
+    await flush();
+    expect(subtitle(first.tree)).toBe('Card 2 of 2');
+    const sessionId = useSessionStore.getState().sessionId;
+    const eventsBefore = vi.mocked(recordReviewEvent).mock.calls.length;
+    const rewardsBefore = vi.mocked(settleRatingReward).mock.calls.length;
+    await act(async () => first.tree.unmount());
+    expect(useSessionStore.getState().sessionId).toBeNull();
+    const second = await mount();
+    expect(questionShown(second.tree)).toBe(NEW_B.Question);
+    expect(subtitle(second.tree)).toBe('Card 2 of 2');
+    expect(pressables(second.tree, 'Got it')).toHaveLength(1);
+    expect(useSessionStore.getState().sessionId).toBe(sessionId);
+    expect(recordReviewEvent).toHaveBeenCalledTimes(eventsBefore);
+    expect(settleRatingReward).toHaveBeenCalledTimes(rewardsBefore);
+    await press(second.tree, 'Got it');
+    expect(recordReviewEvent).toHaveBeenCalledTimes(eventsBefore + 1);
+    expect(settleRatingReward).toHaveBeenCalledTimes(rewardsBefore + 1);
+    expect(second.navigation.replace).toHaveBeenCalledWith('SessionSummary', expect.objectContaining({ sessionDone: 2 }));
+    await flush();
+    expect([...store.keys()].some(key => key.includes('session-checkpoint:v1:'))).toBe(false);
+    await act(async () => second.tree.unmount());
+  });
+
+  it('keeps the in-progress card usable and retries a failed position save', async () => {
+    serve([NEW_A, NEW_B], [fresh('new-a'), fresh('new-b')], 2);
+    const storage = (await import('@react-native-async-storage/async-storage')).default;
+    const original = vi.mocked(storage.setItem).getMockImplementation()!;
+    vi.mocked(storage.setItem).mockImplementation(async (key, value) => {
+      if (key.includes('session-checkpoint:v1:')) throw new Error('position write failed');
+      return original(key, value);
+    });
+    const first = await mount();
+    expect(byTestID(first.tree, 'session-position-error')).toHaveLength(1);
+    expect(questionShown(first.tree)).toBe(NEW_A.Question);
+    vi.mocked(storage.setItem).mockImplementation(original);
+    await act(async () => byTestID(first.tree, 'session-position-retry')[0].props.onPress());
+    await flush();
+    expect(byTestID(first.tree, 'session-position-error')).toHaveLength(0);
+    await act(async () => first.tree.unmount());
+  });
+
   it('keeps the revealed card on enqueue failure and retries the same event id', async () => {
     serve([NEW_A], [fresh('new-a')], 1);
     vi.mocked(recordReviewEvent).mockRejectedValueOnce(new Error('storage full'));
@@ -460,7 +506,8 @@ describe('SessionCardScreen learning step (R22 §6: teach before testing; 2026-1
     await act(async () => first.tree.unmount());
     resetSessionStore();
     const second = await mount();
-    await study(second.tree);
+    expect(pressables(second.tree, 'Got it')).toHaveLength(1);
+    await press(second.tree, 'Got it');
     const calls = vi.mocked(recordReviewEvent).mock.calls;
     expect((calls[1][0] as any).eventId).toBe(event.eventId);
     expect((calls[1][0] as any).reviewedAtMs).toBe(event.reviewedAtMs);

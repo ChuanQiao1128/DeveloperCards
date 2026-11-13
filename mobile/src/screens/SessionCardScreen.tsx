@@ -80,6 +80,7 @@ import {
 import { getAuthSessionGeneration } from '../auth/sessionBoundary';
 import { buildPrerequisiteLabels } from '../features/gacha/components/prerequisiteLabels';
 import { resetSessionStore, useSessionStore } from '../features/gacha/session/sessionStore';
+import { checkpointDate, checkpointProgressStamp, clearSessionCheckpoint, loadSessionCheckpoint, saveSessionCheckpoint } from '../features/gacha/session/sessionCheckpoint';
 import { useScrollToTopOnChange } from '../features/gacha/session/useScrollToTopOnChange';
 import SessionProgressHeader from '../features/gacha/components/SessionProgressHeader';
 import RatingBar from '../features/gacha/components/RatingBar';
@@ -244,6 +245,10 @@ export function SessionCardScreen({ navigation, route }: Props) {
   // Bumped by the error state's Retry so the load effect re-runs without a
   // slug change (offline / deck-not-found recovers once the deck is reachable).
   const [reloadToken, setReloadToken] = useState(0);
+  const [checkpointFailed, setCheckpointFailed] = useState(false);
+  const [checkpointRetry, setCheckpointRetry] = useState(0);
+  const [checkpointReadFailed, setCheckpointReadFailed] = useState(false);
+  const checkpointOwner = useRef<{ sub: string; generation: number } | null>(null);
   // R22 §4: the deck is being downloaded before the run can start (the starter lesson's first run
   // on a fresh install), and whether the current load error belongs to the starter lesson.
   const [installing, setInstalling] = useState(false);
@@ -356,6 +361,29 @@ export function SessionCardScreen({ navigation, route }: Props) {
   const prerequisiteLabels = useMemo(() => buildPrerequisiteLabels(deck?.Cards ?? [], cardLang === 'zh-CN' ? 'zh-CN' : undefined), [deck, cardLang]);
   const prerequisiteReturn = useRef<{ generation: number; sessionId: string | null; context: string } | null>(null);
   const studyContext = JSON.stringify([slug, mode, previewLimit, focusKey, routeLimit, isPremiumUser]);
+  useEffect(() => {
+    const owner = checkpointOwner.current;
+    if (loading || reviewing || !deck || !current || !owner || owner.generation !== getAuthSessionGeneration()) return;
+    const state = useSessionStore.getState();
+    if (!state.sessionId || state.slug !== deck.Slug) return;
+    let cancelled = false;
+    void saveSessionCheckpoint(owner.sub, deck.Slug, {
+      v: 1, dateKey: checkpointDate(new Date(state.startedAt ?? Date.now())),
+      deckVersion: deck.Version, context: studyContext, progressStamp: checkpointProgressStamp(progress, ownedSet),
+      currentUid: current.card.StableUid, showAnswer, limit: sessionLimit, minimumGoal: plannedMinimumGoal ?? 1,
+      focusRatedUids: [...focusRatedUidsRef.current], attempts: [...attemptIndexRef.current],
+      mcqRun: { ...mcqRunRef.current }, picks: { ...picksRef.current }, loadForecast,
+      session: { sessionId: state.sessionId, slug: state.slug, route: state.route, currentIndex: state.currentIndex,
+        completedCount: state.completedCount, streakEarned: state.streakEarned,
+        sessionRatings: state.sessionRatings, startedAt: state.startedAt, rewardOutcome: state.rewardOutcome },
+    }).then(() => {
+      if (!cancelled && owner.generation === getAuthSessionGeneration()) setCheckpointFailed(false);
+    }).catch(() => {
+      if (!cancelled && owner.generation === getAuthSessionGeneration()) setCheckpointFailed(true);
+    });
+    return () => { cancelled = true; };
+  }, [loading, reviewing, deck, current, progress, ownedSet, showAnswer, sessionDone, sessionLimit,
+    plannedMinimumGoal, studyContext, loadForecast, checkpointRetry]);
   const openPrerequisite = useCallback((uid: string) => {
     if (commitBusyRef.current) return;
     prerequisiteReturn.current = { generation: getAuthSessionGeneration(), sessionId: useSessionStore.getState().sessionId, context: studyContext };
@@ -500,6 +528,10 @@ export function SessionCardScreen({ navigation, route }: Props) {
         const slugValue = slug;
         if (!slugValue) return;
         setLoading(true);
+        checkpointOwner.current = null;
+        setCheckpointFailed(false);
+        setCheckpointReadFailed(false);
+        const loadGeneration = getAuthSessionGeneration();
         setLoadError(null);
         setStarterLoadError(false);
         setStarterOfflineNotice(false);
@@ -665,7 +697,7 @@ export function SessionCardScreen({ navigation, route }: Props) {
           } catch {
             // Keep local-only data if sync cache fails.
           }
-          const subAtLoad = await captureProgressUserSub();
+          const subAtLoad = await captureProgressUserSub(true);
           const nextProgress = await loadDeckProgress(deckForStudy, subAtLoad);
           try {
             for (const intent of await readPendingRatings<PendingRatingIntent>(subAtLoad, resolved.Slug)) {
@@ -740,6 +772,46 @@ export function SessionCardScreen({ navigation, route }: Props) {
             ownedSet: nextOwned,
             mode,
           });
+          let checkpoint;
+          try {
+            checkpoint = await loadSessionCheckpoint(subAtLoad, resolved.Slug, {
+              deckVersion: resolved.Version, context: studyContext,
+              progressStamp: checkpointProgressStamp(nextProgress, nextOwned),
+            });
+          } catch {
+            if (!cancelled) setCheckpointReadFailed(true);
+            throw new Error('Your saved study position could not be read. Please retry. Your ratings are saved.');
+          }
+          if (cancelled || loadGeneration !== getAuthSessionGeneration() || await captureProgressUserSub(true) !== subAtLoad) return;
+          checkpointOwner.current = { sub: subAtLoad, generation: loadGeneration };
+          const savedCard = checkpoint ? deckForStudy.Cards.find(card => card.StableUid === checkpoint.currentUid) : null;
+          if (checkpoint && savedCard && (nextOwned === null || nextOwned.has(savedCard.StableUid))) {
+            const savedProgress = nextProgress.find(row => row.stableUid === savedCard.StableUid);
+            if (savedProgress) {
+              const { sessionId, slug: savedSlug, route: savedRoute, currentIndex, completedCount,
+                streakEarned, sessionRatings, startedAt, rewardOutcome } = checkpoint.session;
+              useSessionStore.setState({ sessionId, slug: savedSlug, route: savedRoute, currentIndex,
+                completedCount, streakEarned, sessionRatings, startedAt, rewardOutcome });
+              setPlannedMinimumGoal(checkpoint.minimumGoal);
+              setPlannedLimit(checkpoint.limit);
+              setSessionDone(checkpoint.session.completedCount);
+              setProgress(nextProgress);
+              setOwnedSet(nextOwned);
+              setDailyStats(stats);
+              focusRatedUidsRef.current = new Set(checkpoint.focusRatedUids);
+              attemptIndexRef.current = new Map(checkpoint.attempts);
+              const nextAttempt = attemptIndexRef.current.get(savedCard.StableUid) ?? 1;
+              attemptIndexRef.current.set(savedCard.StableUid, Math.max(0, nextAttempt - 1));
+              applyCurrent({ card: savedCard, progress: savedProgress }, checkpoint.session.sessionId!);
+              mcqRunRef.current = checkpoint.mcqRun;
+              picksRef.current = checkpoint.picks;
+              setLoadForecast(checkpoint.loadForecast);
+              // Unsubmitted MCQ picks restart on the question; no verdict or rating is replayed.
+              if (resolveMcq(savedCard, getFeatureFlags()) === null) setShowAnswer(checkpoint.showAnswer);
+              setLoading(false);
+              return;
+            }
+          }
           setPlannedMinimumGoal(plannedChallenge.minimumGoal);
           // Sync sessionLimit to the planner's actual route length so
           // the header reads "Run 0/3" when the deck has 3 due cards
@@ -1053,6 +1125,7 @@ export function SessionCardScreen({ navigation, route }: Props) {
       recordSessionRating({ stableUid: current.card.StableUid, rating });
       if (completedLesson) {
         starterLessonRef.current = null;
+        void clearSessionCheckpoint(sub, deck.Slug).catch(() => {});
         navigation.replace('Draw', { slug: starterLesson.slug, rewardPending: true });
         return;
       }
@@ -1074,6 +1147,7 @@ export function SessionCardScreen({ navigation, route }: Props) {
         now: new Date(nowAtRating.getTime()),
       });
       if (!nextCurrent) {
+        void clearSessionCheckpoint(sub, deck.Slug).catch(() => {});
         navigation.replace('SessionSummary', {
           sessionId: useSessionStore.getState().sessionId ?? undefined,
           slug: deck.Slug,
@@ -1204,7 +1278,7 @@ export function SessionCardScreen({ navigation, route }: Props) {
         >
           <View style={styles.center}>
             <Text style={styles.errorTitle} numberOfLines={2} testID="session-card-error-title">
-              {starterLoadError ? STARTER_COPY.offlineTitle : 'Deck not available'}
+              {checkpointReadFailed ? 'Study position unavailable' : starterLoadError ? STARTER_COPY.offlineTitle : 'Deck not available'}
             </Text>
             <Text style={styles.errorBody} numberOfLines={starterLoadError ? 3 : 2} testID="session-card-error-body">
               {starterLoadError ? STARTER_COPY.offlineBody : loadError}
@@ -1320,6 +1394,7 @@ export function SessionCardScreen({ navigation, route }: Props) {
     );
   }
   function requestPause() {
+    if (commitBusyRef.current) return;
     Alert.alert('Pause this session?', 'Your ratings are saved.', [
       { text: 'Keep reviewing', style: 'cancel' },
       { text: 'Pause', onPress: () => navigation.goBack() },
@@ -1349,6 +1424,8 @@ export function SessionCardScreen({ navigation, route }: Props) {
               style={({ pressed }) => [styles.pauseButton, pressed && styles.pressed]}
               accessibilityRole="button"
               accessibilityLabel="Pause session"
+              accessibilityState={{ disabled: reviewing }}
+              disabled={reviewing}
               onPress={requestPause}
             >
               <Text style={styles.pauseText} numberOfLines={1} maxFontSizeMultiplier={CHROME_MAX_FONT_SCALE}>
@@ -1369,6 +1446,15 @@ export function SessionCardScreen({ navigation, route }: Props) {
           </View>
           <TranslationAvailability state={deckTranslations} />
           <SessionProgressHeader vm={sessionVm} />
+          {checkpointFailed ? (
+            <View accessibilityRole="alert" testID="session-position-error">
+              <Text style={styles.forecastLine}>Your ratings are saved, but this study position could not be saved.</Text>
+              <Pressable accessibilityRole="button" testID="session-position-retry" style={styles.backButton}
+                onPress={() => setCheckpointRetry(value => value + 1)}>
+                <Text style={styles.backText}>Try again</Text>
+              </Pressable>
+            </View>
+          ) : null}
           {loadForecast ? (
             <Text testID="session-card-load-forecast" numberOfLines={2} style={styles.forecastLine}>
               {loadForecast}
