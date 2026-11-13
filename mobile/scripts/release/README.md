@@ -58,3 +58,21 @@ says 1.9.0) and push it. `ota.sh` reads the runtime from `app.json`, so running 
 publishes for runtime 2.0.0 only.
 
 Add `DRY_RUN=1` (shell scripts) or omit `--apply` (node script) to see the plan without touching anything.
+
+## Queue ownership rollout: 2.1.1 (26)
+
+The ownership reader requires a **new native 2.1.1 / build 26 baseline**, retaining
+`runtimeVersion.policy: appVersion`. This repository change is not a signed IPA or an App Store release.
+Do not send it to 2.1.0: that embedded fallback can drop events or reassign ownership.
+From a committed, clean source tree, use the existing Apple account and local Xcode/EAS tooling:
+`OWNERSHIP_APPLE_TEAM_ID=<existing-10-character-team-id> LOCAL_BUILD=1 IOS_LOCAL_ARTIFACT=/absolute/archive.ipa OWNERSHIP_BASELINE_PROOF=/absolute/baseline.json bash scripts/release/ios-build.sh production`.
+The ownership build entry refuses missing `LOCAL_BUILD=1` before any EAS call (exit 7); the default cloud path is not authorized.
+This runs a local build, verifies the Apple identity/team/bundle ID, native version/runtime and embedded
+reader/queue guard, and records the actual IPA/embedded SHA-256 plus the reviewed source commit.
+Archive both files, complete the normal signed-native/TestFlight/App Store rollout, then supply
+`OWNERSHIP_APPLE_TEAM_ID=<same-team-id> OWNERSHIP_BASELINE_PROOF=/absolute/baseline.json OTA_RUNTIME_VERSION=2.1.1`
+to `ota.sh` (including `DRY_RUN=1`). The guard re-reads the signed artifact and rejects missing proof,
+changed bytes, ad-hoc/unknown signers, old/unknown/mismatched runtime, a different runtime policy,
+or an unreviewed source commit before any EAS call (exit 7). A 2.1.1 embedded fallback is accepted only
+with that artifact proof; 2.1.0 fallback is rejected. Current tests use explicit stubs and do not create
+release evidence. Until a real compatible signed IPA exists this release gate stays closed.

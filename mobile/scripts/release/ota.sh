@@ -15,13 +15,14 @@
 # OTA_KEYCHAIN=1; never when OTA_KEYCHAIN=0). The token is inherited by the upload child only; it is never
 # printed, never written to a file and never put on a command line.
 # Exit codes: 0 ok · 2 usage / eas-cli missing or not logged in · 3 missing EXPO_PUBLIC name(s) ·
-# 6 runtime guard (exit 5 belongs to ios-build.sh).
+# 6 Sentry runtime guard · 7 ownership baseline/runtime gate (exit 5 belongs to ios-build.sh).
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"; MOBILE="$(cd "$HERE/../.." && pwd)"; cd "$MOBILE"
 MESSAGE="${1:-}"
 [ -n "$MESSAGE" ] || { echo 'usage: ota.sh "<message>"' >&2; exit 2; }
 REQUIRED_NAMES=(EXPO_PUBLIC_API_BASE EXPO_PUBLIC_AWS_REGION EXPO_PUBLIC_COGNITO_USER_POOL_ID EXPO_PUBLIC_COGNITO_USER_POOL_CLIENT_ID EXPO_PUBLIC_RC_IOS_API_KEY)
 VERSION=$(node -p "require('./app.json').expo.version")
+node "$HERE/queueOwnershipRollout.cjs" check
 # GE190=1 when the runtime (major.minor.patch, compared numerically) is at least 1.9.0.
 GE190=$(node -e 'const [a, b, c] = String(process.argv[1]).split(".").map((x) => parseInt(x, 10) || 0); const v = a * 1e6 + b * 1e3 + c; console.log(v >= 1009000 ? 1 : 0)' "$VERSION")
 if [ "$GE190" != 1 ] && node -e 'process.exit((require("./package.json").dependencies || {})["@sentry/react-native"] ? 0 : 1)'; then

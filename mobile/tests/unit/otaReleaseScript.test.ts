@@ -21,58 +21,6 @@ const ALL_NAMES = [
 // surface it, because eas env:list reveals real secret values.
 const MARKER = 'secret-value-do-not-print';
 
-// Legacy cases run the real ota.sh in the real mobile/ tree, whose eas.json carries the real Sentry slugs, so
-// every external binary the script can reach is faked (R19M-REL-1): `eas` answers the three subcommands
-// ota.sh uses: whoami (logged in), env:list (NAME=value lines whose value carries the marker, names driven
-// by FAKE_EAS_NAMES), and update (records its args + EXPO_PUBLIC_ENV to FAKE_EAS_LOG instead of
-// publishing); `npx` and `security` only log their argv. Every fake appends its argv to its own log and
-// keeps its stderr in a file, so an unexpected status can be diagnosed (R19M-REL-7).
-function makeFakeEasDir(): string {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ota-fake-eas-'));
-  const eas = path.join(dir, 'eas');
-  fs.writeFileSync(
-    eas,
-    [
-      '#!/usr/bin/env bash',
-      `[ "$1" = ${PROBE} ] && exit 0`,
-      `exec 2>> "${path.join(dir, 'eas.stderr.log')}"`,
-      `echo "$@" >> "${path.join(dir, 'eas.argv.log')}"`,
-      'case "$1" in',
-      '  whoami) exit 0 ;;',
-      `  env:list) for n in $FAKE_EAS_NAMES; do echo "$n=${MARKER}"; done ;;`,
-      '  update)',
-      '    echo "$@" >> "$FAKE_EAS_LOG"',
-      '    echo "EXPO_PUBLIC_ENV=$EXPO_PUBLIC_ENV" >> "$FAKE_EAS_LOG"',
-      '    ;;',
-      'esac',
-      '',
-    ].join('\n'),
-  );
-  fs.chmodSync(eas, 0o755);
-  waitUntilExecutable(eas);
-  for (const name of ['npx', 'security']) {
-    const file = path.join(dir, name);
-    fs.writeFileSync(
-      file,
-      ['#!/usr/bin/env bash', `[ "$1" = ${PROBE} ] && exit 0`, `echo "$*" >> "${path.join(dir, `${name}.log`)}"`, 'exit 0', ''].join('\n'),
-    );
-    fs.chmodSync(file, 0o755);
-    waitUntilExecutable(file);
-  }
-  return dir;
-}
-
-// Every SENTRY_* name, OTA_KEYCHAIN*, EXPO_PUBLIC_SENTRY_DSN and DRY_RUN from the developer's shell is
-// dropped, and OTA_KEYCHAIN=0 keeps ota.sh away from the Keychain even when stdin is a terminal.
-function isolatedEnv(): NodeJS.ProcessEnv {
-  const env: NodeJS.ProcessEnv = { ...process.env };
-  for (const k of Object.keys(env)) {
-    if (k.startsWith('SENTRY_') || k.startsWith('OTA_KEYCHAIN') || k === 'EXPO_PUBLIC_SENTRY_DSN' || k === 'DRY_RUN') delete env[k];
-  }
-  env.OTA_KEYCHAIN = '0';
-  return env;
-}
-
 const readLog = (f: string) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : '');
 
 // Printed by a failing status assertion: the script's output and every fake's argv/stderr log.
@@ -85,28 +33,13 @@ function diagnose(res: ReturnType<typeof spawnSync>, logs: Record<string, string
   ].join('\n');
 }
 
+// Legacy environment/Sentry behavior runs in a pre-ownership release fixture.
+// The real current tree is covered separately and refuses missing baseline proof.
 function runOta(opts: { names: string[]; dryRun?: boolean }) {
-  const dir = makeFakeEasDir();
-  const logPath = path.join(dir, 'eas.log');
-  const env: NodeJS.ProcessEnv = {
-    ...isolatedEnv(),
-    PATH: `${dir}:${process.env.PATH ?? ''}`,
-    FAKE_EAS_LOG: logPath,
-    FAKE_EAS_NAMES: opts.names.join(' '),
-  };
-  if (opts.dryRun) env.DRY_RUN = '1';
-  const res = spawnSync('bash', [OTA, 'test message'], { env, encoding: 'utf8' });
-  const log = readLog(logPath);
-  const npx = readLog(path.join(dir, 'npx.log'));
-  const security = readLog(path.join(dir, 'security.log'));
-  const diag = diagnose(res, {
-    'eas update log': log,
-    'eas argv log': readLog(path.join(dir, 'eas.argv.log')),
-    'eas stderr log': readLog(path.join(dir, 'eas.stderr.log')),
-    'npx log': npx,
-    'security log': security,
-  });
-  return { res, log, npx, security, diag };
+  const r = runOtaTree({ version: '2.0.0', sentryDependency: true,
+    org: 'example-org', project: 'example-project', names: opts.names,
+    env: { OTA_KEYCHAIN: '0', ...(opts.dryRun ? { DRY_RUN: '1' } : {}) } });
+  return { ...r, log: r.eas };
 }
 
 // Each case spawns the real ota.sh, which starts node three to five times; on a loaded machine (a delivery
@@ -163,7 +96,7 @@ describe('ota.sh', { timeout: OTA_CASE_TIMEOUT_MS }, () => {
   });
 
   it('puts fake npx and security first on PATH for the legacy cases', () => {
-    const dir = makeFakeEasDir();
+    const { bin: dir } = runOtaTree({ version: '2.0.0', names: ALL_NAMES, env: { DRY_RUN: '1', OTA_KEYCHAIN: '0' } });
     for (const name of ['eas', 'npx', 'security']) {
       const r = spawnSync('bash', ['-c', `command -v ${name}`], { env: { ...process.env, PATH: `${dir}:${process.env.PATH ?? ''}` }, encoding: 'utf8' });
       expect(r.stdout.trim()).toBe(path.join(dir, name));
@@ -201,10 +134,14 @@ function runOtaTree(opts: TreeOpts) {
   const release = path.join(mobile, 'scripts', 'release');
   fs.mkdirSync(release, { recursive: true });
   fs.copyFileSync(OTA, path.join(release, 'ota.sh'));
+  fs.copyFileSync(path.join(path.dirname(OTA), 'queueOwnershipRollout.cjs'), path.join(release, 'queueOwnershipRollout.cjs'));
   fs.writeFileSync(
     path.join(mobile, 'app.json'),
-    JSON.stringify({ expo: { version: opts.version, runtimeVersion: { policy: 'appVersion' } } }),
+    JSON.stringify({ expo: { version: opts.version, runtimeVersion: { policy: 'appVersion' }, extra: { progressQueueOwnershipFormat: 0 } } }),
   );
+  fs.mkdirSync(path.join(mobile, 'src/sync'), { recursive: true });
+  fs.writeFileSync(path.join(mobile, 'src/sync/progressSync.ts'),
+    'export async function recordReviewEvent() { return enqueueProgressEvent(); }\nasync function enqueueProgressEvent() { return "legacy-format-0 fixture"; }');
   const dependencies: Record<string, string> = { expo: '~54.0.0' };
   if (opts.sentryDependency) dependencies['@sentry/react-native'] = '~7.2.0';
   fs.writeFileSync(path.join(mobile, 'package.json'), JSON.stringify({ name: 'mobile', version: opts.version, dependencies }));
@@ -239,7 +176,7 @@ function runOtaTree(opts: TreeOpts) {
     'case "$1" in',
     '  whoami) exit 0 ;;',
     `  env:list) for n in $FAKE_EAS_NAMES; do echo "$n=${MARKER}"; done ;;`,
-    '  update) exit 0 ;;',
+    `  update) echo "EXPO_PUBLIC_ENV=$EXPO_PUBLIC_ENV" >> "${easLog}"; exit 0 ;;`,
     'esac',
   ]);
   // Records its argv, SENTRY_ORG/SENTRY_PROJECT and only whether a token is set (never the value).
@@ -262,7 +199,7 @@ function runOtaTree(opts: TreeOpts) {
 
   const env: NodeJS.ProcessEnv = { ...process.env };
   for (const k of Object.keys(env)) {
-    if (k.startsWith('SENTRY_') || k.startsWith('OTA_KEYCHAIN') || k === 'EXPO_PUBLIC_SENTRY_DSN' || k === 'DRY_RUN') delete env[k];
+    if (k.startsWith('SENTRY_') || k.startsWith('OWNERSHIP_') || k === 'OTA_RUNTIME_VERSION' || k.startsWith('OTA_KEYCHAIN') || k === 'EXPO_PUBLIC_SENTRY_DSN' || k === 'DRY_RUN') delete env[k];
   }
   env.PATH = `${bin}:${process.env.PATH ?? ''}`;
   env.FAKE_EAS_NAMES = opts.names.join(' ');
@@ -277,7 +214,7 @@ function runOtaTree(opts: TreeOpts) {
     'npx log': logs.npx,
     'security log': logs.security,
   });
-  return { res, out, ...logs, diag };
+  return { res, out, ...logs, diag, bin };
 }
 
 const NAMES_180 = ALL_NAMES.filter((n) => n !== 'EXPO_PUBLIC_SENTRY_DSN');
