@@ -110,7 +110,7 @@ public class PublishReplayGaugeTests
     var (resp, stdout) = await RunAsync(fn, One("j1", "1"));
 
     Assert.Empty(resp.BatchItemFailures);
-    Assert.Equal(1, rebuilds);
+    Assert.Equal(0, rebuilds);
     AssertCounts(stdout, succeeded: 0, failed: 0);
   }
 

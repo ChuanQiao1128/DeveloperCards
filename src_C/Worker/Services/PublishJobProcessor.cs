@@ -12,7 +12,7 @@ namespace RecallSmith.Lambda.Worker.Services;
 /// 发布任务处理器
 /// 执行 5-Step 流水线：抢占 -> 数据准备 -> S3上传 -> 完成
 /// </summary>
-public class PublishJobProcessor : IPublishJobProcessor, IReplayOutcome
+public class PublishJobProcessor : IPublishJobProcessor, IReplayOutcome, IPublishManifestDelivery
 {
   private readonly IJobRepository _jobRepository;
   private readonly IS3DeckUploader _s3Uploader;
@@ -89,6 +89,14 @@ public class PublishJobProcessor : IPublishJobProcessor, IReplayOutcome
       throw new BusinessException($"{PublishSnapshot.StaleErrorCode}: cards changed after the AI QA publish gate passed; publish again");
     }
 
+    await using (var snapshotConn = await Pg.OpenConnectionOrNullAsync())
+    {
+      if (snapshotConn is null) throw new InvalidOperationException("Failed to open database connection");
+      if (await PublishDelivery.Ready(snapshotConn) && await DbUtil.ExecuteScalarAsync(snapshotConn,null,
+        "select publish_editing_snapshot is not null and publish_editing_snapshot is distinct from content_editing_snapshot(deck_id) from deck_publishes where job_id=$1",[jobId]) is true)
+        throw new BusinessException($"{PublishSnapshot.StaleErrorCode}: content or settings changed after validation; publish again");
+    }
+
     // An automation publish checked the deck's settings too (R18C, backend-design-11): a settings edit since then is a
     // human change, which only a human publishes. Read after the deck, so an edit that the build read is always seen.
     if (await DeckSettingsChangedAsync(jobId))
@@ -126,8 +134,12 @@ public class PublishJobProcessor : IPublishJobProcessor, IReplayOutcome
     await _contentArtifacts.GenerateAsync(job, deckData, uploadResult);
 
     // Step 5: 最终一致性提交
-    await _jobRepository.CompleteJobAsync(jobId, deckData.Cards.Count);
-    if (job.DeckSlug == "aws-saa-fundamentals" && (await _jobRepository.GetJobAsync(jobId))?.Status != "SUCCESS")
+    try { await _jobRepository.CompleteJobAsync(jobId, deckData.Cards.Count); }
+    catch (PostgresException ex) when (ex.SqlState=="P0001" && ex.MessageText=="PUBLISH_SNAPSHOT_STALE")
+    {
+      throw new BusinessException($"{PublishSnapshot.StaleErrorCode}: content or settings changed during upload; publish again");
+    }
+    if ((await _jobRepository.GetJobAsync(jobId))?.Status != "SUCCESS")
       throw new BusinessException("RELEASE_GENERATION_CANCELLED: no live build was committed");
     await AfterPublishSucceededAsync(job);
 
@@ -158,6 +170,19 @@ public class PublishJobProcessor : IPublishJobProcessor, IReplayOutcome
     {
       Console.WriteLine($"[JobId={job.JobId}] After-publish side effects failed (ignored): {ex.Message}");
     }
+  }
+
+  public async Task<bool> DeliverManifestAsync(string jobId, Func<Task> rebuild)
+  {
+    await using var conn = await Pg.OpenConnectionOrNullAsync();
+    if (conn is null) throw new InvalidOperationException("Failed to open database connection");
+    if (await PublishDelivery.Ready(conn))
+    {
+      await PublishDelivery.DeliverManifest(conn, jobId, rebuild);
+      return await DbUtil.ExecuteScalarAsync(conn,null,"select state='delivered' from publish_manifest_delivery where job_id=$1",[jobId]) is true;
+    }
+    await rebuild(); // Pre-053: current-pointer rebuild only; no durable delivery guarantee.
+    return true;
   }
 
   public async Task FailAsync(string jobId, string errorMessage)

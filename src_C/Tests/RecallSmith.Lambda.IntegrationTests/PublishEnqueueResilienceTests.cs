@@ -192,6 +192,9 @@ public class PublishEnqueueResilienceTests
     try
     {
       var jobId = AssertDispatchUnconfirmed(await PublishAsync(deckId, actor, "original note"));
+      Assert.Equal(200,(await PublishAsync(deckId,NewSub(),"lease-held")).StatusCode);
+      Assert.Single(sent);
+      await _db.QueryAsync("update publish_dispatch set lease_until=now()-interval '1 second' where job_id=$1",jobId);
       var retry = await PublishAsync(deckId, NewSub(), "retry note");
       Assert.Equal(200, retry.StatusCode);
       Assert.Equal(jobId, DataJobId(retry));
@@ -309,8 +312,8 @@ public class PublishEnqueueResilienceTests
       Publish.TestEnqueueSeam = null;
     }
 
-    // A PENDING retry redelivers the same job; duplicate delivery is fenced by worker acquisition.
-    Assert.Equal(2, calls);
+    // A confirmed wake-up is not multiplied by an immediate duplicate request.
+    Assert.Equal(1, calls);
   }
 
   [Fact]

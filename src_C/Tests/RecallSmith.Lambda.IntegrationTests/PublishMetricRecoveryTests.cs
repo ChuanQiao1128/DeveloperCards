@@ -113,16 +113,15 @@ public class PublishMetricRecoveryTests
 
     var (response, stdout) = await RunAsync(worker, job.JobId, receive);
 
-    Assert.Equal(manifestFails ? 1 : 0, response.BatchItemFailures.Count);
-    if (manifestFails) Assert.Equal("m1", Assert.Single(response.BatchItemFailures).ItemIdentifier);
-    Assert.Equal(1, rebuilds);
+    // Historical terminal jobs have no pending delivery row; replay acknowledges without network.
+    Assert.Empty(response.BatchItemFailures);
+    Assert.Equal(0, rebuilds);
     Assert.Equal(0, uploader.Uploads);
     Assert.Equal(status == "SUCCESS" ? PublishReplayOutcome.Succeeded : PublishReplayOutcome.FailedOrAbsent,
       processor.LastCallReplayOutcome);
     Assert.Equal(status, await _db.ScalarAsync("select status from deck_publishes where job_id = $1", job.JobId));
     Assert.Equal("old-build", await _db.ScalarAsync("select live_build_id from decks where id = $1", job.DeckId));
-    // H02's conservative SUCCESS + stale manifest bad event is retained, even for a terminal replay.
-    AssertCounts(stdout, succeeded: 0, failed: status == "SUCCESS" && manifestFails && receive >= 3 ? 1 : 0);
+    AssertCounts(stdout, succeeded: 0, failed: 0);
   }
 
   [Theory]
@@ -141,19 +140,20 @@ public class PublishMetricRecoveryTests
     });
 
     var first = await RunAsync(worker, job.JobId, 1);
-    Assert.Equal("m1", Assert.Single(first.Response.BatchItemFailures).ItemIdentifier);
+    Assert.Empty(first.Response.BatchItemFailures);
     AssertCounts(first.Stdout, succeeded: 0, failed: 0);
     Assert.Equal("SUCCESS", await _db.ScalarAsync("select status from deck_publishes where job_id = $1", job.JobId));
-    Assert.Equal(job.BuildId, await _db.ScalarAsync("select live_build_id from decks where id = $1", job.DeckId));
-
+    Assert.Equal("pending",await _db.ScalarAsync("select state from publish_manifest_delivery where job_id=$1",job.JobId));
+    // SQS is acknowledged once the build committed; independent recovery owns manifest retries.
     var replay = await RunAsync(worker, job.JobId, 2);
-    Assert.Equal(failsThroughFinalReceive ? 1 : 0, replay.Response.BatchItemFailures.Count);
+    Assert.Empty(replay.Response.BatchItemFailures);Assert.Equal(1,rebuilds);
     AssertCounts(replay.Stdout, succeeded: 0, failed: 0);
-
+    await _db.QueryAsync("update publish_manifest_delivery set next_attempt_at=now()-interval '1 second' where job_id=$1",job.JobId);
     var final = await RunAsync(worker, job.JobId, 3);
-    Assert.Equal(failsThroughFinalReceive ? 1 : 0, final.Response.BatchItemFailures.Count);
-    AssertCounts(final.Stdout, succeeded: 0, failed: failsThroughFinalReceive ? 1 : 0);
-    Assert.Equal(3, rebuilds);
+    Assert.Empty(final.Response.BatchItemFailures);
+    AssertCounts(final.Stdout, succeeded: 0, failed: 0);
+    Assert.Equal(2,rebuilds);
+    Assert.Equal(failsThroughFinalReceive?"pending":"delivered",await _db.ScalarAsync("select state from publish_manifest_delivery where job_id=$1",job.JobId));
     Assert.Equal(1, uploader.Uploads);
     Assert.Equal("SUCCESS", await _db.ScalarAsync("select status from deck_publishes where job_id = $1", job.JobId));
     Assert.Equal(job.BuildId, await _db.ScalarAsync("select live_build_id from decks where id = $1", job.DeckId));

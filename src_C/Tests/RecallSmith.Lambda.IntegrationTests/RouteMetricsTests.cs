@@ -564,6 +564,19 @@ public class RouteMetricsTests
     Assert.Equal(router, table);
   }
 
+  [Fact]
+  public void MaintenanceRoute_ReusesExistingAdminMetricSeries()
+  {
+    const string maintenance="/api/v1/admin/maintenance/run";
+    Assert.Equal("/api/v1/admin/publish/reap",RouteMetrics.RouteFor(maintenance));
+    Assert.Equal("/api/v1/admin/publish/reap",RouteMetrics.RouteFor("/stage"+maintenance));
+    Assert.Contains(maintenance,RouteMetrics.KnownRoutes);
+    var originalLabels=RouteMetrics.KnownRoutes.Where(r=>!RouteMetrics.RouteAliases.ContainsKey(r)).ToHashSet(StringComparer.Ordinal);
+    var actualLabels=RouteMetrics.KnownRoutes.Select(RouteMetrics.RouteFor).ToHashSet(StringComparer.Ordinal);
+    Assert.True(originalLabels.SetEquals(actualLabels));
+    Assert.DoesNotContain(maintenance,actualLabels);
+  }
+
   /// <summary>Walks up from the test binary to the directory the projects live in.</summary>
   private static string SourceRoot()
   {

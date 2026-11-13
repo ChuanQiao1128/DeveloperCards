@@ -45,6 +45,7 @@ public static class PublishJobs
 
     var rows = await DbUtil.QueryAsync(conn, null, sql, [auth.IsSuperAdmin, auth.UserSub]);
 
+    await PublishDelivery.Annotate(conn,rows);
     return res.Ok(rows);
   }
 }

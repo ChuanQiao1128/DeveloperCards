@@ -65,6 +65,8 @@ public sealed class ContentReleaseTests(PostgresFixture db)
       await Revoke(current,"revoke-current");
       Assert.Equal(Convert.ToInt64(generation)+1,await DbUtil.ExecuteScalarAsync(c,null,"select release_generation from decks where id=$1",[id]));
       Assert.Equal("FAILED",await DbUtil.ExecuteScalarAsync(c,null,"select status from deck_publishes where job_id=$1",[jid]));
+      await DbUtil.ExecuteAsync(c,null,"update publish_dispatch set next_attempt_at=now()-interval '1 second' where job_id=$1",[jid]);
+      Assert.Null(await PublishDelivery.Dispatch(c,jid,_=>throw new Exception("revoked job must not redispatch")));
       await Assert.ThrowsAsync<InvalidOperationException>(()=>ContentReleaseFence.ValidateJob(c,jid));
       Assert.False(await repo.TryAcquireJobAsync(jid));await repo.CompleteJobAsync(jid,1);
       Assert.Null(await DbUtil.ExecuteScalarAsync(c,null,"select live_build_id from decks where id=$1",[id]));
@@ -88,6 +90,7 @@ public sealed class ContentReleaseTests(PostgresFixture db)
       await using var c=await Open();
       for(var attempt=0;attempt<2;attempt++)
       {
+        if(attempt>0) await DbUtil.ExecuteAsync(c,null,"update publish_dispatch set lease_until=now()-interval '1 second' where deck_id=$1",[id]);
         var failed=await AuthoringPublish(body);Assert.Equal(503,failed.StatusCode);Assert.Contains("PUBLISH_DISPATCH_UNCONFIRMED",failed.Body);
         Assert.Equal(1L,await DbUtil.ExecuteScalarAsync(c,null,"select count(*) from deck_publishes where deck_id=$1",[id]));
         Assert.Equal(1L,await DbUtil.ExecuteScalarAsync(c,null,"select release_generation from decks where id=$1",[id]));
@@ -99,16 +102,17 @@ public sealed class ContentReleaseTests(PostgresFixture db)
       Assert.Equal("committed",committed.GetProperty("outcome").GetString());
       var jobId=committed.GetProperty("jobId").GetString()!;
       Assert.Equal("PENDING",observed.GetProperty("jobs")[0].GetProperty("status").GetString());
+      await DbUtil.ExecuteAsync(c,null,"update publish_dispatch set lease_until=now()-interval '1 second' where deck_id=$1",[id]);
       var queued=Data(await AuthoringPublish(body));Assert.Equal("queued",queued.GetProperty("outcome").GetString());Assert.Equal(jobId,queued.GetProperty("jobId").GetString());
-      Data(await AuthoringPublish(body));Assert.Equal(4,sends.Count);Assert.All(sends,j=>Assert.Equal(jobId,j));Assert.All(accepted,j=>Assert.Equal(jobId,j));
+      Data(await AuthoringPublish(body));Assert.Equal(3,sends.Count);Assert.All(sends,j=>Assert.Equal(jobId,j));Assert.All(accepted,j=>Assert.Equal(jobId,j));
       Assert.Equal(1L,await DbUtil.ExecuteScalarAsync(c,null,"select count(*) from content_release_actions where kind='publish' and deck_id=$1",[id]));
       Assert.Equal(1L,await DbUtil.ExecuteScalarAsync(c,null,"select count(*) from deck_publishes where deck_id=$1",[id]));
       Assert.Equal(1L,await DbUtil.ExecuteScalarAsync(c,null,"select release_generation from decks where id=$1",[id]));
       var repo=new JobRepository();Assert.True(await repo.TryAcquireJobAsync(jobId));Assert.False(await repo.TryAcquireJobAsync(jobId));
-      Assert.Equal("processing",Data(await AuthoringPublish(body)).GetProperty("outcome").GetString());Assert.Equal(4,sends.Count);
+      Assert.Equal("processing",Data(await AuthoringPublish(body)).GetProperty("outcome").GetString());Assert.Equal(3,sends.Count);
       await DbUtil.ExecuteAsync(c,null,"update deck_publishes set content_sha256=$2,content_bytes=100 where job_id=$1",[jobId,new string('a',64)]);
       await repo.CompleteJobAsync(jobId,1);Assert.False(await repo.TryAcquireJobAsync(jobId));await repo.CompleteJobAsync(jobId,1);
-      var done=Data(await AuthoringPublish(body));Assert.Equal("success",done.GetProperty("outcome").GetString());Assert.False(done.GetProperty("manifestVerified").GetBoolean());Assert.Equal(4,sends.Count);
+      var done=Data(await AuthoringPublish(body));Assert.Equal("success",done.GetProperty("outcome").GetString());Assert.False(done.GetProperty("manifestVerified").GetBoolean());Assert.Equal(3,sends.Count);
       Assert.Equal(queued.GetProperty("buildId").GetString(),await DbUtil.ExecuteScalarAsync(c,null,"select live_build_id from decks where id=$1",[id]));
       var replacement=await Publish(id,snap,receipt,"replacement",queued.GetProperty("buildId").GetString());
       var generation=await DbUtil.ExecuteScalarAsync(c,null,"select release_generation from decks where id=$1",[id]);
@@ -341,6 +345,9 @@ public sealed class ContentReleaseTests(PostgresFixture db)
       await Assert.ThrowsAsync<RecallSmith.Lambda.Worker.BusinessException>(()=>processor.ProcessAsync(job.GetProperty("jobId").GetString()!));
       await using var c=await Open();Assert.Null(await DbUtil.ExecuteScalarAsync(c,null,"select live_build_id from decks where id=$1",[id]));
       Assert.Equal("FAILED",await DbUtil.ExecuteScalarAsync(c,null,"select status from deck_publishes where job_id=$1",[job.GetProperty("jobId").GetString()]));
+      var oldJob=job.GetProperty("jobId").GetString()!;
+      await DbUtil.ExecuteAsync(c,null,"update publish_dispatch set next_attempt_at=now()-interval '1 second' where job_id=$1",[oldJob]);
+      Assert.Null(await PublishDelivery.Dispatch(c,oldJob,_=>throw new Exception("cancelled generation must not redispatch")));
     }finally{Vpc.Authoring.Publish.TestEnqueueSeam=null;await Restore();}
   }
 

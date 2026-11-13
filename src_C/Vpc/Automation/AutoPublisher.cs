@@ -167,7 +167,7 @@ public static class AutoPublisher
       try
       {
         var start = await Publish.StartPublishAsync(conn, deckId, Actor, $"auto-publish run {runId?.ToString("D") ?? "unknown"}",
-          bindSnapshot: true, expectedSnapshot: verdict.Snapshot, allowResume: false, expectedDeckUpdatedAt: verdict.DeckUpdatedAt, ct: ct);
+          bindSnapshot: true, expectedSnapshot: verdict.Snapshot, allowResume: false, expectedDeckUpdatedAt: verdict.DeckUpdatedAt, ct: ct, actorSuperadmin: true);
         if (start.Outcome is Publish.Queued or Publish.Resumed or Publish.DispatchUnconfirmed)
         {
           (state, reason, detail, jobId, buildId, snapshot) = (Publishing, null, null, start.JobId, start.BuildId, start.SnapshotSha256);

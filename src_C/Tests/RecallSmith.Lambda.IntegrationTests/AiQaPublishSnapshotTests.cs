@@ -185,16 +185,16 @@ public class AiQaPublishSnapshotTests
   }
 
   [Fact]
-  public async Task UngatedPublish_StoresNoSnapshot_AndBuildsLiveCards()
+  public async Task UngatedPublish_BindsSnapshot_AndRefusesChangedLiveCards()
   {
     var deck = await SeedReviewedDeckAsync("snapoff", 1);
     var jobId = JobId(await WithGateAsync("0", "0", () => PublishAsync(deck.DeckId)));
-    Assert.Null(await SnapshotAsync(jobId));
+    Assert.NotNull(await SnapshotAsync(jobId));
 
     await _db.QueryAsync("update cards set explanation = 'Synthetic later edit.', updated_at = now() where id = $1", deck.CardIds[0]);
     var uploader = new CapturingUploader();
-    await new PublishJobProcessor(new JobRepository(), uploader, new NoopArtifacts()).ProcessAsync(jobId, 1);
-    Assert.Equal("Synthetic later edit.", Assert.Single(uploader.Captured!.Cards).Explanation);
+    await Assert.ThrowsAsync<RecallSmith.Lambda.Worker.BusinessException>(()=>new PublishJobProcessor(new JobRepository(), uploader, new NoopArtifacts()).ProcessAsync(jobId, 1));
+    Assert.Null(uploader.Captured);
   }
 
   [Fact]

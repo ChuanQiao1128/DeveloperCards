@@ -426,10 +426,10 @@ public static class ManifestBuilder
   /// and rebuild, up to three attempts. <paramref name="premiumPrefix"/> is accepted for signature
   /// stability but never enters the document.
   /// </summary>
-  public static Task<ManifestBuildResult> RebuildAsync(NpgsqlConnection conn, IAmazonS3 s3, string bucket, string contentPrefix, string premiumPrefix, long? nowMs = null)
-    => RebuildImplAsync(conn, s3, bucket, contentPrefix, premiumPrefix, nowMs);
+  public static Task<ManifestBuildResult> RebuildAsync(NpgsqlConnection conn, IAmazonS3 s3, string bucket, string contentPrefix, string premiumPrefix, long? nowMs = null, CancellationToken ct = default)
+    => RebuildImplAsync(conn, s3, bucket, contentPrefix, premiumPrefix, nowMs, ct);
 
-  private static async Task<ManifestBuildResult> RebuildImplAsync(NpgsqlConnection conn, IAmazonS3 s3, string bucket, string contentPrefix, string premiumPrefix, long? nowMs)
+  private static async Task<ManifestBuildResult> RebuildImplAsync(NpgsqlConnection conn, IAmazonS3 s3, string bucket, string contentPrefix, string premiumPrefix, long? nowMs, CancellationToken ct)
   {
     if (string.IsNullOrEmpty(bucket)) throw new InvalidOperationException("Missing env CONTENT_BUCKET");
 
@@ -441,7 +441,7 @@ public static class ManifestBuilder
       GetObjectMetadataResponse? head;
       try
       {
-        head = await s3.GetObjectMetadataAsync(new GetObjectMetadataRequest { BucketName = bucket, Key = key });
+        head = await s3.GetObjectMetadataAsync(new GetObjectMetadataRequest { BucketName = bucket, Key = key }, ct);
       }
       catch (AmazonS3Exception ex) when (ex.StatusCode == HttpStatusCode.NotFound)
       {
@@ -463,7 +463,7 @@ public static class ManifestBuilder
 
       try
       {
-        var putResponse = await s3.PutObjectAsync(put);
+        var putResponse = await s3.PutObjectAsync(put, ct);
         return new ManifestBuildResult(body.DeckCount, body.PatchEdgeCount, key, putResponse.ETag ?? string.Empty, generatedAtMs);
       }
       catch (AmazonS3Exception ex) when (ex.StatusCode is HttpStatusCode.PreconditionFailed or HttpStatusCode.Conflict)

@@ -506,7 +506,7 @@ public class AutomationTickTests
   private static string? Subject(Dictionary<string, object?>? notification) => notification?["subject"] as string;
 
   [Fact]
-  public async Task Tick_RunFinalisedDuringPublish_GetsItsOwnPublishAndSummary()
+  public async Task Tick_RunFinalisedDuringPublish_RejectsLateOldCommitAndReevaluates()
   {
     await using var scope = new A04Kit.Scope(AutomationMode.Live);
     await InScratchAsync(scope, async sql =>
@@ -539,32 +539,18 @@ public class AutomationTickTests
       Assert.Null(await NotificationAsync(sql, $"batch:{runA:D}"));
       Assert.Null(await NotificationAsync(sql, $"batch:{runB:D}"));
 
-      // A's job succeeds with A's snapshot only. The tick publishes A's row with A's card and opens B's own row.
-      await WorkerSucceedsAsync(sql, jobA);
+      await Assert.ThrowsAsync<PostgresException>(()=>WorkerSucceedsAsync(sql,jobA));
+      await sql.QueryAsync("update deck_publishes set status='FAILED',error_message='AI_QA_STALE: content changed' where job_id=$1",jobA);
       var data = await TickDataAsync();
-
-      Assert.Equal(1, Action(data, "publishesReconciled"));
-      Assert.Equal(1, Action(data, "publishesStarted"));
-      var doneA = await A04Kit.PublishRowAsync(sql, publishA);
-      Assert.Equal("published", doneA["state"]);
-      Assert.Equal(new[] { cardA }, (long[])doneA["card_ids"]!);
-      Assert.Empty((long[])doneA["deferred_card_ids"]!);
-      var rowB = (await sql.QueryAsync("select * from automation_publishes where deck_id = $1 and id <> $2", deck.Id, publishA)).Single();
-      Assert.Equal(("publishing", runB), ((string)rowB["state"]!, (Guid)rowB["run_id"]!));
-      Assert.Equal(new[] { cardB }, (long[])rowB["card_ids"]!);
-      var jobB = (string)rowB["job_id"]!;
-      Assert.NotEqual(jobA, jobB);
-      Assert.Equal(2, scope.PublishSent.Count);
-
-      // A's summary says published; B's waits for its own build instead of claiming A's.
-      Assert.EndsWith(": 1 auto-accepted, 0 need you, published", Subject(await NotificationAsync(sql, $"batch:{runA:D}")));
-      Assert.Null(await NotificationAsync(sql, $"batch:{runB:D}"));
-
-      await WorkerSucceedsAsync(sql, jobB);
+      Assert.Equal(1,Action(data,"publishesStarted"));
+      var retry = await A04Kit.PublishRowAsync(sql,publishA);
+      Assert.Equal("publishing",retry["state"]);
+      Assert.NotEqual(jobA,retry["job_id"]);
+      Assert.Equal(new[]{cardA,cardB}.Order().ToArray(),((long[])retry["card_ids"]!).Order().ToArray());
+      await WorkerSucceedsAsync(sql,(string)retry["job_id"]!);
       await TickDataAsync();
-      Assert.Equal("published", (await A04Kit.PublishRowAsync(sql, A04Kit.Long(rowB["id"])))["state"]);
-      Assert.EndsWith(": 1 auto-accepted, 0 need you, published", Subject(await NotificationAsync(sql, $"batch:{runB:D}")));
-      Assert.Equal(0, await sql.CountAsync("select count(*) from automation_notifications where subkind = 'publish_failed'"));
+      Assert.Equal("published",(await A04Kit.PublishRowAsync(sql,publishA))["state"]);
+
     });
   }
 

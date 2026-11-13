@@ -487,9 +487,11 @@ public class RevenueCatDeleteTests
   [Fact]
   public void RevenueCatDelete_RetentionIsATickStep()
   {
-    var source = File.ReadAllText(Path.Combine(SrcC(), "Vpc", "Automation", "AutomationTick.cs"));
+    var source = File.ReadAllText(Path.Combine(SrcC(), "Vpc", "Automation", "BaselineMaintenance.cs"));
     Assert.Contains("Step(\"revenuecat_deletions_retention\", () => Runtime.RevenueCatDeletions.DeleteExpiredAsync(conn))", source,
       StringComparison.Ordinal);
+    var tick=File.ReadAllText(Path.Combine(SrcC(),"Vpc","Automation","AutomationTick.cs"));
+    Assert.Contains("BaselineMaintenance.Run(conn",tick,StringComparison.Ordinal);
   }
 
   [Fact]

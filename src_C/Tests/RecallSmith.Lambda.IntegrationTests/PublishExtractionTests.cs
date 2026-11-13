@@ -39,7 +39,7 @@ public class PublishExtractionTests
   private async Task<Publish.PublishStart> StartAsync(long deckId, string actor, bool bindSnapshot, string? expected, bool allowResume)
   {
     await using var conn = await _db.OpenAsync();
-    return await Publish.StartPublishAsync(conn, deckId, actor, "auto-publish run test", bindSnapshot, expected, allowResume);
+    return await Publish.StartPublishAsync(conn, deckId, actor, "auto-publish run test", bindSnapshot, expected, allowResume, actorSuperadmin: true);
   }
 
   private async Task<string> DigestAsync(long deckId)
@@ -93,9 +93,9 @@ public class PublishExtractionTests
     Assert.Equal("Resumed existing job", resumed.GetProperty("note").GetString());
     var job = (await _sql.QueryAsync("select published_by_admin_sub, note, qa_snapshot_sha256 from deck_publishes where job_id = $1", jobId)).Single();
     Assert.Equal((sub, "console note"), ((string)job["published_by_admin_sub"]!, (string)job["note"]!));
-    Assert.Null(job["qa_snapshot_sha256"]);
-    Assert.Equal(2, scope.PublishSent.Count);
-    using (var message = JsonDocument.Parse(scope.PublishSent[1].MessageBody))
+    Assert.NotNull(job["qa_snapshot_sha256"]);
+    Assert.Single(scope.PublishSent);
+    using (var message = JsonDocument.Parse(scope.PublishSent[0].MessageBody))
     {
       Assert.Equal(["jobId", "deckId", "adminSub", "note"], A04Kit.Keys(message.RootElement));
       Assert.Equal(sub, message.RootElement.GetProperty("adminSub").GetString());
@@ -200,7 +200,7 @@ public class PublishExtractionTests
     Publish.PublishStart start;
     await using (var conn = await _db.OpenAsync())
     {
-      start = await Publish.StartPublishAsync(conn, deck.Id, AutoPublisher.Actor, $"auto-publish run {runId:D}", true, await DigestAsync(deck.Id), false);
+      start = await Publish.StartPublishAsync(conn, deck.Id, AutoPublisher.Actor, $"auto-publish run {runId:D}", true, await DigestAsync(deck.Id), false, actorSuperadmin: true);
     }
 
     Assert.Equal(Publish.Queued, start.Outcome);

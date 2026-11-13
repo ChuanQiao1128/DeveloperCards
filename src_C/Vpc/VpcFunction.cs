@@ -237,6 +237,10 @@ public sealed class VpcFunction
       {
         return await Vpc.Authoring.DeckBuilds.HandleDeckBuilds(req, res, auth);
       }
+      if (p.EndsWith("/api/v1/admin/maintenance/run", StringComparison.OrdinalIgnoreCase))
+      {
+        return await Vpc.Automation.BaselineMaintenance.Handle(req, res, auth);
+      }
       if (p.EndsWith("/api/v1/admin/publish/reap", StringComparison.OrdinalIgnoreCase))
       {
         return await Vpc.Authoring.PublishReaper.HandlePublishReap(req, res, auth);

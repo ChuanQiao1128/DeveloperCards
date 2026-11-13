@@ -46,6 +46,7 @@ public static partial class Publish
           select $1,$2,$3,id,slug,'PENDING',$5,$6,$7,release_generation,$8,$9,$10,
             (select array_agg(c.id order by c.id) from cards c where c.deck_id=$4 and c.is_deleted=0) from decks where id=$4
           """,[job,build,key,deckId,auth.UserSub,note,snapshot,receipt,expected,expectedLive]);
+        if (await PublishDelivery.Ready(conn)) await PublishDelivery.Stage(conn,tx,job,auth.IsSuperAdmin);
         result=res.Ok(new{outcome="committed",jobId=job,buildId=build,releaseId=release,snapshotSha256=snapshot,manifestVerified=false});
         await ContentRelease.Save(conn,tx,deckId,release,action,"publish",hash,result);
       }
@@ -57,17 +58,11 @@ public static partial class Publish
     var status=(string?)await DbUtil.ExecuteScalarAsync(conn,null,"select status from deck_publishes where deck_id=$1 and job_id=$2",[deckId,jobId]);
     if(status is null)return Helpers.ErrorEnvelope(res,409,"RELEASE_JOB_NOT_FOUND","Committed publish job is missing; query the release action");
     if(status!="PENDING")return Outcome(status.ToLowerInvariant());
-    // Retrying a committed PENDING job may duplicate SQS delivery; worker acquisition/generation fences make that safe.
-    try
-    {
-      var message=new SendMessageRequest{QueueUrl=TestEnqueueSeam?.QueueUrl??PublishJobQueueUrl,MessageBody=JsonSerializer.Serialize(new{jobId,deckId,adminSub=auth.UserSub,note})};
-      if(TestEnqueueSeam is not null)await TestEnqueueSeam.Send(message);else await SQS().SendMessageAsync(message);
-    }
-    catch(Exception ex)
-    {
-      Log.Event("warn",new{tag="controlled-publish",jobId,reason="send_response_uncertain",error=ex.Message});
-      return res.ServiceUnavailable("PUBLISH_DISPATCH_UNCONFIRMED","Publish job committed; delivery is unconfirmed. Query the release action, then retry the identical publish action to deliver the same job.",1);
-    }
+    // Use the committed actor/note; a replaying administrator cannot replace message identity.
+    var sent = await DispatchPublishAsync(conn, new PublishStart(Queued,200,null,null,jobId,
+      data.GetProperty("buildId").GetString(),data.GetProperty("snapshotSha256").GetString(),null),deckId,"",auth.UserSub,note,
+      TestEnqueueSeam?.QueueUrl??PublishJobQueueUrl!,default);
+    if(sent.Outcome==DispatchUnconfirmed)return StartResponse(sent,res);
     return Outcome("queued");
   }
 }

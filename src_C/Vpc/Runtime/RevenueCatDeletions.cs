@@ -54,21 +54,24 @@ public static class RevenueCatDeletions
 
   // Retention now escalates unfinished work; it never removes an obligation.
   // Before 052 there is no state column, so preserve the row for migration.
-  public static async Task<int> DeleteExpiredAsync(NpgsqlConnection conn)
+  public static async Task<int> DeleteExpiredAsync(NpgsqlConnection conn, int limit = DefaultLimit)
   {
     if (await DbUtil.ExecuteScalarAsync(conn, null, Ready, []) is not true) return 0;
     if (!await HasStateAsync(conn)) return 0;
-    return await MarkNeedsAttentionAsync(conn);
+    return await MarkNeedsAttentionAsync(conn, limit);
   }
 
   private static async Task<bool> HasStateAsync(NpgsqlConnection conn) =>
     await DbUtil.ExecuteScalarAsync(conn, null,
       "select exists(select 1 from information_schema.columns where table_schema='public' and table_name='revenuecat_deletions' and column_name='state')", []) is true;
 
-  private static Task<int> MarkNeedsAttentionAsync(NpgsqlConnection conn) =>
-    DbUtil.ExecuteAsync(conn, null,
-      "update revenuecat_deletions set state='needs_attention' where state='pending' and (attempts >= $1 or requested_at < now() - make_interval(days => $2))",
-      [MaxAttempts, RetentionDays]);
+  private static Task<int> MarkNeedsAttentionAsync(NpgsqlConnection conn, int limit = DefaultLimit) =>
+    DbUtil.ExecuteAsync(conn, null, """
+      update revenuecat_deletions set state='needs_attention' where sub in (
+        select sub from revenuecat_deletions where state='pending'
+          and (attempts >= $1 or requested_at < now() - make_interval(days => $2))
+        order by requested_at,sub limit $3 for update skip locked)
+      """, [MaxAttempts, RetentionDays, Math.Clamp(limit,0,MaxLimit)]);
 
   // GET /api/v1/internal/revenuecat-deletions?limit=50
   public static async Task<APIGatewayProxyResponse> HandlePending(LambdaRequest req, Res res)

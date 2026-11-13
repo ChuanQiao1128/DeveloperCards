@@ -30,6 +30,7 @@
 
 import type { PublishJob } from '../../../api/authoring';
 import { safeDateTime } from '../deckListManifest';
+import { publishJobStage } from '../publishJobStage';
 
 export interface PublishJobsPanelProps {
   jobs: PublishJob[];
@@ -76,7 +77,7 @@ export function PublishJobsPanel({ jobs, onRefresh }: PublishJobsPanelProps) {
                             job.status === 'PROCESSING' ? 'bg-blue-100 text-blue-700' :
                             'bg-amber-100 text-amber-700'
                           }`}>
-                            {job.status}
+                            {publishJobStage(job)}
                           </span>
                         </td>
                         <td className="px-4 py-3 text-xs">
