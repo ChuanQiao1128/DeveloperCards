@@ -3,7 +3,7 @@
 // V11: the signed-in learner's own card reports (GET /api/v1/user/card-reports),
 // reached from the flag-gated "My reports" row on More. Read-only; the author
 // resolves reports in the console. Notes are shown as plain text only.
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -57,13 +57,16 @@ function dayOf(iso: string | null): string {
 export function MyReportsScreen({ navigation }: Props) {
   const [state, setState] = useState<LoadState>({ kind: 'loading' });
 
+  const requestRef = useRef(0);
   const load = useCallback(async (isCancelled: () => boolean) => {
+    const request = ++requestRef.current;
+    const isStale = () => isCancelled() || request !== requestRef.current;
     setState({ kind: 'loading' });
     try {
       const items = await listMyCardReports();
-      if (!isCancelled()) setState({ kind: 'ready', items });
+      if (!isStale()) setState({ kind: 'ready', items });
     } catch (e) {
-      if (isCancelled()) return;
+      if (isStale()) return;
       setState(e instanceof CardReportSignedOutError ? { kind: 'signed_out' } : { kind: 'error', message: cardReportErrorMessage(e) });
     }
   }, []);
@@ -71,10 +74,13 @@ export function MyReportsScreen({ navigation }: Props) {
   useEffect(() => {
     let cancelled = false;
     void load(() => cancelled);
+    const unsubscribe = navigation.addListener?.('focus', () => { void load(() => cancelled); });
     return () => {
       cancelled = true;
+      requestRef.current += 1;
+      if (typeof unsubscribe === 'function') unsubscribe();
     };
-  }, [load]);
+  }, [load, navigation]);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -118,6 +124,14 @@ export function MyReportsScreen({ navigation }: Props) {
               <Text testID="my-reports-signed-out" style={styles.emptyBody}>
                 Sign in to see your reports
               </Text>
+              <Pressable
+                testID="my-reports-sign-in"
+                accessibilityRole="button"
+                style={({ pressed }) => [styles.retry, pressed && styles.pressed]}
+                onPress={() => navigation.navigate('SignIn')}
+              >
+                <Text style={styles.retryText}>Sign in</Text>
+              </Pressable>
             </View>
           ) : null}
 

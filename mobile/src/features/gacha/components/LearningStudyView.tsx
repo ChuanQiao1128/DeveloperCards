@@ -62,6 +62,8 @@ export type LearningStudyViewProps = {
   rank?: number | null;
   /** The learner tapped "Show answer": the answer sections and the source are on screen. */
   revealed?: boolean;
+  onPressPrerequisite?: (uid: string) => void;
+  prerequisiteLabels?: Readonly<Record<string, string>>;
 };
 
 export const LearningStudyView = React.memo(function LearningStudyView(props: LearningStudyViewProps) {
@@ -110,7 +112,7 @@ export const LearningStudyView = React.memo(function LearningStudyView(props: Le
           is still read on mount, so it is ready by the time the answer opens. */}
       {revealed ? (
         <View style={styles.answerWrap}>
-          <CardAnswerSections card={card} testID="learning-study-answer" />
+          <CardAnswerSections card={card} testID="learning-study-answer" onPressPrerequisite={props.onPressPrerequisite} prerequisiteLabels={props.prerequisiteLabels} />
         </View>
       ) : null}
       {revealed && source ? (

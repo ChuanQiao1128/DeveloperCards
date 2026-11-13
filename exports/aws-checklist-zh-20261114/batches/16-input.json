@@ -1,0 +1,91 @@
+[
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-083",
+    "question": "队列里某个坏任务一直失败，不能让它无限重试影响其他工作。怎样隔离？",
+    "answerZh": "设置合适的重试次数和dead-letter queue，把超过阈值的消息转入死信队列分析。",
+    "pointsEn": [
+      "Retry threshold plus dead-letter queue",
+      "Remove persistently failing messages from normal processing"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-085",
+    "question": "SNS广播订单到多个队列，同一订单ID的消息要保持顺序。只把末端SQS改成FIFO够吗？",
+    "answerZh": "不够；使用受支持的SNS FIFO到SQS FIFO链路，并把同一订单ID的消息归入同一message group。",
+    "pointsEn": [
+      "SNS FIFO to SQS FIFO",
+      "Same order ID uses one group; ordering must survive upstream hops"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-087",
+    "question": "Amazon MQ for RabbitMQ要跨AZ高可用，应如何部署，为什么不能照搬ActiveMQ的active/standby？",
+    "answerZh": "使用RabbitMQ支持的跨AZ多节点集群与相应队列复制，而不是套用ActiveMQ主备模式。",
+    "pointsEn": [
+      "Supported RabbitMQ cross-AZ cluster with queue replication",
+      "Distributed replicas preserve service; ActiveMQ's deployment pattern is not interchangeable"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-088",
+    "question": "订单处理有多个步骤，需要等待外部确认、失败重试，并在步骤之间保留进度。应该把等待状态只放在某次函数内吗？",
+    "answerZh": "不应；使用Step Functions等适用的持久工作流编排。",
+    "pointsEn": [
+      "Durable workflow orchestration such as Step Functions",
+      "Orchestrator retains progress and waits beyond a single function invocation"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-091",
+    "question": "Kinesis消费者停了较长时间，恢复后必须重读未处理记录。只增加shard就能找回已经过期的数据吗？",
+    "answerZh": "不能；应提前把流记录保留期限设到能覆盖预计中断和追赶窗口。",
+    "pointsEn": [
+      "Set retention to cover outage and catch-up",
+      "Shards increase throughput but cannot restore expired records"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-115",
+    "question": "EC2操作系统仍正常，但Web应用已无法处理请求。ASG只看EC2基础健康检查，能保证替换这台实例吗？",
+    "answerZh": "不能；应配置能反映应用状态的负载均衡健康检查，并让ASG使用相应ELB健康结果。",
+    "pointsEn": [
+      "Application-level load-balancer health checks used by ASG",
+      "EC2-only checks may miss application failure"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-116",
+    "question": "应用平时跨多个AZ运行，要求少一个AZ后仍立即承受正常流量。只保证每个AZ各有一台就够吗？",
+    "answerZh": "不够；必须让剩余AZ的可用容量合计仍达到所需服务容量。",
+    "pointsEn": [
+      "Surviving AZ capacity must meet normal load",
+      "AZ distribution alone does not provide immediate capacity reserve"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-118",
+    "question": "遗留应用只能运行单个实例，底层主机故障后希望恢复原实例身份和磁盘。支持条件下EC2自动恢复怎样帮助？",
+    "answerZh": "把实例恢复到健康的底层主机，并保留适用的实例身份、地址和附加EBS等状态。",
+    "pointsEn": [
+      "Recover the instance on healthy underlying hardware while preserving applicable identity, addresses, and attached EBS state"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-126",
+    "question": "主站正常时不希望用备用站，主站故障才切到备用入口。DNS应怎样按健康状态回答？",
+    "answerZh": "使用适用的Route 53 failover路由，并配置所需健康评估。",
+    "pointsEn": [
+      "Route 53 failover routing with health evaluation",
+      "Healthy primary normally; secondary after primary is unhealthy"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-vc-001",
+    "question": "任务已进入SQS，想由Lambda处理、免自建常驻轮询程序。按默认整批确认方式，谁负责取消息与确认完成？",
+    "answerZh": "配置SQS事件源映射：Lambda服务轮询队列并批量调用函数，整批成功后删除消息。",
+    "pointsEn": [
+      "Lambda service polls through an SQS event source mapping",
+      "It deletes messages after successful whole-batch processing"
+    ]
+  }
+]

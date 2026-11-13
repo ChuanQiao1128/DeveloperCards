@@ -1,0 +1,57 @@
+{
+  "batch": "18",
+  "inputSha256": "e5e12c445cf346d65df88db43b2f453572b7495f34e6da4fbf9214c1f200f574",
+  "outputSha256": "67db783f173d2dcfc87caa3ed4f29f7e48f1dccceb035f3473b3bd2b72802f91",
+  "overall": "FAIL",
+  "cards": [
+    {
+      "uid": "aws-rb2-20261107-pack-cmp-m15",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-cmp-m19",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-lm01",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-na02",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-na05",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-nb01",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-nc01",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-nc04",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-nc07",
+      "verdict": "FAIL",
+      "note": "第2条把可选择的适用需求连为“和”，应保留“或”的条件关系。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-nc11",
+      "verdict": "PASS"
+    }
+  ],
+  "findings": [
+    {
+      "uid": "aws-rb2-20261107-pack-nc07",
+      "pointIndex": 1,
+      "description": "英文 repeated transfer/validation/throttling 列出 DataSync 的适用需求，结合已接受中文答案为“持续托管传输、校验或限速”。当前“需要…重复传输、验证和限速”将条件收窄为同时具备三种需求，应保留选择关系。",
+      "suggestedChinese": "需要托管的重复传输、验证或限速：DataSync"
+    }
+  ]
+}

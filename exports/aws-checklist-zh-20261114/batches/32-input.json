@@ -1,0 +1,92 @@
+[
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-141",
+    "question": "EC2要按内存压力扩容，但默认CloudWatch监控里只有现成CPU等指标。提高监控展示刷新速度就会出现内存指标吗？",
+    "answerZh": "不会；须用CloudWatch Agent或其他适用方式采集并发布所需自定义内存指标。",
+    "pointsEn": [
+      "Collect/publish custom memory metrics",
+      "Dashboard refresh cannot generate missing observations"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-142",
+    "question": "一次用户请求经过多个微服务，整体变慢，却不知道时间耗在哪个调用环节。只看AWS API审计够吗？",
+    "answerZh": "不够；使用适用的分布式追踪，如X-Ray/OpenTelemetry相关接入。",
+    "pointsEn": [
+      "Distributed tracing",
+      "Correlated request segments locate per-hop latency"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-143",
+    "question": "要看ECS或EKS容器的CPU、内存与日志，CloudTrail记录AWS API操作就够吗？",
+    "answerZh": "不够；应启用适用的Container Insights等工作负载指标和日志采集。",
+    "pointsEn": [
+      "Container Insights or applicable workload collection",
+      "Runtime metrics/logs are different from API audit events"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-144",
+    "question": "只有CPU高并且另一个健康告警也触发时，才通知值班。两个独立alarm各自发邮件能表达这个条件吗？",
+    "answerZh": "不能直接表达共同条件；可用composite alarm组合已有alarm状态。",
+    "pointsEn": [
+      "Composite alarm with AND",
+      "Combines alarm states instead of notifying independently"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-145",
+    "question": "EC2性能分析要达到1分钟粒度，普通指标每5分钟一个点。每秒刷新仪表板能补齐吗，应改哪里？",
+    "answerZh": "不能靠刷新补齐；对适用EC2标准指标启用详细监控，可得到1分钟粒度。若需秒级，则按支持范围采集高分辨率自定义指标。",
+    "pointsEn": [
+      "Detailed monitoring for applicable one-minute EC2 metrics",
+      "Change collection resolution, not dashboard refresh"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-vc-002",
+    "question": "批任务要托管排队调度，何时能用AWS Batch配Fargate，何时应改用EC2计算环境？例如单作业实际需要64vCPU和512GiB。",
+    "answerZh": "符合Fargate作业范围时可用Batch+Fargate免维护主机；64vCPU/512GiB超当前单作业范围，应让Batch在足够规格的EC2计算环境调度。",
+    "pointsEn": [
+      "Fargate for supported jobs; EC2 for the stated oversized job",
+      "Scheduler does not override compute resource limits"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-vc-003",
+    "question": "Aurora的writer（写实例）、reader（读实例）各自保存独立的整份数据库吗？reader为什么也能用于故障接管？",
+    "answerZh": "它们共用区域集群存储；reader平时分担读查询，writer故障时可由适用reader提升接管。",
+    "pointsEn": [
+      "Shared regional cluster storage",
+      "Eligible readers can be promoted while normally serving reads"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-vc-004",
+    "question": "Lambda处理文件时需2GB本地临时工作空间，内存和运行时间均适合。默认512MB不够，必须换EC2吗？",
+    "answerZh": "不必；可把Lambda的/tmp临时存储配置到2GB。",
+    "pointsEn": [
+      "Increase /tmp to 2 GB",
+      "Temporary disk is independently configurable from memory"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-vc-005",
+    "question": "已有EKS和机房Kubernetes集群，要从EKS控制台集中查看集群与工作负载，保留机房集群现有管理方式。用什么？",
+    "answerZh": "用EKS Connector注册并连接符合要求的外部Kubernetes集群。",
+    "pointsEn": [
+      "EKS Connector",
+      "Central viewing retains existing external-cluster management"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-vc-014",
+    "question": "EBS存放频繁随机小块读写的数据库，与连续扫描大文件，这两种负载怎样选择SSD和HDD卷？",
+    "answerZh": "随机小I/O、看重IOPS和低延迟时考虑gp3或io系列SSD；连续大块吞吐工作负载才比较st1/sc1等HDD。",
+    "pointsEn": [
+      "Random small I/O: suitable SSD",
+      "Sequential large throughput: compare HDD"
+    ]
+  }
+]

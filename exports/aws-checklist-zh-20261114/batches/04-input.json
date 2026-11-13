@@ -1,0 +1,92 @@
+[
+  {
+    "uid": "aws-rb2-20261107-pack-cmp-m04",
+    "question": "客户端在VPC内或经已有专线连入VPC，要私下调用服务。调用受支持AWS服务，与供应商自建TCP服务，发布端和消费端分别做什么？",
+    "answerZh": "AWS服务的客户创建对应service的interface endpoint；供应商自建TCP服务，供应商先在服务前配置NLB并发布endpoint service，客户再建interface endpoint连接它。",
+    "pointsEn": [
+      "AWS service: consumer creates the corresponding interface endpoint",
+      "Custom TCP: provider publishes NLB-backed endpoint service; consumer connects its interface endpoint"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-cmp-m05",
+    "question": "只允许开发成员账户启动批准的EC2实例类型，成员管理员甚至root也不能绕过，生产账户不受影响。限制应放哪里、挂在哪个范围？",
+    "answerZh": "用SCP明确Deny不符合批准类型的ec2:RunInstances，以ec2:InstanceType作为条件；挂到开发成员账户或独立开发OU（账户分组）。",
+    "pointsEn": [
+      "Explicit Deny SCP on RunInstances with an ec2:InstanceType condition",
+      "Attach to development accounts or their separate OU, because inheritance sets the affected scope"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-cmp-m06",
+    "question": "EC2或Lambda里的应用要读S3，不保存长期访问密钥。怎样把权限交给运行代码，为什么不直接保存用户密钥？",
+    "answerZh": "授给具备所需S3动作和资源权限的IAM角色：EC2通过instance profile关联角色，Lambda关联执行角色。",
+    "pointsEn": [
+      "EC2 instance profile or Lambda execution role with required S3 permissions",
+      "Automatically refreshed temporary credentials avoid distributing long-term user keys"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-cmp-m07",
+    "question": "应用密码或受支持大小的敏感值不能写死在代码中，要受控取用；数据库密码还须定期轮换。同一凭据需在多Region读取，怎样管理？",
+    "answerZh": "集中放Secrets Manager，由获授权应用运行时读取；数据库密码配置适用自动轮换。同一凭据需就近读取时复制主secret，在主secret轮换。",
+    "pointsEn": [
+      "Secrets Manager with authorized runtime reads and database rotation",
+      "Replicate the primary secret and rotate there for propagation"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-cmp-m08",
+    "question": "多个Lambda共用读取数据库秘密的逻辑。把密码也打包进layer，能让轮换后的值自动同步吗？应怎样共享？",
+    "answerZh": "不能。layer只打包共享取值代码和依赖；秘密集中存Secrets Manager，由获授权的函数运行时读取。",
+    "pointsEn": [
+      "Layer shares retrieval code, not automatically updated passwords",
+      "Store secrets centrally and fetch them at runtime"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-cmp-m09",
+    "question": "S3策略要分别限制“只有本组织的身份能来访问”和“应用只能访问本账户的桶”。该检查请求者还是桶，用什么条件？",
+    "answerZh": "前者在桶策略检查aws:PrincipalOrgID；后者在应用角色策略用s3:ResourceAccount，对非本账户所有的桶明确Deny。",
+    "pointsEn": [
+      "Bucket policy checks requester organization with aws:PrincipalOrgID",
+      "Application role denies other owners with s3:ResourceAccount"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-cmp-m10",
+    "question": "分层应用接收连接时，如何按实际上一跳和服务端口设置入站安全组？如果连接改为跨Region私网路径，还能引用远端安全组吗？",
+    "answerZh": "在接收端只放行实际上一跳和目标服务端口；支持引用时用上一跳的安全组。跨Region peering或TGW对等路径不支持远端安全组引用，用实际来源私有IP或收窄CIDR。",
+    "pointsEn": [
+      "Allow actual previous hop and listening port at the receiver",
+      "Cross-Region peering paths need private IP or CIDR sources instead of remote group references"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-cmp-m11",
+    "question": "数据已静态加密、请求又走私网，能代替TLS吗？以EC2连接RDS MySQL为例，客户端怎样加密连接并验证数据库身份？",
+    "answerZh": "仍须启用数据库客户端TLS，并使用AWS提供的RDS CA证书包验证服务端证书。",
+    "pointsEn": [
+      "Private paths and at-rest encryption do not replace TLS",
+      "Enable client TLS and server verification using the RDS CA bundle"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-cmp-m16",
+    "question": "S3版本或备份在固定保留期内连管理员也不能提前删；若S3改成等获准人员解除保留才可删，应怎样选择？Versioning或Lifecycle能替代吗？",
+    "answerZh": "固定期用对应Object Lock或Backup Vault Lock的compliance模式；S3无限期等待解除用legal hold。Versioning留历史，Lifecycle安排清理，不能替代强制保留。",
+    "pointsEn": [
+      "Fixed period: applicable compliance-mode lock; indefinite until release: S3 legal hold",
+      "Versioning and Lifecycle do not enforce equivalent retention"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-cmp-m20",
+    "question": "敏感数据交给S3或数据库前就必须用客户自己的密钥成为密文。SSE-C符合吗？EMR的ETL输出可怎样落实这一要求？",
+    "answerZh": "SSE-C不符合：应用应先用可调用的客户密钥完成客户端加密，再交给存储。使用支持EMRFS的EMR时，可用CSE-Custom及客户自定义key provider加密输出后上传。",
+    "pointsEn": [
+      "SSE-C does not qualify; encrypt client-side before storage receives data",
+      "EMRFS CSE-Custom with a custom key provider can encrypt output before upload"
+    ]
+  }
+]

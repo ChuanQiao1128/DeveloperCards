@@ -1,0 +1,57 @@
+{
+  "batch": "22",
+  "inputSha256": "f3ef229118f4a164a70c3467396b950d427357fcb5ce192dbea40cf9e2d844d3",
+  "outputSha256": "3d5883d88c7d80ac53622b1dbace52b6045df4765371f6d6a67dc82a816d8305",
+  "overall": "FAIL",
+  "cards": [
+    {
+      "uid": "aws-rb2-20261107-pack-gcl-004",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gcl-006",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gcl-007",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gcl-008",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gcl-009",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gcl-010",
+      "verdict": "FAIL",
+      "note": "第2条新增“只能”，将 ASG 的能力范围作了原文没有的绝对限定。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gcl-013",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gcl-015",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gcl-016",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gcl-021",
+      "verdict": "PASS"
+    }
+  ],
+  "findings": [
+    {
+      "uid": "aws-rb2-20261107-pack-gcl-010",
+      "pointIndex": 1,
+      "description": "原文说明普通 ASG 扩缩主机但不提供 Kubernetes 编排，并未说其全部能力“只能”扩缩主机。译文新增“只能”扩大了否定范围；已接受答案使用“主要伸缩主机”。",
+      "suggestedChinese": "普通 ASG 扩缩主机，不提供 Kubernetes 编排"
+    }
+  ]
+}

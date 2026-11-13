@@ -1,0 +1,59 @@
+{
+  "batch": "17",
+  "inputSha256": "6bffe3f396fadcf35814977d39fb178701a22fc1edc623b08ddf9e175f69aef3",
+  "outputSha256": "6a65b477c2acb6f64c83e19be40cc0761d22c67c85467d466ed54920f8de6335",
+  "overall": "PASS",
+  "cards": [
+    {
+      "uid": "aws-rb2-20261107-pack-vc-009",
+      "verdict": "PASS",
+      "note": "内容未变，沿用17-review.r1.json有效结果。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-vc-015",
+      "verdict": "PASS",
+      "note": "内容未变，沿用17-review.r1.json有效结果。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-ca13",
+      "verdict": "PASS",
+      "note": "内容未变，沿用17-review.r1.json有效结果。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-ca16",
+      "verdict": "PASS",
+      "note": "内容未变，沿用17-review.r1.json有效结果。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-ca17",
+      "verdict": "PASS",
+      "note": "内容未变，沿用17-review.r1.json有效结果。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-cb16",
+      "verdict": "PASS",
+      "note": "内容未变，沿用17-review.r1.json有效结果。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-cb18",
+      "verdict": "PASS",
+      "note": "内容未变，沿用17-review.r1.json有效结果。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-cc03",
+      "verdict": "PASS",
+      "note": "内容未变，沿用17-review.r1.json有效结果。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-cc17",
+      "verdict": "PASS",
+      "note": "本次仅局部复核第2条，已保留事件路由与负载转换的职责分离；第1条沿用17-review.r1.json有效结果。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-cc22",
+      "verdict": "PASS",
+      "note": "内容未变，沿用17-review.r1.json有效结果。"
+    }
+  ],
+  "findings": []
+}

@@ -1,0 +1,57 @@
+{
+  "batch": "26",
+  "inputSha256": "37213c0e5ca496cec7b1fdccb4c3d1983c5016d8a2f8f376d2d255211a9c4d39",
+  "outputSha256": "d403f85be4ae71a5097a7bfd4000b4975c68c9baf8cdc0f69565f53dfb2c1c13",
+  "overall": "FAIL",
+  "cards": [
+    {
+      "uid": "aws-rb2-20261107-pack-gsc-036",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gsc-037",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gsc-040",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gsc-041",
+      "verdict": "FAIL",
+      "note": "第1条“元数据或引用”把须保留对象引用的要求改成二选一。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gsc-042",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gsc-046",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gsc-048",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gsc-049",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gsc-050",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gsc-051",
+      "verdict": "PASS"
+    }
+  ],
+  "findings": [
+    {
+      "uid": "aws-rb2-20261107-pack-gsc-041",
+      "pointIndex": 0,
+      "description": "metadata/reference 在该卡指数据库或消息中保留的元数据及对象引用，已接受答案明确为“元数据和对象引用”，下一条也要求消费者通过该引用取正文。译为“元数据或引用”允许只存不含对象引用的元数据，改变了本条要求。",
+      "suggestedChinese": "正文放在 S3，元数据和对象引用放在数据库或队列"
+    }
+  ]
+}

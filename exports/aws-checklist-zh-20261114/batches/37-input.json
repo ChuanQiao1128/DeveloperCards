@@ -1,0 +1,92 @@
+[
+  {
+    "uid": "aws-rb2-20261107-pack-vc-007",
+    "question": "稳定用量可持续三年，比较适用EC2/RDS预留、Dedicated Host预留及Compute Savings Plans。只在开机时付承诺费吗，能预付时怎样争取更深折扣？",
+    "answerZh": "承诺期内约定费用仍需支付；在这些匹配的选项中，较长期限和更多预付通常换取更深折扣，可比较三年全预付。",
+    "pointsEn": [
+      "Fees remain due for the commitment term",
+      "Compare applicable longer terms/more prepayment such as three-year all-upfront"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-vc-010",
+    "question": "RDS PostgreSQL Multi-AZ DB cluster要保留最近30天原生自动备份/PITR。AWS Backup周期快照计划能直接接管这段连续窗口吗？",
+    "answerZh": "不能；为集群原生自动备份设置30天保留期，其合法范围为1–35天。",
+    "pointsEn": [
+      "Native automatic-backup retention of 30 days",
+      "AWS Backup periodic snapshots do not replace this continuous PITR window"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-vc-012",
+    "question": "文件转归档后只再保留60天。到期删除后，就只付实际60天存储费吗？",
+    "answerZh": "不一定；若低于该层的最低存储计费期，还要支付剩余天数的存储费。",
+    "pointsEn": [
+      "Remaining minimum-duration charges can apply",
+      "Billing minimum begins when entering the class and survives early deletion/transition"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-vc-016",
+    "question": "数据要保存多年、几乎不读取，几个存储层都满足取回等待要求。只按每GB月单价比较，S3各存储层的贵贱顺序是什么，依据什么？",
+    "answerZh": "即时访问层的存储单价高于需等待恢复的归档层，从高到低大致是：S3 Standard、Standard-IA、Glacier Instant Retrieval、Glacier Flexible Retrieval、Glacier Deep Archive；One Zone-IA低于Standard-IA但只存单AZ。现行具体数值以S3定价页为准。",
+    "pointsEn": [
+      "State the approximate descending order and One Zone-IA's single-AZ tradeoff",
+      "Longer acceptable waits enable lower archive storage rates; exact rates follow current pricing"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261108-pack-d1fix-shield-entry",
+    "question": "自管DNS运行在多Region EC2上，但外部流量先进入标准Global Accelerator。Shield Advanced应保护加速器还是直接登记后端实例ID？",
+    "answerZh": "把标准Global Accelerator加速器登记为受保护资源。",
+    "pointsEn": [
+      "Register the standard accelerator",
+      "Protection matches the actual supported entry"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261108-pack-d1fix-shield-advanced",
+    "question": "受支持的公网应用要应对大型复杂DDoS，并希望响应专家主动联系协作。Shield Standard足够吗，应选什么能力？",
+    "answerZh": "选Shield Advanced；需要专家主动联系时，另外配置SRT proactive engagement。",
+    "pointsEn": [
+      "Shield Advanced rather than Standard for enhanced mitigation and SRT",
+      "Configure proactive engagement rather than assuming on-demand help is proactive"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261108-pack-d1fix-root-password",
+    "question": "root密码可以与其他网站共用吗，应怎样设置，为什么？",
+    "answerZh": "使用强而唯一的密码，不把其他网站的密码复用为root密码。",
+    "pointsEn": [
+      "Strong unique root password rather than reuse",
+      "Root is a highly privileged account identity"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261108-pack-d1fix-api-wildcard",
+    "question": "TLS证书已匹配域名和入口。许多客户用a.example.com、b.example.com等一层子域名访问同一个API Gateway REST API，如何共用一个API入口？",
+    "answerZh": "建立*.example.com的API Gateway自定义域名，映射到该API及stage；DNS建立通配记录指向这个入口。",
+    "pointsEn": [
+      "Wildcard custom domain mapped to the same API/stage",
+      "Wildcard DNS pointing to that entry"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261108-pack-d1fix-data-residency",
+    "question": "Control Tower成员账户只能使用批准Region，其VPC还不能接入互联网。启用Region deny就同时满足两项了吗？",
+    "answerZh": "不能；启用Region deny限制非批准Region操作，另启用所需的VPC互联网访问预防型control。",
+    "pointsEn": [
+      "Region deny plus the separate applicable VPC internet-access preventive control",
+      "Location and internet connectivity are distinct conditions"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261108-pack-d1fix-kms-ou",
+    "question": "加密AMI已授予开发OU启动权限。怎样只让该OU中的实际身份使用快照KMS key，能直接把OU ARN当作IAM主体吗？",
+    "answerZh": "OU ARN不是IAM主体；在key policy给实际账户或身份授权，并用aws:PrincipalOrgPaths匹配开发OU路径；跨账户调用方还需相应IAM用钥权限。",
+    "pointsEn": [
+      "Authorize actual principals with a key-policy PrincipalOrgPaths condition",
+      "Cross-account callers also require IAM key-use permission"
+    ]
+  }
+]

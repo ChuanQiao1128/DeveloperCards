@@ -1,0 +1,13 @@
+{
+  "appId": "com.timeawake.recallsmith.qa.ota210",
+  "wallet": {
+    "availablePulls": 10,
+    "reservePulls": 0
+  },
+  "learned": 23,
+  "position": null,
+  "session": null,
+  "contentVersion": "20261109T004729Z-3b73803a",
+  "contentSha256": "c994e567628dbe7d9bcf1372ae8cb4ee610873fcf95196e637a15cb6fcca6e0b",
+  "chineseChecklistPoints": 0
+}

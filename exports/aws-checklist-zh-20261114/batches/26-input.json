@@ -1,0 +1,92 @@
+[
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-036",
+    "question": "DynamoDB已经提供毫秒响应，但大量相同项目反复读取，业务需要亚毫秒读响应。哪种兼容缓存可考虑？为什么适合？",
+    "answerZh": "DynamoDB Accelerator（DAX）。",
+    "pointsEn": [
+      "DAX: managed in-memory read cache for DynamoDB",
+      "Cache hits reduce repeated table-read latency; compatible APIs reduce custom cache integration"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-037",
+    "question": "DynamoDB刚写成功，随后的读取偶尔还见旧值。若必须读到最新已完成写入，应该加DAX还是改变读取一致性？",
+    "answerZh": "对支持的读取使用强一致读取。",
+    "pointsEn": [
+      "Supported strongly consistent reads",
+      "Consistency, not additional caching, addresses latest-write visibility"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-040",
+    "question": "DynamoDB记录过期后不应再展示。启用TTL，就能保证到期那一秒已从表中删除吗？",
+    "answerZh": "不能；TTL异步删除，读取时还应过滤过期记录。",
+    "pointsEn": [
+      "TTL is asynchronous, not exact-second deletion",
+      "Filter expired records on reads"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-041",
+    "question": "文件太大，超出数据库项目或队列消息的载荷限制，还要按ID查找或排队处理。怎样分开存？",
+    "answerZh": "正文放S3，数据库或消息保留元数据和对象引用，读取方按引用取回正文。",
+    "pointsEn": [
+      "Body in S3; metadata/reference in database or queue",
+      "Consumer retrieves the body through the reference"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-042",
+    "question": "下游要处理DynamoDB或Neptune中的业务数据变更，其中DynamoDB不能额外消耗表读取容量。RDS那类资源事件通知够吗，应使用什么记录，为什么？",
+    "answerZh": "不够；DynamoDB用DynamoDB Streams，Neptune用Neptune Streams记录业务数据变化，再由消费者处理。",
+    "pointsEn": [
+      "Business-data changes require DynamoDB Streams or Neptune Streams rather than resource-status notifications",
+      "DynamoDB Streams provides asynchronous change records with read capacity separate from the source table"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-046",
+    "question": "给RDS建了read replica，应用却仍把所有查询发到原主库端点。读负载会自动分过去吗？",
+    "answerZh": "不会；应把适用的只读请求连接到副本端点。",
+    "pointsEn": [
+      "Direct eligible reads to the replica endpoint",
+      "Replication alone does not rewrite connections"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-048",
+    "question": "RDS快照导出的S3数据文件，可以当作原RDS快照直接恢复出同一个数据库吗？",
+    "answerZh": "不可以；快照导出面向数据分析，恢复数据库应使用受支持的快照恢复或数据导入路径。",
+    "pointsEn": [
+      "Use a supported restoration/import path",
+      "Analytical export files are not native snapshot recovery points"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-049",
+    "question": "数据库必须使用某个操作系统补丁或引擎定制，普通RDS不给所需底层权限。如何判断部署方式？",
+    "answerZh": "在支持范围内可用RDS Custom，例如采用自带许可证（BYOL）的Oracle；不支持所需定制或拓扑时评估EC2自管。",
+    "pointsEn": [
+      "Supported RDS Custom, otherwise applicable EC2 self-management",
+      "More low-level control entails more customer maintenance"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-050",
+    "question": "RDS数据量持续增长，担心存储空间耗尽，但CPU并不忙。应优先扩计算实例还是安排存储自动扩展？",
+    "answerZh": "安排符合引擎条件的存储自动扩展，并设定合适上限。",
+    "pointsEn": [
+      "Storage autoscaling with a suitable limit",
+      "Storage capacity, not CPU size, is the constrained resource"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-051",
+    "question": "RDS写入慢，已确认瓶颈是存储IOPS。MySQL/ PostgreSQL容量在400GiB以上，要15000或超过20000IOPS，就必须直接换最贵存储吗？",
+    "answerZh": "先在支持范围内提高gp3 IOPS，满足不了持续性能等要求时再比较io2；也要确认实例I/O能力。",
+    "pointsEn": [
+      "Evaluate supported gp3 IOPS increases before io2",
+      "Match actual storage and instance limits rather than assuming high IOPS mandates io2"
+    ]
+  }
+]

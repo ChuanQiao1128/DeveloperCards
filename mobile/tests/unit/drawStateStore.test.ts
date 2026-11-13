@@ -11,10 +11,12 @@ vi.mock('@react-native-async-storage/async-storage', () => ({
     removeItem: vi.fn(async (key: string) => {
       store.delete(key);
     }),
+    getAllKeys: vi.fn(async () => [...store.keys()]),
   },
 }));
 
-import { loadDrawState, saveDrawState } from '../../src/features/gacha/draw/drawStateStore';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { listDrawStateSlugs, loadDrawState, saveDrawState } from '../../src/features/gacha/draw/drawStateStore';
 // store.clear() below wipes the keys behind the store's back, the same way the
 // debug reset does in production -- and, like production, the in-memory read
 // model has to be told or one test's collection leaks into the next.
@@ -59,6 +61,20 @@ describe('drawStateStore', () => {
 
     expect([...loaded.owned].sort()).toEqual(['a', 'b']);
     expect(loaded.pity).toEqual({ draws: 3, threshold: 10 });
+  });
+
+  it('reports a failed strict read instead of an empty collection', async () => {
+    vi.mocked(AsyncStorage.getItem).mockRejectedValueOnce(new Error('read failed'));
+    await expect(loadDrawState(slug, { strict: true })).rejects.toThrow('read failed');
+    vi.mocked(AsyncStorage.getItem).mockRejectedValueOnce(new Error('read failed'));
+    expect((await loadDrawState(slug)).owned).toEqual([]);
+  });
+
+  it('reports an unreadable key list to strict summary readers', async () => {
+    vi.mocked(AsyncStorage.getAllKeys).mockRejectedValueOnce(new Error('key scan failed'));
+    await expect(listDrawStateSlugs({ strict: true })).rejects.toThrow('key scan failed');
+    vi.mocked(AsyncStorage.getAllKeys).mockRejectedValueOnce(new Error('key scan failed'));
+    expect(await listDrawStateSlugs()).toEqual([]);
   });
 
   it('returns an empty collection and no pity when the deck has never been drawn', async () => {

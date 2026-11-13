@@ -1,0 +1,92 @@
+[
+  {
+    "uid": "aws-rb2-20261107-pack-new03",
+    "question": "公网ALB遭少数已知恶意IP访问。要在网络层明确拒绝这些地址，安全组够吗，应在哪里设置？",
+    "answerZh": "安全组只有允许规则；可在ALB所在入口子网的NACL设置针对这些来源IP的拒绝规则。",
+    "pointsEn": [
+      "Use ALB entry-subnet NACL deny rules",
+      "Put them before matching allows; security groups cannot explicitly deny"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-new05",
+    "question": "一条策略允许ec2:*，另一条明确拒绝ec2:TerminateInstances；两条的资源和条件都适用。再加一条允许终止的策略，就能终止实例吗？",
+    "answerZh": "不能。匹配当前终止请求的显式Deny优先，增加Allow不会解除它。",
+    "pointsEn": [
+      "Termination remains denied",
+      "An applicable explicit Deny overrides additional Allows"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-sc01",
+    "question": "运行身份已有读取加密资源的权限，为什么仍可能被拒绝？即使IAM策略写了KMS Allow，还要检查什么？",
+    "answerZh": "检查实际用钥身份是否获准执行所需KMS操作；IAM Allow还需要该key的key policy允许这种授权方式。",
+    "pointsEn": [
+      "Check required KMS permissions for the actual identity",
+      "Check the key policy allows the IAM authorization path"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xa003",
+    "question": "人员继续在本地自管AD维护，又要用Identity Center跨账户SSO。如何连接原目录？如果经过AWS Managed Microsoft AD，信任应是什么方向？",
+    "answerZh": "可用AD Connector桥接原AD；若经AWS Managed Microsoft AD连接原目录，建立双向林信任。",
+    "pointsEn": [
+      "AD Connector can bridge the original AD",
+      "Managed Microsoft AD path requires a two-way forest trust"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xa004",
+    "question": "应用在两个Region做客户端加密，密文要在另一Region直接解密，不想回调原Region或换钥重加密。怎样选KMS key？",
+    "answerZh": "在两个Region部署同一组相关的KMS multi-Region keys。",
+    "pointsEn": [
+      "Use related KMS multi-Region keys",
+      "Shared material and key ID enable local cross-Region ciphertext decryption"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xa005",
+    "question": "ALB使用导入ACM的证书，要提前30天通知。ACM事件和Config评估分别怎样触发提醒，提醒会自动续期吗？",
+    "answerZh": "可用ACM临近到期事件按DaysToExpiry筛到30天，或用Config证书到期规则设30天阈值；经EventBridge接通知链。两者都不会代外部CA续期。",
+    "pointsEn": [
+      "Describe BOTH paths: ACM event DaysToExpiry filter at 30 days AND Config certificate-expiry rule with a 30-day threshold, feeding notifications through EventBridge",
+      "Neither notification path renews the imported certificate"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xa006",
+    "question": "终止EC2的Allow已匹配；另有Deny，条件为NotIpAddress、aws:SourceIp列出两个允许网段。请求来自两个网段之外，会怎样，为什么？",
+    "answerZh": "会被Deny拒绝。",
+    "pointsEn": [
+      "Denied",
+      "Source outside both ranges matches NotIpAddress; explicit Deny wins"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xa007",
+    "question": "多个账户、多个Region的REST API都要持续应用同一套WAF防护，怎样避免各账户手工复制维护？",
+    "answerZh": "使用Firewall Manager集中管理WAF策略，并在涉及的Region配置保护范围。",
+    "pointsEn": [
+      "Centrally manage WAF policies with Firewall Manager",
+      "Configure account/resource scope in the involved Regions"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xa008",
+    "question": "AWS账户重要邮件不能因一人离职而漏接，还要按账单、运维、安全类别送给负责团队。联系人怎样安排？",
+    "answerZh": "每个账户的root邮箱使用受控管理员分发列表；再分别设置billing、operations、security备用联系人为对应团队列表。",
+    "pointsEn": [
+      "Root email uses a controlled administrator list",
+      "Set category-specific alternate contacts to the responsible teams"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xa011",
+    "question": "用户经CloudFront提交敏感表单，HTTPS之外还要求经过中间应用时字段仍是密文，只有指定下游应用可读。选什么？",
+    "answerZh": "配置CloudFront field-level encryption，对指定表单字段在边缘加密。",
+    "pointsEn": [
+      "CloudFront field-level encryption",
+      "Public-key-encrypted fields remain readable only with the corresponding private key"
+    ]
+  }
+]

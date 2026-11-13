@@ -1,0 +1,21 @@
+{
+  "appId": "com.timeawake.recallsmith.qa.ota210",
+  "wallet": {
+    "availablePulls": 7,
+    "reservePulls": 0
+  },
+  "learned": 20,
+  "position": {
+    "currentUid": "aws-rb2-20261107-pack-cc10",
+    "showAnswer": true,
+    "limit": 5,
+    "dateKey": "2026-11-14"
+  },
+  "session": {
+    "sessionId": "aws-saa-fundamentals-1794595367514",
+    "completedCount": 2
+  },
+  "contentVersion": "20261109T004729Z-3b73803a",
+  "contentSha256": "c994e567628dbe7d9bcf1372ae8cb4ee610873fcf95196e637a15cb6fcca6e0b",
+  "chineseChecklistPoints": 0
+}

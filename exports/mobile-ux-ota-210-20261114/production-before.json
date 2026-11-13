@@ -1,0 +1,19 @@
+{
+  "channel": "production",
+  "channelId": "9bef1db9-3ccb-4dd5-bb8e-73235dfbdde6",
+  "paused": false,
+  "updates": [
+    {
+      "id": "01a1d3b8-2bee-76b3-b754-0719e4d36a5e",
+      "group": "d4ad156d-4f0b-453d-a552-8f9c50b7b857",
+      "message": "Draw: material pack opening and focused rare-card reveal",
+      "createdAt": "2026-11-13T07:03:44.878Z",
+      "runtimeVersion": "2.1.0",
+      "platform": "ios",
+      "gitCommitHash": "ce9ea8c116502d4724cc8ba05cd2258d8b3e57b2",
+      "isGitWorkingTreeDirty": false,
+      "environment": "production",
+      "manifestPermalink": "https://u.expo.dev/update/01a1d3b8-2bee-76b3-b754-0719e4d36a5e"
+    }
+  ]
+}

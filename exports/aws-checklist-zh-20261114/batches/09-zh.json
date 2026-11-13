@@ -1,0 +1,12 @@
+[
+  ["在等待期结束前调用 CancelKeyDeletion", "实际销毁后，无法再通过取消删除来恢复"],
+  ["使用用户池的自适应身份验证，并配置基于风险的 MFA", "用户池评估登录风险；身份池负责换取 AWS 凭证"],
+  ["使用 Systems Manager Inventory", "集中收集软件、版本和配置元数据"],
+  ["使用 S3 Storage Lens 指标", "在所需范围内汇总当前存储和保护状态"],
+  ["使用 Amazon Security Lake", "将受支持的原始安全日志和事件收集、规范化后存入 S3"],
+  ["使用 Access Analyzer 的未使用访问权限分析", "它分析 IAM 访问权限使用情况，而不是软件漏洞"],
+  ["主题策略允许发起订阅的身份", "函数资源策略允许来自该主题的 SNS；创建订阅与消息投递是不同请求"],
+  ["启用 runtime roles，并为每个作业指定受限的团队角色", "作业身份替代共用的实例角色访问，且不能访问集群 IMDS"],
+  ["REST API：使用资源策略；HTTP API：由 Lambda authorizer 根据上下文来源 IP 验证", "HTTP API 不支持直接套用 REST API 的资源策略"],
+  ["为实际使用的 Auto Scaling service-linked role 授权", "启动实例时，由该角色创建加密 EBS 卷"]
+]

@@ -1,0 +1,231 @@
+
+ RUN  v4.1.11 /Users/qc/.codex/worktrees/mobile-ux-ota-210-20261114/draw-motion-20261113/mobile
+
+ ❯ tests/unit/prerequisiteLearning.test.ts (9 tests | 4 failed) 7ms
+     × teaches the owned foundation before its earlier dependent 4ms
+     × prioritizes an owned foundation of an already learned legacy dependent 1ms
+     × never lets avoidUid skip a still-new foundation in favor of its dependent 0ms
+     × uses the same rule with a cached index, never admitting out-of-scope cards 0ms
+ ❯ tests/unit/orderedAcquisition.test.ts (69 tests | 8 failed) 238ms
+     × earns the later foundation before its earlier dependent and spends one pull per card 4ms
+     × repairs an old owned/learned dependent before unrelated earlier gaps 1ms
+     × batch and singles agree across transitive dependencies and old ownership gaps 1ms
+     × rejects a missing dependency before any grant or wallet debit 1ms
+     × rejects a cycle dependency before any grant or wallet debit 0ms
+     × rejects a self dependency before any grant or wallet debit 0ms
+     × rejects a malformed dependency before any grant or wallet debit 0ms
+     × keeps old ordered and new dependency histories replayable without changing the history schema 0ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 12 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/unit/orderedAcquisition.test.ts > prerequisite-aware earned card acquisition > earns the later foundation before its earlier dependent and spends one pull per card
+AssertionError: expected [ 'c1', 'c2', 'c3' ] to deeply equal [ 'c8', 'c1', 'c2' ]
+
+- Expected
++ Received
+
+  [
+-   "c8",
+    "c1",
+    "c2",
++   "c3",
+  ]
+
+ ❯ tests/unit/orderedAcquisition.test.ts:390:26
+    388|     needs('c1', 'c8');
+    389|     const result = await acquireDraw(slug, 3, { deck });
+    390|     expect(uids(result)).toEqual(['c8', 'c1', 'c2']);
+       |                          ^
+    391|     expect(result.spent).toBe(3);
+    392|     expect((await loadDeckWallet(slug)).availablePulls).toBe(7);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/12]⎯
+
+ FAIL  tests/unit/orderedAcquisition.test.ts > prerequisite-aware earned card acquisition > repairs an old owned/learned dependent before unrelated earlier gaps
+AssertionError: expected [ 'c1', 'c2', 'c3' ] to deeply equal [ 'c7', 'c8', 'c9' ]
+
+- Expected
++ Received
+
+  [
+-   "c7",
+-   "c8",
+-   "c9",
++   "c1",
++   "c2",
++   "c3",
+  ]
+
+ ❯ tests/unit/orderedAcquisition.test.ts:398:56
+    396|     needs('c11', 'c8'); needs('c8', 'c7');
+    397|     seed(['c11']); store.set(progressKey, JSON.stringify([learned('c12…
+    398|     expect(uids(await acquireDraw(slug, 3, { deck }))).toEqual(['c7', …
+       |                                                        ^
+    399|     expect((await loadDrawState(slug)).owned).toEqual(['c11', 'c7', 'c…
+    400|     expect(JSON.parse(store.get(progressKey)!)).toEqual([learned('c12'…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/12]⎯
+
+ FAIL  tests/unit/orderedAcquisition.test.ts > prerequisite-aware earned card acquisition > batch and singles agree across transitive dependencies and old ownership gaps
+AssertionError: expected [ 'c1', 'c2', 'c3', 'c4', 'c5' ] to deeply equal [ 'c10', 'c7', 'c8', 'c1', 'c2' ]
+
+- Expected
++ Received
+
+  [
+-   "c10",
+-   "c7",
+-   "c8",
+    "c1",
+    "c2",
++   "c3",
++   "c4",
++   "c5",
+  ]
+
+ ❯ tests/unit/orderedAcquisition.test.ts:409:21
+    407|     const batch = await acquireDraw(slug, 5, { deck });
+    408|     expect(uids(batch)).toEqual(singles);
+    409|     expect(singles).toEqual(['c10', 'c7', 'c8', 'c1', 'c2']);
+       |                     ^
+    410|     expect(batch.spent).toBe(5);
+    411|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/12]⎯
+
+ FAIL  tests/unit/orderedAcquisition.test.ts > prerequisite-aware earned card acquisition > rejects a missing dependency before any grant or wallet debit
+ FAIL  tests/unit/orderedAcquisition.test.ts > prerequisite-aware earned card acquisition > rejects a cycle dependency before any grant or wallet debit
+ FAIL  tests/unit/orderedAcquisition.test.ts > prerequisite-aware earned card acquisition > rejects a self dependency before any grant or wallet debit
+ FAIL  tests/unit/orderedAcquisition.test.ts > prerequisite-aware earned card acquisition > rejects a malformed dependency before any grant or wallet debit
+AssertionError: promise resolved "{ result: { …(8) }, …(2) }" instead of rejecting
+
+- Expected
++ Received
+
+- Error {
+-   "message": "rejected promise",
++ {
++   "result": {
++     "cards": [
++       {
++         "difficulty": 1,
++         "question": "Q1",
++         "rank": 1,
++         "rarity": "COM",
++         "stableUid": "c1",
++       },
++     ],
++     "highlightedRarity": null,
++     "ownedAfter": 1,
++     "pityAfter": 10,
++     "pityBefore": 10,
++     "pityFiredFor": null,
++     "poolExhausted": false,
++     "totalCards": 12,
++   },
++   "spent": 1,
++   "wallet": {
++     "availablePulls": 9,
++     "reservePulls": 0,
++   },
+  }
+
+ ❯ tests/unit/orderedAcquisition.test.ts:418:50
+    416|       if (kind === 'self') needs('c1', 'c1');
+    417|       if (kind === 'malformed') { needs('c1'); deck.Cards.find(c => c.…
+    418|       await expect(acquireDraw(slug, 1, { deck })).rejects.toThrow();
+       |                                                  ^
+    419|       expect(writes).toEqual([]);
+    420|       expect((await loadDeckWallet(slug)).availablePulls).toBe(10);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/12]⎯
+
+ FAIL  tests/unit/orderedAcquisition.test.ts > prerequisite-aware earned card acquisition > keeps old ordered and new dependency histories replayable without changing the history schema
+AssertionError: expected '[["c1",1,1],["c2",2,1],["c3",3,1],["c…' to match /^prerequisites-v1:/
+
+- Expected:
+/^prerequisites-v1:/
+
++ Received:
+"[[\"c1\",1,1],[\"c2\",2,1],[\"c3\",3,1],[\"c4\",4,1],[\"c5\",5,1],[\"c6\",6,1],[\"c7\",7,1],[\"c8\",8,1],[\"c9\",9,1],[\"c10\",10,1],[\"c11\",11,1],[\"c12\",12,1]]"
+
+ ❯ tests/unit/orderedAcquisition.test.ts:435:30
+    433|     const next = history[1];
+    434|     expect(next.selectionPolicy).toBe('ordered-v1');
+    435|     expect(next.sortingHash).toMatch(/^prerequisites-v1:/);
+       |                              ^
+    436|     expect(replayDraw(next, deck.Cards, deck.Version).matches).toBe(tr…
+    437|     needs('c1', 'c9');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/12]⎯
+
+ FAIL  tests/unit/prerequisiteLearning.test.ts > owned foundations before new dependent learning > teaches the owned foundation before its earlier dependent
+AssertionError: expected 'child' to be 'parent' // Object.is equality
+
+Expected: "parent"
+Received: "child"
+
+ ❯ tests/unit/prerequisiteLearning.test.ts:24:88
+     22|
+     23| describe('owned foundations before new dependent learning', () => {
+     24|   it('teaches the owned foundation before its earlier dependent', () =…
+       |                                                                                        ^
+     25|   it('continues after the first study, without waiting for Mastered', …
+     26|     expect(pick([fresh('child'), fresh('other'), learned('parent')])).…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/12]⎯
+
+ FAIL  tests/unit/prerequisiteLearning.test.ts > owned foundations before new dependent learning > prioritizes an owned foundation of an already learned legacy dependent
+AssertionError: expected 'other' to be 'parent' // Object.is equality
+
+Expected: "parent"
+Received: "other"
+
+ ❯ tests/unit/prerequisiteLearning.test.ts:29:71
+     27|   });
+     28|   it('prioritizes an owned foundation of an already learned legacy dep…
+     29|     expect(pick([learned('child'), fresh('other'), fresh('parent')])).…
+       |                                                                       ^
+     30|   });
+     31|   it('never lets avoidUid skip a still-new foundation in favor of its …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/12]⎯
+
+ FAIL  tests/unit/prerequisiteLearning.test.ts > owned foundations before new dependent learning > never lets avoidUid skip a still-new foundation in favor of its dependent
+AssertionError: expected 'child' to be 'parent' // Object.is equality
+
+Expected: "parent"
+Received: "child"
+
+ ❯ tests/unit/prerequisiteLearning.test.ts:32:93
+     30|   });
+     31|   it('never lets avoidUid skip a still-new foundation in favor of its …
+     32|     expect(pick(undefined, { avoidUid: 'parent', ownedSet: new Set(['p…
+       |                                                                                             ^
+     33|     expect(pick(undefined, { avoidUid: 'parent' })).toBe('other');
+     34|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/12]⎯
+
+ FAIL  tests/unit/prerequisiteLearning.test.ts > owned foundations before new dependent learning > uses the same rule with a cached index, never admitting out-of-scope cards
+AssertionError: expected 'child' to be 'parent' // Object.is equality
+
+Expected: "parent"
+Received: "child"
+
+ ❯ tests/unit/prerequisiteLearning.test.ts:40:140
+     38|   });
+     39|   it('uses the same rule with a cached index, never admitting out-of-s…
+     40|     expect(pick(undefined, { deck: undefined, index: { cards, cardMap:…
+       |                                                                                                                                            ^
+     41|   });
+     42|   it('preserves due review and sweep behavior', () => {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/12]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  12 failed | 66 passed (78)
+   Start at  08:11:43
+   Duration  547ms (transform 318ms, setup 83ms, import 271ms, tests 246ms, environment 0ms)
+

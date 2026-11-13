@@ -1,0 +1,92 @@
+[
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-055",
+    "question": "Aurora有多个读实例，普通查询可用全部reader，但报表只想使用指定的一组实例。连接入口怎样区分？",
+    "answerZh": "普通读流量用reader endpoint；指定实例组可使用受支持的custom endpoint。",
+    "pointsEn": [
+      "Ordinary reads: reader endpoint",
+      "Selected subset: custom endpoint"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-057",
+    "question": "Aurora是兼容MySQL/PostgreSQL的关系库。负载变化时，Serverless v2与Aurora Auto Scaling分别怎样扩展计算能力？",
+    "answerZh": "Serverless v2调整适用实例的计算容量；Aurora Auto Scaling按读负载指标自动增减reader副本。",
+    "pointsEn": [
+      "Serverless v2 scales instance capacity",
+      "Aurora Auto Scaling changes reader count"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-060",
+    "question": "迁数据库时源库仍持续写入。只做一次全量复制，切换时会有什么缺口，应补什么？",
+    "answerZh": "采用受支持的持续复制，追赶后再安排切换：通用路径是DMS全量加载加CDC；RDS PostgreSQL迁Aurora PostgreSQL也可创建原生Aurora只读副本，追平后提升。",
+    "pointsEn": [
+      "Full copy plus supported continuous change replication, then catch-up/cutover",
+      "A one-time copy misses subsequent writes"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-061",
+    "question": "Oracle迁PostgreSQL，已经准备DMS复制数据。数据库结构、存储过程和SQL差异也会自动全部解决吗？",
+    "answerZh": "不会；应另用适用的schema conversion工具评估和转换，并修正不兼容代码。",
+    "pointsEn": [
+      "Schema-conversion assessment and incompatible-code repair",
+      "Data replication and program/schema compatibility are separate tasks"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-062",
+    "question": "SQL Server应用要迁Aurora PostgreSQL，又希望减少T-SQL和连接协议改造。哪种兼容能力值得先评估？",
+    "answerZh": "Babelfish for Aurora PostgreSQL。",
+    "pointsEn": [
+      "Babelfish",
+      "Supported protocol/T-SQL compatibility can reduce application changes"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-066",
+    "question": "迁移前要取得服务器配置、实际利用率及依赖，而非只按购买的硬件选云资源。可以从什么AWS发现能力取得这些数据？",
+    "answerZh": "已有使用资格时可使用Application Discovery Service的适用采集能力；新客户评估AWS Transform当前支持的发现和评估路径。",
+    "pointsEn": [
+      "Eligible ADS collection or current AWS Transform discovery",
+      "Actual utilization/dependencies guide sizing and migration grouping"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-073",
+    "question": "机房经Direct Connect访问AWS公有服务地址，与访问VPC私网地址，能都照搬同一种VIF路径吗？",
+    "answerZh": "不能；公有服务通常用public VIF，VPC私网用适用的private或transit VIF及对应网关。",
+    "pointsEn": [
+      "Public services: public VIF",
+      "VPC private addresses: supported private/transit VIF and gateway"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-075",
+    "question": "VPC从两个增长到很多个，还要让各VPC与机房多方互通。继续逐对建peering有什么问题，应考虑什么？",
+    "answerZh": "评估Transit Gateway的中心转接拓扑。",
+    "pointsEn": [
+      "TGW hub",
+      "Peering lacks transitive routing needed for multi-network connectivity"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-076",
+    "question": "VPC原IPv4地址段不够用了。一定要把所有应用迁到另一个VPC吗？",
+    "answerZh": "不一定；在规则允许时关联额外CIDR，并在新地址范围创建子网。",
+    "pointsEn": [
+      "Add an allowed CIDR and new subnets",
+      "Existing VPC relationships can remain"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-077",
+    "question": "海量历史数据须在固定期限内迁云，但共享网络带宽很小。怎样判断在线搬运还是离线设备运输？",
+    "answerZh": "先用数据量÷实际可用传输速率估算在线下限；窗口不够时，比较适用的离线设备方案。",
+    "pointsEn": [
+      "Volume divided by actual migration bandwidth",
+      "Compare eligible offline transport when online time exceeds the window, including logistics"
+    ]
+  }
+]

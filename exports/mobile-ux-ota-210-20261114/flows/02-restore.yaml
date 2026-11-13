@@ -1,0 +1,11 @@
+appId: com.timeawake.recallsmith.qa.ota210
+---
+- launchApp
+- assertVisible:
+    id: "screen-home-root"
+- tapOn:
+    id: "home-primary-cta"
+- assertVisible: "Card 3 of 5"
+- assertVisible:
+    id: "learning-study-got-it"
+- takeScreenshot: 05-after-process-restart

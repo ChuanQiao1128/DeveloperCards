@@ -1,0 +1,12 @@
+[
+  ["用 Lambda 定时调用 DescribeScalingActivities，并将结果收集到 S3", "Metric Streams 传输数值指标，而不是扩缩容活动详情"],
+  ["使用 Elastic Beanstalk 托管环境", "它编排部署及相关资源，而不只是提供一台非托管实例"],
+  ["使用 AppSync pipeline resolver", "pipeline function 依次组合受支持的数据源结果"],
+  ["用 FSx for Windows 保存云端共享文件", "用 FSx File Gateway 在机房缓存访问"],
+  ["使用 NFS DataSync 源，并在机房部署 agent", "连接底层文件接口，而不是应用的 SFTP 入口"],
+  ["使用 EKS 控制平面和托管节点生命周期", "普通 ASG 只能扩缩主机，不提供 Kubernetes 编排"],
+  ["将自动备份保留期设为非零", "按建议等待长事务完成，以降低首次复制的影响"],
+  ["使用 Glue job bookmarks", "在多次运行之间跟踪已处理的受支持输入"],
+  ["使用 DocumentDB 所支持的 MongoDB 兼容接口", "DynamoDB 的 API 和数据模型不同，可能需要更多应用改造"],
+  ["mount target 提供网络入口", "access point 控制目录和身份语义，不负责建立网络连通性"]
+]

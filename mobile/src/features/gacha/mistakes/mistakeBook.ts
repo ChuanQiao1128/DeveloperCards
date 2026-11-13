@@ -272,33 +272,36 @@ function parseEntry(key: string, raw: unknown): MistakeEntry | null {
   };
 }
 
-function parseBook(raw: string | null): MistakeBookState {
+function parseBook(raw: string | null, strict = false): MistakeBookState {
   if (!raw) return emptyBook();
   try {
     const parsed: unknown = JSON.parse(raw);
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return emptyBook();
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('Invalid mistake book');
     const obj = parsed as Record<string, unknown>;
-    if (obj.v !== 1) return emptyBook();
+    if (obj.v !== 1) throw new Error('Unsupported mistake book');
     const rawEntries = obj.entries;
-    if (!rawEntries || typeof rawEntries !== 'object' || Array.isArray(rawEntries)) return emptyBook();
+    if (!rawEntries || typeof rawEntries !== 'object' || Array.isArray(rawEntries)) throw new Error('Invalid mistake entries');
     const entries: Record<string, MistakeEntry> = {};
     for (const [key, value] of Object.entries(rawEntries as Record<string, unknown>)) {
       const entry = parseEntry(key, value);
       if (entry) entries[key] = entry;
+      else if (strict) throw new Error('Unreadable mistake entry');
     }
     return typeof obj.adoptedAnon === 'string' && /^[0-9a-f]{8}$/.test(obj.adoptedAnon)
       ? { v: 1, entries, adoptedAnon: obj.adoptedAnon }
       : { v: 1, entries };
-  } catch {
+  } catch (error) {
+    if (strict) throw error;
     return emptyBook();
   }
 }
 
-/** Reads the current user's book. Absent, corrupt or unreadable storage reads as an empty book. Never throws. */
-export async function loadMistakeBook(): Promise<MistakeBookState> {
+/** Best-effort by default; the book screen opts in to errors instead of claiming there are no mistakes. */
+export async function loadMistakeBook(options: { strict?: boolean } = {}): Promise<MistakeBookState> {
   try {
-    return parseBook(await AsyncStorage.getItem(await getUserScopedKey(MISTAKE_BOOK_KEY)));
-  } catch {
+    return parseBook(await AsyncStorage.getItem(await getUserScopedKey(MISTAKE_BOOK_KEY, undefined, options.strict)), options.strict);
+  } catch (error) {
+    if (options.strict) throw error;
     return emptyBook();
   }
 }

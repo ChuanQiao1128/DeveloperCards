@@ -37,6 +37,8 @@ export interface CardTags {
 }
 
 export interface CardTeachingZh {
+  /** Optional for older published decks; aligned with the English answer checklist. */
+  mustAnswer?: string[];
   answer: string;
   keyPoint: string;
   watchOut?: string;

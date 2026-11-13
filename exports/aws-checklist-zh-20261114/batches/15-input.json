@@ -1,0 +1,91 @@
+[
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-056",
+    "question": "Aurora要在第二Region准备灾备，故障后少做手工提升与改连接。怎样把复制副本变成恢复写入服务的路径？",
+    "answerZh": "用Aurora Global Database及受支持的受管切换/故障转移流程，使目标Region成为主写入区；应用连接Global Database writer endpoint。",
+    "pointsEn": [
+      "Managed Global Database switchover/failover promotes the target",
+      "Global writer endpoint follows the current primary"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-064",
+    "question": "机房服务器要少改应用迁到AWS，与持续为机房建立灾后恢复能力，应该只因为都做复制就用同一种工具吗？",
+    "answerZh": "不应；整机迁移评估适用的Application Migration Service等路径，持续灾备评估Elastic Disaster Recovery。",
+    "pointsEn": [
+      "Migration: applicable migration path; ongoing DR: Elastic Disaster Recovery",
+      "Different lifecycle goals determine tool choice"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-065",
+    "question": "服务器已持续复制到AWS，要先测试再正式切换。测试启动成功，就能忽略源端继续写入的最终同步吗？",
+    "answerZh": "不能；测试用于验证副本运行，正式切换还要控制源端写入并核对最终同步，再迁移业务流量。",
+    "pointsEn": [
+      "Control source writes and verify final synchronization before cutover",
+      "Successful tests do not include subsequent source changes"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-067",
+    "question": "灾备要求最多丢5分钟数据，并在1小时恢复服务。RPO和RTO分别限制什么？",
+    "answerZh": "RPO限制可丢失的数据时间范围；RTO限制恢复服务允许的停机时间。",
+    "pointsEn": [
+      "RPO: tolerable lost-data time span",
+      "RTO: permitted recovery downtime"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-068",
+    "question": "需要比“故障后从备份重建”更快恢复，又不想一直支付完整双站点运行成本。怎样理解pilot light和warm standby？",
+    "answerZh": "pilot light保留关键数据及最小基础；warm standby持续运行一套缩小的可用环境。",
+    "pointsEn": [
+      "Pilot light: critical data and minimal foundation",
+      "Warm standby: scaled-down running environment with more preparation and ongoing cost"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-070",
+    "question": "源Region每小时做快照，但跨Region复制偶尔拖延。灾备Region的RPO能直接算作1小时吗？",
+    "answerZh": "不能；应看目标Region最近已可用恢复点覆盖到哪个时刻。",
+    "pointsEn": [
+      "Use the latest usable destination recovery point",
+      "Source cadence excludes copying delay and cannot alone establish destination RPO"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-071",
+    "question": "机房以Direct Connect访问AWS，主专线断开后仍要继续连接。应该故障时才建VPN，还是预先准备？",
+    "answerZh": "预建并测试Site-to-Site VPN备用路径，配置适用的路由切换。",
+    "pointsEn": [
+      "Prebuild/test Site-to-Site VPN with route failover",
+      "Avoid configuration and validation delay during failure"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-079",
+    "question": "任务交给EC2处理，实例可能处理中断。怎样避免协调进程一停就丢掉尚未完成的工作？",
+    "answerZh": "用SQS等持久工作队列保存任务，消费者成功处理后再确认删除，失败任务允许重试。",
+    "pointsEn": [
+      "Durable queue rather than coordinator-only state",
+      "Delete after success so unfinished work remains retryable"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-081",
+    "question": "一个SQS任务还没处理完，就又被其他消费者取到。应先检查哪个超时？",
+    "answerZh": "检查visibility timeout是否覆盖实际处理时间，必要时延长或处理期间续期。",
+    "pointsEn": [
+      "Check the SQS visibility timeout, which controls how long an undeleted message remains hidden"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-082",
+    "question": "支付消息或API重试可能重复到达，怎样避免同一笔业务被扣款两次？只靠消息不重复就够吗？",
+    "answerZh": "用稳定的业务ID做幂等检查，让已完成的同一笔操作返回已有结果，而非再次扣款。",
+    "pointsEn": [
+      "Stable business ID and reliably recorded result",
+      "Return prior completion instead of repeating the charge; message deduplication alone is insufficient"
+    ]
+  }
+]

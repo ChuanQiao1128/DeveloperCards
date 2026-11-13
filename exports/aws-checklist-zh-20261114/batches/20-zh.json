@@ -1,0 +1,42 @@
+[
+  [
+    "先用 Textract 做 OCR，再用 Comprehend Medical 分析",
+    "先提取文本，再分析医疗实体或 PHI"
+  ],
+  [
+    "复制到数据湖：配置实际运行的 Glue JDBC 连接和蓝图摄取路径，将数据写入 S3",
+    "原地查询 Redshift：配置联合目录，并为 Glue ETL 等引擎授予权限；仅授权不会自动建立数据路径"
+  ],
+  [
+    "邮件通知：使用 SNS，并确认订阅",
+    "自定义资源操作：使用 Lambda 目标"
+  ],
+  [
+    "按键在线访问使用 DynamoDB",
+    "并行 SQL 分析使用 Redshift"
+  ],
+  [
+    "希望减少主机维护：选择 Fargate",
+    "需要修改内核：选择 EC2 等可自行管理操作系统的环境"
+  ],
+  [
+    "REST 私有集成通过 VPC link 和受支持的负载均衡器实现",
+    "它连接 API Gateway 与后端，区别于客户端访问私有 API 的 endpoint"
+  ],
+  [
+    "使用 Outposts rack 配合 EKS local cluster",
+    "local 同时将节点和控制平面留在现场；extended 不会"
+  ],
+  [
+    "配置 Transfer Family AS2 服务器及其连接",
+    "协议和合作方交换需要 AS2 endpoint，普通复制不能替代"
+  ],
+  [
+    "按国家使用 geolocation；按距离使用 geoproximity；按网络延迟使用 latency",
+    "地理距离不等于实测网络性能"
+  ],
+  [
+    "使用 outbound endpoint",
+    "配置转发到机房 DNS 的域名转发规则，并将其关联到 VPC"
+  ]
+]

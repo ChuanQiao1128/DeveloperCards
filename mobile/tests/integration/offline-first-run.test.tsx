@@ -372,6 +372,12 @@ function shownStudyQuestion(tree: renderer.ReactTestRenderer): string {
   return String(shown[0].props.children);
 }
 
+// This suite exercises the bundled fallback of its published SAA fixture. Availability has its own real-hook offline test.
+vi.mock('../../src/features/gacha/audience/useGoalAvailability', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/features/gacha/audience/useGoalAvailability')>();
+  return { ...actual, useGoalAvailability: () => actual.resolveGoalChoices(MANIFEST.decks as any) };
+});
+
 async function finishOnboarding() {
   const replace = vi.fn();
   let tree!: renderer.ReactTestRenderer;
@@ -379,7 +385,7 @@ async function finishOnboarding() {
     tree = renderer.create(<AudienceSurveyScreen navigation={{ replace } as any} route={{ key: 'audience', name: 'AudienceSurvey' } as any} />);
   });
   // 2026-10-14 three decks: the default goal is AWS fundamentals, which ships no starter pack; this
-  // run picks SAA-C03, a bundled pack.
+  // run picks the published SAA-C03 fixture, a bundled pack.
   await act(async () => {
     tree.root.find((node) => (node.type as any) === 'Pressable' && node.props.testID === `goal-choice-${SLUG}`).props.onPress();
     await Promise.resolve();

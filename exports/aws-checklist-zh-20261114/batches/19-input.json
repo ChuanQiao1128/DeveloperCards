@@ -1,0 +1,92 @@
+[
+  {
+    "uid": "aws-rb2-20261107-pack-ns01",
+    "question": "持续流记录要转换后近实时进入S3、OpenSearch或Redshift。只建Kinesis Data Streams就够吗？举一种适用的受管处理交付方式，并解释原因。",
+    "answerZh": "不够；例如配置Data Firehose缓冲交付，做受支持的格式转换，或调用Lambda做自定义变换。Redshift还可用原生流摄取，从KDS/MSK读入materialized view，再用SQL处理。",
+    "pointsEn": [
+      "KDS retention alone does not transform records and write the destination",
+      "Give one applicable managed processing/delivery path, such as Firehose with a supported transformation, or Redshift native streaming ingestion with SQL for the Redshift case"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-ns02",
+    "question": "客户防火墙要求固定入口IP。单Region负载均衡与多Region统一入口，应怎样区分NLB和Global Accelerator？",
+    "answerZh": "区域入口可用NLB的每AZ静态地址；多Region应用需要统一固定入口并健康选路时，考虑Global Accelerator。",
+    "pointsEn": [
+      "Regional: NLB static addresses",
+      "Multi-Region fixed entry and health routing: Global Accelerator"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-ns04",
+    "question": "Salesforce等受支持SaaS已提供API，需要把数据送到S3或Redshift，又想少写抓取代码。若S3数据还要求客户管理KMS key加密，应先检查并配置什么，为什么？",
+    "answerZh": "选用支持该源和目标的AppFlow flow；S3场景为目标数据选择客户管理KMS key的SSE-KMS配置。",
+    "pointsEn": [
+      "AppFlow supports the chosen source and destination",
+      "Explicitly select customer-key SSE-KMS for S3 output"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-sm01",
+    "question": "两种任务：从历史样本学习自定义模型，与用已训练模型为交互请求返回预测。SageMaker分别用什么执行形态，为什么？",
+    "answerZh": "学习模型用托管训练作业；交互预测把训练好的模型部署为托管实时endpoint。",
+    "pointsEn": [
+      "Training job learns model parameters from samples",
+      "Managed real-time endpoint applies the trained model to interactive predictions"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xa012",
+    "question": "某应用的EC2、Lambda、RDS等资源散在多个Region，已带相同application标签。怎样最快查出组成资源，避免逐服务脚本查询？",
+    "answerZh": "用Resource Groups Tag Editor，选择相关Region和资源类型，按application标签键值查询。",
+    "pointsEn": [
+      "Resource Groups Tag Editor across relevant Regions/types",
+      "Filter by application tag key/value"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xa013",
+    "question": "CloudFront请求要先自定义鉴权或做受支持的内容处理，希望少回到集中源站。代码放在哪一层，缓存策略能代替执行吗？",
+    "answerZh": "在适用的CloudFront边缘函数中执行，例如Lambda@Edge；仅改缓存或请求头策略不能执行自定义处理代码。",
+    "pointsEn": [
+      "Applicable CloudFront edge function",
+      "Policies configure behavior but do not execute custom logic"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xa031",
+    "question": "已验证的一套网络、负载均衡、实例和数据库，要反复在新环境自动部署。怎样避免逐服务手工创建，为什么？",
+    "answerZh": "把资源及属性写成CloudFormation模板，以stack部署。",
+    "pointsEn": [
+      "CloudFormation template deployed as a stack",
+      "Declarative resources and dependencies drive automated provisioning"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xa036",
+    "question": "同一Region内多个AWS账户的CloudWatch指标、日志和追踪要在专用监控账户统一查询，如何建立共享关系，为什么？",
+    "answerZh": "配置CloudWatch cross-account observability：监控账户建立接收配置，各源账户建立到它的共享链接。",
+    "pointsEn": [
+      "Monitoring-account receiving configuration plus source-account links",
+      "Links share selected observability data; IAM users or SCPs alone do not"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xa046",
+    "question": "各工作负载要分账户部署，但网络由中央团队统一维护。能让它们在中央VPC里创建自己的资源吗，为什么？",
+    "answerZh": "可以；网络账户用AWS RAM把VPC子网共享给同组织的工作负载账户。",
+    "pointsEn": [
+      "AWS RAM subnet sharing within the organization",
+      "Participants own workload resources while the network account manages the VPC"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xb004",
+    "question": "持续到达的交易既要供多个应用分别读取，又要由一条处理路径去掉敏感字段后写DynamoDB。怎样组织摄取与处理？",
+    "answerZh": "把交易写入Kinesis Data Streams；各应用作为消费者读取，另用Lambda消费者清理记录并写入DynamoDB。",
+    "pointsEn": [
+      "KDS with independent application consumers",
+      "Lambda consumer removes sensitive fields and writes DynamoDB"
+    ]
+  }
+]

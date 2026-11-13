@@ -1,0 +1,12 @@
+[
+  ["Config 规则负责评估配置", "关联的 Automation 文档执行整改；仅标记为不合规还不够"],
+  ["仅启用登录 MFA 不够，应使用 S3 MFA Delete", "登录验证与永久删除版本时的验证，保护的是不同操作"],
+  ["仅有端点还不够", "同时建立端点访问路径，并用桶策略限制请求的端点来源"],
+  ["对象清单不会检查内容", "在每个数据所在的 Region 运行适用的 Macie 发现作业"],
+  ["使用按身份区分的 Lake Formation 权限或过滤器", "保留数据，通过过滤控制可见范围，而不是为所有人统一删除字段"],
+  ["签发限定对象、操作和有效时间的 presigned URL", "客户端直接与 S3 传输，无需公开桶或让应用中转文件"],
+  ["不支持 Cookie：使用 signed URL", "URL 必须保持不变且支持 Cookie：使用 signed cookies"],
+  ["安全组变更查看 management events（管理事件）", "S3 对象操作查看 data events（数据事件）；仅靠配置快照不够"],
+  ["VPC 内：使用 gateway endpoint，并关联调用方的路由表", "机房：使用可到达的 S3 interface endpoint，因为 gateway endpoint 不延伸到机房"],
+  ["默认设置不会重写已有对象", "使用清单驱动的 Batch Operations；自定义逻辑通过 Lambda 实现"]
+]

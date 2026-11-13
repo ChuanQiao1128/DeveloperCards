@@ -4,6 +4,7 @@ import type { CardExport } from '../../../types/deckExport';
 import { getUserScopedKey } from '../../../review/storage';
 import { isLearnedProgress } from '../selectors/progressSelectors';
 import { STARTER_LESSON_KEY } from '../starter/starterGate';
+import { prerequisiteOrder } from './prerequisiteOrder';
 
 export { ORDERED_DECK_SLUG, isOrderedDeck } from './orderedDeckPolicy';
 
@@ -28,6 +29,19 @@ export function orderedCards(cards: readonly CardExport[]): CardExport[] {
 // Stored with the content version; replay requires the same frozen snapshot.
 export function sortingHash(cards: readonly CardExport[]): string {
   return JSON.stringify(orderedCards(cards).map(card => [card.StableUid, card.OrderInDeck, card.Revision ?? 0]));
+}
+
+// The existing opaque history field versions the algorithm without changing the legacy reader.
+export function prerequisiteSortingHash(cards: readonly CardExport[]): string {
+  return 'prerequisites-v1:' + JSON.stringify(orderedCards(cards).map(card =>
+    [card.StableUid, card.OrderInDeck, card.Revision ?? 0, card.Teaching?.prerequisites ?? []]));
+}
+
+export function prerequisiteAcquisitionCards(cards: readonly CardExport[], owned: ReadonlySet<string>): CardExport[] {
+  const canonical = orderedCards(cards);
+  // Visit owned roots too: their missing foundations get the next earned pulls.
+  return prerequisiteOrder(canonical, canonical.filter(card => owned.has(card.StableUid)).map(card => card.StableUid), true)
+    .filter(card => !owned.has(card.StableUid));
 }
 
 /** Strict qualification read: absence is new, unreadable or unmigrated is unknown. */

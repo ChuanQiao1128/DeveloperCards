@@ -1,0 +1,92 @@
+[
+  {
+    "uid": "aws-rb2-20261107-pack-xa056",
+    "question": "设备经NLB连接EC2，希望客户端这段连接加密，并由NLB完成TLS握手。监听器与证书应怎样配置，为什么？",
+    "answerZh": "配置TLS listener，并在这个监听器关联至少一张服务器证书。",
+    "pointsEn": [
+      "TLS listener with a server certificate",
+      "NLB listener completes the client TLS handshake"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xb001",
+    "question": "私有子网中的服务器只能访问批准的软件仓库域名。要在出站途中检查并拦下其他HTTP/HTTPS流量，应使用什么，为什么不能只收集威胁告警？",
+    "answerZh": "使用AWS Network Firewall域名允许列表，确保未匹配的HTTP/HTTPS流量被丢弃，并用路由表把流量导向防火墙。",
+    "pointsEn": [
+      "Network Firewall domain allow list with unmatched traffic dropped",
+      "Route through the firewall; alerts alone do not block traffic"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xb002",
+    "question": "第三方防火墙已支持GWLB所需的GENEVE封装。多个应用VPC的流量都要透明经过它检查，应怎样连接？",
+    "answerZh": "设备侧部署Gateway Load Balancer，应用侧创建GWLB endpoint，并用路由把待检查流量送至该端点。",
+    "pointsEn": [
+      "Appliance-side GWLB and application-side GWLB endpoints",
+      "Route inspection traffic through those endpoints"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xb003",
+    "question": "产品经理没有AWS账号，只需定期查看一个CloudWatch仪表板。怎样给他入口，而不分发共享IAM登录凭据？",
+    "answerZh": "在CloudWatch分享该仪表板，指定他的邮箱，完成邀请后让他用自己的密码打开分享链接。",
+    "pointsEn": [
+      "Email-invited CloudWatch dashboard sharing",
+      "Recipient uses their own password and shared link"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xb005",
+    "question": "网站的ALB已分别监听HTTP和HTTPS，但访问者仍可能打开HTTP地址。怎样让这些请求转为HTTPS，为什么只装证书不够？",
+    "answerZh": "给HTTP监听器配置redirect动作，重定向到HTTPS地址。",
+    "pointsEn": [
+      "HTTP-listener redirect to HTTPS",
+      "Certificate enables HTTPS but redirect changes the HTTP client's destination"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xb008",
+    "question": "Aurora PostgreSQL的业务数据只保留5年，但数据库内部操作审计日志必须长期保留。能只延长备份保留期吗，应怎样处理日志？",
+    "answerZh": "不能；配置所需数据库审计记录，把PostgreSQL日志持续导出到CloudWatch Logs，并设置不自动到期的日志保留。",
+    "pointsEn": [
+      "Enable auditing and continuously export logs to CloudWatch Logs",
+      "Set nonexpiring log retention; backups do not replace operation logs"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xb012",
+    "question": "一个Lambda需要HTTPS入口。内部IAM调用方，与不能签AWS请求、但能发送约定签名的第三方webhook，认证怎样选？",
+    "answerZh": "用function URL：IAM调用选AWS_IAM并授予调用权限；第三方webhook可选NONE及允许访问的资源策略，由函数校验约定签名。",
+    "pointsEn": [
+      "IAM callers: AWS_IAM plus permissions",
+      "Webhook: NONE plus resource-policy access and function-side signature validation"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xb014",
+    "question": "现有SFTP用户用本地Microsoft AD凭据登录，文件要放S3，又不想改客户端或另建一套用户。托管入口应怎样接身份？",
+    "answerZh": "使用Transfer Family SFTP服务器，选AWS Directory Service身份提供方；用AD Connector桥接本地Microsoft AD，并授予相应目录组文件访问。",
+    "pointsEn": [
+      "Transfer Family SFTP with Directory Service and AD Connector",
+      "Grant directory groups file access while retaining original AD authentication"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xb018",
+    "question": "Transfer Family SFTP入口需要限制谁能连接。仅从已连通公司网络访问，与必须让指定公网IP的伙伴访问，应怎样选VPC托管端点？",
+    "answerZh": "公司私网访问选Internal；公网伙伴访问选Internet Facing，关联Elastic IP，并用端点安全组只放行可信来源。",
+    "pointsEn": [
+      "Corporate private path: Internal",
+      "Public partners: Internet Facing with EIPs and trusted-source security-group rules"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xb021",
+    "question": "策略已允许对arn:aws:s3:::example-bucket执行ListBucket和DeleteObject，却仍删不了桶内对象。怎样最小补充，为什么？",
+    "answerZh": "为s3:DeleteObject增加对象资源arn:aws:s3:::example-bucket/*，保留列桶动作在桶ARN上。",
+    "pointsEn": [
+      "DeleteObject needs the object ARN suffix /*",
+      "ListBucket remains on bucket ARN because actions target different resource types"
+    ]
+  }
+]

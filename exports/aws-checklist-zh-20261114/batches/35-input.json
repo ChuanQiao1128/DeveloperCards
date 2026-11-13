@@ -1,0 +1,91 @@
+[
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-052",
+    "question": "开发RDS库要闲置好几周。停止实例后就能一直保持停止、不再产生计算费吗？",
+    "answerZh": "不能；适用RDS实例停止一段受限时间后会自动启动，长期不用可评估保留快照后删除，再按需恢复。",
+    "pointsEn": [
+      "No; a stopped eligible RDS instance automatically restarts after a limited period"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-054",
+    "question": "一个RDS数据库长期稳定运行。若只比较RDS Reserved DB Instances和Compute Savings Plans，哪种承诺可抵扣它的数据库实例费用？",
+    "answerZh": "符合购买属性的RDS Reserved DB Instances。",
+    "pointsEn": [
+      "Matching RDS Reserved DB Instances",
+      "Compute Savings Plans do not cover RDS instance fees"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-058",
+    "question": "开发测试要快速得到一份大型Aurora数据库数据，不想一开始就复制全部底层存储。怎样做？",
+    "answerZh": "使用受支持的Aurora克隆。",
+    "pointsEn": [
+      "Aurora clone",
+      "Copy-on-write avoids the initial full-storage copy"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-059",
+    "question": "Aurora账单中存储I/O费用占比很高，而且负载会持续。应只看实例单价，还是比较什么部署计费方式？",
+    "answerZh": "优先比较Aurora I/O-Optimized；I/O请求费占比超过总Aurora费用25%时，是官方建议重点采用的范围。",
+    "pointsEn": [
+      "Compare Aurora I/O-Optimized",
+      "Compare total compute, storage, and I/O charges rather than instance price alone"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-063",
+    "question": "DMS复制负载变化明显，不想一直人工给复制实例选固定规格。有什么受支持的容量方式可比较？",
+    "answerZh": "评估DMS Serverless，在适用范围和容量上下限内管理复制资源伸缩。",
+    "pointsEn": [
+      "DMS Serverless",
+      "Managed workload-based replication capacity within limits"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-074",
+    "question": "机房只需较小带宽的专线，不想按独享物理连接的起始规格购买。可以比较哪种连接方式？",
+    "answerZh": "比较Direct Connect合作伙伴提供的hosted connection与dedicated connection。",
+    "pointsEn": [
+      "Partner-hosted connection compared with dedicated",
+      "Hosted supports smaller capacities such as 200 Mbps"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-078",
+    "question": "应用与数据跨AZ或Region传输需要付费，原始数据很大、处理结果很小。在满足可用性要求前提下，怎样减少传输？",
+    "answerZh": "优先让计算靠近大数据所在位置，只把较小结果传往需要的地方。",
+    "pointsEn": [
+      "Process close to the large input dataset",
+      "Send only the smaller results across the charged boundary"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-099",
+    "question": "EMR要用Spot降费，但控制节点和承载关键HDFS数据的节点不希望被中断。优先把Spot放在哪类节点？",
+    "answerZh": "优先用于不存HDFS数据、可重新执行任务的task节点；关键primary/core按可靠性要求使用稳定容量。",
+    "pointsEn": [
+      "Spot first on retryable task nodes",
+      "Task compute is more recoverable than critical control/HDFS duties"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-136",
+    "question": "Lambda是CPU密集型任务。减少内存配置就一定降低单次运行费用吗？",
+    "answerZh": "不一定；内存配置也影响分配的CPU资源，应比较配置变化后的运行时长和总费用。",
+    "pointsEn": [
+      "Compare resource allocation and measured duration",
+      "Memory changes CPU and runtime as well as the rate"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-146",
+    "question": "有可重试的批任务，也有不能因Spot回收而中断的服务基线。Spot降费应该优先承载哪一部分？",
+    "answerZh": "优先承载能容忍中断并恢复的任务，关键基线使用符合可靠性要求的稳定容量。",
+    "pointsEn": [
+      "Recoverable interruption-tolerant tasks",
+      "Keep interruption-sensitive baseline on suitable stable capacity"
+    ]
+  }
+]

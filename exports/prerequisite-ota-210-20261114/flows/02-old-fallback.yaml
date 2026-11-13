@@ -1,0 +1,15 @@
+appId: com.timeawake.recallsmith.qa.prerequisites
+---
+- launchApp
+- assertVisible:
+    id: "screen-home-root"
+- tapOn: "Library"
+- tapOn:
+    id: "library-search"
+- inputText: "na03"
+- hideKeyboard
+- tapOn:
+    id: "library-card-aws-rb2-20261107-pack-na03"
+- assertVisible:
+    id: "card-detail-show-answer"
+- takeScreenshot: 03-old-version-retains-earned-foundation

@@ -1,0 +1,19 @@
+{
+  "channel": "production",
+  "channelId": "9bef1db9-3ccb-4dd5-bb8e-73235dfbdde6",
+  "paused": false,
+  "updates": [
+    {
+      "id": "01a1d65f-5762-7d7c-b1b2-587335c73f11",
+      "group": "dd2ad2ee-7ca5-4cf7-9165-9fe9215e8975",
+      "message": "Prerequisite-first earned cards and new learning",
+      "createdAt": "2026-11-13T19:25:34.946Z",
+      "runtimeVersion": "2.1.0",
+      "platform": "ios",
+      "gitCommitHash": "1b3605c61191ca158866060cf637ca6a82a1d606",
+      "isGitWorkingTreeDirty": false,
+      "environment": "production",
+      "manifestPermalink": "https://u.expo.dev/update/01a1d65f-5762-7d7c-b1b2-587335c73f11"
+    }
+  ]
+}

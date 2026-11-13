@@ -1,0 +1,12 @@
+[
+  ["在 ALB 入口子网的 NACL 中设置拒绝规则", "把拒绝规则排在匹配的允许规则之前；安全组不能显式拒绝"],
+  ["终止操作仍被拒绝", "适用的显式 Deny 优先于额外的 Allow"],
+  ["检查实际调用身份是否具备所需 KMS 权限", "检查 key policy 是否允许通过 IAM 授权的路径"],
+  ["AD Connector 可以桥接原有 AD", "Managed Microsoft AD 路径需要双向林信任"],
+  ["使用相互关联的 KMS 多 Region 密钥", "共享的密钥材料和 key ID 支持在各 Region 本地解密跨 Region 密文"],
+  ["两条路径都须说明：ACM 事件按 DaysToExpiry 为 30 天筛选；Config 证书到期规则设 30 天阈值，再通过 EventBridge 发送通知", "这两条通知路径都不会为导入证书续期"],
+  ["拒绝访问", "来源不在两个范围内时匹配 NotIpAddress，显式 Deny 优先"],
+  ["用 Firewall Manager 集中管理 WAF 策略", "在涉及的 Region 配置账户和资源范围"],
+  ["root 邮箱使用受控的管理员邮件列表", "按类别把备用联系人设置为负责的团队"],
+  ["使用 CloudFront 字段级加密", "用公钥加密的字段，仅能由持有对应私钥的一方读取"]
+]

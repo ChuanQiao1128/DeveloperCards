@@ -1,0 +1,57 @@
+{
+  "batch": "34",
+  "inputSha256": "bb73efae07e01c91c6e51ea113eec79110a959993f7f3a5b967bccf447aa847e",
+  "outputSha256": "2f591f43fde6af4fe3bf733222b59211cf8e3c47cc79bd07dfe0477d4e90096d",
+  "overall": "FAIL",
+  "cards": [
+    {
+      "uid": "aws-rb2-20261107-pack-gcl-025",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gsc-009",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gsc-018",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gsc-024",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gsc-025",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gsc-026",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gsc-027",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gsc-028",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gsc-038",
+      "verdict": "FAIL",
+      "note": "第2条把 provisioned 配合自动扩缩容的方案译成二者之间的比较。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gsc-043",
+      "verdict": "PASS"
+    }
+  ],
+  "findings": [
+    {
+      "uid": "aws-rb2-20261107-pack-gsc-038",
+      "pointIndex": 1,
+      "description": "原文 provisioned/autoscaling 结合已接受答案为 provisioned 配合自动伸缩。译为“比较 provisioned 和自动扩缩容”将同一组合方案的两个部分变成待比较的选项，改变容量模式的选择关系。",
+      "suggestedChinese": "可规划的稳定负载：比较 provisioned 配合自动扩缩容的方案"
+    }
+  ]
+}

@@ -1,0 +1,94 @@
+[
+  {
+    "uid": "aws-rb2-20261107-pack-cb12",
+    "question": "希望按请求来源IP定位到的国家过滤内容访问，应该在哪里控制？",
+    "answerZh": "在实际入口设置国家允许或拒绝规则，例如CloudFront地域限制或ALB前的WAF地域规则。",
+    "pointsEn": [
+      "Apply country allow/deny at the actual entry, such as CloudFront geo restriction or a WAF geo rule"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-cb13",
+    "question": "外部CA证书要给Regional API Gateway或CloudFront的HTTPS入口使用，应导入哪个Region的ACM，为什么？",
+    "answerZh": "将证书导入ACM并绑定实际TLS入口。Regional API Gateway用API同Region的证书；CloudFront查看者证书导入us-east-1。ALB的HTTPS监听器也可使用导入ACM的证书终止客户端TLS。",
+    "pointsEn": [
+      "Regional API Gateway: import into the API's own Region",
+      "CloudFront viewer certificate: import into us-east-1",
+      "Binding follows the entry that completes the TLS handshake"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-cb15",
+    "question": "服务器已允许客户端从临时端口发来HTTPS请求。安全组与NACL对响应的放行有何不同，NACL回程应匹配哪个端口？",
+    "answerZh": "安全组自动允许已放行连接的响应；NACL必须另有出站允许规则，目的端口应匹配客户端的临时端口。",
+    "pointsEn": [
+      "Security groups statefully allow return traffic of permitted connections",
+      "NACLs need an explicit outbound allow for the response",
+      "The NACL outbound destination port is the client's ephemeral port, not 443"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-cb19",
+    "question": "HTTP请求洪泛的来源IP不断变化，固定黑名单难维护。要按请求组的速率限制此类流量，怎样配置？",
+    "answerZh": "在实际受支持的HTTP入口配置WAF rate-based规则，选择适合该请求组的聚合条件、阈值及Block动作。",
+    "pointsEn": [
+      "Use a WAF rate-based rule on the serving HTTP entry",
+      "Choose the aggregation key, threshold, and Block action for the request group",
+      "Per-IP aggregation misses distributed floods where each IP stays under the threshold"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-cc01",
+    "question": "一批受管EC2要安装补丁：操作系统补丁已被托管工具支持；若换成自定义第三方Linux软件补丁，执行方法应怎样选？",
+    "answerZh": "受支持的补丁用Systems Manager Patch Manager；自定义安装步骤用Run Command执行相应命令。",
+    "pointsEn": [
+      "Supported OS patches go through Patch Manager",
+      "Custom third-party software steps go through Run Command commands"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-cc02",
+    "question": "要找EC2软件的已知漏洞，与要持续发现AWS环境可疑访问行为，应分别选什么？",
+    "answerZh": "已知软件漏洞用适用的Inspector；可疑行为与威胁迹象用GuardDuty。",
+    "pointsEn": [
+      "Inspector for known software vulnerabilities",
+      "GuardDuty for suspicious activity"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-cc05",
+    "question": "服务同时支持AWS managed和customer managed KMS key。只要年度轮换和使用审计，与需要自行创建、轮换、禁用密钥，选择有何不同？",
+    "answerZh": "无自定义控制需求时可用服务支持的AWS managed key；要自行控制密钥生命周期时用customer managed key。",
+    "pointsEn": [
+      "AWS managed key for the stated needs without custom control",
+      "Customer managed key for customer lifecycle control"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-cc06",
+    "question": "要求KMS密钥每年自动轮换，应选择哪种材料来源的key？导入客户材料能开启同样的自动轮换吗？",
+    "answerZh": "不能。要求年度自动轮换，应使用AWS生成材料的对称加密KMS key，并开启自动轮换，周期设为365天。",
+    "pointsEn": [
+      "Use an AWS-generated symmetric encryption KMS key and enable annual automatic rotation",
+      "Imported material does not support automatic rotation"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-cc08",
+    "question": "RDS和Redshift的数据都要静态加密。新建存储可用什么；若已有RDS未加密运行，能只加TLS证书改变存储吗？",
+    "answerZh": "新RDS可启用KMS静态加密，Redshift也提供基于KMS的服务端存储加密。已有未加密RDS应制作快照、复制并加密该快照，再恢复新加密DB并安排切换；TLS证书不会加密存储。",
+    "pointsEn": [
+      "New RDS and Redshift can use KMS-based storage encryption",
+      "TLS certificates do not encrypt existing RDS storage"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-cc09",
+    "question": "同账户同Region的新EBS卷都要自动加密，已有未加密卷也要改造。只打开默认加密够吗，旧卷应怎样处理？",
+    "answerZh": "新卷开启EBS默认加密；旧卷先做快照，再从快照创建加密新卷并安排替换。",
+    "pointsEn": [
+      "Enable default encryption for new volumes",
+      "Snapshot old volumes and create encrypted replacements; the default does not convert them"
+    ]
+  }
+]

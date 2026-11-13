@@ -1,0 +1,24 @@
+appId: com.timeawake.recallsmith.qa.ota210
+---
+- tapOn:
+    id: "learning-study-got-it"
+- repeat:
+    times: 2
+    commands:
+      - tapOn:
+          id: "learning-study-show-answer"
+      - tapOn:
+          id: "learning-study-got-it"
+- assertVisible:
+    id: "screen-session-summary-root"
+- assertVisible: "You studied 5 cards"
+- takeScreenshot: 06-restored-session-complete
+- tapOn:
+    id: "screen-session-summary-primary-cta"
+- tapOn: "Me"
+- scrollUntilVisible:
+    element:
+      id: "more-study-snapshot"
+    direction: DOWN
+    centerElement: true
+- takeScreenshot: 07-profile-summary

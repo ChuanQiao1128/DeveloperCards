@@ -1,0 +1,91 @@
+[
+  {
+    "uid": "aws-rb2-20261107-pack-xa014",
+    "question": "一个账户内所有IAM用户的控制台密码，都必须满足统一复杂度和到期周期。策略设在哪一级？",
+    "answerZh": "设置该AWS账户的IAM password policy。",
+    "pointsEn": [
+      "Set the account-level IAM password policy for uniform password requirements"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xa015",
+    "question": "部署工程师只应操作指定堆栈，创建EC2等资源的权限不想直接交给他。CloudFormation怎样完成部署？",
+    "answerZh": "给工程师所需的堆栈操作权限，并让堆栈使用仅含所需资源动作的CloudFormation service role；首次指定角色需有相应iam:PassRole。",
+    "pointsEn": [
+      "Engineer gets stack permissions; CloudFormation gets a restricted service role",
+      "Initial role specification needs applicable iam:PassRole"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xa017",
+    "question": "策略对StopInstances和TerminateInstances设Deny，条件是BoolIfExists检查aws:MultiFactorAuthPresent=false。MFA字段为false或根本缺失时，会拒绝哪些动作，为什么？",
+    "answerZh": "两种情况都匹配这条Deny，但只拒绝声明列出的停止和终止动作。",
+    "pointsEn": [
+      "Both false and absent match",
+      "Only the listed stop and terminate actions are denied; IfExists does not expand Action"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xa018",
+    "question": "Lake Formation里的表越来越多，要把符合某类标签的数据跨账户授权给工程团队，怎样避免逐表授权，为什么？",
+    "answerZh": "使用Lake Formation tag-based access control（LF-TBAC），给数据目录资源贴LF-Tag，按标签值授予跨账户权限。",
+    "pointsEn": [
+      "LF-TBAC with resource LF-Tags and cross-account tag-value grants",
+      "Matching tags let new tables follow the same permission rule"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xa020",
+    "question": "开发者要自己开通公司批准的数据库等工具，但只能使用限定配置。怎样兼顾中央管理和自助部署，为什么？",
+    "answerZh": "把批准配置发布为Service Catalog产品，向开发者开放相应portfolio，并设置开通约束。",
+    "pointsEn": [
+      "Service Catalog products and an authorized portfolio",
+      "Provisioning constraints preserve centrally managed configuration boundaries"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xa021",
+    "question": "EKS中敏感值已写进Kubernetes Secret，目标是保护控制平面etcd里的数据。应检查哪一层加密，改EBS卷或把另一份值放Secrets Manager够吗，为什么？",
+    "answerZh": "检查EKS Kubernetes API数据的KMS封套加密；EKS 1.28及以上已默认提供，可按需要使用客户管理KMS key。",
+    "pointsEn": [
+      "Check KMS envelope encryption of Kubernetes API data",
+      "EBS or external secret storage does not encrypt the API data in etcd"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xa023",
+    "question": "Control Tower纳管环境中，账户被移到其他OU等治理关系发生变化，需要少维护地发现并提醒运维。应使用什么能力，为什么？",
+    "answerZh": "使用Control Tower drift detection，并订阅适用的漂移通知。",
+    "pointsEn": [
+      "Control Tower drift detection and applicable notifications",
+      "It checks managed governance relationships beyond stack-resource drift"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xa025",
+    "question": "子公司现有AWS账户要迁入另一组织，并保留账户内资源。能同时加入两个组织过渡吗，应按什么顺序，为什么？",
+    "answerZh": "不能；先退出原组织，再接受新组织管理账户的邀请。",
+    "pointsEn": [
+      "Leave the old organization, then accept the new invitation",
+      "Only one organization membership is allowed at a time"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xa026",
+    "question": "员工要沿用企业目录登录AWS，不另建IAM用户。已有SAML 2.0身份提供商与只有不兼容SAML的LDAP目录时，临时身份的桥接路径有什么不同，为什么？",
+    "answerZh": "前者建立SAML federation并映射到授权IAM角色；后者可由自建identity broker先验证LDAP身份，再向STS取得临时凭证。",
+    "pointsEn": [
+      "SAML IdP: federation mapped to IAM roles",
+      "Non-SAML LDAP: authenticating broker obtains temporary STS credentials"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xa027",
+    "question": "网站要同时支持example.com、cn.example.com和nz.example.com。证书只写*.example.com够吗，应包含哪些名称，为什么？",
+    "answerZh": "不够；证书须覆盖example.com及两个子域名。可用example.com加*.example.com，或在SAN中逐一列出这三个名称。",
+    "pointsEn": [
+      "Certificate covers the apex and both required subdomains, using apex plus wildcard or explicit names",
+      "A wildcard alone excludes the apex"
+    ]
+  }
+]

@@ -164,6 +164,7 @@ describe('DrawResultScreen v9', () => {
     const order = tree.root.findAll(node => typeof node.type === 'string').map(node => node.props.testID);
     expect(order.indexOf('screen-draw-result-primary-cta')).toBeLessThan(order.indexOf('screen-draw-result-featured-card'));
     expect(collectText(tree)).toContain('Continue learning');
+    expect(collectText(tree)).toContain('Study foundations before dependent new cards, including cards unlocked earlier.');
     act(() => button.props.onPress());
     expect(navigation.navigate).toHaveBeenCalledWith('SessionCard', { slug: 'aws-saa-fundamentals' });
   });

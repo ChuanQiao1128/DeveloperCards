@@ -1,0 +1,49 @@
+{
+  "batch": "12",
+  "inputSha256": "dbb5786513bb2bf47460c2ef098197ca7510fde319b3d2a8c3ea7d79e885a47b",
+  "outputSha256": "2af1d38ee6c5cf1bd5e46af07b84a3dff7bca868072a0c3c6cd01d494777362d",
+  "overall": "PASS",
+  "cards": [
+    {
+      "uid": "aws-rb2-20261107-pack-aws-rb2-20261105-boundary-aurora-iam-token-login",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-aws-rb2-domain1-normal-batch06-20261105-roles-anywhere-workload-identity",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-aws-rb2-domain1-normal-batch08-20261105-s3-account-public-access-guardrail",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-vc-008",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-vc-011",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-vc-013",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-ca15",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-cb01",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-cb03",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-cb06",
+      "verdict": "PASS"
+    }
+  ],
+  "findings": []
+}

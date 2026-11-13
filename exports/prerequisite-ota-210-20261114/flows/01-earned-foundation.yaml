@@ -1,0 +1,58 @@
+appId: com.timeawake.recallsmith.qa.prerequisites
+---
+- launchApp
+- assertVisible:
+    id: "screen-home-root"
+- tapOn: "Library"
+- tapOn:
+    id: "library-search"
+- inputText: "fh01"
+- hideKeyboard
+- tapOn:
+    id: "library-card-aws-rb2-20261107-pack-fh01"
+- tapOn:
+    id: "card-detail-show-answer"
+- scrollUntilVisible:
+    element:
+      id: "prereq-chip-aws-rb2-20261107-pack-na03"
+    direction: DOWN
+- tapOn:
+    id: "prereq-chip-aws-rb2-20261107-pack-na03"
+- assertVisible: "Not in your collection yet"
+- assertNotVisible:
+    id: "card-detail-show-answer"
+- takeScreenshot: 01-prerequisite-stays-locked
+- tapOn: "Back"
+- tapOn: "Back"
+- tapOn: "Draw"
+- assertVisible:
+    id: "screen-draw-root"
+- tapOn:
+    id: "screen-draw-secondary-cta"
+- extendedWaitUntil:
+    visible:
+      id: "draw-ceremony-swipe-pack"
+    timeout: 30000
+- swipe:
+    start: "38%,59%"
+    end: "76%,59%"
+    duration: 600
+- runFlow:
+    when:
+      visible:
+        id: "reveal-spotlight-skip-all"
+    commands:
+      - tapOn:
+          id: "reveal-spotlight-skip-all"
+- extendedWaitUntil:
+    visible:
+      id: "screen-draw-ceremony-primary-cta"
+    timeout: 30000
+- tapOn:
+    id: "screen-draw-ceremony-primary-cta"
+- assertVisible:
+    id: "screen-draw-result-root"
+- assertVisible: "1 new card unlocked"
+- assertVisible: "Continue learning"
+- assertVisible: "Study foundations before dependent new cards, including cards unlocked earlier."
+- takeScreenshot: 02-earned-foundation-result

@@ -1,0 +1,92 @@
+[
+  {
+    "uid": "aws-rb2-20261107-pack-xb023",
+    "question": "本地Windows SMB文件要迁到FSx for Windows，要求用户原有读写权限不变。应选择什么传输方式，为什么不能只复制文件内容？",
+    "answerZh": "使用DataSync的SMB→FSx for Windows传输，并让传输身份具备复制Windows ACL等元数据的必要权限。",
+    "pointsEn": [
+      "DataSync SMB to FSx with metadata-copy permissions",
+      "Retain NTFS ACLs as well as file contents"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xb025",
+    "question": "EKS集群已启用私有Kubernetes API端点，节点也在同VPC。再创建EKS的interface VPC endpoint，就能代替节点到Kubernetes控制面的连接吗？",
+    "answerZh": "不能。节点要连集群自己的私有Kubernetes API端点，并获集群安全组放行；EKS interface endpoint用于AWS EKS管理API。",
+    "pointsEn": [
+      "Nodes need the private Kubernetes API endpoint and cluster-group permission",
+      "EKS interface endpoint is for management APIs, not a substitute"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xb026",
+    "question": "管理员使用Session Manager原生交互会话，要求会话内容进入S3留档。已能登录就会自动归档吗，应配置什么？",
+    "answerZh": "不会；在Session Manager preferences启用S3 logging，指定归档桶，并配置必要写入/加密权限。",
+    "pointsEn": [
+      "Enable S3 logging in preferences and select the bucket",
+      "Configure necessary write and encryption permissions; login alone does not archive"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xb033",
+    "question": "ECS容器里的应用要读S3。应把权限给task role还是task execution role，为什么不能只给拉取镜像的角色？",
+    "answerZh": "给task role（任务角色）授予应用需要的S3权限。",
+    "pointsEn": [
+      "Task role gets application S3 permissions",
+      "Execution role serves agent operations rather than application credentials"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xb036",
+    "question": "EC2现有实例角色只供应用访问数据库，不能被替换。实例的SSM Agent、IMDSv2和联网均满足自动纳管条件。怎样让Systems Manager纳管，又不破坏应用权限？",
+    "answerZh": "在该账户/Region启用Default Host Management Configuration，使用其默认管理角色纳管实例，保留应用角色。",
+    "pointsEn": [
+      "Enable account/Region Default Host Management Configuration using its management role",
+      "This supplies SSM management permissions separately from application permissions"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xb040",
+    "question": "ECS仍用原来的任务部署，但已有镜像和以后新推送镜像都要检查已知漏洞。怎样用托管仓库接入扫描，不必改成EKS？",
+    "answerZh": "把镜像放在ECR私有仓库，对相应仓库配置basic scan on push；已有镜像按需要启动一次手动扫描。",
+    "pointsEn": [
+      "ECR private repositories with basic scan on push",
+      "Manually scan existing images as needed"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xb042",
+    "question": "许多应用共用一个S3桶，每个应用只能操作自己的前缀。怎样减少把全部权限塞进一条大桶策略的维护负担，而不复制数据？",
+    "answerZh": "为各应用创建独立S3 Access Point，在各自访问点策略中限制应用身份及允许的前缀。",
+    "pointsEn": [
+      "Separate access point per application",
+      "Access-point policies restrict identity and prefix while sharing original objects"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xb043",
+    "question": "现有NLB创建时没有关联任何安全组，现在要只允许可信IP连接。能直接给它补上安全组吗，应怎样处理？",
+    "answerZh": "不能；创建带安全组的替代NLB，配置可信来源规则后切换入口，并关闭旧的未受限入口。",
+    "pointsEn": [
+      "Replace with an NLB created with security groups and trusted-source rules",
+      "Switch traffic and close the old unrestricted entry"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xb045",
+    "question": "EC2已按实例ID注册到负载均衡目标组，SSM条件已满足。补丁期间必须暂停接收业务，打完再恢复。应选哪个托管自动化流程，而不只安排一个维护时间？",
+    "answerZh": "使用AWSEC2-PatchLoadBalancerInstance Automation runbook：移出目标、等待连接排空、执行补丁，再重新注册。",
+    "pointsEn": [
+      "AWSEC2-PatchLoadBalancerInstance",
+      "Deregister and drain before patching, then reregister"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xr102",
+    "question": "员工在家或流动地点，要从自己的设备安全访问VPC内的文件共享。应使用Client VPN还是办公室的Site-to-Site VPN，为什么？",
+    "answerZh": "用AWS Client VPN，让员工通过VPN客户端建立加密连接，并按用户或组授予目标网络访问权限。",
+    "pointsEn": [
+      "Client VPN with user/group network authorization",
+      "It connects individual devices rather than fixed office networks"
+    ]
+  }
+]

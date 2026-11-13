@@ -1,0 +1,12 @@
+[
+  ["查看 AWS/Events 的 CloudWatch 匹配、调用和失败指标", "区分事件匹配与投递，不只根据死信队列或审计记录推断"],
+  ["使用 Distributed Map", "通过独立子执行，避免把并发和历史记录集中在一次 inline 执行中"],
+  ["城市扩展使用 Local Zones，运营商边缘使用 Wavelength", "两者都用于部署工作负载，但地点和网络集成方式不同"],
+  ["为 EFS 使用受支持的静态 PV/PVC", "EKS 不同于 ECS，且该 Fargate 路径不支持动态预置"],
+  ["统一请求入口使用 MRAP，数据分布使用复制", "路由和复制解决的是不同需求"],
+  ["配置 EFS access point 和函数本地挂载路径", "仅有网络连接，不会让代码直接访问文件系统"],
+  ["使用适用的 Multi-AZ ONTAP iSCSI", "它的块存储语义和跨 AZ 托管可用性，不同于 SMB 或局限于单 AZ 的 EBS"],
+  ["App2Container 生成容器和部署产物", "ECS 或 EKS 编排运行时执行"],
+  ["通过 NFS 共用一个 EFS 文件系统，而不是分别维护块存储卷副本", "close-to-open 可见性：写入方关闭文件，读取方重新打开文件"],
+  ["在 task definition 中定义 EFS 卷", "通过容器 mount point 将该卷接到容器目录"]
+]

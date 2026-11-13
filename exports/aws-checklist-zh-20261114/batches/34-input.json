@@ -1,0 +1,92 @@
+[
+  {
+    "uid": "aws-rb2-20261107-pack-gcl-025",
+    "question": "EC2平时CPU基线很低，偶尔显著突发。T类burstable实例的credit和unlimited怎样影响选择？",
+    "answerZh": "评估突发频率和时长：credit允许在基线以上突发，unlimited可在相应条件下继续突发，但可能收取额外费用。",
+    "pointsEn": [
+      "Evaluate credit use and burst duration",
+      "Unlimited may extend bursts with additional charges"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-009",
+    "question": "ONTAP中大部分文件长期很冷，想减少SSD费用；如果条件变成全部数据都必须保留SSD访问特性，分层策略怎样变？",
+    "answerZh": "冷数据可分层至容量池；全部数据都需SSD时选NONE，不选ALL。",
+    "pointsEn": [
+      "Cold data can use capacity-pool tiering to reduce SSD cost",
+      "NONE keeps all volume data on SSD; ALL tiers it instead"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-018",
+    "question": "EBS旧快照长期不读，归档每GiB便宜，就一定比标准层省钱吗？",
+    "answerZh": "不一定，要按归档后的完整快照大小及保留、恢复费用比较。",
+    "pointsEn": [
+      "Compare full archive size and retention/restore costs",
+      "Incremental sharing does not preserve the same billed size in archive"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-024",
+    "question": "有海量小文件，很少读取。只看归档层每GiB单价，就能选出最便宜的S3存储层吗？",
+    "answerZh": "不能；还要计算最小计费对象大小、每次转换请求和适用的元数据开销。",
+    "pointsEn": [
+      "Include object minima, transition requests, and metadata overhead",
+      "Per-object costs can dominate tiny-file storage"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-025",
+    "question": "S3对象冷热难预测，用户仍需立即读取。怎样减少手工判断每个对象应放哪一层？",
+    "answerZh": "使用S3 Intelligent-Tiering，让它按访问情况调整适用的即时访问层。",
+    "pointsEn": [
+      "Intelligent-Tiering's applicable instant tiers",
+      "Observed access drives automatic moves while retaining immediate access"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-026",
+    "question": "S3桶启用了版本控制，已设置当前对象过期，账单却仍不断增长。还应检查什么生命周期规则？",
+    "answerZh": "检查并设置非当前版本的过期或转层规则。",
+    "pointsEn": [
+      "Noncurrent version expiry/transitions",
+      "Current-object expiry does not clean all retained history"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-027",
+    "question": "S3可见对象数量没增加，但大量分块上传失败后存储费增长。应清理什么，怎样避免反复发生？",
+    "answerZh": "清理未完成multipart upload的分块，并配置AbortIncompleteMultipartUpload生命周期规则。",
+    "pointsEn": [
+      "Remove unfinished multipart parts",
+      "AbortIncompleteMultipartUpload rule automates cleanup"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-028",
+    "question": "公司向外部合作方开放S3数据读取，希望由对方承担读取请求和下载传输费用。怎样改变费用承担方？",
+    "answerZh": "对适用桶启用Requester Pays，并让请求者按要求确认付费。",
+    "pointsEn": [
+      "Requester Pays with requester acknowledgment",
+      "Transfers eligible request/transfer charges, not storage charges"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-038",
+    "question": "DynamoDB流量难预测，不想预先估计读写容量；与长期稳定且能规划容量的业务，容量模式怎样选？",
+    "answerZh": "难预测的负载考虑on-demand；稳定且可规划时比较provisioned配合自动伸缩。",
+    "pointsEn": [
+      "Unpredictable: on-demand",
+      "Plannable stable: compare provisioned/autoscaling"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-043",
+    "question": "要分析DynamoDB历史数据，又不能用大量Scan挤占线上表读取能力。可怎样把分析与在线读取分开？",
+    "answerZh": "在支持条件下把表数据导出S3，再对导出数据分析。",
+    "pointsEn": [
+      "Supported DynamoDB export to S3",
+      "Analyze a separate copy without Scan read-capacity consumption"
+    ]
+  }
+]
