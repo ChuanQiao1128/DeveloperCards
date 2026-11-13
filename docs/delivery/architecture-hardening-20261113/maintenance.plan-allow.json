@@ -1,0 +1,12 @@
+{
+  "tags_only_updates": false,
+  "changes": {
+    "module.identity.aws_iam_role.maintenance": "create",
+    "module.identity.aws_iam_role_policy.maintenance": "create",
+    "module.identity.aws_iam_role_policy.runtime_no_maintenance[\"api\"]": "create",
+    "module.identity.aws_iam_role_policy.runtime_no_maintenance[\"worker\"]": "create",
+    "module.operators.aws_iam_role_policy.deploy_no_maintenance[\"local\"]": "create",
+    "module.operators.aws_iam_role_policy.deploy_no_maintenance[\"cd\"]": "create"
+  },
+  "_note": "Expected source-declared IAM-only changes for architecture hardening. This is an anticipated allow-list, not an observed AWS plan or owner approval. No function, schedule, database, queue, metric or compute increase is allowed. module.operators remains break-glass: the existing pipeline must refuse automatic apply and the owner must inspect an actual complete plan and use the existing MFA path. Drift, replacement, update or any extra address must fail the exact allow-list. No production plan/apply was run."
+}
