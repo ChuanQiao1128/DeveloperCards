@@ -1,0 +1,7 @@
+appId: com.timeawake.recallsmith.qa.ota210
+---
+- launchApp
+- assertVisible:
+    id: "screen-home-root"
+- tapOn: "Me"
+- takeScreenshot: 08-baseline-fallback-profile

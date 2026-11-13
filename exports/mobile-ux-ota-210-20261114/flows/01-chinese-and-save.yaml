@@ -1,0 +1,45 @@
+appId: com.timeawake.recallsmith.qa.ota210
+---
+- launchApp
+- assertVisible:
+    id: "screen-home-root"
+- tapOn: "Library"
+- tapOn:
+    id: "library-search"
+- inputText: "配置"
+- hideKeyboard
+- assertVisible:
+    id: "library-card-aws-rb2-20261107-pack-cc10"
+- takeScreenshot: 01-library-chinese-preview
+- tapOn:
+    id: "library-card-aws-rb2-20261107-pack-cc10"
+- tapOn:
+    id: "card-detail-show-answer"
+- scrollUntilVisible:
+    element: "Config 规则负责评估配置"
+    direction: DOWN
+    centerElement: true
+- assertNotVisible:
+    id: "teaching-english-checklist-toggle"
+- takeScreenshot: 02-chinese-answer-checklist
+- scrollUntilVisible:
+    element:
+      id: "prereq-chip-aws-rb2-20261107-pack-cc09"
+    direction: DOWN
+    centerElement: true
+- takeScreenshot: 03-prerequisite-touch-target
+- tapOn: "Back"
+- tapOn: "Home"
+- tapOn:
+    id: "home-primary-cta"
+- repeat:
+    times: 2
+    commands:
+      - tapOn:
+          id: "learning-study-show-answer"
+      - tapOn:
+          id: "learning-study-got-it"
+- tapOn:
+    id: "learning-study-show-answer"
+- assertVisible: "Card 3 of 5"
+- takeScreenshot: 04-before-process-stop

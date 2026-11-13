@@ -1,0 +1,47 @@
+
+> mobile@2.1.0 test
+> npm run test:typecheck && npm run test:unit && npm run test:integration && npm run test:smoke
+
+
+> mobile@2.1.0 test:typecheck
+> tsc --noEmit
+
+
+> mobile@2.1.0 test:unit
+> vitest run tests/unit
+
+
+ RUN  v4.1.11 /Users/qc/.codex/worktrees/mobile-ux-ota-210-20261114/draw-motion-20261113/mobile
+
+
+ Test Files  259 passed (259)
+      Tests  2352 passed (2352)
+   Start at  07:45:15
+   Duration  19.70s (transform 8.57s, setup 5.09s, import 16.19s, tests 41.44s, environment 13ms)
+
+
+> mobile@2.1.0 test:integration
+> vitest run tests/integration
+
+
+ RUN  v4.1.11 /Users/qc/.codex/worktrees/mobile-ux-ota-210-20261114/draw-motion-20261113/mobile
+
+
+ Test Files  86 passed (86)
+      Tests  769 passed (769)
+   Start at  07:45:35
+   Duration  3.00s (transform 10.50s, setup 1.82s, import 21.78s, tests 10.89s, environment 5ms)
+
+
+> mobile@2.1.0 test:smoke
+> vitest run tests/smoke
+
+
+ RUN  v4.1.11 /Users/qc/.codex/worktrees/mobile-ux-ota-210-20261114/draw-motion-20261113/mobile
+
+
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+   Start at  07:45:39
+   Duration  244ms (transform 131ms, setup 38ms, import 4ms, tests 125ms, environment 0ms)
+
