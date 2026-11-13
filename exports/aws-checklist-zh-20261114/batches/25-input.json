@@ -1,0 +1,92 @@
+[
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-020",
+    "question": "多台实例想共同写一个EBS卷。开启Multi-Attach，就能像EFS一样跨AZ共享普通文件系统吗？",
+    "answerZh": "不能。Multi-Attach只在同一AZ给受支持实例共享适用io1/io2块卷，还需要应用或集群文件系统协调写入。",
+    "pointsEn": [
+      "Same-AZ supported block sharing, not cross-AZ EFS semantics",
+      "Requires application/clustered-filesystem write coordination"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-021",
+    "question": "大文件上传S3速度慢，而且网络中断后不想重传整个文件。怎样上传？",
+    "answerZh": "使用multipart upload，把对象分块并行上传，只重试失败的块。",
+    "pointsEn": [
+      "Parallel multipart upload",
+      "Independently retry failed parts instead of the whole file"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-022",
+    "question": "要从S3下载一个大对象，单连接吞吐不足。除了上传时分块，下载能怎样并行？",
+    "answerZh": "用多个GET请求读取对象的不同字节范围，再按顺序组合。",
+    "pointsEn": [
+      "Parallel ranged GETs",
+      "Client assembles distinct byte ranges in order"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-023",
+    "question": "全球用户对同一S3桶上传和下载独有大文件，远距离传输慢，下载也很难复用缓存。怎样优化路径？",
+    "answerZh": "评估S3 Transfer Acceleration，使用加速端点执行支持的上传与下载操作。",
+    "pointsEn": [
+      "S3 Transfer Acceleration endpoint",
+      "Optimizes upload/download paths without depending on reusable cached content"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-029",
+    "question": "文件一进入S3就要处理，不想每小时扫描整个桶。怎样触发后续计算？",
+    "answerZh": "使用S3对象创建事件。原生通知可直达Lambda、SNS或SQS；需要SageMaker Pipelines等其他目标时，经EventBridge路由。",
+    "pointsEn": [
+      "S3 object-created events through an appropriate supported target/path",
+      "Event-driven processing replaces repeated bucket scans"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-030",
+    "question": "Lambda要处理S3新增对象，只监听ObjectCreated:Put，会覆盖CopyObject和完成分块上传产生的对象吗？",
+    "answerZh": "不会；应匹配相应的Copy、CompleteMultipartUpload事件，或按业务使用ObjectCreated的全部子类型。",
+    "pointsEn": [
+      "Include the relevant creation subtypes or all ObjectCreated events",
+      "Copy and multipart completion are not Put"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-031",
+    "question": "大量文件放S3，业务要按年份、客户等属性检索后取回对应文件。只给对象加标签，就等于已有搜索数据库吗？",
+    "answerZh": "不等于；应建立可查询的元数据索引，记录业务属性和对应S3对象位置。",
+    "pointsEn": [
+      "Queryable metadata index linking attributes to S3 object locations",
+      "Tags alone do not provide the required search database"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-032",
+    "question": "重复读取拖慢数据库，需低延迟缓存；采用node-based ElastiCache且要求副本与自动故障接管。Redis OSS/Valkey与Memcached怎样选？",
+    "answerZh": "选满足要求的Redis OSS/Valkey复制组，并配置副本和适用的接管。",
+    "pointsEn": [
+      "Redis OSS/Valkey replication group with replicas and failover",
+      "Node-based replication/failover meets the stated requirements"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-033",
+    "question": "应用使用自己维护的cache-aside缓存：先查缓存，未命中再读数据库。只更新数据库后，缓存中的旧值会自动消失吗？",
+    "answerZh": "不会；应用应在写入时更新或使相应缓存失效。写数据库时同步更新缓存，称为write-through策略。",
+    "pointsEn": [
+      "Application updates or invalidates cache on writes",
+      "Database writes do not automatically synchronize an independent cache"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-034",
+    "question": "游戏分数频繁变化，要随时取得前十名，而不是每次扫描整张成绩表排序。Redis哪种结构适合？",
+    "answerZh": "有序集合（sorted set），把玩家和分数一起保存。",
+    "pointsEn": [
+      "Sorted set",
+      "Maintained score ordering supports direct ranked retrieval"
+    ]
+  }
+]

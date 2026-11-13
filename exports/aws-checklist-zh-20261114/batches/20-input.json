@@ -1,0 +1,92 @@
+[
+  {
+    "uid": "aws-rb2-20261107-pack-xb006",
+    "question": "医院上传英文扫描病历PDF或JPEG，要找出其中的医疗信息或受保护健康信息PHI，又不想自建识别模型。应先后调用什么？",
+    "answerZh": "先用Textract提取文字，再用Comprehend Medical识别文字中的医疗实体或PHI。",
+    "pointsEn": [
+      "Textract OCR, then Comprehend Medical",
+      "Text extraction precedes medical entity/PHI analysis"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xb010",
+    "question": "关系库数据要与S3湖联合分析，只给原库加Lake Formation权限就够吗？必须拷贝入湖，与允许Redshift数据留原地查询时，各怎样接入？",
+    "answerZh": "不够，还要建立数据路径：拷贝入S3可用Glue JDBC连接和Lake Formation蓝图摄取；Redshift留原地时，可建立Lake Formation联邦目录，让Glue ETL、EMR等授权引擎查询外部表。",
+    "pointsEn": [
+      "Copy into the lake: an actual Glue JDBC/blueprint ingestion path into S3",
+      "Query Redshift in place: a federated catalog and permissions for an engine such as Glue ETL; permissions alone do not create the data path"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xb011",
+    "question": "EventBridge已匹配到需要处理的AWS服务事件。要给人员发邮件，与要运行代码修改资源，应分别选什么目标？",
+    "answerZh": "人员邮件用SNS主题和已确认的邮件订阅；执行自定义动作则把相应Lambda函数设为目标。",
+    "pointsEn": [
+      "Email: SNS with confirmed subscriptions",
+      "Custom resource actions: Lambda target"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xb013",
+    "question": "按已知键高并发读写，和对大量数据做并行SQL分析，应怎样在DynamoDB与Redshift间选择？",
+    "answerZh": "在线键值/文档访问优先考虑DynamoDB；数据仓库的并行分析考虑Redshift，少管理集群可用适用的Redshift Serverless。",
+    "pointsEn": [
+      "DynamoDB for keyed online access",
+      "Redshift for parallel SQL analytics"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xb019",
+    "question": "容器只想少维护主机，与应用必须修改Linux内核，这两个条件怎样改变Fargate和自管EC2的选择？",
+    "answerZh": "少维护宿主机可选Fargate；必须自行控制内核时，需要能自管OS的EC2等适用部署。",
+    "pointsEn": [
+      "Less host maintenance: Fargate",
+      "Kernel changes: self-managed OS such as EC2"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xb020",
+    "question": "对外REST API的容器后端在私有VPC子网中。API Gateway怎样把请求送到后端，为什么不是给客户端建private API端点？",
+    "answerZh": "配置REST API的private integration，通过VPC link连接受支持的ALB或NLB，再转到容器服务。",
+    "pointsEn": [
+      "REST private integration through VPC link and supported load balancer",
+      "It connects Gateway to backend, unlike a client private-API endpoint"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xb029",
+    "question": "Kubernetes应用必须在公司机房运行，并想使用AWS管理的EKS能力。AWS应把哪种基础设施交付到现场，怎样让Kubernetes控制面也留在现场？",
+    "answerZh": "部署Outposts rack；需要控制面与节点都在现场时使用EKS local cluster。",
+    "pointsEn": [
+      "Outposts rack with EKS local cluster",
+      "Local keeps both nodes and control plane on site; extended does not"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xb031",
+    "question": "供应链伙伴要求用AS2交换文件，想少维护协议服务器。应选哪种AWS入口，为什么普通文件同步任务不能直接替代？",
+    "answerZh": "使用Transfer Family的AS2服务器及适用的AS2连接配置。",
+    "pointsEn": [
+      "Transfer Family AS2 server and connection configuration",
+      "Protocol and partner exchange require an AS2 endpoint, not generic copying"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xb032",
+    "question": "DNS要按国家分内容、按用户与资源的地理距离、或按实际网络延迟选入口，这三种依据怎样区分？",
+    "answerZh": "国家内容用geolocation；地理距离用geoproximity；网络延迟用latency routing。",
+    "pointsEn": [
+      "Country: geolocation; distance: geoproximity; network delay: latency",
+      "Geographic distance differs from measured network performance"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xb034",
+    "question": "VPC应用要解析本地机房的私有域名，VPN网络已连通。Route 53 Resolver应使用哪种端点，如何决定哪些域名转交机房？",
+    "answerZh": "创建Resolver outbound endpoint，配置将相应域名转发到机房DNS的规则，并把规则关联应用VPC。",
+    "pointsEn": [
+      "Outbound endpoint",
+      "Domain forwarding rules to on-premises DNS associated with the VPC"
+    ]
+  }
+]

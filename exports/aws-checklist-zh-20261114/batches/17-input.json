@@ -1,0 +1,91 @@
+[
+  {
+    "uid": "aws-rb2-20261107-pack-vc-009",
+    "question": "SNS把事件交给Lambda处理，要把最终失败的事件保留14天排查。只增加SNS投递重试够吗，失败该接在哪里？",
+    "answerZh": "不够；SNS交付失败用订阅的SQS死信队列；Lambda已接收但异步处理最终失败，用函数的SQS失败目的地，并配置所需保留期。",
+    "pointsEn": [
+      "SNS delivery failures: subscription SQS DLQ",
+      "Lambda asynchronous execution failures: SQS on-failure destination with required retention"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-vc-015",
+    "question": "API Gateway REST API要发新版本，先让少量真实请求验证，通过后再推广。用什么机制，为什么比直接全量切换稳妥？",
+    "answerZh": "启用stage的canary（金丝雀）发布：给新部署设置小流量比例，验证后提升为正式部署。",
+    "pointsEn": [
+      "Stage canary deployment with small traffic share, then promotion",
+      "Limits exposure while the old deployment keeps serving most requests"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-ca13",
+    "question": "全球HTTP网站希望可缓存内容在靠近用户的边缘返回，动态请求仍访问Region内源站。应使用什么入口，为什么？",
+    "answerZh": "使用CloudFront分发。",
+    "pointsEn": [
+      "Use a CloudFront distribution",
+      "Eligible cache hits are served nearby without an origin round trip; misses or dynamic requests go to the origin"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-ca16",
+    "question": "网站只有HTML、CSS、浏览器JavaScript和图片，没有需要服务器执行的代码。怎样托管可少维护服务器？",
+    "answerZh": "可用S3静态网站托管或适配的托管静态前端服务。",
+    "pointsEn": [
+      "S3 static hosting or a suitable managed static frontend",
+      "Files are served directly and JavaScript runs in browsers"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-ca17",
+    "question": "后端必须跨AZ可用。一类HTTP请求要执行短时业务逻辑，另一类只转发到SQS或Kinesis/Firehose，连接与授权已满足。后端都必须经过Lambda吗，为什么？",
+    "answerZh": "不必。有业务计算时可由API Gateway调用Lambda；纯转发可用受支持的AWS服务集成直接调用目标服务。",
+    "pointsEn": [
+      "Use Lambda when business computation is required; its managed execution runs across AZs",
+      "Use supported direct AWS service integration for pure forwarding; an unnecessary intermediate function is not required for availability"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-cb16",
+    "question": "两个地址不重叠的VPC要让EC2直接私网通信，没有集中检查需求，也不想引入中转设备单点或带宽瓶颈。选什么，路由还须怎样配，为什么？",
+    "answerZh": "选择VPC peering，并为两边参与通信子网设置指向对端的路由。",
+    "pointsEn": [
+      "VPC peering with routes on both sides",
+      "Avoids a separate transit appliance while still requiring bidirectional routing"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-cb18",
+    "question": "Lambda并发猛增或数据库writer切换时，想让应用少直接承担数据库连接变化。RDS Proxy怎样帮助？",
+    "answerZh": "让应用连接RDS Proxy，由代理管理到数据库的连接池，并在适用故障切换中重新连接后端。",
+    "pointsEn": [
+      "Application connects through RDS Proxy",
+      "Pooling and backend reconnection separate connection lifecycles"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-cc03",
+    "question": "结构化结果或日志已经在S3，偶尔用SQL分析且希望少管服务器，是否需要先搬到自管数据库？",
+    "answerZh": "用Athena查询S3数据并建立相应表定义，不必先搬进自管数据库；加密数据还要符合其读取格式并配好所需表属性和权限。",
+    "pointsEn": [
+      "Use Athena with table definitions to query S3 directly, without moving data into a self-managed database"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-cc17",
+    "question": "应用事件或GuardDuty发现要按条件送给处理函数，每个函数只接收需要的字段。EventBridge事件模式与输入转换各负责什么，为什么？",
+    "answerZh": "事件模式筛选并路由事件；目标的input transformer裁剪或重排发送给函数的字段。",
+    "pointsEn": [
+      "Event pattern selects and routes events",
+      "Input transformer shapes target payloads, separating recipient and content decisions"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-cc22",
+    "question": "关系应用要保留适用的数据库引擎与事务能力，又希望减少服务器和数据库平台维护，为什么考虑RDS而非在EC2自管？",
+    "answerZh": "在引擎和功能兼容的前提下迁移到相应RDS。",
+    "pointsEn": [
+      "Compatible RDS engine",
+      "Managed infrastructure/platform reduces maintenance while retaining compatible relational capabilities"
+    ]
+  }
+]

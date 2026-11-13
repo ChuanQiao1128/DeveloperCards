@@ -1,0 +1,59 @@
+{
+  "batch": "07",
+  "inputSha256": "1d566c8d95f99341f9a5029389c06754a80db0d17cc820cdc0ef4e8846ae47c7",
+  "outputSha256": "ed1559544845ecf63e26ee9815d2e287ad8315617c6ecd2f6e0bda28d5fcdee4",
+  "overall": "PASS",
+  "cards": [
+    {
+      "uid": "aws-rb2-20261107-pack-xa014",
+      "verdict": "PASS",
+      "note": "内容未变，沿用07-review.r1.json有效结果。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-xa015",
+      "verdict": "PASS",
+      "note": "内容未变，沿用07-review.r1.json有效结果。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-xa017",
+      "verdict": "PASS",
+      "note": "内容未变，沿用07-review.r1.json有效结果。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-xa018",
+      "verdict": "PASS",
+      "note": "内容未变，沿用07-review.r1.json有效结果。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-xa020",
+      "verdict": "PASS",
+      "note": "内容未变，沿用07-review.r1.json有效结果。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-xa021",
+      "verdict": "PASS",
+      "note": "内容未变，沿用07-review.r1.json有效结果。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-xa023",
+      "verdict": "PASS",
+      "note": "内容未变，沿用07-review.r1.json有效结果。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-xa025",
+      "verdict": "PASS",
+      "note": "内容未变，沿用07-review.r1.json有效结果。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-xa026",
+      "verdict": "PASS",
+      "note": "内容未变，沿用07-review.r1.json有效结果。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-xa027",
+      "verdict": "PASS",
+      "note": "本次仅局部复核两条 apex 译名修订，均已准确改为根域名；其余9卡沿用07-review.r1.json有效结果。"
+    }
+  ],
+  "findings": []
+}

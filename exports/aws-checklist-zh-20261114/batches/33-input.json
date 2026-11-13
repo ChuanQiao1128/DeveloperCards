@@ -1,0 +1,92 @@
+[
+  {
+    "uid": "aws-rb2-20261107-pack-cb02",
+    "question": "稳定计算同时使用EC2、Lambda、Fargate，EC2型号还可能变化；另有SageMaker用量。怎样用尽量少的计划类型覆盖？",
+    "answerZh": "EC2、Lambda、Fargate用Compute Savings Plans；SageMaker用其自己的Savings Plans。",
+    "pointsEn": [
+      "Compute SP for EC2/Lambda/Fargate",
+      "SageMaker's separate SP"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-cmp-m01",
+    "question": "低频S3文件仍需多AZ保存。必须立即读取，与允许先恢复后读取，两种条件怎样改变存储层选择？",
+    "answerZh": "立即读取可选Standard-IA或Glacier Instant Retrieval等适用即时层；能等待恢复时，才考虑Glacier Flexible Retrieval或Deep Archive，并按阶段用Lifecycle转换。",
+    "pointsEn": [
+      "Immediate: applicable instant class",
+      "Restore delay allowed: suitable archival class, while preserving multi-AZ needs"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xa019",
+    "question": "账户达到预算阈值后，既要通知负责人，又要自动禁止继续创建资源。只设预算告警够吗，为什么？",
+    "answerZh": "不够；配置AWS Budgets action，由有权限的服务角色应用拒绝新建资源的IAM策略或SCP，并设置通知。",
+    "pointsEn": [
+      "Budget action applying appropriate deny policy/SCP through a service role",
+      "Alerts notify; actions execute restrictions"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xa022",
+    "question": "多个原先独立计费的账户要共用已购买但用不完的Savings Plans折扣，怎样组织并开启共享，为什么？",
+    "answerZh": "把相关账户纳入同一Organizations合并计费组织，由管理账户在Billing preferences启用相应账户的折扣共享。",
+    "pointsEn": [
+      "Common consolidated-billing organization and Billing discount sharing",
+      "Shares eligible discount application rather than resources through RAM"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xa055",
+    "question": "S3大文件要交给北美和欧洲用户。改由CloudFront分发，为什么可能降低传出费？这等于用户下载全部免费吗？",
+    "answerZh": "S3到CloudFront的AWS回源免数据传出费；用户下载改按所选CloudFront方案核算。已核的北美、欧洲常见付费档，边缘传出单价可低于us-east-1的S3直出，不能把整个分发当免费。",
+    "pointsEn": [
+      "Origin transfer is free but viewer delivery follows CloudFront pricing",
+      "Applicable edge rates may be lower; all downloads are not free"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xb027",
+    "question": "开发PostgreSQL数据库长时间没人连接，可接受恢复时短暂等待。使用支持自动暂停的Aurora Serverless版本时，怎样减少空闲算力费用？",
+    "answerZh": "启用自动暂停，把支持的最小容量设为0 ACU，并设定空闲等待时间。",
+    "pointsEn": [
+      "Automatic pause with supported zero-ACU minimum and idle interval",
+      "Idle pause removes running compute until a connection resumes it"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-aws-rb2-domain1-normal-batch07-20261105-s3-bucket-key-request-cost",
+    "question": "S3对象使用SSE-KMS，新增对象持续写入且读取频繁。必须继续使用KMS加密，怎样减少KMS请求费用，为什么？",
+    "answerZh": "为新增对象启用S3 Bucket Key（桶密钥）。",
+    "pointsEn": [
+      "Enable S3 Bucket Key for new objects",
+      "Bucket-level key reuse reduces per-object KMS requests"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gcl-005",
+    "question": "Aurora global database灾备Region暂不提供查询，希望保留复制数据却少付常驻数据库计算费。支持的headless secondary怎样取舍？",
+    "answerZh": "可以保留支持的无DB实例secondary存储，灾后需要时再补相应计算。",
+    "pointsEn": [
+      "Supported instance-free secondary storage",
+      "Saves resident compute but needs compute added for recovery"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gcl-018",
+    "question": "共享POSIX文件长期少读，但应用仍要沿用同一文件路径。怎样减少EFS存储费用，而不是改成取对象的应用？",
+    "answerZh": "评估EFS生命周期管理，把符合条件的冷文件转入较低成本的EFS访问层。",
+    "pointsEn": [
+      "EFS lifecycle tiering",
+      "Preserves file paths/interfaces while moving eligible cold files"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gcl-023",
+    "question": "DynamoDB读写频繁，与大量数据很少读写、主要付存储费，这两种负载的Standard和Standard-IA表类怎样取舍？",
+    "answerZh": "频繁请求通常比较Standard；存储费用占主导且访问稀少时比较Standard-IA总费用。",
+    "pointsEn": [
+      "Frequent requests: compare Standard; storage-dominated rare access: Standard-IA",
+      "Compare both storage and request prices"
+    ]
+  }
+]

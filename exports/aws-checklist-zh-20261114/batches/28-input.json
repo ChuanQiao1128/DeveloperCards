@@ -1,0 +1,92 @@
+[
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-080",
+    "question": "同一事件要让多个下游各收到一份，还希望下游只收自己关心的类型。多个消费者竞争同一SQS队列够吗？",
+    "answerZh": "不够；用SNS发布订阅扇出，并给相应订阅设置过滤。",
+    "pointsEn": [
+      "SNS fan-out with subscription filtering",
+      "Separate subscriptions deliver copies instead of dividing one queue's work"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-086",
+    "question": "旧应用必须保留JMS或AMQP消息接口，希望少改代码迁AWS。能只因为SQS也叫队列就直接替换吗？",
+    "answerZh": "不能；应评估兼容所需协议的Amazon MQ引擎。",
+    "pointsEn": [
+      "Protocol-compatible Amazon MQ engine",
+      "SQS's own API is not automatically compatible with existing JMS/AMQP clients"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-089",
+    "question": "每天固定时间运行报表，与订单事件出现时立即启动处理，触发方式怎样选？",
+    "answerZh": "固定时间用适用调度器，如EventBridge Scheduler；业务事件用EventBridge规则等事件匹配路径。",
+    "pointsEn": [
+      "Fixed time: scheduler",
+      "Business occurrence: event-matching path"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-090",
+    "question": "业务事件匹配后要带认证调用第三方HTTPS接口，不想为简单转发额外写Lambda。EventBridge可用什么？",
+    "answerZh": "适用的API destination，并配置connection管理所需认证。",
+    "pointsEn": [
+      "API destination",
+      "Connection provides supported target authentication"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-093",
+    "question": "Kinesis流量难预测，不想持续人工计算shard数量。可考虑哪种容量模式？",
+    "answerZh": "评估Kinesis Data Streams的on-demand模式。",
+    "pointsEn": [
+      "On-demand mode",
+      "Service-managed scaling reduces manual shard sizing"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-094",
+    "question": "Kinesis中同一设备的事件要按顺序处理。随机给每条记录不同partition key合适吗？",
+    "answerZh": "不合适；同一有序业务键应使用一致的partition key，并按分片顺序消费。",
+    "pointsEn": [
+      "Same ordered business key uses consistent partition key",
+      "Consume in shard order rather than scatter across shards"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-095",
+    "question": "数据要转换后进入S3供分析，可能是已落地CSV，也可能来自MSK/Kinesis持续流。只运行Glue crawler够吗？",
+    "answerZh": "不够；应运行实际Glue ETL作业：批作业可把CSV转Parquet，streaming ETL可从MSK/Kinesis消费并转换后写S3。",
+    "pointsEn": [
+      "Actual Glue batch or streaming ETL",
+      "Crawler discovers structure rather than transforming data"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-096",
+    "question": "分析员不写清洗代码，要可视化规范字段、分析数据质量、追溯处理来源，并共享重复使用的清洗步骤。可考虑什么？",
+    "answerZh": "在适用环境中使用Glue DataBrew；把转换步骤保存为可共享复用的recipe。",
+    "pointsEn": [
+      "Applicable DataBrew with reusable recipes",
+      "Profiles and lineage support quality/provenance analysis"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-097",
+    "question": "大量数据可以拆分并行，单台服务器越来越慢，而且处理必须留在公司机房。怎样用AWS的多节点方案扩展，为什么不能只不断加大一台机器？",
+    "answerZh": "评估在受支持Outposts上运行EMR的Spark/Hadoop等分布式作业。",
+    "pointsEn": [
+      "Distributed Spark/Hadoop processing on EMR on supported Outposts satisfies the on-premises constraint",
+      "Partition suitable work among nodes instead of only enlarging one server"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-102",
+    "question": "Lambda要偶尔查询受支持的Redshift，不想自己维护传统持久数据库连接。可以使用哪种调用接口？",
+    "answerZh": "Redshift Data API。",
+    "pointsEn": [
+      "Redshift Data API",
+      "Service API submits SQL/results without a traditional persistent client connection"
+    ]
+  }
+]

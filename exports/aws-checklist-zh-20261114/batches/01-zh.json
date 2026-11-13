@@ -1,0 +1,12 @@
+[
+  ["为实例关联具备 SSM 所需权限的实例角色", "使用 Session Manager，并通过 IAM 控制管理员的会话访问"],
+  ["AssumeRole 路径：受限角色信任调用方，调用方也获准 AssumeRole，从而取得临时凭证", "资源策略路径保留调用方原有身份，且要求服务支持资源策略", "两边账户的权限都必须允许这次访问"],
+  ["把策略附加到 IAM 组，再将用户加入该组", "经批准确需全面访问时，选择 AdministratorAccess，因为它授予 Action:* 和 Resource:*"],
+  ["通过 IAM Identity Center 管理用户和团队", "为组分配目标账户上的 permission set（权限集）"],
+  ["不能：用户池登录令牌不是 AWS 凭证", "通过身份池将登录身份换成临时 AWS 凭证", "由 IAM 角色限制客户端可对 S3 执行的操作"],
+  ["每个工作负载使用不同的 Kubernetes service account（服务账户）", "通过 IRSA 将服务账户关联到各自受限的 IAM 角色", "Pod 不再共用节点角色作为调用身份"],
+  ["Cognito 令牌交由 Cognito authorizer 验证", "自定义验证使用 Lambda authorizer", "IAM 凭证采用 AWS_IAM，并对请求签名"],
+  ["公开网站使用部署在公有子网中的 internet-facing ALB", "仅供办公室使用的网站采用 internal ALB"],
+  ["IPv4 出站通过部署在公有子网中的公有 NAT 网关", "IPv6 出站使用 egress-only internet gateway（仅出站互联网网关）"],
+  ["将 WAF web ACL 关联到实际承载请求的入口", "用内容规则过滤 SQL 注入和 XSS，用 IP set 控制来源 IP"]
+]

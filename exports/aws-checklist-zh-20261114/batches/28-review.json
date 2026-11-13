@@ -1,0 +1,59 @@
+{
+  "batch": "28",
+  "inputSha256": "7d9243112d659227c4268441be365212af2300f4c5469a37db39a4db134f47a1",
+  "outputSha256": "6b586a84183a46b63500b44a2f3f79616997ec027551aef4fafdd6f720b6abba",
+  "overall": "PASS",
+  "cards": [
+    {
+      "uid": "aws-rb2-20261107-pack-gsc-080",
+      "verdict": "PASS",
+      "note": "内容未变，沿用28-review.r1.json有效结果。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gsc-086",
+      "verdict": "PASS",
+      "note": "内容未变，沿用28-review.r1.json有效结果。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gsc-089",
+      "verdict": "PASS",
+      "note": "内容未变，沿用28-review.r1.json有效结果。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gsc-090",
+      "verdict": "PASS",
+      "note": "内容未变，沿用28-review.r1.json有效结果。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gsc-093",
+      "verdict": "PASS",
+      "note": "本次仅局部复核第2条，已准确保留所需分片数量的规划对象；第1条沿用28-review.r1.json有效结果。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gsc-094",
+      "verdict": "PASS",
+      "note": "内容未变，沿用28-review.r1.json有效结果。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gsc-095",
+      "verdict": "PASS",
+      "note": "内容未变，沿用28-review.r1.json有效结果。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gsc-096",
+      "verdict": "PASS",
+      "note": "内容未变，沿用28-review.r1.json有效结果。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gsc-097",
+      "verdict": "PASS",
+      "note": "内容未变，沿用28-review.r1.json有效结果。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gsc-102",
+      "verdict": "PASS",
+      "note": "内容未变，沿用28-review.r1.json有效结果。"
+    }
+  ],
+  "findings": []
+}

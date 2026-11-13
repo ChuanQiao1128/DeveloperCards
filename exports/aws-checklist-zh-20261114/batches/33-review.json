@@ -1,0 +1,49 @@
+{
+  "batch": "33",
+  "inputSha256": "ecb61eda1c3a689e175a401f3c32fd1a04ee5d99115d80a70e208e62b4d08006",
+  "outputSha256": "ca7730d864debfb4b86a348712dc0c7e794979ae6b9ebd6aaf28bc76cf91ac2e",
+  "overall": "PASS",
+  "cards": [
+    {
+      "uid": "aws-rb2-20261107-pack-cb02",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-cmp-m01",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-xa019",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-xa022",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-xa055",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-xb027",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-aws-rb2-domain1-normal-batch07-20261105-s3-bucket-key-request-cost",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gcl-005",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gcl-018",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gcl-023",
+      "verdict": "PASS"
+    }
+  ],
+  "findings": []
+}

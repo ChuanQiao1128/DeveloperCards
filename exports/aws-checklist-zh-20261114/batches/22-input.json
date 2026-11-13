@@ -1,0 +1,92 @@
+[
+  {
+    "uid": "aws-rb2-20261107-pack-gcl-004",
+    "question": "要把EC2 Auto Scaling每次活动的ID和成功/失败状态近实时存入S3，不影响实例启动。仅开Metric Streams能拿到这些明细吗？",
+    "answerZh": "不能；可按需要的频率调度Lambda，调用DescribeScalingActivities取得活动记录后写S3。",
+    "pointsEn": [
+      "Scheduled DescribeScalingActivities collection with Lambda to S3",
+      "Metric Streams carries numeric metrics rather than activity details"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gcl-006",
+    "question": "已有受支持的服务器端Web应用，希望少改代码，并少手工配置负载均衡、伸缩和部署环境。只给一台EC2就完成这些管理了吗？应考虑哪种托管应用方案？",
+    "answerZh": "没有；可评估Elastic Beanstalk托管应用环境。",
+    "pointsEn": [
+      "Elastic Beanstalk managed environment",
+      "Orchestrates deployment and related resources beyond one unmanaged instance"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gcl-007",
+    "question": "GraphQL API要先后从多个受支持数据源取数，再组合响应，不想在一个应用函数中手写全部调用编排。可怎样实现？",
+    "answerZh": "使用适用的AppSync pipeline resolver，把数据访问步骤组织成流水线函数。",
+    "pointsEn": [
+      "AppSync pipeline resolver",
+      "Pipeline functions sequentially combine supported data-source results"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gcl-008",
+    "question": "一个符合FSx File Gateway使用资格的既有混合Windows部署，用云端文件后端和机房缓存。FSx与本地网关分别承担什么？",
+    "answerZh": "FSx for Windows File Server保存云端共享文件；本地FSx File Gateway缓存访问数据，供机房客户端低延迟读取。",
+    "pointsEn": [
+      "FSx for Windows holds cloud shared files",
+      "FSx File Gateway caches access on premises"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gcl-009",
+    "question": "机房SFTP应用的文件实际存在NFS共享上，要用DataSync迁到已配置的EFS。DataSync按SFTP应用入口还是底层文件接口接入？",
+    "answerZh": "按实际NFS文件源配置DataSync source location，并通过机房侧适用agent访问源。",
+    "pointsEn": [
+      "NFS DataSync source with an on-premises agent",
+      "Connect to the underlying file interface, not the application's SFTP entry"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gcl-010",
+    "question": "已选EC2运行容器，想少维护Kubernetes节点和编排平台。EKS managed node group与仅用EC2 ASG管理主机有什么差别？",
+    "answerZh": "EKS提供托管Kubernetes控制面，managed node group管理适用节点生命周期；普通ASG主要伸缩主机，不提供完整Kubernetes编排。",
+    "pointsEn": [
+      "EKS control plane and managed node lifecycle",
+      "Ordinary ASG scales hosts without Kubernetes orchestration"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gcl-013",
+    "question": "RDS MySQL要创建读副本，创建前备份状态和长事务应怎样准备？",
+    "answerZh": "启用所需自动备份，保留期不为0；为减少初始复制影响，按建议等待长事务完成再安排创建。",
+    "pointsEn": [
+      "Nonzero automated-backup retention",
+      "Wait for long transactions as recommended to reduce initial-copy impact"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gcl-015",
+    "question": "Glue ETL定期处理持续新增的受支持S3文件输入，例如适用XML，不想每次重读全部旧输入。应使用什么进度机制？",
+    "answerZh": "使用适用的job bookmarks记录已处理进度。",
+    "pointsEn": [
+      "Glue job bookmarks",
+      "Track previously processed supported inputs between runs"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gcl-016",
+    "question": "已有MongoDB应用想少改访问方式并减少自管数据库工作。为什么可评估DocumentDB，而不是直接换成DynamoDB？",
+    "answerZh": "DocumentDB提供受支持的MongoDB兼容接口；DynamoDB是不同的访问API和数据模型。",
+    "pointsEn": [
+      "DocumentDB's supported MongoDB-compatible interface",
+      "Different DynamoDB APIs/model can require larger application changes"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gcl-021",
+    "question": "EC2跨AZ访问同一个EFS，需要网络挂载入口。多建access point，就等于各AZ已有网络入口吗？",
+    "answerZh": "不等于；网络入口是mount target，access point主要定义应用看到的目录和文件访问身份等。",
+    "pointsEn": [
+      "Mount target provides network entry",
+      "Access point controls directory/identity semantics, not network connectivity"
+    ]
+  }
+]

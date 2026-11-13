@@ -1,0 +1,91 @@
+[
+  {
+    "uid": "aws-rb2-20261107-pack-cc13",
+    "question": "S3文档允许持续修改上传，但需要误删后找回历史版本，应启用什么？为什么只看对象列表不够？",
+    "answerZh": "启用Versioning；恢复时检查对象版本，而不只看当前对象列表。",
+    "pointsEn": [
+      "Enable Versioning and inspect versions",
+      "Delete markers can hide current objects without removing retained historical versions"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-nb04",
+    "question": "数据库误改后要找回过去的数据，或内存缓存清空后要恢复。跨AZ当前副本能代替历史备份吗？",
+    "answerZh": "不能。RDS/Aurora或DynamoDB使用各自支持的备份/时间点恢复；ElastiCache的Redis OSS/Valkey可从快照恢复到新缓存。",
+    "pointsEn": [
+      "Current replicas do not replace historical backups",
+      "Use the service's backup/PITR or snapshot-restore capability"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-nb05",
+    "question": "EBS快照或适用AMI误删后，要在保留窗口内方便恢复，选什么？若对EBS快照要求删除请求本身被阻止呢？",
+    "answerZh": "删除后恢复用预先配置、匹配资源的Recycle Bin保留规则；阻止EBS快照删除用处于有效锁定期的EBS Snapshot Lock。",
+    "pointsEn": [
+      "After-deletion recovery: matching Recycle Bin rules",
+      "Prevent EBS snapshot deletion: effective Snapshot Lock"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-nb08",
+    "question": "ALB后Web实例本机保存会话。开启sticky sessions会怎样分配请求？能保证实例故障后会话还在吗？",
+    "answerZh": "同一会话尽量继续到同一目标；粘滞不复制本机会话。要跨实例保留状态，可把会话外置到DynamoDB或Redis等共享存储。",
+    "pointsEn": [
+      "Stickiness favors the same target but does not replicate local sessions or preserve them through instance failure"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-new04",
+    "question": "S3需要向另一桶持续复制，还要包括历史对象。同Region和跨Region怎样选，只打开live replication够吗？",
+    "answerZh": "同Region选SRR，跨Region选CRR；两者可用于受支持的跨账户目标。live replication处理符合规则的新版本，历史对象用Batch Replication等有效补复制。",
+    "pointsEn": [
+      "Same Region: SRR; different Region: CRR",
+      "Live replication needs a valid historical-object backfill"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-ns03",
+    "question": "要自动安排备份周期与到期保留。仅管理EBS快照或EBS-backed AMI，与统一保护多个服务时，工具怎样选？",
+    "answerZh": "EBS快照和EBS-backed AMI生命周期用Data Lifecycle Manager，可配置周期创建、到期删除与跨Region复制；跨服务统一备份计划用AWS Backup。",
+    "pointsEn": [
+      "DLM for EBS snapshot/AMI lifecycle",
+      "AWS Backup for supported cross-service scheduling and retention"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xb016",
+    "question": "Auto Scaling实例启动后、终止前都要向审计系统提交信息；终止时不能在上报前就删掉实例。应使用什么机制？",
+    "answerZh": "为启动和终止配置lifecycle hooks，触发上报动作，在等待期间完成后再继续生命周期。",
+    "pointsEn": [
+      "Launch and termination lifecycle hooks",
+      "Complete reporting in the wait state before continuing"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xb030",
+    "question": "公司安装Outposts rack，AWS维护机柜内设备。公司还要为现场运行保障什么，为什么不能把故障余量都交给AWS？",
+    "answerZh": "公司负责场地物理访问控制、供电和网络连接，并规划足够工作负载容量及故障备用容量。",
+    "pointsEn": [
+      "Customer supplies site access, power, networking, and capacity reserve",
+      "Finite rack capacity requires advance failure/maintenance planning"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gcl-011",
+    "question": "新版本要先独立验证，旧版本继续服务，通过后再切流。蓝绿部署为什么比直接改生产环境更适合？",
+    "answerZh": "建立并行的新环境，验证后按受支持机制切换入口；有状态数据还须保持适用同步。",
+    "pointsEn": [
+      "Build and validate a parallel environment before switching traffic",
+      "Isolation keeps unverified changes away from production users until validation"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gcl-012",
+    "question": "数据库必须自管在EC2，要求故障后自动接管。只留一台机器加AMI，或简单建两台不同AZ机器，够吗？",
+    "answerZh": "不够；需要跨故障域的数据复制，并配置支持自动故障接管的数据库集群机制。",
+    "pointsEn": [
+      "Cross-failure-domain data replication and automatic database-cluster failover",
+      "Extra machines or AMIs alone do not provide data and takeover coordination"
+    ]
+  }
+]

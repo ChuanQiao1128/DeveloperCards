@@ -1,0 +1,63 @@
+{
+  "batch": "07",
+  "inputSha256": "1d566c8d95f99341f9a5029389c06754a80db0d17cc820cdc0ef4e8846ae47c7",
+  "outputSha256": "cc85b0cf07ca9e3627f6cb242ebb4b96992265a4120e65df2cc5f5bda4f328e5",
+  "overall": "FAIL",
+  "cards": [
+    {
+      "uid": "aws-rb2-20261107-pack-xa014",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-xa015",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-xa017",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-xa018",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-xa020",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-xa021",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-xa023",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-xa025",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-xa026",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-xa027",
+      "verdict": "FAIL",
+      "note": "两条中的 apex 均误译为顶级域名，应指本题根域名 example.com。"
+    }
+  ],
+  "findings": [
+    {
+      "uid": "aws-rb2-20261107-pack-xa027",
+      "pointIndex": 0,
+      "description": "apex 在本题指 example.com 这一根域名/裸域名；“顶级域名”通常指 .com 这一层，改变了证书必须覆盖的名称。",
+      "suggestedChinese": "证书须覆盖根域名 example.com 和两个所需子域名，可用根域名加通配符，或显式列出各名称"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-xa027",
+      "pointIndex": 1,
+      "description": "apex 被译为“顶级域名”，同样混淆 example.com 与 .com；此处排除的是根域名 example.com 本身。",
+      "suggestedChinese": "单独使用通配符不会覆盖根域名 example.com 本身"
+    }
+  ]
+}

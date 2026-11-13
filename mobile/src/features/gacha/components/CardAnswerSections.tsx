@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import CodeBlock from '../../../components/CodeBlock';
 import type { CardExport } from '../../../types/deckExport';
+import { chineseAnswerChecklist } from '../../../content/checklistLocalization';
 import { splitKeyLine, type AnswerKeyLine } from '../../../content/answerKeyLine';
 import { stripInlineCode } from '../../../content/inlineCode';
 import { normalizeCodeLanguage, renderSimpleMarkdown } from '../session/reviewContentHelpers';
@@ -140,9 +141,8 @@ export function CardAnswerSections(props: { card: CardExport; testID?: string; o
 
     // 2. Self-Check Points (mustAnswer)
     if (t.mustAnswer && t.mustAnswer.length > 0) {
-      const zhPoints = t['zh-CN']?.mustAnswer;
-      const hasChineseChecklist = Array.isArray(zhPoints) && zhPoints.length === t.mustAnswer.length &&
-        zhPoints.every((point) => typeof point === 'string' && point.trim().length > 0);
+      const zhPoints = chineseAnswerChecklist(card);
+      const hasChineseChecklist = zhPoints !== null;
       const needsEnglishDisclosure = isZh && !hasChineseChecklist;
       const points = isZh && hasChineseChecklist ? zhPoints! : t.mustAnswer;
       sections.push({

@@ -1,0 +1,92 @@
+[
+  {
+    "uid": "aws-rb2-20261107-pack-gcl-024",
+    "question": "EventBridge规则目标没收到流量，要知道“有没有匹配”和“有没有调用目标”。只查看DLQ或CloudTrail够吗？",
+    "answerZh": "不够；查看CloudWatch中AWS/Events对应的匹配、调用及失败等指标。",
+    "pointsEn": [
+      "AWS/Events CloudWatch matching/invocation/failure metrics",
+      "Separate matching from delivery rather than inferring from DLQ/audit alone"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gcl-026",
+    "question": "S3数据集有数千独立项，要用Step Functions按需大规模并行处理。Inline Map和Distributed Map怎样选？",
+    "answerZh": "评估Distributed Map。",
+    "pointsEn": [
+      "Distributed Map",
+      "Independent child executions avoid concentrating concurrency/history in one inline execution"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gcl-027",
+    "question": "应用代码须实际部署到靠近用户的位置：普通城市低延迟部署，与运营商5G网络边缘场景，怎样区分Local Zones和Wavelength？",
+    "answerZh": "城市附近的区域扩展评估Local Zones；运营商网络边缘场景评估Wavelength。",
+    "pointsEn": [
+      "City extension: Local Zones; carrier edge: Wavelength",
+      "Both place workloads, with different locations/network integration"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gcl-028",
+    "question": "EKS Fargate Pod要使用已选好的EFS，能照搬ECS任务的volume声明，或假设动态供给必然支持吗？",
+    "answerZh": "不能；按EKS支持方式用静态PV/PVC关联EFS，核对Fargate的供给限制。",
+    "pointsEn": [
+      "Use supported static PV/PVC for EFS",
+      "EKS differs from ECS and this Fargate path lacks dynamic provisioning"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gcl-029",
+    "question": "S3数据分布在多个Region，应用希望用统一入口就近读写。仅开启桶间复制就够吗？",
+    "answerZh": "不够；可用S3 Multi-Region Access Point提供统一对象请求入口，复制另行负责数据分布。",
+    "pointsEn": [
+      "MRAP for unified request entry; replication for data distribution",
+      "Routing and copying solve separate requirements"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gcl-030",
+    "question": "Lambda经已连通的对等VPC读取同一物理AZ的跨账户EFS，权限已满足。仅给函数加VPC配置，代码就能直接读文件吗？",
+    "answerZh": "不能；还须配置受支持的EFS接入点和函数本地挂载路径。",
+    "pointsEn": [
+      "Configure EFS access point and local function mount path",
+      "Networking alone does not expose the filesystem to code"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gcl-031",
+    "question": "Windows应用需要共享块存储接口，还要托管的跨AZ故障切换。普通SMB文件共享或单AZ EBS Multi-Attach等价吗？",
+    "answerZh": "不等价；评估适用Multi-AZ FSx for ONTAP的iSCSI块访问。",
+    "pointsEn": [
+      "Applicable Multi-AZ ONTAP iSCSI",
+      "Block semantics and cross-AZ managed availability differ from SMB or AZ-scoped EBS"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gcl-032",
+    "question": "已有App2Container使用资格，旧Web应用及环境受支持，要分析并打包成容器交ECS/EKS运行。工具与运行平台分别负责什么？",
+    "answerZh": "App2Container分析、容器化并生成适用部署工件；ECS/EKS承担容器的实际编排运行。",
+    "pointsEn": [
+      "App2Container creates container/deployment artifacts",
+      "ECS/EKS orchestrates runtime execution"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-001",
+    "question": "多台Linux实例要共同使用同一批文件，不想各自保留一份独立副本。应怎样存，才能让其他实例读取已提交的新内容？",
+    "answerZh": "把文件放在同一个EFS文件系统，让实例共同挂载。",
+    "pointsEn": [
+      "Use one shared EFS filesystem over NFS rather than independent block-volume copies",
+      "Close-to-open visibility: the writer closes the file and the reader opens it again"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-003",
+    "question": "ECS容器要读写已有EFS，网络和权限都已满足。只创建文件系统，容器目录会自动接上吗？",
+    "answerZh": "不会；在任务定义声明EFS卷，并把该卷挂到容器所需目录。",
+    "pointsEn": [
+      "EFS volume in task definition",
+      "Container mount point connects that volume to its directory"
+    ]
+  }
+]

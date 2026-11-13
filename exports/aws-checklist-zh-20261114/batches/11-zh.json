@@ -1,0 +1,12 @@
+[
+  ["使用 DataSync 将 SMB 数据传到 FSx，并提供复制元数据所需的权限", "同时保留 NTFS ACL 和文件内容"],
+  ["节点需要连通私有 Kubernetes API endpoint，并具备集群安全组所需权限", "EKS interface endpoint 面向管理 API，不能替代 Kubernetes API endpoint"],
+  ["在偏好设置中启用 S3 日志，并选择存储桶", "配置必要的写入和加密权限；仅成功登录不会自动归档"],
+  ["由 task role 承载应用访问 S3 所需的权限", "execution role 用于代理执行操作，不是应用使用的凭证身份"],
+  ["在账户和 Region 中启用 Default Host Management Configuration，并使用其管理角色", "它提供 SSM 管理权限，与应用权限分开"],
+  ["使用 ECR 私有仓库，并启用推送时 basic scan", "按需要手动扫描已有镜像"],
+  ["每个应用使用单独的 access point", "通过 access point 策略限制身份和前缀，同时共享原有对象"],
+  ["替换为创建时即关联安全组的 NLB，并配置可信来源规则", "切换流量，并关闭原来不受限制的入口"],
+  ["使用 AWSEC2-PatchLoadBalancerInstance", "打补丁前先取消注册并排空流量，完成后重新注册"],
+  ["使用 Client VPN，并按用户或组授予网络访问权限", "它连接的是个人设备，而不是固定办公室网络"]
+]

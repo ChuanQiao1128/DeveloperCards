@@ -1,0 +1,59 @@
+{
+  "batch": "04",
+  "inputSha256": "6f0b56948cdb89b9e7ebb48027d6afcf353384392d6b6542cb2a0ecf5b5e4e47",
+  "outputSha256": "4f868da497cfd931eeb0acf0a896fc044448272cf0554458779d17edeb18bd79",
+  "overall": "PASS",
+  "cards": [
+    {
+      "uid": "aws-rb2-20261107-pack-cmp-m04",
+      "verdict": "PASS",
+      "note": "内容未变，沿用04-review.r1.json有效结果。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-cmp-m05",
+      "verdict": "PASS",
+      "note": "内容未变，沿用04-review.r1.json有效结果。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-cmp-m06",
+      "verdict": "PASS",
+      "note": "本次仅局部复核第1条修订，已明确权限属于 IAM 角色；第2条沿用04-review.r1.json有效结果。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-cmp-m07",
+      "verdict": "PASS",
+      "note": "内容未变，沿用04-review.r1.json有效结果。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-cmp-m08",
+      "verdict": "PASS",
+      "note": "内容未变，沿用04-review.r1.json有效结果。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-cmp-m09",
+      "verdict": "PASS",
+      "note": "内容未变，沿用04-review.r1.json有效结果。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-cmp-m10",
+      "verdict": "PASS",
+      "note": "内容未变，沿用04-review.r1.json有效结果。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-cmp-m11",
+      "verdict": "PASS",
+      "note": "内容未变，沿用04-review.r1.json有效结果。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-cmp-m16",
+      "verdict": "PASS",
+      "note": "内容未变，沿用04-review.r1.json有效结果。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-cmp-m20",
+      "verdict": "PASS",
+      "note": "内容未变，沿用04-review.r1.json有效结果。"
+    }
+  ],
+  "findings": []
+}

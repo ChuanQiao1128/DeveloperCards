@@ -1,0 +1,49 @@
+{
+  "batch": "37",
+  "inputSha256": "4d5a66e8852d4788a5b1517dc4df5b12388596ade14f64effcac76fb2c4d82c7",
+  "outputSha256": "03fb2dd530278b72f59cbabf9d2edfdc4fec913e7f46abe60bf547080bd4d753",
+  "overall": "PASS",
+  "cards": [
+    {
+      "uid": "aws-rb2-20261107-pack-vc-007",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-vc-010",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-vc-012",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-vc-016",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261108-pack-d1fix-shield-entry",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261108-pack-d1fix-shield-advanced",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261108-pack-d1fix-root-password",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261108-pack-d1fix-api-wildcard",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261108-pack-d1fix-data-residency",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261108-pack-d1fix-kms-ou",
+      "verdict": "PASS"
+    }
+  ],
+  "findings": []
+}

@@ -1,0 +1,92 @@
+[
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-130",
+    "question": "同一URL按语言返回不同内容。CloudFront只转发语言请求头，但缓存键不区分语言，会有什么问题？",
+    "answerZh": "不同语言可能共用同一缓存响应；应把真正影响内容版本的值纳入适用缓存键。",
+    "pointsEn": [
+      "Different languages may reuse the same cached response",
+      "Forwarding a header does not make the cache key distinguish language variants"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-131",
+    "question": "S3源端已更新，CloudFront还可能返回旧响应。单次清除旧副本，与每次复用前验证新鲜度，分别用什么？",
+    "answerZh": "单次更新可用invalidation使旧对象失效；持续重验证用符合要求的no-cache或零有效期策略。",
+    "pointsEn": [
+      "One-time: invalidation",
+      "Before each reuse: compatible revalidation/zero-lifetime policy"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-132",
+    "question": "静态文件在S3，动态接口在ALB，希望用户用同一个CloudFront域名。必须把两类内容搬到同一个源站吗？",
+    "answerZh": "不必；为分发配置多个origin，并用路径cache behavior把请求送到相应源站。",
+    "pointsEn": [
+      "Multiple origins with path behaviors",
+      "Unified entry does not require one backend origin"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-133",
+    "question": "同样只跑几分钟：Python函数需要1GB内存，另一项是现成Windows容器。两者能直接用标准Lambda吗？不能的那项可选什么执行环境，为什么？",
+    "answerZh": "Python函数可用受支持的Python运行时并配置1GB内存；Windows容器不能直接用标准Lambda，可用受支持的ECS/Fargate Windows环境或Batch的Fargate Windows作业。",
+    "pointsEn": [
+      "A supported Python Lambda runtime can use 1 GB of memory",
+      "Standard Lambda uses a Linux execution environment, so a Windows container instead needs a supported Windows container execution environment"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-134",
+    "question": "Lambda既有“限制最多同时运行多少”，又有“提前准备执行环境减少冷启动”的需求。reserved和provisioned concurrency各解决什么？",
+    "answerZh": "reserved concurrency预留并限制并发额度；provisioned concurrency预先初始化相应执行环境。",
+    "pointsEn": [
+      "Reserved: reserved/capped execution slots",
+      "Provisioned: initialized environments"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-135",
+    "question": "Java 11 Lambda初始化慢，希望减少扩容冷启动，没有严格的预热环境保证要求。怎样改善，为什么先比较SnapStart？",
+    "answerZh": "发布适用版本时保存初始化状态快照，新环境可从快照恢复。",
+    "pointsEn": [
+      "Applicable SnapStart initialization snapshot/restore",
+      "Reuses costly initialization without managed-Java SnapStart feature charges"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-137",
+    "question": "ECS要随业务负载自动增加任务副本；如果用EC2承载，新任务却放不下。服务伸缩和底层容量伸缩各管什么？",
+    "answerZh": "Service Auto Scaling按CloudWatch指标增减服务任务数；EC2承载时，还要用适用容量提供者或实例伸缩补足底层资源。",
+    "pointsEn": [
+      "Service scaling changes task count",
+      "EC2 hosting capacity separately needs scaling to place those tasks"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-138",
+    "question": "EKS已由HPA增加Pod副本，但Pod因节点资源不足一直Pending。继续只提高Pod副本数有用吗？",
+    "answerZh": "不够；还要用适用的节点自动伸缩能力增加可调度节点，如Karpenter或Cluster Autoscaler。",
+    "pointsEn": [
+      "Applicable node autoscaling",
+      "HPA increases Pods, not the node capacity they require"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-139",
+    "question": "必须保留Kubernetes部署对象与API，或没有这项要求、只想少维护主机并降低编排成本，EKS和ECS怎样选？",
+    "answerZh": "保留Kubernetes方式优先评估EKS；没有该要求时可评估ECS配Fargate。",
+    "pointsEn": [
+      "Required Kubernetes interface: EKS",
+      "Otherwise ECS/Fargate may avoid EKS orchestration charges while reducing host management"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-140",
+    "question": "容器必须继续在机房运行，但希望由ECS管理。把管理接到AWS，会自动把计算也迁到Fargate吗？",
+    "answerZh": "不会；可评估ECS Anywhere把适用外部实例纳入管理，工作负载仍在本地主机执行。",
+    "pointsEn": [
+      "ECS Anywhere for supported external hosts",
+      "Management can be in AWS while computation stays local"
+    ]
+  }
+]

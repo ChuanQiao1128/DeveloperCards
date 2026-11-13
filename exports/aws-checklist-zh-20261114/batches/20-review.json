@@ -1,0 +1,59 @@
+{
+  "batch": "20",
+  "inputSha256": "85f5f1ccc45fef491b3ab5b314bc19efa7a9a945abb4f02a39ad2e926e448291",
+  "outputSha256": "cb949e4f918a6182a52635556758660b2423313cacb1fc2df22d1c40e76a14e6",
+  "overall": "PASS",
+  "cards": [
+    {
+      "uid": "aws-rb2-20261107-pack-xb006",
+      "verdict": "PASS",
+      "note": "本次仅局部复核所报逻辑或范围修订，已准确对齐；该卡未变条目沿用20-review.r1.json有效结果。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-xb010",
+      "verdict": "PASS",
+      "note": "本次仅局部复核所报逻辑或范围修订，已准确对齐；该卡未变条目沿用20-review.r1.json有效结果。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-xb011",
+      "verdict": "PASS",
+      "note": "内容未变，沿用20-review.r1.json有效结果。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-xb013",
+      "verdict": "PASS",
+      "note": "内容未变，沿用20-review.r1.json有效结果。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-xb019",
+      "verdict": "PASS",
+      "note": "内容未变，沿用20-review.r1.json有效结果。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-xb020",
+      "verdict": "PASS",
+      "note": "内容未变，沿用20-review.r1.json有效结果。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-xb029",
+      "verdict": "PASS",
+      "note": "内容未变，沿用20-review.r1.json有效结果。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-xb031",
+      "verdict": "PASS",
+      "note": "内容未变，沿用20-review.r1.json有效结果。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-xb032",
+      "verdict": "PASS",
+      "note": "内容未变，沿用20-review.r1.json有效结果。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-xb034",
+      "verdict": "PASS",
+      "note": "内容未变，沿用20-review.r1.json有效结果。"
+    }
+  ],
+  "findings": []
+}

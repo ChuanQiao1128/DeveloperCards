@@ -1,0 +1,92 @@
+[
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-103",
+    "question": "分析员主要会SQL，想用仓库数据训练模型并在SQL中调用预测，不想另外手写整套模型服务。Redshift有什么适用能力？",
+    "answerZh": "评估Redshift ML。",
+    "pointsEn": [
+      "Redshift ML",
+      "Integrates model creation/prediction with SQL workflows"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-104",
+    "question": "持续新增的文档需要按正文关键词检索。仅把文件放S3并加几个标签，等于已经有全文搜索了吗？",
+    "answerZh": "没有；应把适用文本建立搜索索引，例如使用OpenSearch。",
+    "pointsEn": [
+      "Full-text index such as OpenSearch",
+      "Index document contents, not just object attributes"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-105",
+    "question": "客户评论已经是文字，要识别情绪和实体。应先做语音转录、OCR，还是文本理解？",
+    "answerZh": "使用适用的文本理解能力，如Amazon Comprehend。",
+    "pointsEn": [
+      "Text understanding such as Comprehend",
+      "Input is already text, so media-to-text conversion is unnecessary"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-106",
+    "question": "非英语录音已转成原语言文字，但下游分析只接受英语。应直接做情绪分析，还是先补哪一步？",
+    "answerZh": "先用适用的翻译能力把文字转换为英语，例如Amazon Translate。",
+    "pointsEn": [
+      "Translate text into English first",
+      "Transcription alone does not change the language required downstream"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-107",
+    "question": "用户上传图片，需要用现成模型识别常见物体或审核不适宜内容，不想自建视觉训练流程。可用什么？",
+    "answerZh": "评估Amazon Rekognition对应的图像识别或内容审核能力。",
+    "pointsEn": [
+      "Applicable Rekognition capability",
+      "Pretrained analysis avoids custom training for supported tasks"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-109",
+    "question": "已有Forecast使用资格，团队缺少ML建模经验，只需受支持的标准时序预测。与自行在SageMaker训练部署模型相比，应怎样取舍？",
+    "answerZh": "优先评估符合需求的专用托管预测能力，如Forecast；需要更多定制控制时再考虑自行建模。",
+    "pointsEn": [
+      "Suitable specialized managed forecasting first",
+      "More custom control also requires more modeling and operations"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-110",
+    "question": "已有视频文件的格式或码率不适合目标播放器。只放到CloudFront缓存，就能自动变成合适的视频版本吗？",
+    "answerZh": "先进行适用转码，再分发输出。例如用托管MediaConvert；也可在EC2自管编码程序，但要承担更多程序与服务器维护。",
+    "pointsEn": [
+      "Transcode then distribute",
+      "Cache placement does not change video encoding"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-111",
+    "question": "实例CPU利用率不高，内存却持续不足。应只增加同类实例数量，还是先按什么调整规格？",
+    "answerZh": "先按真实资源瓶颈评估更合适的内存规格，例如R5这类memory-optimized实例。",
+    "pointsEn": [
+      "Evaluate more suitable memory capacity",
+      "Match the constrained resource rather than spare CPU"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-112",
+    "question": "ASG已设最小和最大实例数，流量增长时就会自动按目标CPU扩容吗？",
+    "answerZh": "不会只因设置上下限就按CPU伸缩；应配置适用的动态策略，例如target tracking。",
+    "pointsEn": [
+      "Configure target tracking or another applicable dynamic policy",
+      "Min/max bounds do not define metric-driven scaling"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-113",
+    "question": "高峰到来前就得准备实例：已知每天固定开场时间，与需要从历史流量预测高峰，扩容怎样安排？",
+    "answerZh": "已知日历和容量用scheduled scaling；按历史规律估计容量可用predictive scaling，并配合实时动态调整。",
+    "pointsEn": [
+      "Known schedule: scheduled scaling",
+      "Historical prediction: predictive scaling, with dynamic adjustments"
+    ]
+  }
+]

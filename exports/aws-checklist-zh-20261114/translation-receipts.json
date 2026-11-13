@@ -1,0 +1,306 @@
+[
+  {
+    "batch": "01",
+    "inputSha256": "a675dfabd3e9cea94e18166bec24db03cf1c2679062640cb37a36c25eb404341",
+    "outputSha256": "d2693d1bf10d59ae3111c4db8879213298b7f82953ea4ae99576667295ca1517",
+    "cards": 10,
+    "points": 24,
+    "semanticReview": "PASS"
+  },
+  {
+    "batch": "02",
+    "inputSha256": "5bf31ce948c228a4abd1d8b39a8a44076ba1a55b873736917478521a3da5b38d",
+    "outputSha256": "f38e73c24e94a2b27f34bf6a416f3ae1e3b13bdb22b25eda1c2bfa85d6e54c78",
+    "cards": 10,
+    "points": 22,
+    "semanticReview": "PASS"
+  },
+  {
+    "batch": "03",
+    "inputSha256": "1a13943da0d071ae1222d2ad95a517889b9c29162077c974b84cf049e73fb8bc",
+    "outputSha256": "e5ec1d986237d25c2ef7266befc6a5d008c613d7fe4986a0c87b9ab0b0470612",
+    "cards": 10,
+    "points": 20,
+    "semanticReview": "PASS"
+  },
+  {
+    "batch": "04",
+    "inputSha256": "6f0b56948cdb89b9e7ebb48027d6afcf353384392d6b6542cb2a0ecf5b5e4e47",
+    "outputSha256": "4f868da497cfd931eeb0acf0a896fc044448272cf0554458779d17edeb18bd79",
+    "cards": 10,
+    "points": 20,
+    "semanticReview": "PASS"
+  },
+  {
+    "batch": "05",
+    "inputSha256": "77a31056d77e61acc4528ab823666aef73eb078ee711f4f69e980a127f6ca4c0",
+    "outputSha256": "887a63022c630b2deb1d74454d645f42733d40c9bbee0a1516ed7517c9841b5b",
+    "cards": 10,
+    "points": 20,
+    "semanticReview": "PASS"
+  },
+  {
+    "batch": "06",
+    "inputSha256": "316d9651ee8a80afcd7c5913cda37de4a952e37f9b224fcb3f82c7082036086a",
+    "outputSha256": "ca23ffbe15e15fcc072ba32b7bd48e982daa22f78f39c1cae296a884e83c7989",
+    "cards": 10,
+    "points": 20,
+    "semanticReview": "PASS"
+  },
+  {
+    "batch": "07",
+    "inputSha256": "1d566c8d95f99341f9a5029389c06754a80db0d17cc820cdc0ef4e8846ae47c7",
+    "outputSha256": "ed1559544845ecf63e26ee9815d2e287ad8315617c6ecd2f6e0bda28d5fcdee4",
+    "cards": 10,
+    "points": 19,
+    "semanticReview": "PASS"
+  },
+  {
+    "batch": "08",
+    "inputSha256": "28f62b8127b6a908872122b715cab16cf80963a9146554c1075ec267bae3c557",
+    "outputSha256": "0963fbe469b2053e31129cf37a422bf66a4156bf22660b5fa75f6204c3a5135c",
+    "cards": 10,
+    "points": 20,
+    "semanticReview": "PASS"
+  },
+  {
+    "batch": "09",
+    "inputSha256": "e3967b993e6d86a0860910e92e2b249224a26c0dd041394f2157462cf795adb2",
+    "outputSha256": "c3ace5d95b7dd126f1ae394844fa9317e8e31a2cc72f9e3ad3eac18460c69775",
+    "cards": 10,
+    "points": 20,
+    "semanticReview": "PASS"
+  },
+  {
+    "batch": "10",
+    "inputSha256": "7a39c15bed835b7ee121cbb81a6a6c75b4aac807f6f321e9ca09d177e7ae08a3",
+    "outputSha256": "5cfc4e836da7e88aa78dcbd388c59e2aac123046d9aaf7ff54927a7616b44480",
+    "cards": 10,
+    "points": 20,
+    "semanticReview": "PASS"
+  },
+  {
+    "batch": "11",
+    "inputSha256": "e948924ba9fb4d0b270a5db2b77d3dbbae9311ffd806101d942e982c2df4d0ba",
+    "outputSha256": "6bda948d43232c9f5152deb9e9e31b9b6880ab377ad1047977adec93bf981156",
+    "cards": 10,
+    "points": 20,
+    "semanticReview": "PASS"
+  },
+  {
+    "batch": "12",
+    "inputSha256": "dbb5786513bb2bf47460c2ef098197ca7510fde319b3d2a8c3ea7d79e885a47b",
+    "outputSha256": "2af1d38ee6c5cf1bd5e46af07b84a3dff7bca868072a0c3c6cd01d494777362d",
+    "cards": 10,
+    "points": 19,
+    "semanticReview": "PASS"
+  },
+  {
+    "batch": "13",
+    "inputSha256": "6c53938eb2162214289d50649229fbd4691db2535bfa664093c7df11d35bfdd3",
+    "outputSha256": "87fb591d84896b6f933cc54890fdb2396b9b44e2db08ec0aef989c559f9962f2",
+    "cards": 10,
+    "points": 19,
+    "semanticReview": "PASS"
+  },
+  {
+    "batch": "14",
+    "inputSha256": "dfc403abc2c9b60747123ee1aeb2756bb1054a1c7c1f36392e3faca8c35e4d8b",
+    "outputSha256": "6421bc40f5fa93617486cd71f3861162a4a76ff9119a497ad317993f0612350d",
+    "cards": 10,
+    "points": 20,
+    "semanticReview": "PASS"
+  },
+  {
+    "batch": "15",
+    "inputSha256": "2d5425d7a915ed76b0c552c2f9bbb4c1a0d9cd06e671cb641dadb333bd02b813",
+    "outputSha256": "0972a2269aeed0a6757527b441476c15bc3fceebc0f6086a4be62de6a36b935f",
+    "cards": 10,
+    "points": 19,
+    "semanticReview": "PASS"
+  },
+  {
+    "batch": "16",
+    "inputSha256": "0570e14b90a74a12c7e73a68445cc126173a5e51e869cb39340a0581e84d2a2a",
+    "outputSha256": "75cd2f75cf6e9dafcb1cde991a657c02be4c77d65764d8d63c74bcc366dae274",
+    "cards": 10,
+    "points": 19,
+    "semanticReview": "PASS"
+  },
+  {
+    "batch": "17",
+    "inputSha256": "6bffe3f396fadcf35814977d39fb178701a22fc1edc623b08ddf9e175f69aef3",
+    "outputSha256": "6a65b477c2acb6f64c83e19be40cc0761d22c67c85467d466ed54920f8de6335",
+    "cards": 10,
+    "points": 19,
+    "semanticReview": "PASS"
+  },
+  {
+    "batch": "18",
+    "inputSha256": "e5e12c445cf346d65df88db43b2f453572b7495f34e6da4fbf9214c1f200f574",
+    "outputSha256": "3c177b20ca2ea7c12f613d00c2333ac15a737b96f892b9ce8d960a9b08cbbfb6",
+    "cards": 10,
+    "points": 20,
+    "semanticReview": "PASS"
+  },
+  {
+    "batch": "19",
+    "inputSha256": "196e4a344481cc7cf0733108b255554881ab90161f696e84c8431fd60cc62295",
+    "outputSha256": "b8c962513afb706a7a52f4e9780ff7a6c190441b3f25eb177e17fb21f5a87541",
+    "cards": 10,
+    "points": 20,
+    "semanticReview": "PASS"
+  },
+  {
+    "batch": "20",
+    "inputSha256": "85f5f1ccc45fef491b3ab5b314bc19efa7a9a945abb4f02a39ad2e926e448291",
+    "outputSha256": "cb949e4f918a6182a52635556758660b2423313cacb1fc2df22d1c40e76a14e6",
+    "cards": 10,
+    "points": 20,
+    "semanticReview": "PASS"
+  },
+  {
+    "batch": "21",
+    "inputSha256": "0732131650f92dcf2d7fe6440f121e5533ea50cb16b25e091d696835282d0de8",
+    "outputSha256": "d521be2279aada6b5e26cd5132354a501ce764a0a2b061c3fe4908282ff690bd",
+    "cards": 10,
+    "points": 20,
+    "semanticReview": "PASS"
+  },
+  {
+    "batch": "22",
+    "inputSha256": "f3ef229118f4a164a70c3467396b950d427357fcb5ce192dbea40cf9e2d844d3",
+    "outputSha256": "61f0aa5769f0955b894963023ce8698640791145c1518b7e816f5363a8a644f1",
+    "cards": 10,
+    "points": 20,
+    "semanticReview": "PASS"
+  },
+  {
+    "batch": "23",
+    "inputSha256": "ce443fc9d3f471579691c7ac691dc7a205c18371006fc5f7d2fb7c54492d5c94",
+    "outputSha256": "8fa7de9f530a1e2dbfd4d7cae156c87d42a0dc38d07f3c2c13d769bfe3bae936",
+    "cards": 10,
+    "points": 20,
+    "semanticReview": "PASS"
+  },
+  {
+    "batch": "24",
+    "inputSha256": "b95eef1fb8c37e86807ed041cde682f092b70bbd72bd5984254065a8d6242bb4",
+    "outputSha256": "7b4f30efe7f311e2abc9c5e871706d8e198e7b13c4b731ce45ad703bbe1367ce",
+    "cards": 10,
+    "points": 20,
+    "semanticReview": "PASS"
+  },
+  {
+    "batch": "25",
+    "inputSha256": "07316c76af216587ce9bd9b02da2d2972d7861ccae14c8d39bdc5f9a46aa5383",
+    "outputSha256": "ff9d6a6b8bfd77994c3149a138b392ec423ab69885d2fcfed31f2fc9aa549239",
+    "cards": 10,
+    "points": 20,
+    "semanticReview": "PASS"
+  },
+  {
+    "batch": "26",
+    "inputSha256": "37213c0e5ca496cec7b1fdccb4c3d1983c5016d8a2f8f376d2d255211a9c4d39",
+    "outputSha256": "949d0f558753f5bf362bd9d85e2dd0ef803d2ef107862f4b7076a1166fe7f610",
+    "cards": 10,
+    "points": 20,
+    "semanticReview": "PASS"
+  },
+  {
+    "batch": "27",
+    "inputSha256": "d9295572488da64fa3e154d39d4f509414bee31831f47f9ab1a3482e665f622e",
+    "outputSha256": "de3b0e7a39187259a4d07b34ced56c0e517fcf2563563e672a9057a4902a22a2",
+    "cards": 10,
+    "points": 20,
+    "semanticReview": "PASS"
+  },
+  {
+    "batch": "28",
+    "inputSha256": "7d9243112d659227c4268441be365212af2300f4c5469a37db39a4db134f47a1",
+    "outputSha256": "6b586a84183a46b63500b44a2f3f79616997ec027551aef4fafdd6f720b6abba",
+    "cards": 10,
+    "points": 20,
+    "semanticReview": "PASS"
+  },
+  {
+    "batch": "29",
+    "inputSha256": "a9aa1c576f76e2148ae63351fc4590de9c61926a2141dc50c5763dc08891b828",
+    "outputSha256": "e224f40a4c8f16ef6967e9fa1b10f2a8a5055ecfbfcdda60d9d99b0e6ab5fcf1",
+    "cards": 10,
+    "points": 20,
+    "semanticReview": "PASS"
+  },
+  {
+    "batch": "30",
+    "inputSha256": "dd1db2ef3585653e924b40a7ba45fd5a7816b23db0d6417659ad881ae2e5da63",
+    "outputSha256": "46e49d2dc4588e9190db5df844c8dd41d91e12fc47187557b1c4a2d51942335b",
+    "cards": 10,
+    "points": 20,
+    "semanticReview": "PASS"
+  },
+  {
+    "batch": "31",
+    "inputSha256": "745d6ab408347989ce80a88de935f455af35cc66969ce79eac68aa7997d69956",
+    "outputSha256": "ee6332b2ec36e402d0dbec3f2b4f712838e43838da0e47da27568b6c752eb335",
+    "cards": 10,
+    "points": 20,
+    "semanticReview": "PASS"
+  },
+  {
+    "batch": "32",
+    "inputSha256": "3eb194312da31e0099ccdbe020a38a4eb8d806a1b20035ee59a2d7261cad777c",
+    "outputSha256": "83f3e21f1ccc98b458945ce46d8a73bd2df2fbf7e007257b730780ef4525770a",
+    "cards": 10,
+    "points": 20,
+    "semanticReview": "PASS"
+  },
+  {
+    "batch": "33",
+    "inputSha256": "ecb61eda1c3a689e175a401f3c32fd1a04ee5d99115d80a70e208e62b4d08006",
+    "outputSha256": "ca7730d864debfb4b86a348712dc0c7e794979ae6b9ebd6aaf28bc76cf91ac2e",
+    "cards": 10,
+    "points": 20,
+    "semanticReview": "PASS"
+  },
+  {
+    "batch": "34",
+    "inputSha256": "bb73efae07e01c91c6e51ea113eec79110a959993f7f3a5b967bccf447aa847e",
+    "outputSha256": "63040a94ce7c196ff4979e2dc905c75ab3efae205a59d7aa8dc97cb0b58820e7",
+    "cards": 10,
+    "points": 20,
+    "semanticReview": "PASS"
+  },
+  {
+    "batch": "35",
+    "inputSha256": "21f70f70cd49737ad017223627b13e01b81bcd6c418512635b382ebc70f55de2",
+    "outputSha256": "4248b7bdb3cd91befaefa30443d3c360395db5c9cc9d5244e83b27d7d0954795",
+    "cards": 10,
+    "points": 19,
+    "semanticReview": "PASS"
+  },
+  {
+    "batch": "36",
+    "inputSha256": "39bdaff0ada4fc5435e3c3aed99020ccd751b343f47d69833908e26cccbe8722",
+    "outputSha256": "d86ba6b76fd09497ecdd00ad097206a3c93bf03f3556756120dc2ba8fcecdf16",
+    "cards": 10,
+    "points": 20,
+    "semanticReview": "PASS"
+  },
+  {
+    "batch": "37",
+    "inputSha256": "4d5a66e8852d4788a5b1517dc4df5b12388596ade14f64effcac76fb2c4d82c7",
+    "outputSha256": "03fb2dd530278b72f59cbabf9d2edfdc4fec913e7f46abe60bf547080bd4d753",
+    "cards": 10,
+    "points": 20,
+    "semanticReview": "PASS"
+  },
+  {
+    "batch": "38",
+    "inputSha256": "c82d2a848ae55c9db991dfce480189d7d547214c79c63cfcbc58649aa1bb4042",
+    "outputSha256": "976c75906db93d5e52f4cc80c6504ffa8171b397163d63d86dc69fa8c9e42130",
+    "cards": 9,
+    "points": 18,
+    "semanticReview": "PASS"
+  }
+]

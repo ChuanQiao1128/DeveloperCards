@@ -1,0 +1,57 @@
+{
+  "batch": "27",
+  "inputSha256": "d9295572488da64fa3e154d39d4f509414bee31831f47f9ab1a3482e665f622e",
+  "outputSha256": "13cd82a31cb0d25967778436d39f35fe678e32ba2642a79b12a30923277edf10",
+  "overall": "FAIL",
+  "cards": [
+    {
+      "uid": "aws-rb2-20261107-pack-gsc-055",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gsc-057",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gsc-060",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gsc-061",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gsc-062",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gsc-066",
+      "verdict": "FAIL",
+      "note": "第1条应明确保留 ADS 使用资格前提，不能仅写适用的数据收集。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gsc-073",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gsc-075",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gsc-076",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gsc-077",
+      "verdict": "PASS"
+    }
+  ],
+  "findings": [
+    {
+      "uid": "aws-rb2-20261107-pack-gsc-066",
+      "pointIndex": 0,
+      "description": "Eligible ADS collection 的资格条件在已接受答案中明确为“已有使用资格时”。“适用的 ADS 数据收集”只表述采集方式适用，没有明确保留调用方须有使用资格的前提。",
+      "suggestedChinese": "已有使用资格时可使用 ADS 采集能力，或使用当前 AWS Transform 的发现能力"
+    }
+  ]
+}

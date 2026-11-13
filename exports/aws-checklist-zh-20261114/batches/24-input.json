@@ -1,0 +1,92 @@
+[
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-005",
+    "question": "多台Linux EC2并行访问整个文件集，要求亚毫秒访问和至少6GBps读取。比较持久SSD的Lustre和ONTAP时，怎样判断，为什么不能只看服务名称？",
+    "answerZh": "可比较配足吞吐的Lustre持久SSD，或使用NONE保留SSD数据的二代ONTAP；两者都有可满足这类读取要求的配置。",
+    "pointsEn": [
+      "Use an appropriately provisioned all-SSD configuration; qualifying persistent SSD Lustre and second-generation ONTAP NONE are both candidates",
+      "Match read throughput and IOPS as well as full-dataset SSD latency; names alone do not establish performance"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-006",
+    "question": "HPC数据已经在S3，计算程序必须按文件访问，结果最终也要保留在S3。Lustre怎样衔接这两端？",
+    "answerZh": "把FSx for Lustre关联S3数据仓库，按文件处理数据，再把结果导出回S3。",
+    "pointsEn": [
+      "Associate Lustre with S3 for file processing",
+      "Export results back using the applicable process"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-007",
+    "question": "Linux客户端用NFS，Windows客户端用SMB，但两边必须访问同一份共享数据。怎样避免维护两份文件副本？",
+    "answerZh": "选择支持多协议访问的FSx for NetApp ONTAP，并配置相应的文件访问权限。",
+    "pointsEn": [
+      "Multiprotocol FSx for ONTAP",
+      "One dataset through NFS/SMB with appropriate permissions"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-010",
+    "question": "Volume Gateway要求完整主数据始终留在机房，容量符合配额。选stored还是cached，为什么？",
+    "answerZh": "选stored volumes。",
+    "pointsEn": [
+      "Stored volumes",
+      "Complete primary data remains local while AWS receives asynchronous backups"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-012",
+    "question": "两种机房需求：一类要用SMB/NFS共享，把文件存成S3对象并缓存热点；另一类要多个客户端用NFSv4文件锁协调写入。怎样在S3 File Gateway与EFS之间选择？",
+    "answerZh": "普通文件入口、S3对象后端和本地热点缓存可用S3 File Gateway；必须保留NFSv4文件锁时，应选支持该语义的EFS等文件系统。",
+    "pointsEn": [
+      "Ordinary S3-backed cached file access: S3 File Gateway",
+      "Required NFSv4 locks: supporting filesystem such as EFS"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-013",
+    "question": "公司已有磁带备份软件，想保留备份流程，却不再管理实体磁带。哪种网关能接上原软件？",
+    "answerZh": "Tape Gateway。",
+    "pointsEn": [
+      "Tape Gateway",
+      "Virtual tape interfaces preserve existing tape-software integration"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-014",
+    "question": "视频原件已可靠保存，处理中间文件可重建，主要追求本机高I/O。instance store能用吗，什么时候应换EBS？",
+    "answerZh": "临时工作集可用instance store；必须在实例停止或主机丢失后保留的数据应放持久存储，如EBS。",
+    "pointsEn": [
+      "Instance store for regenerable temporary work",
+      "Durable storage such as EBS when data must survive stop/host loss"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-015",
+    "question": "块卷容量已经够，但IOPS不够。gp2与gp3提高性能，都必须继续多买GiB吗？",
+    "answerZh": "gp2基线IOPS随容量增长；gp3在支持范围内可单独提高IOPS或吞吐，不必仅为性能购买多余容量。",
+    "pointsEn": [
+      "gp2 baseline scales with capacity",
+      "gp3 independently provisions supported performance"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-016",
+    "question": "数据库I/O已碰到单块EBS卷上限。增加卷做条带化一定有用吗，要先检查哪一层？",
+    "answerZh": "先看实例EBS带宽；实例仍有余量时，多卷条带化才可能提高聚合性能。",
+    "pointsEn": [
+      "Check instance EBS bandwidth/headroom",
+      "Striping helps only when the instance path does not already bottleneck aggregate I/O"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-017",
+    "question": "从快照创建的EBS卷要马上承担高性能业务，不能接受首次读取某些块时变慢。应怎样准备？",
+    "answerZh": "在目标AZ对该快照启用Fast Snapshot Restore，再创建卷；或在上线前完成卷初始化。",
+    "pointsEn": [
+      "Target-AZ FSR before creation or completed initialization before use",
+      "Avoids first-read initialization delay"
+    ]
+  }
+]

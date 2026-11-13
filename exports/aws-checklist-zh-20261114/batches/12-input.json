@@ -1,0 +1,91 @@
+[
+  {
+    "uid": "aws-rb2-20261107-pack-aws-rb2-20261105-boundary-aurora-iam-token-login",
+    "question": "EC2应用要连接Aurora，但不想维护静态数据库密码。网络已连通，数据库版本支持IAM认证。应采用什么认证方式，EC2应使用哪种身份，为什么？",
+    "answerZh": "启用IAM数据库认证并创建对应数据库用户；给EC2实例角色授予连接权限，应用使用角色获取的认证令牌登录。",
+    "pointsEn": [
+      "IAM database authentication and corresponding DB user",
+      "EC2 role with connection permission generates login tokens using temporary credentials"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-aws-rb2-domain1-normal-batch06-20261105-roles-anywhere-workload-identity",
+    "question": "机房VM上的无人值守应用要访问S3，不想保存长期AWS访问密钥。公司已有受信任CA签发的X.509证书。应采用什么凭据方案，为什么？",
+    "answerZh": "使用IAM Roles Anywhere，让应用用证书验证身份，换取有相应S3权限的IAM角色临时凭据。",
+    "pointsEn": [
+      "Roles Anywhere exchanges trusted certificate authentication for temporary role credentials",
+      "Trust anchor validates workload identity; role grants S3 operations"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-aws-rb2-domain1-normal-batch08-20261105-s3-account-public-access-guardrail",
+    "question": "Organizations成员账户的现有和未来S3桶都不能被员工误公开，员工也不能关闭防护。可采用什么控制组合？为什么比发现公开后再修复更合适？",
+    "answerZh": "例如：启用账户级全部S3 Block Public Access设置，再用SCP拒绝员工更改这些防护设置。",
+    "pointsEn": [
+      "Accept an effective preventive combination, such as all account-level BPA settings plus an SCP protecting them",
+      "Prevents public access and protects controls before exposure rather than repairing afterward"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-vc-008",
+    "question": "同一VPC的Web和数据库使用分别新建的安全组，默认路由和默认NACL未改。数据库运行正常却连不上，为什么应先看数据库安全组入站？",
+    "answerZh": "同VPC默认已有local路由，默认NACL允许流量，但新安全组默认不允许入站；须在数据库组放行Web组到数据库监听端口。",
+    "pointsEn": [
+      "Existing local routing/default NACL allow the path, but a newly created database security group has no inbound allow by default"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-vc-011",
+    "question": "S3只需普通静态加密、不想管理密钥，与必须自行设定年度密钥轮换或指定客户KMS key时，应怎样选？",
+    "answerZh": "普通要求可用SSE-S3，当前新上传已自动加密；要控制轮换周期或指定客户key，选对应客户管理key的SSE-KMS，按要求配置轮换。",
+    "pointsEn": [
+      "Ordinary encryption: automatic SSE-S3 suffices",
+      "Customer control over annual rotation or a specified key: SSE-KMS with the appropriate customer managed key"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-vc-013",
+    "question": "S3旧对象和今后上传都必须采用客户逐次提供密钥的SSE-C。只改桶默认加密就够吗，应怎样处理？",
+    "answerZh": "不够；旧对象需用支持SSE-C的copy/重写请求生成加密副本，后续上传也须逐请求提供客户密钥，不能把SSE-C设成桶的默认加密方式。",
+    "pointsEn": [
+      "Rewrite/copy old objects with SSE-C and supply keys on future requests",
+      "SSE-C cannot be bucket default encryption"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-ca15",
+    "question": "Windows应用要保留SMB和AD文件权限，计划维护或一个AZ故障时，还要尽量不丢刚写入的文件。应怎样部署文件后端？",
+    "answerZh": "使用适配AD的全托管FSx for Windows File Server Multi-AZ部署。",
+    "pointsEn": [
+      "AD-integrated FSx for Windows Multi-AZ",
+      "Synchronous replication and automatic failover protect the file backend"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-cb01",
+    "question": "支持的RDS引擎要跨AZ高可用、分担主库读负载，并在多数故障下40秒内接管。经典Multi-AZ standby与Multi-AZ DB cluster怎样选，为什么？",
+    "answerZh": "经典Multi-AZ DB instance的standby不服务读取；Multi-AZ DB cluster有一个writer和两个reader，分别在三个AZ，读取可走reader endpoint。",
+    "pointsEn": [
+      "Choose Multi-AZ DB cluster: its readable replicas offload reads and most failovers are typically under 35 seconds, meeting the stated under-40-second comparison",
+      "Classic Multi-AZ DB instance standby does not serve reads and typically takes 60–120 seconds to fail over"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-cb03",
+    "question": "计算层不能因一个AZ失效全部停止。子网和实例应怎样放，Auto Scaling负责什么？",
+    "answerZh": "在多个AZ各设子网并分散实例，由跨AZ Auto Scaling组维持容量。",
+    "pointsEn": [
+      "Subnets and instances across multiple AZs",
+      "Multi-AZ Auto Scaling replenishes lost capacity"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-cb06",
+    "question": "多个AZ的私有实例都依赖互联网出站，不能让某一AZ故障切断其他AZ出口，应怎样安排NAT路径？",
+    "answerZh": "每个AZ部署自己的NAT gateway，私有子网使用本AZ的NAT出口。",
+    "pointsEn": [
+      "NAT gateway per AZ",
+      "Each private subnet uses its own AZ's egress to avoid a shared AZ failure point"
+    ]
+  }
+]

@@ -1,0 +1,45 @@
+{
+  "batch": "38",
+  "inputSha256": "c82d2a848ae55c9db991dfce480189d7d547214c79c63cfcbc58649aa1bb4042",
+  "outputSha256": "976c75906db93d5e52f4cc80c6504ffa8171b397163d63d86dc69fa8c9e42130",
+  "overall": "PASS",
+  "cards": [
+    {
+      "uid": "aws-rb2-20261108-pack-d1fix-msg-sse",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261108-pack-d1fix-s3-sse-header",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261108-d234fix-ec2-transfer",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261108-d234fix-dx-egress",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261108-d234fix-approved-template",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261108-d234fix-lambda-invocation-duration",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261108-d234fix-volume-read-charges",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261108-d234fix-s3-local-client-versus-gateway",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261108-d234fix-eventbridge-glue-workflow",
+      "verdict": "PASS"
+    }
+  ],
+  "findings": []
+}

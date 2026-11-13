@@ -1,0 +1,57 @@
+{
+  "batch": "28",
+  "inputSha256": "7d9243112d659227c4268441be365212af2300f4c5469a37db39a4db134f47a1",
+  "outputSha256": "41be282e9dcc8f9b6509a11aec1c6037486c1395c2d8e4ef598f48a40bbdf7c5",
+  "overall": "FAIL",
+  "cards": [
+    {
+      "uid": "aws-rb2-20261107-pack-gsc-080",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gsc-086",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gsc-089",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gsc-090",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gsc-093",
+      "verdict": "FAIL",
+      "note": "第2条 shard sizing 应指所需分片数量规划，译为分片规格改变了规划对象。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gsc-094",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gsc-095",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gsc-096",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gsc-097",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gsc-102",
+      "verdict": "PASS"
+    }
+  ],
+  "findings": [
+    {
+      "uid": "aws-rb2-20261107-pack-gsc-093",
+      "pointIndex": 1,
+      "description": "结合题面“人工计算 shard 数量”，manual shard sizing 指规划所需分片数量/容量。译成“手动规划分片规格”容易变成选择单个分片规格，未准确保留本卡判断对象。",
+      "suggestedChinese": "由服务管理扩缩容，减少手动估算所需分片数量的工作"
+    }
+  ]
+}
