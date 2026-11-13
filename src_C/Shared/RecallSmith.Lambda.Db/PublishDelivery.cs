@@ -115,6 +115,13 @@ public static class PublishDelivery
 
   public static async Task<bool> DeliverManifest(NpgsqlConnection conn, string jobId, Func<Task> rebuild)
   {
+    // A pre-053 SUCCESS may still have an unacknowledged SQS wake-up after its manifest failed.
+    // Missing evidence is not delivered evidence; adopt only this replayed successful job.
+    await DbUtil.ExecuteAsync(conn,null,"""
+      insert into publish_manifest_delivery(job_id)
+      select job_id from deck_publishes where job_id=$1 and status='SUCCESS'
+      on conflict do nothing
+      """,[jobId]);
     var token = Guid.NewGuid().ToString();
     var rows = await DbUtil.QueryAsync(conn, null, """
       update publish_manifest_delivery m set lease_token=$2,lease_until=clock_timestamp()+interval '60 seconds',attempts=m.attempts+1
@@ -149,6 +156,20 @@ public static class PublishDelivery
 
   public static async Task<int> RecoverManifest(NpgsqlConnection conn, Func<Task> rebuild, Func<bool> stop, int max = Batch)
   {
+    max=Math.Clamp(max,0,Batch);
+    if (max==0 || stop()) return 0;
+    // Recover current legacy live pointers, never every historical successful build.
+    await DbUtil.ExecuteAsync(conn,null,"""
+      insert into publish_manifest_delivery(job_id)
+      select live.job_id from decks d join lateral (
+        select p.job_id from deck_publishes p
+        where p.deck_id=d.id and p.status='SUCCESS' and p.job_id is not null
+          and (p.build_id=d.live_build_id or d.live_build_id is null)
+        order by p.created_at desc,p.job_id limit 1
+      ) live on true
+      where d.is_deleted=0 and not exists(select 1 from publish_manifest_delivery m where m.job_id=live.job_id)
+      order by d.id limit $1 on conflict do nothing
+      """,[max]);
     if (stop()) return 0;
     await DbUtil.ExecuteAsync(conn,null,"""
       update publish_manifest_delivery set state='needs_attention' where job_id in(
@@ -161,10 +182,15 @@ public static class PublishDelivery
         and (m.lease_until is null or m.lease_until<clock_timestamp()) order by m.next_attempt_at,m.job_id limit $1
       """, [Math.Clamp(max, 0, Batch)]);
     var count = 0;
+    // These successful commits are all visible before the first rebuild reads current pointers.
+    // One conditional manifest write covers the selected batch; cache failures too.
+    Task? rebuildTask=null;
+    async Task Rebuild() => await rebuild();
+    Task RebuildOnce() => rebuildTask ??= Rebuild();
     foreach (var row in rows)
     {
       if (stop()) break;
-      if (await DeliverManifest(conn, (string)row["job_id"]!, rebuild)) count++;
+      if (await DeliverManifest(conn, (string)row["job_id"]!, RebuildOnce)) count++;
     }
     return count;
   }

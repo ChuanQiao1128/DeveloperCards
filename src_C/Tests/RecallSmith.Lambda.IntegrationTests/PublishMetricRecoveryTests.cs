@@ -113,9 +113,11 @@ public class PublishMetricRecoveryTests
 
     var (response, stdout) = await RunAsync(worker, job.JobId, receive);
 
-    // Historical terminal jobs have no pending delivery row; replay acknowledges without network.
+    // An untracked legacy SUCCESS is conservatively adopted; FAILED/absent remains network-free.
     Assert.Empty(response.BatchItemFailures);
-    Assert.Equal(0, rebuilds);
+    Assert.Equal(status=="SUCCESS"?1:0, rebuilds);
+    Assert.Equal(status=="SUCCESS"?(manifestFails?"pending":"delivered"):null,
+      await _db.ScalarAsync("select state from publish_manifest_delivery where job_id=$1",job.JobId));
     Assert.Equal(0, uploader.Uploads);
     Assert.Equal(status == "SUCCESS" ? PublishReplayOutcome.Succeeded : PublishReplayOutcome.FailedOrAbsent,
       processor.LastCallReplayOutcome);
