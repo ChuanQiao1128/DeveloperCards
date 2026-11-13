@@ -66,6 +66,9 @@ public static class PublishSnapshot
           teaching = JsonSerializer.Deserialize<JsonElement>(CanonicalJson(c.TeachingJson)),
           tags = c.TagsJson is null ? (JsonElement?)null : JsonSerializer.Deserialize<JsonElement>(CanonicalJson(c.TagsJson)),
         });
+      // Tags-only cards gain an explicit binding without changing any legacy or teaching-v1 bytes.
+      else if (c.TagsJson is not null)
+        fields.Add(new { schema = "tags-only-v1", tags = JsonSerializer.Deserialize<JsonElement>(CanonicalJson(c.TagsJson)) });
       return fields.ToArray();
     }).ToList();
     var hash = SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(payload)));

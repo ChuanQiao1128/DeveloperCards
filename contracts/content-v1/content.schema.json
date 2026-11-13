@@ -123,7 +123,7 @@
         }
       },
       "additionalProperties": true,
-      "description": "Source schema may be absent; canonical output always emits teaching-v1. Unknown teaching properties are discarded. Null/empty top-level object is no teaching. Array uniqueness is after trimming."
+      "description": "Source schema may be absent; canonical output always emits teaching-v1. Unknown teaching properties are discarded. Null/empty top-level object is no teaching. Array uniqueness is after trimming. Mobile display guards reject unsupported versions/malformed render fields by falling back to legacy prose."
     },
     "tags": {
       "type": "object",

@@ -4,5 +4,6 @@
   "translationVersion": 1,
   "chunkPackageVersion": 1,
   "manifestVersion": 2,
-  "note": "Current behavior baseline. N5 producer/consumer wiring is a separate node."
+  "note": "Shared current producer/consumer behavior, wired into publish/worker; no content rewrite.",
+  "tagsOnlyHashSchema": "tags-only-v1"
 }

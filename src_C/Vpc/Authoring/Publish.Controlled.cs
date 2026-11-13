@@ -34,6 +34,10 @@ public static partial class Publish
         var receipts=await DbUtil.QueryAsync(conn,tx,"select publish_snapshot from content_review_receipts r where id=$1 and deck_id=$2 and release_id=$3 and editing_snapshot=$4 and expires_at>clock_timestamp() and not exists(select 1 from content_review_revocations where receipt_id=r.id)",[receipt,deckId,release,expected]);
         if(receipts.Count!=1)return Helpers.ErrorEnvelope(res,409,"CODEX_REVIEW_REQUIRED","A current unrevoked Codex receipt is required");
         var snapshot=(string)receipts[0]["publish_snapshot"]!;
+        var candidateRows=await DbUtil.QueryAsync(conn,tx,CardsSql,[deckId]);
+        var referenceGate=await ReferenceGateAsync(conn,tx,deckId,slug,candidateRows);
+        if(referenceGate is not null)return StartResponse(referenceGate,res);
+
         // Replacing an attempt revokes its generation, including workers already uploading.
         await DbUtil.ExecuteAsync(conn,tx,"update decks set release_generation=release_generation+1 where id=$1",[deckId]);
         await DbUtil.ExecuteAsync(conn,tx,"update deck_publishes set status='FAILED',error_message='RELEASE_SUPERSEDED',updated_at=now() where deck_id=$1 and status in('PENDING','PROCESSING')",[deckId]);

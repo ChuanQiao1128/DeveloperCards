@@ -271,6 +271,17 @@ public static partial class Publish
     order by order_in_deck asc, id asc
     """;
 
+  internal static async Task<PublishStart?> ReferenceGateAsync(NpgsqlConnection conn, NpgsqlTransaction? tx, long deckId, string slug,
+    IReadOnlyList<Dictionary<string, object?>> rows)
+  {
+    var cards = rows.Select(row => new DeckReferenceCard(Convert.ToString(row["stableUid"], CultureInfo.InvariantCulture) ?? "",
+      Helpers.JsonbElement(row, "teaching"), Helpers.JsonbElement(row, "tags"))).ToList();
+    foreach (var row in await DbUtil.QueryAsync(conn, tx, "select stable_uid from cards where deck_id=$1 and is_deleted<>0 order by id", [deckId]))
+      cards.Add(new(Convert.ToString(row["stable_uid"], CultureInfo.InvariantCulture) ?? "", Deleted: true));
+    var result = DeckReferenceValidation.Validate(slug, cards);
+    return result.IsValid ? null : Refuse(400, "CONTENT_REFERENCE_GATE", string.Join("; ", result.Errors.Select(e => $"{e.StableUid}: {e.Code}" + (e.ReferenceUid is null ? "" : $" ({e.ReferenceUid})"))) + (result.Truncated ? "; additional errors omitted" : ""));
+  }
+
   public static async Task<APIGatewayProxyResponse> HandleAuthoringPublish(LambdaRequest req, Res res, AuthContext auth)
   {
     var deny = Auth.RequireAdmin(auth, res);
@@ -319,6 +330,9 @@ public static partial class Publish
       var loaded = await LoadDeckAsync(conn, deckIdInt);
       if (loaded.Refusal is not null) return StartResponse(loaded.Refusal, res);
       var (deck, deckSlug, cardRows, deckType, tier) = (loaded.Deck!, loaded.DeckSlug!, loaded.CardRows!, loaded.DeckType, loaded.Tier!);
+
+      var referenceGate = await ReferenceGateAsync(conn, null, deckIdInt, deckSlug, cardRows);
+      if (referenceGate is not null) return StartResponse(referenceGate, res);
 
       var baseCards = cardRows.Select(c =>
       {
@@ -461,6 +475,9 @@ public static partial class Publish
     {
       return StaleRefusal(deckId);
     }
+
+    var referenceGate = await ReferenceGateAsync(conn, null, deckId, deckSlug, cardRows);
+    if (referenceGate is not null) return referenceGate;
 
     // Optional teaching/help/tag structure is checked even when cloud QA is disabled.
     foreach (var card in cardRows)

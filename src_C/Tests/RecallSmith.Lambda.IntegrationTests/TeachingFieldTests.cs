@@ -53,6 +53,8 @@ public class TeachingFieldTests(PostgresFixture db)
     Assert.Equal("1", get.GetProperty("tags").GetProperty("domain").GetString());
     var page = Data(await AutomationTestKit.CallAsync(CardsPage.HandleAuthoringCardsPage, "GET", "/api/v1/authoring/cards/page", null, Admin(), new Dictionary<string, string> { ["deckId"] = deckId.ToString() }));
     Assert.Equal("Attach a role.", page.GetProperty("items")[0].GetProperty("teaching").GetProperty("answer").GetString());
+    // A publish now validates the complete prerequisite inventory, not just the teaching shape.
+    await db.QueryAsync("insert into cards(deck_id,stable_uid,order_in_deck,question,explanation) values($1,'aws-pre-1',2,'Base question','Base answer')", deckId);
     var preview = Data(await AutomationTestKit.CallAsync(Publish.HandleAuthoringPublish, "POST", "/api/v1/authoring/publish", new { deckId }, Admin(), new Dictionary<string, string> { ["mode"] = "preview" }));
     Assert.Equal("Attach a role.", preview.GetProperty("export").GetProperty("cards")[0].GetProperty("teaching").GetProperty("answer").GetString());
     await using var conn = await db.OpenAsync();

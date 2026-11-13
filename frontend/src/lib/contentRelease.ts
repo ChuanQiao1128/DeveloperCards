@@ -1,3 +1,4 @@
+import { canonicalizeJson } from './canonicalJson';
 import type { ImportCardInput } from '../api/authoring';
 import type { Card } from '../types/card';
 import type { ApiResult } from '../types/api';
@@ -85,7 +86,7 @@ export function parseReleaseBundle(raw: string, now = Date.now(), requireFresh =
     keys(item, ['stableUid', 'verdict', 'cardContentHash', 'schema', 'revision', 'orderInDeck', 'blockers', 'unknowns']);
     requireValue(typeof item.stableUid === 'string' && uids.has(item.stableUid) && !seen.has(item.stableUid), 'Model review UID coverage differs from the candidate.');
     seen.add(item.stableUid); hash(item.cardContentHash);
-    requireValue(item.verdict === 'PASS' && ['legacy-v1', 'front-help-v1'].includes(String(item.schema)) && typeof item.revision === 'number' && Number.isSafeInteger(item.revision) && item.revision >= 1, 'Every model review needs PASS, schema and a positive revision.');
+    requireValue(item.verdict === 'PASS' && ['legacy-v1', 'front-help-v1', 'tags-only-v1'].includes(String(item.schema)) && typeof item.revision === 'number' && Number.isSafeInteger(item.revision) && item.revision >= 1, 'Every model review needs PASS, schema and a positive revision.');
     requireValue(Array.isArray(item.blockers) && item.blockers.length === 0 && Array.isArray(item.unknowns) && item.unknowns.length === 0, 'Model review blockers and unknowns must be empty.');
     requireValue(bundle.cards.some((card: ImportCardInput) => card.stableUid === item.stableUid && card.orderInDeck === item.orderInDeck), 'Model review order differs from the candidate.');
   }
@@ -123,10 +124,10 @@ export function assertReleaseSnapshot(snapshot: ReleaseSnapshot): void {
   for (const card of snapshot.cards) {
     const row = rows.get(card.stableUid);
     hash(card.cardContentHash);
-    requireValue(!seen.has(card.stableUid) && row && row.is_deleted === 0 && integer(card.version) && integer(card.revision) && integer(card.orderInDeck) && ['legacy-v1', 'front-help-v1'].includes(card.schema) && row.version === card.version && row.revision === card.revision && row.order_in_deck === card.orderInDeck, 'Snapshot backup is incomplete or inconsistent.');
+    requireValue(!seen.has(card.stableUid) && row && row.is_deleted === 0 && integer(card.version) && integer(card.revision) && integer(card.orderInDeck) && ['legacy-v1', 'front-help-v1', 'tags-only-v1'].includes(card.schema) && row.version === card.version && row.revision === card.revision && row.order_in_deck === card.orderInDeck, 'Snapshot backup is incomplete or inconsistent.');
     const translations = row.translations as Record<string, Record<string, unknown>> | null;
     const hasHelp = Boolean(parseFrontHelp(row.front_help)?.length) || Object.values(translations ?? {}).some(translation => translation && typeof translation === 'object' && parseFrontHelp(translation.frontHelp)?.length);
-    requireValue(card.schema === (hasHelp ? 'front-help-v1' : 'legacy-v1'), 'Snapshot backup schema metadata is inconsistent.');
+    requireValue(card.schema === (hasHelp ? 'front-help-v1' : !row.teaching && row.tags ? 'tags-only-v1' : 'legacy-v1'), 'Snapshot backup schema metadata is inconsistent.');
     seen.add(card.stableUid);
   }
 }
@@ -142,17 +143,6 @@ export function captureReleaseBackupInventory(snapshot: ReleaseSnapshot): Releas
 export function assertOriginalLive(session: ReleaseSession, snapshot: ReleaseSnapshot) {
   assertReleaseSnapshot(snapshot);
   requireValue(snapshot.deck.live_build_id === session.baseline.deck.live_build_id, 'Live build changed since the initial backup. This release cannot rebase onto it.');
-}
-
-/** Mirrors the import reconciler, preserving code whitespace and checking help explicitly. */
-function canonicalizeJson(val: unknown): unknown {
-  if (val === null || typeof val !== 'object') return val;
-  if (Array.isArray(val)) return val.map(canonicalizeJson);
-  const out: Record<string, unknown> = {};
-  for (const k of Object.keys(val as Record<string, unknown>).sort()) {
-    out[k] = canonicalizeJson((val as Record<string, unknown>)[k]);
-  }
-  return out;
 }
 
 export function canonicalReleaseCard(card: ImportCardInput | Card): string {

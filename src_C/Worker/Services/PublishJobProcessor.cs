@@ -78,6 +78,8 @@ public class PublishJobProcessor : IPublishJobProcessor, IReplayOutcome, IPublis
       throw new BusinessException("Deck has no cards");
     }
 
+    await ValidateCandidateReferencesAsync(job.DeckId, deckData);
+
     Console.WriteLine($"[JobId={jobId}] Loaded {deckData.Cards.Count} cards");
 
     // The AI QA publish gate passed a specific set of cards (backend-design-16): never build anything else. A card
@@ -214,6 +216,33 @@ public class PublishJobProcessor : IPublishJobProcessor, IReplayOutcome, IPublis
     var error = errorMessage.Length > 300 ? errorMessage[..300] : errorMessage;
     await AutomationLedger.RecordAsync(conn, new AutomationEvent("publish_pipeline", 0, "failure",
       DeckId: deckId, Ref: jobId, DedupeKey: $"publish-fail:{jobId}", Details: new { error }));
+  }
+
+  private static async Task ValidateCandidateReferencesAsync(int deckId, DeckExportData deck)
+  {
+    var cards = new List<CandidateDeckCard>(deck.Cards.Count);
+    foreach (var card in deck.Cards)
+    {
+      try
+      {
+        var teaching = card.Teaching;
+        if (teaching is { } value && value.TryGetProperty("schema", out var schema) && schema.GetString() != "teaching-v1")
+          throw new BusinessException($"CONTENT_REFERENCE_GATE: {card.StableUid}: TEACHING_BAD_SHAPE");
+        var refs = teaching?.TryGetProperty("prerequisites", out var p) == true && p.ValueKind != JsonValueKind.Null
+          ? p.EnumerateArray().Select(r => r.GetString()!.Trim()).ToArray() : null;
+        var domain = card.Tags?.TryGetProperty("domain", out var d) == true ? d.GetString()?.Trim() : null;
+        var task = card.Tags?.TryGetProperty("examTask", out var t) == true ? t.GetString()?.Trim() : null;
+        cards.Add(new(card.StableUid, refs, domain, task));
+      }
+      catch (Exception error) when (error is InvalidOperationException or NullReferenceException)
+      { throw new BusinessException($"CONTENT_REFERENCE_GATE: {card.StableUid}: BAD_SHAPE"); }
+    }
+    await using var conn = await Pg.OpenConnectionOrNullAsync();
+    if (conn is null) throw new InvalidOperationException("Failed to open database connection");
+    foreach (var row in await DbUtil.QueryAsync(conn, null, "select stable_uid from cards where deck_id=$1 and is_deleted<>0 order by id", [deckId]))
+      cards.Add(new(Convert.ToString(row["stable_uid"], CultureInfo.InvariantCulture) ?? "", Deleted: true));
+    var result = CandidateDeckValidation.Validate(deck.Slug, cards);
+    if (!result.IsValid) throw new BusinessException("CONTENT_REFERENCE_GATE: " + string.Join("; ", result.Errors.Select(e => $"{e.StableUid}: {e.Code}")) + (result.Truncated ? "; additional errors omitted" : ""));
   }
 
   /// <summary>The <see cref="PublishSnapshot"/> digest of the cards this job is about to build.</summary>

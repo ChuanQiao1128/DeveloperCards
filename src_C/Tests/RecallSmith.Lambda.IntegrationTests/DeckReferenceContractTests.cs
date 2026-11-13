@@ -111,7 +111,10 @@ public class DeckReferenceContractTests
     var oldHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(oldPayload)))).ToLowerInvariant();
     Assert.Equal(oldHash, CardContentHash.Compute(legacyRow));
     legacyRow["tags"] = Json("{\"domain\":\"1\"}");
-    Assert.Equal(oldHash, CardContentHash.Compute(legacyRow)); // Existing tags-only hash limitation, handed to N5.
+    Assert.NotEqual(oldHash, CardContentHash.Compute(legacyRow));
+    Assert.Equal("tags-only-v1", CardContentHash.Schema(legacyRow));
+    var beforeTags = PublishSnapshot.FromRow(legacyRow) with { TagsJson = null };
+    Assert.NotEqual(PublishSnapshot.Digest(new[] { beforeTags }), PublishSnapshot.Digest(new[] { PublishSnapshot.FromRow(legacyRow) }));
   }
 
   [Fact]

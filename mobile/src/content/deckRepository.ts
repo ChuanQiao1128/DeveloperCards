@@ -1696,6 +1696,17 @@ function isRawDeckFlat(x: any): x is RawDeckJsonFlat {
   );
 }
 
+// Unknown teaching versions use the card's ordinary prose; never render an unchecked future shape.
+function supportedTeaching(raw: any): boolean {
+  return raw !== null && typeof raw === 'object' && !Array.isArray(raw) &&
+    (raw.schema === undefined || raw.schema === 'teaching-v1') &&
+    typeof raw.answer === 'string' && typeof raw.keyPoint === 'string' &&
+    (raw.watchOut == null || typeof raw.watchOut === 'string') &&
+    (raw['zh-CN'] == null || typeof raw['zh-CN'] === 'object' && !Array.isArray(raw['zh-CN']) && typeof raw['zh-CN'].answer === 'string' && typeof raw['zh-CN'].keyPoint === 'string' && (raw['zh-CN'].watchOut == null || typeof raw['zh-CN'].watchOut === 'string')) &&
+    Array.isArray(raw.mustAnswer) && raw.mustAnswer.length > 0 && raw.mustAnswer.length <= 8 && raw.mustAnswer.every((item: unknown) => typeof item === 'string') &&
+    (raw.prerequisites == null || Array.isArray(raw.prerequisites) && raw.prerequisites.length <= 16 && raw.prerequisites.every((uid: unknown) => typeof uid === 'string'));
+}
+
 function mapRawDeckV1ToDeckExport(raw: RawDeckJsonV1): DeckExport {
   const d = raw.deck;
   const cards = Array.isArray(raw.cards) ? raw.cards : [];
@@ -1735,7 +1746,7 @@ function mapRawDeckV1ToDeckExport(raw: RawDeckJsonV1): DeckExport {
       Topic: typeof (c as any).topic === 'string' ? (c as any).topic : null,
       Mcq: typeof (c as any).mcq === 'object' && (c as any).mcq !== null ? (c as any).mcq : null,
       ...(((c as any).tags && typeof (c as any).tags === 'object') ? { Tags: (c as any).tags } : ((c as any).Tags && typeof (c as any).Tags === 'object') ? { Tags: (c as any).Tags } : {}),
-      ...(((c as any).teaching && typeof (c as any).teaching === 'object') ? { Teaching: (c as any).teaching } : ((c as any).Teaching && typeof (c as any).Teaching === 'object') ? { Teaching: (c as any).Teaching } : {}),
+      ...(supportedTeaching((c as any).teaching) ? { Teaching: (c as any).teaching } : supportedTeaching((c as any).Teaching) ? { Teaching: (c as any).Teaching } : {}),
 
       Revision: revision,
       Version: version,
@@ -1799,7 +1810,7 @@ function mapRawDeckFlatToDeckExport(raw: RawDeckJsonFlat): DeckExport {
       Topic: typeof (c as any).topic === 'string' ? (c as any).topic : null,
       Mcq: typeof (c as any).mcq === 'object' && (c as any).mcq !== null ? (c as any).mcq : null,
       ...(((c as any).tags && typeof (c as any).tags === 'object') ? { Tags: (c as any).tags } : ((c as any).Tags && typeof (c as any).Tags === 'object') ? { Tags: (c as any).Tags } : {}),
-      ...(((c as any).teaching && typeof (c as any).teaching === 'object') ? { Teaching: (c as any).teaching } : ((c as any).Teaching && typeof (c as any).Teaching === 'object') ? { Teaching: (c as any).Teaching } : {}),
+      ...(supportedTeaching((c as any).teaching) ? { Teaching: (c as any).teaching } : supportedTeaching((c as any).Teaching) ? { Teaching: (c as any).Teaching } : {}),
 
       Revision: revision,
       Version: version,

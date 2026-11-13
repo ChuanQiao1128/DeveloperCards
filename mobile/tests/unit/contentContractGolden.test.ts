@@ -191,13 +191,21 @@ describe('shared content-v1 actual installed-deck paths', () => {
     expect(parseCardTranslations({ 'zh-CN': { ...golden.cards[1].translations['zh-CN'], v: 2 } })).toBeNull();
   });
 
-  it('documents the current mapper forwarding unsupported teaching schemas and unknown tags', async () => {
-    const teaching = { ...golden.cards[1].teaching, schema: 'teaching-v2' };
-    const tags = { ...golden.cards[1].tags, future: true };
-    seed({ ...golden, slug: 'algo', cards: [{ ...golden.cards[1], teaching, tags }] });
-    const { resolveDeckBySlug } = await loadRepo();
-    const card = (await resolveDeckBySlug('algo'))!.Cards[0];
-    expect(card.Teaching).toEqual(teaching);
-    expect(card.Tags).toEqual(tags);
-  });
+  for (const shape of ['flat', 'v1']) {
+    it(`falls back to legacy prose for unsupported/malformed teaching in ${shape} files without changing source bytes`, async () => {
+      for (const teaching of [{ ...golden.cards[1].teaching, schema: 'teaching-v2' }, { ...golden.cards[1].teaching, mustAnswer: 'bad' }, { ...golden.cards[1].teaching, 'zh-CN': { answer: 1, keyPoint: 'bad' } }]) {
+        const tags = { ...golden.cards[1].tags, future: true };
+        const cards = [{ ...golden.cards[1], teaching, tags }];
+        seed(shape === 'flat' ? { ...golden, slug: 'algo', cards } : { buildId: 'v1', deck: { ...golden, slug: 'algo' }, cards });
+        const before = files.get(DECK_FILE);
+        const { resolveDeckBySlug } = await loadRepo();
+        const card = (await resolveDeckBySlug('algo'))!.Cards[0];
+        expect(card).not.toHaveProperty('Teaching');
+        expect(card.Explanation).toBe(golden.cards[1].explanation);
+        expect(card.Tags).toEqual(tags);
+        expect(files.get(DECK_FILE)).toBe(before);
+      }
+    });
+  }
+
 });
