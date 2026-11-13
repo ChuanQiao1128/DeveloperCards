@@ -65,5 +65,21 @@ class GovernanceTests(unittest.TestCase):
             text = (ROOT / name).read_text()
             for key, value in values.items(): self.assertRegex(text, rf'(?m)^\s*{key}\s*=\s*{value}\b')
 
+    def test_cost_gate_rejects_unknown_and_incomplete_plans(self):
+        baseline = {'format_version': '1.2', 'resource_changes': [], 'complete': True,
+                    'deferred_changes': [], 'errored': False}
+        self.assertTrue(cost.validate(baseline))
+        for changes in [
+            {'format_version': '999.0'}, {'format_version': '1.invalid'},
+            {'complete': False}, {'complete': 'true'}, {'errored': True},
+            {'deferred_changes': [{'reason': 'resource_config_unknown', 'resource_change': {
+                'mode': 'managed', 'type': 'aws_db_instance', 'change': {'actions': ['create']}}}]},
+            {'deferred_changes': None},
+            {'resource_changes': [{'mode': 'data', 'type': 'aws_iam_policy_document',
+                                   'change': {'actions': ['create']}}]},
+        ]:
+            with self.subTest(changes=changes), self.assertRaises(ValueError):
+                cost.validate({**baseline, **changes})
+
 
 if __name__ == '__main__': unittest.main()

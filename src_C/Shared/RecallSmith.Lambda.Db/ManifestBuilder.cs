@@ -427,7 +427,7 @@ public static class ManifestBuilder
   /// stability but never enters the document.
   /// </summary>
   public static Task<ManifestBuildResult> RebuildAsync(NpgsqlConnection conn, IAmazonS3 s3, string bucket, string contentPrefix, string premiumPrefix, long? nowMs = null, CancellationToken ct = default)
-    => RebuildImplAsync(conn, s3, bucket, contentPrefix, premiumPrefix, nowMs, ct);
+    => RebuildImplAsync(conn, s3, bucket, contentPrefix, premiumPrefix, nowMs, RecallSmith.Lambda.Common.RequestBudget.Combine(ct));
 
   private static async Task<ManifestBuildResult> RebuildImplAsync(NpgsqlConnection conn, IAmazonS3 s3, string bucket, string contentPrefix, string premiumPrefix, long? nowMs, CancellationToken ct)
   {
@@ -463,7 +463,7 @@ public static class ManifestBuilder
 
       try
       {
-        var putResponse = await s3.PutObjectAsync(put, RecallSmith.Lambda.Common.RequestBudget.Combine(ct));
+        var putResponse = await s3.PutObjectAsync(put, ct);
         return new ManifestBuildResult(body.DeckCount, body.PatchEdgeCount, key, putResponse.ETag ?? string.Empty, generatedAtMs);
       }
       catch (AmazonS3Exception ex) when (ex.StatusCode is HttpStatusCode.PreconditionFailed or HttpStatusCode.Conflict)
