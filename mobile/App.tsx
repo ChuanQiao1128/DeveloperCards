@@ -47,6 +47,7 @@ import ForgotPasswordScreen from './src/screens/ForgotPasswordScreen';
 
 import { configureAmplifyOnce } from './src/auth/amplify';
 import { useAuthStore } from './src/auth/authStore';
+import { AccountDeletionGate } from './src/auth/AccountDeletionGate';
 import { installAccessTokenRefresher, refreshAuthOnForeground } from './src/auth/freshToken';
 import { scheduleProgressSync, setProgressSyncAppActive } from './src/sync/progressSync';
 import { createAppStateSyncHandler } from './src/sync/appStateSync';
@@ -232,6 +233,7 @@ function App() {
       <SafeAreaProvider initialMetrics={initialWindowMetrics}>
       <RootErrorBoundary>
         <View style={styles.appShell}>
+      <AccountDeletionGate>
       <View style={styles.navigatorShell}>
         <NavigationContainer
           ref={navigationRef}
@@ -303,6 +305,7 @@ function App() {
         }}
       />
 
+      </AccountDeletionGate>
       {forceUpdate ? <ForceUpdateOverlay {...forceUpdate} /> : null}
         </View>
       </RootErrorBoundary>

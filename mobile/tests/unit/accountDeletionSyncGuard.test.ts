@@ -223,6 +223,9 @@ let warnSpy: ReturnType<typeof vi.spyOn>;
 beforeEach(async () => {
   warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
   deleteBehaviour.fail = false;
+  store.clear();
+  (deleteUser as any).mockReset();
+  (deleteUser as any).mockResolvedValue(undefined);
   net.delayMs = {};
   net.gate = {};
   storeBehaviour.getDelayMs = 0;
@@ -312,7 +315,7 @@ describe('account deletion blocks every sync', () => {
     expect(callsAfterDelete().some((c) => c.includes('/api/v1/sync/push'))).toBe(true);
   });
 
-  it('a failed deletion lifts the block so normal sync resumes', async () => {
+  it('an unconfirmed server deletion keeps sync blocked until retry', async () => {
     deleteBehaviour.fail = true;
     await expect(useAuthStore.getState().deleteAccountNow()).rejects.toThrow();
     await wait(60);
@@ -322,7 +325,8 @@ describe('account deletion blocks every sync', () => {
     await forceProgressSync('manual');
     await wait(20);
 
-    expect(netLog.some((c) => c.includes('/api/v1/sync/'))).toBe(true);
+    expect(netLog.some((c) => c.includes('/api/v1/sync/'))).toBe(false);
+    expect(useAuthStore.getState().status).toBe('deletion_pending');
   });
 
   it('normal sync is unaffected when no deletion is running', async () => {
@@ -439,7 +443,7 @@ describe('account deletion blocks every sync', () => {
     expect(callsAfterDelete()).toEqual([]);
   });
 
-  it('a failed Cognito deleteUser lifts the block so normal sync resumes', async () => {
+  it('a failed Cognito deleteUser keeps sync blocked and persists deletion across restart', async () => {
     (deleteUser as any).mockRejectedValueOnce(new Error('Network error'));
     await expect(useAuthStore.getState().deleteAccountNow()).rejects.toThrow();
     await wait(60);
@@ -449,14 +453,17 @@ describe('account deletion blocks every sync', () => {
     await forceProgressSync('manual');
     await wait(20);
 
-    expect(isSyncBlocked()).toBe(false);
-    expect(netLog).toContain(PUSH);
+    expect(isSyncBlocked()).toBe(true);
+    expect(netLog).not.toContain(PUSH);
+    await useAuthStore.getState().init();
+    expect(isSyncBlocked()).toBe(true);
+    expect(useAuthStore.getState().status).toBe('deletion_pending');
   });
 
   it.each([
     ['the server DELETE', () => (deleteBehaviour.fail = true)],
     ['Cognito deleteUser', () => (deleteUser as any).mockRejectedValueOnce(new Error('Network error'))],
-  ])('when %s fails, the sync deletion suppressed runs again without a manual trigger', async (_label, failIt) => {
+  ])('when %s fails, the suppressed sync stays blocked', async (_label, failIt) => {
     await recordReviewEvent('algo', 'c11', 'good', Date.now());
     // The rating debounce armed just before the user tapped Delete account;
     // deletion cancels it.
@@ -467,6 +474,7 @@ describe('account deletion blocks every sync', () => {
     await expect(useAuthStore.getState().deleteAccountNow()).rejects.toThrow();
     await wait(80);
 
-    expect(netLog).toContain(PUSH);
+    expect(netLog).not.toContain(PUSH);
+    expect(isSyncBlocked()).toBe(true);
   });
 });

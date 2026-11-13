@@ -532,6 +532,10 @@ public static class DrawStateSync
         throw;
       }
     }
+    catch (PostgresException ex) when (AccountDeletionBarrier.IsRejection(ex))
+    {
+      return AccountDeletionBarrier.Rejected(res);
+    }
     catch (Exception ex) when (ex is ValidationError)
     {
       return res.BadRequest("VALIDATION_ERROR", ex.Message);

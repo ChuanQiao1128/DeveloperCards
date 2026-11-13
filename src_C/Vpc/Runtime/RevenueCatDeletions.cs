@@ -16,11 +16,11 @@ namespace RecallSmith.Lambda.Vpc.Runtime;
 /// <item><see cref="EnqueueAsync"/>: DELETE /api/v1/user/me inserts the caller's sub into <c>revenuecat_deletions</c>
 /// (migration 044) inside the deletion's own transaction, so a rolled-back deletion queues nothing.</item>
 /// <item><c>GET /api/v1/internal/revenuecat-deletions?limit=50</c>: the pending subs (attempts &lt; 10, requested within
-/// 30 days), oldest first.</item>
+/// 30 days), oldest first; exhausted work remains needs_attention.</item>
 /// <item><c>POST /api/v1/internal/revenuecat-deletions/report</c> with <c>[{sub, status}]</c>: 2xx or 404 removes the
 /// row; anything else (a null status is a timeout or network error) counts one more attempt.</item>
-/// <item><see cref="DeleteExpiredAsync"/>: the tick's <c>revenuecat_deletions_retention</c> step drops rows older than 30
-/// days, whatever their state.</item>
+/// <item><see cref="DeleteExpiredAsync"/>: the tick's <c>revenuecat_deletions_retention</c> step retains exhausted
+/// or old obligations as needs_attention until a trusted operator resolves them.</item>
 /// </list>
 /// Both routes are the notifier's (services/notifier, on every tick) and are verified exactly like its tick and report
 /// routes: <see cref="Auth.VerifyInternalSignatureStrict"/> against <c>INTERNAL_SECRET_NOTIFIER</c>. The GET has an empty
@@ -52,16 +52,23 @@ public static class RevenueCatDeletions
       [userSub]);
   }
 
-  /// <summary>Deletes the rows requested more than <see cref="RetentionDays"/> days ago; 0 before migration 044.</summary>
+  // Retention now escalates unfinished work; it never removes an obligation.
+  // Before 052 there is no state column, so preserve the row for migration.
   public static async Task<int> DeleteExpiredAsync(NpgsqlConnection conn)
   {
     if (await DbUtil.ExecuteScalarAsync(conn, null, Ready, []) is not true) return 0;
-    var deleted = await DbUtil.ExecuteAsync(conn, null,
-      "delete from revenuecat_deletions where requested_at < now() - make_interval(days => $1)",
-      [RetentionDays]);
-    if (deleted > 0) Log.Event("info", new { tag = "revenuecat_delete", outcome = "expired", rows = deleted });
-    return deleted;
+    if (!await HasStateAsync(conn)) return 0;
+    return await MarkNeedsAttentionAsync(conn);
   }
+
+  private static async Task<bool> HasStateAsync(NpgsqlConnection conn) =>
+    await DbUtil.ExecuteScalarAsync(conn, null,
+      "select exists(select 1 from information_schema.columns where table_schema='public' and table_name='revenuecat_deletions' and column_name='state')", []) is true;
+
+  private static Task<int> MarkNeedsAttentionAsync(NpgsqlConnection conn) =>
+    DbUtil.ExecuteAsync(conn, null,
+      "update revenuecat_deletions set state='needs_attention' where state='pending' and (attempts >= $1 or requested_at < now() - make_interval(days => $2))",
+      [MaxAttempts, RetentionDays]);
 
   // GET /api/v1/internal/revenuecat-deletions?limit=50
   public static async Task<APIGatewayProxyResponse> HandlePending(LambdaRequest req, Res res)
@@ -86,10 +93,14 @@ public static class RevenueCatDeletions
       if (conn is null) return Helpers.ConfigError(res, "Missing PG env vars (PGHOST/PGDATABASE/PGUSER/PGPASSWORD)");
       if (await DbUtil.ExecuteScalarAsync(conn, null, Ready, []) is not true) return NotReady(res);
 
+      var hasState = await HasStateAsync(conn);
+      if (hasState) await MarkNeedsAttentionAsync(conn);
+      var stateFilter = hasState ? "and state = 'pending'" : "";
       var rows = await DbUtil.QueryAsync(conn, null,
-        """
+        $"""
         select sub from revenuecat_deletions
         where attempts < $1 and requested_at >= now() - make_interval(days => $2)
+        {stateFilter}
         order by requested_at, sub
         limit $3
         """,
@@ -126,6 +137,7 @@ public static class RevenueCatDeletions
       if (conn is null) return Helpers.ConfigError(res, "Missing PG env vars (PGHOST/PGDATABASE/PGUSER/PGPASSWORD)");
       if (await DbUtil.ExecuteScalarAsync(conn, null, Ready, []) is not true) return NotReady(res);
 
+      var hasState = await HasStateAsync(conn);
       int deleted = 0, retried = 0, unknown = 0;
       foreach (var (sub, status) in items)
       {
@@ -138,7 +150,9 @@ public static class RevenueCatDeletions
         else
         {
           rows = await DbUtil.ExecuteAsync(conn, null,
-            "update revenuecat_deletions set attempts = attempts + 1, last_status = $2, last_attempt_at = now() where sub = $1",
+            hasState
+              ? "update revenuecat_deletions set attempts = least(attempts + 1, 10), last_status = $2, last_attempt_at = now(), state = case when state='needs_attention' or attempts + 1 >= 10 or requested_at < now() - interval '30 days' then 'needs_attention' else 'pending' end where sub = $1"
+              : "update revenuecat_deletions set attempts = least(attempts + 1, 10), last_status = $2, last_attempt_at = now() where sub = $1",
             [sub, status]);
           retried += rows;
         }

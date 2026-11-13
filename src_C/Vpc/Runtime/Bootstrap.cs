@@ -1,3 +1,4 @@
+using Npgsql;
 using System.Text.Json;
 using Amazon.Lambda.APIGatewayEvents;
 using RecallSmith.Lambda.Common;
@@ -63,6 +64,10 @@ public static class Bootstrap
       var nowMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
       var outObj = new Dictionary<string, object?>(row) { ["serverTimeMs"] = nowMs };
       return res.Ok(outObj);
+    }
+    catch (PostgresException ex) when (AccountDeletionBarrier.IsRejection(ex))
+    {
+      return AccountDeletionBarrier.Rejected(res);
     }
     catch (Exception ex) when (ex is ValidationError)
     {
