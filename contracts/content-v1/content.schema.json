@@ -1,0 +1,450 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://recallsmith.invalid/contracts/content-v1/content.schema.json",
+  "title": "Current RecallSmith content structures (documentation, not a new runtime parser)",
+  "$defs": {
+    "teaching": {
+      "type": "object",
+      "required": [
+        "answer",
+        "keyPoint",
+        "mustAnswer"
+      ],
+      "properties": {
+        "schema": {
+          "const": "teaching-v1"
+        },
+        "answer": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000,
+          "description": "Canonicalizers trim before checking length."
+        },
+        "keyPoint": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000,
+          "description": "Canonicalizers trim before checking length."
+        },
+        "watchOut": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4000,
+              "description": "Canonicalizers trim before checking length."
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "goal": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4000,
+              "description": "Canonicalizers trim before checking length."
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "mustAnswer": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          }
+        },
+        "prerequisites": {
+          "anyOf": [
+            {
+              "type": "array",
+              "maxItems": 16,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "zh-CN": {
+          "anyOf": [
+            {
+              "type": "object",
+              "required": [
+                "answer",
+                "keyPoint"
+              ],
+              "properties": {
+                "answer": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4000,
+                  "description": "Canonicalizers trim before checking length."
+                },
+                "keyPoint": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4000,
+                  "description": "Canonicalizers trim before checking length."
+                },
+                "watchOut": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4000,
+                  "description": "Canonicalizers trim before checking length."
+                },
+                "goal": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4000,
+                  "description": "Canonicalizers trim before checking length."
+                }
+              },
+              "additionalProperties": true
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": true,
+      "description": "Source schema may be absent; canonical output always emits teaching-v1. Unknown teaching properties are discarded. Null/empty top-level object is no teaching. Array uniqueness is after trimming."
+    },
+    "tags": {
+      "type": "object",
+      "properties": {
+        "domain": {
+          "enum": [
+            "1",
+            "2",
+            "3",
+            "4"
+          ]
+        },
+        "examTask": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40
+        }
+      },
+      "additionalProperties": false,
+      "description": "Current authoring validator accepts arbitrary nonempty examTask. Pure publish graph helper adds official task consistency only for AWS mapped deck slugs. Empty tags object canonicalizes to null. Mobile mapper preserves unknown tags received in installed files."
+    },
+    "card": {
+      "type": "object",
+      "required": [
+        "stableUid",
+        "question",
+        "explanation"
+      ],
+      "properties": {
+        "stableUid": {
+          "type": "string"
+        },
+        "question": {
+          "type": "string"
+        },
+        "explanation": {
+          "type": "string"
+        },
+        "teaching": {
+          "anyOf": [
+            {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/teaching"
+                },
+                {
+                  "type": "object",
+                  "maxProperties": 0
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "tags": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/tags"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "translations": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "zh-CN": {
+                  "type": "object",
+                  "required": [
+                    "v",
+                    "question"
+                  ],
+                  "properties": {
+                    "v": {
+                      "const": 1
+                    },
+                    "question": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "explanation": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "realWorldUsage": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "frontHelp": {
+                      "anyOf": [
+                        {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "term",
+                              "definition"
+                            ],
+                            "properties": {
+                              "term": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 80
+                              },
+                              "definition": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 240
+                              }
+                            },
+                            "additionalProperties": false
+                          }
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "mcq": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "qualifier": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "options": {
+                              "type": "object",
+                              "minProperties": 1,
+                              "additionalProperties": {
+                                "type": "object",
+                                "required": [
+                                  "text",
+                                  "why"
+                                ],
+                                "properties": {
+                                  "text": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 600
+                                  },
+                                  "why": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  }
+                                },
+                                "additionalProperties": false
+                              }
+                            }
+                          },
+                          "required": [
+                            "options"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "Use existing translation validators for CJK and English/MCQ/frontHelp parity constraints. This structural schema does not replace them."
+                }
+              },
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "revision": {
+          "type": "integer"
+        },
+        "orderInDeck": {
+          "type": "integer"
+        },
+        "difficulty": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": true,
+      "description": "Server worker export uses camelCase. Optional null teaching/tags/translations are omitted by ContentJson; import missing means retain, explicit null means clear. Legacy cards have no structured properties."
+    },
+    "syncEvent": {
+      "type": "object",
+      "required": [
+        "eventId",
+        "deckSlug",
+        "stableUid",
+        "rating",
+        "reviewedAtMs"
+      ],
+      "properties": {
+        "eventId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "schemaVersion": {
+          "type": "integer",
+          "description": "Current server defaults absent/null/nonpositive to 1 and accepts positive future integers; not a reject-unknown gate."
+        },
+        "eventType": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "deckSlug": {
+          "type": "string"
+        },
+        "stableUid": {
+          "type": "string"
+        },
+        "rating": {
+          "type": "integer"
+        },
+        "reviewedAtMs": {
+          "type": "integer"
+        },
+        "deckVersion": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "progressAfter": {
+          "anyOf": [
+            {
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "lastSeenRevision": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": true,
+      "description": "Golden sample pins current mobile push event bytes. Server ingest performs further normalization/length/time checks; schema is not an ingest replacement."
+    }
+  },
+  "type": "object",
+  "required": [
+    "slug",
+    "title",
+    "locale",
+    "deckType",
+    "version",
+    "totalCards",
+    "cards"
+  ],
+  "properties": {
+    "slug": {
+      "type": "string"
+    },
+    "title": {
+      "type": "string"
+    },
+    "locale": {
+      "type": "string"
+    },
+    "deckType": {
+      "type": "integer"
+    },
+    "version": {
+      "type": "string"
+    },
+    "totalCards": {
+      "type": "integer"
+    },
+    "cards": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/card"
+      }
+    }
+  },
+  "additionalProperties": true
+}

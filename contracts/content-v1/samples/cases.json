@@ -1,0 +1,263 @@
+{
+  "teaching": [
+    {
+      "name": "null",
+      "input": null,
+      "canonical": null
+    },
+    {
+      "name": "empty",
+      "input": {},
+      "canonical": null
+    },
+    {
+      "name": "missing-schema",
+      "input": {
+        "answer": " A ",
+        "keyPoint": " K ",
+        "mustAnswer": [
+          " X "
+        ]
+      },
+      "canonical": {
+        "schema": "teaching-v1",
+        "answer": "A",
+        "keyPoint": "K",
+        "mustAnswer": [
+          "X"
+        ]
+      }
+    },
+    {
+      "name": "future-schema",
+      "input": {
+        "schema": "teaching-v2",
+        "answer": "Choose A.",
+        "keyPoint": "A keeps the required value.",
+        "watchOut": "B drops it.",
+        "mustAnswer": [
+          "Choose A",
+          "Explain preservation"
+        ],
+        "prerequisites": [
+          "fixture-base"
+        ],
+        "goal": "Preserve a value.",
+        "zh-CN": {
+          "answer": "选择 A。",
+          "keyPoint": "A 保留所需的值。",
+          "watchOut": "B 丢弃该值。",
+          "goal": "保留一个值。"
+        }
+      },
+      "error": "TEACHING_BAD_SHAPE"
+    },
+    {
+      "name": "duplicate-prerequisite",
+      "input": {
+        "schema": "teaching-v1",
+        "answer": "Choose A.",
+        "keyPoint": "A keeps the required value.",
+        "watchOut": "B drops it.",
+        "mustAnswer": [
+          "Choose A",
+          "Explain preservation"
+        ],
+        "prerequisites": [
+          "fixture-base",
+          "fixture-base"
+        ],
+        "goal": "Preserve a value.",
+        "zh-CN": {
+          "answer": "选择 A。",
+          "keyPoint": "A 保留所需的值。",
+          "watchOut": "B 丢弃该值。",
+          "goal": "保留一个值。"
+        }
+      },
+      "error": "TEACHING_BAD_SHAPE"
+    },
+    {
+      "name": "null-required",
+      "input": {
+        "schema": "teaching-v1",
+        "answer": "Choose A.",
+        "keyPoint": "A keeps the required value.",
+        "watchOut": "B drops it.",
+        "mustAnswer": null,
+        "prerequisites": [
+          "fixture-base"
+        ],
+        "goal": "Preserve a value.",
+        "zh-CN": {
+          "answer": "选择 A。",
+          "keyPoint": "A 保留所需的值。",
+          "watchOut": "B 丢弃该值。",
+          "goal": "保留一个值。"
+        }
+      },
+      "error": "TEACHING_BAD_SHAPE"
+    },
+    {
+      "name": "unknown-teaching-property",
+      "input": {
+        "schema": "teaching-v1",
+        "answer": "Choose A.",
+        "keyPoint": "A keeps the required value.",
+        "watchOut": "B drops it.",
+        "mustAnswer": [
+          "Choose A",
+          "Explain preservation"
+        ],
+        "prerequisites": [
+          "fixture-base"
+        ],
+        "goal": "Preserve a value.",
+        "zh-CN": {
+          "answer": "选择 A。",
+          "keyPoint": "A 保留所需的值。",
+          "watchOut": "B 丢弃该值。",
+          "goal": "保留一个值。"
+        },
+        "future": true
+      },
+      "canonical": {
+        "schema": "teaching-v1",
+        "answer": "Choose A.",
+        "keyPoint": "A keeps the required value.",
+        "watchOut": "B drops it.",
+        "mustAnswer": [
+          "Choose A",
+          "Explain preservation"
+        ],
+        "prerequisites": [
+          "fixture-base"
+        ],
+        "goal": "Preserve a value.",
+        "zh-CN": {
+          "answer": "选择 A。",
+          "keyPoint": "A 保留所需的值。",
+          "watchOut": "B 丢弃该值。",
+          "goal": "保留一个值。"
+        }
+      }
+    }
+  ],
+  "tags": [
+    {
+      "name": "null",
+      "input": null,
+      "canonical": null
+    },
+    {
+      "name": "empty",
+      "input": {},
+      "canonical": null
+    },
+    {
+      "name": "arbitrary-task",
+      "input": {
+        "examTask": "custom-task"
+      },
+      "canonical": {
+        "examTask": "custom-task"
+      }
+    },
+    {
+      "name": "unknown-tag",
+      "input": {
+        "domain": "1",
+        "future": true
+      },
+      "error": "TAGS_BAD_SHAPE"
+    },
+    {
+      "name": "null-domain",
+      "input": {
+        "domain": null
+      },
+      "error": "TAGS_BAD_SHAPE"
+    },
+    {
+      "name": "nonofficial-domain",
+      "input": {
+        "domain": "5"
+      },
+      "error": "TAGS_BAD_SHAPE"
+    }
+  ],
+  "translations": [
+    {
+      "name": "null",
+      "input": null,
+      "valid": true
+    },
+    {
+      "name": "empty",
+      "input": {},
+      "valid": true
+    },
+    {
+      "name": "v1",
+      "input": {
+        "zh-CN": {
+          "v": 1,
+          "question": "哪个选项保留该值？",
+          "explanation": "选择 A，因为它保留该值。"
+        }
+      },
+      "valid": true
+    },
+    {
+      "name": "future-version",
+      "input": {
+        "zh-CN": {
+          "v": 2,
+          "question": "哪个选项保留该值？",
+          "explanation": "选择 A，因为它保留该值。"
+        }
+      },
+      "valid": false,
+      "error": "TRANSLATION_BAD_SHAPE"
+    },
+    {
+      "name": "unknown-field",
+      "input": {
+        "zh-CN": {
+          "v": 1,
+          "question": "哪个选项保留该值？",
+          "explanation": "选择 A，因为它保留该值。",
+          "future": true
+        }
+      },
+      "valid": false,
+      "error": "TRANSLATION_BAD_SHAPE"
+    }
+  ],
+  "packageVersions": [
+    {
+      "value": 1,
+      "valid": true
+    },
+    {
+      "value": 2,
+      "valid": false
+    }
+  ],
+  "syncVersions": [
+    {
+      "name": "missing",
+      "expected": 1
+    },
+    {
+      "name": "null",
+      "value": null,
+      "expected": 1
+    },
+    {
+      "name": "future",
+      "value": 999,
+      "expected": 999
+    }
+  ]
+}
