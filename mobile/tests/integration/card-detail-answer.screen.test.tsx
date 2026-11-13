@@ -409,7 +409,8 @@ describe('CardDetailScreen — show answer', () => {
     // Prerequisite interactive chip
     const prereqChip = byTestId(tree, 'prereq-chip-aws-pre-01');
     expect(prereqChip).toHaveLength(1);
-    expect(textBlob(tree)).toContain('aws-pre-01 →');
+    expect(textBlob(tree)).toContain('Foundation card 1 →');
+    expect(textBlob(tree)).not.toContain('aws-pre-01 →');
   });
 
   it('opens a card from a deck that is not the active one', async () => {

@@ -55,6 +55,7 @@ vi.mock('../../src/features/gacha/draw/effectiveOwned', () => ({
   resolveEffectiveOwned: vi.fn(async () => new Set<string>()),
 }));
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   DONE_FOR_TODAY_TEXT,
   formatLastWrong,
@@ -184,6 +185,25 @@ describe('MistakeBookScreen', () => {
   afterEach(() => {
     vi.useRealTimers();
     applyRemoteFeatures(null);
+  });
+
+  it('shows a retryable error instead of an empty book when storage cannot be read', async () => {
+    vi.mocked(AsyncStorage.getItem).mockRejectedValueOnce(new Error('disk unavailable'));
+    const { tree } = await mount();
+    expect(byTestID(tree, 'mistake-book-error')).toHaveLength(1);
+    expect(byTestID(tree, 'mistake-book-empty')).toHaveLength(0);
+    await act(async () => byTestID(tree, 'mistake-book-retry')[0].props.onPress());
+    await flush();
+    expect(byTestID(tree, 'mistake-book-error')).toHaveLength(0);
+    expect(byTestID(tree, 'mistake-book-empty')).toHaveLength(1);
+  });
+
+  it('does not call a corrupt book empty or overwrite its contents', async () => {
+    store.set(BOOK_KEY, 'not json');
+    const { tree } = await mount();
+    expect(byTestID(tree, 'mistake-book-error')).toHaveLength(1);
+    expect(byTestID(tree, 'mistake-book-empty')).toHaveLength(0);
+    expect(store.get(BOOK_KEY)).toBe('not json');
   });
 
   it('lists active mistakes for each deck with question, topic and wrong count', async () => {

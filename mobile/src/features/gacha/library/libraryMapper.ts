@@ -1,4 +1,5 @@
 import type { DeckExport } from '../../../types/deckExport';
+import type { CardTranslations } from '../../../content/cardTranslation';
 import { questionText } from '../../../content/questionCode';
 import { stripInlineCode } from '../../../content/inlineCode';
 import type { CardProgress } from '../../../review/model';
@@ -210,6 +211,7 @@ export function buildLibraryVM(params: {
   topicFilter?: string | null;
   mcqEnabled?: boolean;
   searchQuery?: string;
+  translations?: ReadonlyMap<string, CardTranslations>;
 }): LibraryViewModel {
   const {
     deck,
@@ -335,6 +337,7 @@ export function buildLibraryVM(params: {
   const searched = !query ? statusFiltered : statusFiltered.filter((row) =>
     row.stableUid.toLocaleLowerCase().includes(query) ||
     row.question.toLocaleLowerCase().includes(query) ||
+    (params.translations?.get(row.stableUid)?.['zh-CN']?.question.toLocaleLowerCase().includes(query) ?? false) ||
     (numberQuery !== null && row.rank === Number(numberQuery[1])),
   );
   const cards = !hasTopics

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import CodeBlock from '../../../components/CodeBlock';
@@ -96,10 +96,12 @@ function ExplanationWithKeyLine(props: { split: AnswerKeyLine; lang: CardTextLan
 // sections — the same labels, order, CodeBlock wiring and empty hint — instead
 // of drifting apart. The section labels follow the card's language
 // (CardTextLangContext); the body text is whatever card the caller passes.
-export function CardAnswerSections(props: { card: CardExport; testID?: string; onPressPrerequisite?: (uid: string) => void }) {
-  const { card, testID, onPressPrerequisite } = props;
+export function CardAnswerSections(props: { card: CardExport; testID?: string; onPressPrerequisite?: (uid: string) => void; prerequisiteLabels?: Readonly<Record<string, string>> }) {
+  const { card, testID, onPressPrerequisite, prerequisiteLabels } = props;
   const lang = useCardTextLang();
   const labels = cardSectionLabels(lang);
+  const [showEnglishChecklist, setShowEnglishChecklist] = useState(false);
+  useEffect(() => setShowEnglishChecklist(false), [card.StableUid, lang]);
 
   const codeLanguageLabel = card.CodeLanguage
     ? friendlyCodeLanguage(card.CodeLanguage)
@@ -138,17 +140,38 @@ export function CardAnswerSections(props: { card: CardExport; testID?: string; o
 
     // 2. Self-Check Points (mustAnswer)
     if (t.mustAnswer && t.mustAnswer.length > 0) {
+      const zhPoints = t['zh-CN']?.mustAnswer;
+      const hasChineseChecklist = Array.isArray(zhPoints) && zhPoints.length === t.mustAnswer.length &&
+        zhPoints.every((point) => typeof point === 'string' && point.trim().length > 0);
+      const needsEnglishDisclosure = isZh && !hasChineseChecklist;
+      const points = isZh && hasChineseChecklist ? zhPoints! : t.mustAnswer;
       sections.push({
         key: 'teaching-self-check',
-        label: (labels as any).selfCheck || (isZh ? '自查得分点' : 'SELF-CHECK POINTS'),
+        label: labels.selfCheck,
         node: (
           <View style={styles.selfCheckContainer} testID="teaching-self-check-list">
-            {t.mustAnswer.map((point, pIdx) => (
+            {needsEnglishDisclosure ? (
+              <>
+                <Text style={styles.selfCheckText}>合上答案，试着说出结论和原因，再核对上方解析。</Text>
+                <Pressable
+                  testID="teaching-english-checklist-toggle"
+                  accessibilityRole="button"
+                  accessibilityState={{ expanded: showEnglishChecklist }}
+                  style={styles.checklistToggle}
+                  onPress={() => setShowEnglishChecklist((shown) => !shown)}
+                >
+                  <Text style={styles.checklistToggleText}>
+                    {showEnglishChecklist ? '收起英文答题要点' : '查看英文答题要点'}
+                  </Text>
+                </Pressable>
+              </>
+            ) : null}
+            {!needsEnglishDisclosure || showEnglishChecklist ? points.map((point, pIdx) => (
               <View key={pIdx} style={styles.selfCheckRow}>
-                <Text style={styles.selfCheckCheckmark}>✓</Text>
-                <Text style={styles.selfCheckText}>{point}</Text>
+                <Text style={styles.selfCheckCheckmark}>•</Text>
+                <Text style={styles.selfCheckText} accessibilityLanguage={isZh && hasChineseChecklist ? 'zh-CN' : 'en-US'}>{point}</Text>
               </View>
-            ))}
+            )) : null}
           </View>
         ),
       });
@@ -183,12 +206,13 @@ export function CardAnswerSections(props: { card: CardExport; testID?: string; o
             <View style={styles.prereqChipsRow}>
               {t.prerequisites.map((pUid, pIdx) => {
                 const isInteractive = Boolean(onPressPrerequisite);
+                const label = prerequisiteLabels?.[pUid] ?? (isZh ? `基础卡 ${pIdx + 1}` : `Foundation card ${pIdx + 1}`);
                 return (
                   <Pressable
                     key={pIdx}
                     testID={`prereq-chip-${pUid}`}
                     accessibilityRole={isInteractive ? 'button' : undefined}
-                    accessibilityLabel={isZh ? `先修卡：${pUid}` : `Prerequisite card: ${pUid}`}
+                    accessibilityLabel={isZh ? `先修卡：${label}` : `Prerequisite card: ${label}`}
                     disabled={!isInteractive}
                     style={({ pressed }) => [
                       styles.prereqChip,
@@ -197,8 +221,8 @@ export function CardAnswerSections(props: { card: CardExport; testID?: string; o
                     ]}
                     onPress={() => onPressPrerequisite?.(pUid)}
                   >
-                    <Text style={[styles.prereqChipText, isInteractive && styles.prereqChipTextInteractive]} numberOfLines={1}>
-                      {pUid}{isInteractive ? ' →' : ''}
+                    <Text style={[styles.prereqChipText, isInteractive && styles.prereqChipTextInteractive]}>
+                      {label}{isInteractive ? ' →' : ''}
                     </Text>
                   </Pressable>
                 );
@@ -373,8 +397,10 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     marginVertical: 3,
   },
+  checklistToggle: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' },
+  checklistToggleText: { color: colors.pokeBlueDeep, fontSize: typography.bodySmall, fontWeight: '700' },
   selfCheckCheckmark: {
-    color: colors.mint,
+    color: colors.inkSecondary,
     fontWeight: '900',
     fontSize: 14,
     marginRight: 6,

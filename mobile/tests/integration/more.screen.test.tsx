@@ -24,7 +24,7 @@ let drawStateFixture: Record<string, string[]> = {
   'aws-saa-c03': ['a-001', 'a-002'],
 };
 let audienceFixture: 'junior' | 'both' | 'all' = 'both';
-const { openUrlMock } = vi.hoisted(() => ({ openUrlMock: vi.fn(async () => undefined) }));
+const { openUrlMock, alertMock } = vi.hoisted(() => ({ openUrlMock: vi.fn(async () => undefined), alertMock: vi.fn() }));
 
 vi.mock('react-native', () => {
   const React = require('react');
@@ -40,6 +40,7 @@ vi.mock('react-native', () => {
       ),
     StyleSheet: { create: (styles: any) => styles },
     Linking: { openURL: openUrlMock },
+    Alert: { alert: alertMock },
   };
 });
 
@@ -171,6 +172,7 @@ describe('Me tab · MoreScreen + Profile + Help real copy', () => {
     installedDecksFixture = ['aws-saa-c03', 'csharp'];
     setAuthIdentitySnapshot({ status: 'anonymous', email: null, sessionExpired: false });
     openUrlMock.mockClear();
+    alertMock.mockClear();
   });
 
   it('renders the day streak and collection count the trackers actually hold', async () => {
@@ -310,6 +312,36 @@ describe('Me tab · MoreScreen + Profile + Help real copy', () => {
     // R24B §1: the Help row names its topics in plain words.
     expect(blob).toContain('Draws, rare cards, offline, devices');
     expect(blob).not.toMatch(/Pulls|pity|Android/);
+  });
+
+  it('reloads Profile preferences when returning from Settings', async () => {
+    let onFocus = () => {};
+    let tree!: renderer.ReactTestRenderer;
+    const navigation = { navigate: vi.fn(), addListener: (_event: string, cb: () => void) => {
+      onFocus = cb; return () => {};
+    } };
+    await act(async () => {
+      tree = renderer.create(<ProfileScreen navigation={navigation as any} route={{ key: 'profile', name: 'Profile' } as any} />);
+    });
+    await flush();
+    expect(textBlob(tree)).toContain('Balanced');
+    audienceFixture = 'junior';
+    await act(async () => onFocus());
+    await flush();
+    expect(textBlob(tree)).not.toContain('Balanced');
+    await act(async () => tree.unmount());
+  });
+
+  it('offers retry when a support link cannot open', async () => {
+    const tree = await renderMore();
+    openUrlMock.mockRejectedValueOnce(new Error('no handler'));
+    const link = tree.root.findAll((node) => typeof node.type === 'string' && node.props.testID === 'more-row-support')[0];
+    await act(async () => { await link.props.onPress(); });
+    expect(alertMock).toHaveBeenCalledWith('Cannot open link', 'Please try again.', expect.any(Array));
+    const actions = alertMock.mock.calls[0][2];
+    await act(async () => { await actions.find((action: any) => action.text === 'Retry').onPress(); });
+    expect(openUrlMock).toHaveBeenCalledTimes(2);
+    await act(async () => tree.unmount());
   });
 
   it('Profile keeps its real data and drops the placeholders', async () => {

@@ -77,6 +77,7 @@ import {
   showTrialUpsellDialog,
   sortCards,
 } from '../features/gacha/session/reviewContentHelpers';
+import { buildPrerequisiteLabels } from '../features/gacha/components/prerequisiteLabels';
 import { resetSessionStore, useSessionStore } from '../features/gacha/session/sessionStore';
 import { useScrollToTopOnChange } from '../features/gacha/session/useScrollToTopOnChange';
 import SessionProgressHeader from '../features/gacha/components/SessionProgressHeader';
@@ -351,6 +352,8 @@ export function SessionCardScreen({ navigation, route }: Props) {
   // complete translation, or in English, display holds the very same objects.
   const cardLang = useCardLangPref();
   const deckTranslations = useDeckTranslations(deck?.Slug ?? slug, deck?.Version ?? null);
+  const prerequisiteLabels = useMemo(() => buildPrerequisiteLabels(deck?.Cards ?? [], cardLang === 'zh-CN' ? 'zh-CN' : undefined), [deck, cardLang]);
+  const openPrerequisite = useCallback((uid: string) => navigation.push('CardDetail', { cardId: uid, studyContext: true }), [navigation]);
   const currentTranslation =
     current && deck ? cardTranslationFor(translationsForCard(deckTranslations, current.card.StableUid), deck.Locale) : null;
   const display = useMemo(
@@ -1441,6 +1444,8 @@ export function SessionCardScreen({ navigation, route }: Props) {
                   deckSlug={deck.Slug}
                   rank={rankMapRef.current.get(current.card.StableUid) ?? null}
                   revealed={showAnswer}
+                  onPressPrerequisite={openPrerequisite}
+                  prerequisiteLabels={prerequisiteLabels}
                 />
               </CardTextLangContext.Provider>
             ) : (
@@ -1450,6 +1455,8 @@ export function SessionCardScreen({ navigation, route }: Props) {
                   rank={rankMapRef.current.get(current.card.StableUid) ?? null}
                   faceUp={showAnswer}
                   onFlip={handleFlip}
+                  onPressPrerequisite={openPrerequisite}
+                  prerequisiteLabels={prerequisiteLabels}
                 />
               </CardTextLangContext.Provider>
             )}

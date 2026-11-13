@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
 import AppInfoScreen from '../components/AppInfoScreen';
@@ -134,8 +134,15 @@ export function MoreScreen({ navigation }: Props) {
       ? `${mistakeCount} ${mistakeCount === 1 ? 'card' : 'cards'} active in Mistake Book`
       : 'Mistake Book clear';
 
-  const openLink = (url: string) => {
-    void Linking.openURL(url).catch(() => undefined);
+  const openLink = async (url: string): Promise<void> => {
+    try {
+      await Linking.openURL(url);
+    } catch {
+      Alert.alert('Cannot open link', 'Please try again.', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Retry', onPress: () => { void openLink(url); } },
+      ]);
+    }
   };
 
   return (

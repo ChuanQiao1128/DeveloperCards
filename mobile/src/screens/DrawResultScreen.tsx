@@ -232,7 +232,7 @@ export function DrawResultScreen({ navigation, route }: Props) {
   const packComplete = params.packComplete === true;
   const canContinueDrawing = !isWalletLoading && remainingPulls > 0 && !packComplete;
   // Random packs offer another draw or the Library; courses continue into study.
-  const primaryLabel = isCourse ? 'Continue learning' : isWalletLoading
+  const primaryLabel = isCourse ? 'Continue course in order' : isWalletLoading
     ? 'Checking draws...'
     : canContinueDrawing
       ? `Continue drawing  ·  ${remainingPulls} draw${remainingPulls === 1 ? '' : 's'} left`
@@ -381,7 +381,7 @@ export function DrawResultScreen({ navigation, route }: Props) {
               testID="screen-draw-result-primary-cta"
               accessibilityRole="button"
               accessibilityLabel={
-                isCourse ? 'Continue learning' : isWalletLoading
+                isCourse ? 'Continue course in order' : isWalletLoading
                   ? 'Checking remaining draws'
                   : canContinueDrawing
                   ? `Continue drawing from ${deckLabel(params)}`
@@ -432,9 +432,12 @@ export function DrawResultScreen({ navigation, route }: Props) {
           {isCourse ? (
             <View style={{ gap: spacing.xs, marginBottom: spacing.md }}>
               <Text style={{ color: colors.ink, fontSize: typography.title3, fontWeight: '800' }}>
-                {`${cards.length} new card${cards.length === 1 ? '' : 's'} ready to learn`}
+                {`${cards.length} new card${cards.length === 1 ? '' : 's'} unlocked`}
               </Text>
               {primaryAction}
+              <Text testID="draw-result-course-order-note" style={{ color: colors.inkSecondary, fontSize: typography.bodySmall }}>
+                Continue from your earliest unlearned card, including cards unlocked earlier.
+              </Text>
             </View>
           ) : null}
           <View

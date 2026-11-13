@@ -338,8 +338,8 @@ export function LibraryHeader({
 
       <TextInput
         testID="library-search"
-        accessibilityLabel="Search cards by question, card number or ID"
-        placeholder="Search question, #number or ID"
+        accessibilityLabel="Search English or Chinese questions, card number or ID"
+        placeholder="Search EN / 中文, #number or ID"
         placeholderTextColor={colors.inkMuted}
         value={searchQuery}
         onChangeText={onSearchQueryChange}

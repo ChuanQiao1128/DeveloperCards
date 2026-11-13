@@ -21,6 +21,7 @@ import { formatRank, rankCardsByOrder } from '../features/gacha/library/cardRank
 import { getFeatureFlags } from '../config/featureFlags';
 import { mcqRequiredCount, resolveMcq } from '../features/gacha/mcq/normalizeMcq';
 import { MCQ_COPY } from '../features/gacha/mcq/mcqConstants';
+import { buildPrerequisiteLabels } from '../features/gacha/components/prerequisiteLabels';
 import { CardAnswerSections } from '../features/gacha/components/CardAnswerSections';
 import { TranslationAvailability } from '../features/gacha/study/TranslationAvailability';
 import { CardLangToggle } from '../features/gacha/components/CardLangToggle';
@@ -232,7 +233,7 @@ function formatRelativeTime(timestamp: number | undefined): string {
 }
 
 function formatNextReview(nextReviewAt: number | undefined): string {
-  if (!nextReviewAt || nextReviewAt <= 0) return 'unscheduled';
+  if (!nextReviewAt || nextReviewAt <= 0) return 'Not yet';
   const ms = nextReviewAt - Date.now();
   if (ms <= 0) return 'due now';
   const days = Math.floor(ms / 86400000);
@@ -365,6 +366,12 @@ export function CardDetailScreen({ navigation, route }: Props) {
   const displayMcq = display?.mcq ?? mcq;
   const cardTextLang = display?.lang === 'zh-CN' ? 'zh-CN' : undefined;
   const sectionLabels = cardSectionLabels(cardTextLang);
+  const prerequisiteLabels = buildPrerequisiteLabels(deck?.Cards ?? [], cardTextLang);
+  const returnToStudy = () => {
+    const session = navigation.getState?.().routes.slice().reverse().find((entry) => entry.name === 'SessionCard');
+    if (session) navigation.popTo('SessionCard', session.params as RootStackParamList['SessionCard']);
+    else navigation.goBack();
+  };
   // A locked card shows its slot and nothing else it could be recognised by.
   // The Library's silhouette tile makes the same trade: the registry admits
   // the card exists, the pull is still the moment you learn what it says.
@@ -397,8 +404,7 @@ export function CardDetailScreen({ navigation, route }: Props) {
   return (
     <SafeAreaView style={styles.safeArea}>
       <LinearGradient colors={[colors.softCream, colors.softPeach, colors.softLavender]} style={styles.gradient}>
-        <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
-          {/* TOP BAR — back button + slot number */}
+          {/* Keep navigation reachable while reading long answers. */}
           <View style={styles.topBar}>
             <Pressable
               accessibilityRole="button"
@@ -418,6 +424,7 @@ export function CardDetailScreen({ navigation, route }: Props) {
             )}
           </View>
 
+        <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
           {!isLocked ? <TranslationAvailability state={deckTranslations} /> : null}
           {/* HERO CARD — same featured style as DrawResult */}
           <View style={styles.heroCardWrap}>
@@ -525,8 +532,8 @@ export function CardDetailScreen({ navigation, route }: Props) {
             </View>
             <View style={styles.metaDivider} />
             <View style={styles.metaCell}>
-              <Text style={styles.metaLabel} maxFontSizeMultiplier={CHROME_MAX_FONT_SCALE}>STAGE</Text>
-              <Text style={styles.metaValue} maxFontSizeMultiplier={CHROME_MAX_FONT_SCALE}>{cardProgress?.stage ?? 0}</Text>
+              <Text style={styles.metaLabel} maxFontSizeMultiplier={CHROME_MAX_FONT_SCALE}>STATUS</Text>
+              <Text style={styles.metaValue} maxFontSizeMultiplier={CHROME_MAX_FONT_SCALE}>{isLocked ? 'Locked' : cardStatus}</Text>
             </View>
           </View>
 
@@ -563,7 +570,7 @@ export function CardDetailScreen({ navigation, route }: Props) {
                           ))}
                       </View>
                     ) : null}
-                    <CardAnswerSections card={displayCard ?? card} onPressPrerequisite={(pUid) => navigation.push('CardDetail', { cardId: pUid })} />
+                    <CardAnswerSections card={displayCard ?? card} prerequisiteLabels={prerequisiteLabels} onPressPrerequisite={(pUid) => navigation.push('CardDetail', { cardId: pUid, ...(route.params.studyContext ? { studyContext: true } : {}) })} />
                     {source ? (
                       <Pressable
                         testID="card-detail-source"
@@ -622,7 +629,7 @@ export function CardDetailScreen({ navigation, route }: Props) {
               card practice but actually launched the full deck session.
               No real single-card mode exists yet, so we're honest:
               "Open deck session" is what the button actually does. */}
-          {isLocked ? (
+          {isLocked && !route.params.studyContext ? (
             // No study entry, and no disabled button either. A dead control is
             // a dead end; the draw is the one action that can actually change
             // this card's state, so it takes the primary slot. The label does
@@ -639,22 +646,24 @@ export function CardDetailScreen({ navigation, route }: Props) {
           ) : (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Open deck session"
+              accessibilityLabel={route.params.studyContext ? 'Return to study' : 'Open deck session'}
               style={({ pressed }) => [styles.primaryAction, pressed && styles.pressed]}
               onPress={() =>
-                navigation.navigate('SessionCard', { slug: deck?.Slug ?? undefined })
+                route.params.studyContext ? returnToStudy() : navigation.navigate('SessionCard', { slug: deck?.Slug ?? undefined })
               }
             >
-              <Text style={styles.primaryActionText}>Open deck session</Text>
+              <Text style={styles.primaryActionText}>{route.params.studyContext ? 'Return to study' : 'Open deck session'}</Text>
             </Pressable>
           )}
-          <Pressable
-            accessibilityRole="button"
-            style={({ pressed }) => [styles.secondaryAction, pressed && styles.pressed]}
-            onPress={() => navigation.navigate('Library')}
-          >
-            <Text style={styles.secondaryActionText}>Back to library</Text>
-          </Pressable>
+          {route.params.studyContext ? null : (
+            <Pressable
+              accessibilityRole="button"
+              style={({ pressed }) => [styles.secondaryAction, pressed && styles.pressed]}
+              onPress={() => navigation.navigate('Library')}
+            >
+              <Text style={styles.secondaryActionText}>Back to library</Text>
+            </Pressable>
+          )}
         </ScrollView>
       </LinearGradient>
     </SafeAreaView>
@@ -673,7 +682,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm,
+    paddingHorizontal: spacing.screenPadding,
+    paddingTop: spacing.sm,
+    flexWrap: 'wrap',
   },
   topRight: {
     flexDirection: 'row',
@@ -702,8 +714,8 @@ const styles = StyleSheet.create({
   // ─── Hero card (matches DrawResult featured) ───────────────────────────
   heroCardWrap: { alignItems: 'center', marginBottom: spacing.md },
   heroCard: {
-    width: 260,
-    aspectRatio: 5 / 7,
+    width: '100%',
+    maxWidth: 420,
     borderRadius: 18,
     borderWidth: 2,
     borderColor: 'rgba(255,255,255,0.7)',
@@ -734,8 +746,7 @@ const styles = StyleSheet.create({
 
   // Pack-themed art window — matches DrawResult v2 design language.
   heroArtWindow: {
-    flex: 1,
-    minHeight: 110,
+    height: 48,
     borderRadius: 14,
     overflow: 'hidden',
     alignItems: 'center',
@@ -759,7 +770,7 @@ const styles = StyleSheet.create({
   },
   heroArtCode: {
     color: 'rgba(255,255,255,0.92)',
-    fontSize: 38,
+    fontSize: 24,
     fontWeight: '900',
     letterSpacing: 4,
     textShadowColor: 'rgba(0,0,0,0.3)',

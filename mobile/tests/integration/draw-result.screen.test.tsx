@@ -160,10 +160,11 @@ describe('DrawResultScreen v9', () => {
     });
     await flush();
     const button = tree.root.findByProps({ testID: 'screen-draw-result-primary-cta' });
-    expect(button.props.accessibilityLabel).toBe('Continue learning');
+    expect(button.props.accessibilityLabel).toBe('Continue course in order');
     const order = tree.root.findAll(node => typeof node.type === 'string').map(node => node.props.testID);
     expect(order.indexOf('screen-draw-result-primary-cta')).toBeLessThan(order.indexOf('screen-draw-result-featured-card'));
-    expect(collectText(tree)).toContain('Continue learning');
+    expect(collectText(tree)).toContain('Continue course in order');
+    expect(collectText(tree)).toContain('Continue from your earliest unlearned card, including cards unlocked earlier.');
     act(() => button.props.onPress());
     expect(navigation.navigate).toHaveBeenCalledWith('SessionCard', { slug: 'aws-saa-fundamentals' });
   });
