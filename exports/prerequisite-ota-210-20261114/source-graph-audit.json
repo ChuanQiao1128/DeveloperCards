@@ -1,0 +1,92 @@
+{
+  "cards": 379,
+  "prerequisiteEdges": 117,
+  "legacyBackwardEdges": 14,
+  "legacyAffectedCards": 12,
+  "backwardEdges": [
+    {
+      "card": "aws-rb2-20261107-pack-fh01",
+      "rank": 43,
+      "prerequisite": "aws-rb2-20261107-pack-na03",
+      "prerequisiteRank": 44
+    },
+    {
+      "card": "aws-rb2-20261107-pack-xa005",
+      "rank": 56,
+      "prerequisite": "aws-rb2-20261107-pack-cc17",
+      "prerequisiteRank": 169
+    },
+    {
+      "card": "aws-rb2-20261107-pack-xa039",
+      "rank": 79,
+      "prerequisite": "aws-rb2-20261107-pack-xa031",
+      "prerequisiteRank": 187
+    },
+    {
+      "card": "aws-rb2-20261107-pack-xa041",
+      "rank": 81,
+      "prerequisite": "aws-rb2-20261107-pack-cc17",
+      "prerequisiteRank": 169
+    },
+    {
+      "card": "aws-rb2-20261107-pack-xa045",
+      "rank": 84,
+      "prerequisite": "aws-rb2-20261107-pack-cc13",
+      "prerequisiteRank": 121
+    },
+    {
+      "card": "aws-rb2-20261107-pack-xb008",
+      "rank": 96,
+      "prerequisite": "aws-rb2-20261107-pack-ns03",
+      "prerequisiteRank": 126
+    },
+    {
+      "card": "aws-rb2-20261107-pack-xb014",
+      "rank": 98,
+      "prerequisite": "aws-rb2-20261107-pack-cmp-m19",
+      "prerequisiteRank": 172
+    },
+    {
+      "card": "aws-rb2-20261107-pack-xb018",
+      "rank": 99,
+      "prerequisite": "aws-rb2-20261107-pack-cmp-m19",
+      "prerequisiteRank": 172
+    },
+    {
+      "card": "aws-rb2-20261107-pack-xb023",
+      "rank": 101,
+      "prerequisite": "aws-rb2-20261107-pack-ca15",
+      "prerequisiteRank": 117
+    },
+    {
+      "card": "aws-rb2-20261107-pack-xb023",
+      "rank": 101,
+      "prerequisite": "aws-rb2-20261107-pack-nc07",
+      "prerequisiteRank": 179
+    },
+    {
+      "card": "aws-rb2-20261107-pack-xr102",
+      "rank": 110,
+      "prerequisite": "aws-rb2-20261107-pack-ca15",
+      "prerequisiteRank": 117
+    },
+    {
+      "card": "aws-rb2-20261107-pack-xr102",
+      "rank": 110,
+      "prerequisite": "aws-rb2-20261107-pack-nb01",
+      "prerequisiteRank": 176
+    },
+    {
+      "card": "aws-rb2-20261107-pack-vc-009",
+      "rank": 161,
+      "prerequisite": "aws-rb2-20261107-pack-gsc-080",
+      "prerequisiteRank": 271
+    },
+    {
+      "card": "aws-rb2-20261107-pack-nc01",
+      "rank": 177,
+      "prerequisite": "aws-rb2-20261107-pack-ns01",
+      "prerequisiteRank": 181
+    }
+  ]
+}

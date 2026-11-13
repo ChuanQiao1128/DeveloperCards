@@ -1,0 +1,15 @@
+{
+  "channel": "production",
+  "updates": [
+    {
+      "id": "01a1d63e-64b8-72b5-a564-d8225d02114e",
+      "group": "3fb8ba07-d454-4edf-a47e-95f080c1c63c",
+      "gitCommitHash": "82f246db778a8942bee41c0f2086f3c2788a4c83",
+      "runtimeVersion": "2.1.0",
+      "createdAt": "2026-11-13T18:49:35.672Z",
+      "environment": "production",
+      "isGitWorkingTreeDirty": false,
+      "platform": "ios"
+    }
+  ]
+}
