@@ -299,7 +299,7 @@ function parseBook(raw: string | null, strict = false): MistakeBookState {
 /** Best-effort by default; the book screen opts in to errors instead of claiming there are no mistakes. */
 export async function loadMistakeBook(options: { strict?: boolean } = {}): Promise<MistakeBookState> {
   try {
-    return parseBook(await AsyncStorage.getItem(await getUserScopedKey(MISTAKE_BOOK_KEY)), options.strict);
+    return parseBook(await AsyncStorage.getItem(await getUserScopedKey(MISTAKE_BOOK_KEY, undefined, options.strict)), options.strict);
   } catch (error) {
     if (options.strict) throw error;
     return emptyBook();

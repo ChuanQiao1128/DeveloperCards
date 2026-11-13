@@ -74,8 +74,8 @@ async function getActiveUserSub(strict = false): Promise<string | null> {
   }
 }
 
-async function getUserScopePrefix(syncUserSub?: string): Promise<string> {
-  const sub = syncUserSub ?? (await getActiveUserSub()) ?? 'anon';
+async function getUserScopePrefix(syncUserSub?: string, strict = false): Promise<string> {
+  const sub = syncUserSub ?? (await getActiveUserSub(strict)) ?? 'anon';
   return `${USER_SCOPE_PREFIX}${sub}:`;
 }
 
@@ -89,8 +89,8 @@ async function getUserScopePrefix(syncUserSub?: string): Promise<string> {
  * scope in one call: a second copy of this rule would keep serving the
  * previous account's data for the length of its own cache.
  */
-export async function getUserScopedKey(baseKey: string, syncUserSub?: string): Promise<string> {
-  return `${await getUserScopePrefix(syncUserSub)}${baseKey}`;
+export async function getUserScopedKey(baseKey: string, syncUserSub?: string, strict = false): Promise<string> {
+  return `${await getUserScopePrefix(syncUserSub, strict)}${baseKey}`;
 }
 
 /**

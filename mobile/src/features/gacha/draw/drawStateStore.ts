@@ -248,7 +248,7 @@ async function claimGlobalDrawState(slug: string, userSub?: string, strict = fal
  */
 export async function loadDrawState(slug: string, options: { strict?: boolean } = {}): Promise<DrawStateRecord> {
   try {
-    const prefix = await getUserScopedKey('');
+    const prefix = await getUserScopedKey('', undefined, options.strict);
     const sub = prefix.slice('devcards:u:'.length, -1);
     return await withDrawStateLock(() => loadDrawStateUnderLock(slug, sub, options.strict));
   } catch (error) {
@@ -317,7 +317,7 @@ export async function loadDrawStateUnderLock(slug: string, userSub?: string, str
  */
 export async function listDrawStateSlugs(options: { strict?: boolean } = {}): Promise<string[]> {
   try {
-    const prefix = await stateKey('');
+    const prefix = await getUserScopedKey(DRAW_STATE_PREFIX, undefined, options.strict);
     const keys = await AsyncStorage.getAllKeys();
     return keys
       .filter((key) => key.startsWith(prefix))
