@@ -39,12 +39,13 @@ function fixture() {
 }
 
 describe('ownership release gate', () => {
-  it('accepts compatible 2.1.1 fallback only with artifact hashes and reviewed source commit proof (stubs)', () => {
-    const f = fixture();
-    const proof = guard.recordProof(f.root, f.ipa, f.proof, f.inspect, f.git);
-    expect(proof.sourceCommit).toBe(commit);
-    expect(proof.archiveSha256).toBe(hash(fs.readFileSync(f.ipa)));
-    expect(guard.checkProof(f.root, '2.1.1', f.proof, f.inspect, f.git)).toMatchObject({ runtime: '2.1.1', buildNumber: '26' });
+  it('removes post-hoc acceptance even for a same-team/runtime/marker IPA', () => {
+    const f = archiveFixture();
+    expect(guard.recordProof).toBeUndefined();
+    const r = spawnSync(process.execPath, [path.join(mobile, 'scripts/release/queueOwnershipRollout.cjs'), 'record', f.ipa, f.proof], { encoding: 'utf8' });
+    expect(r.status).toBe(7);
+    expect(r.stderr).toContain('post-hoc record is forbidden');
+    expect(fs.existsSync(f.proof)).toBe(false);
   });
   it.each(['2.1.0', '2.0.0', '2.1.2', '', 'unknown'])('rejects an incompatible/missing runtime %s before reading proof', runtime => {
     const f = fixture();
@@ -74,22 +75,12 @@ describe('ownership release gate', () => {
     fs.writeFileSync(path.join(f.root, 'app.json'), '{invalid');
     expect(() => guard.checkProof(f.root, '2.1.0', undefined)).toThrow();
   });
-  it('fails closed on missing proof and altered IPA/embedded proof bytes', () => {
+  it('fails closed on missing proof, schema-v1 receipts and an unreviewed source', () => {
     const f = fixture();
     expect(() => guard.checkProof(f.root, '2.1.1', undefined)).toThrow('embedded-baseline proof required');
-    guard.recordProof(f.root, f.ipa, f.proof, f.inspect, f.git);
-    fs.appendFileSync(f.ipa, 'tampered');
-    expect(() => guard.checkProof(f.root, '2.1.1', f.proof, f.inspect, f.git)).toThrow('archiveSha256');
-    guard.recordProof(f.root, f.ipa, f.proof, f.inspect, f.git);
-    const altered = JSON.parse(fs.readFileSync(f.proof, 'utf8')); altered.embeddedBundleSha256 = '0'.repeat(64);
-    fs.writeFileSync(f.proof, JSON.stringify(altered));
-    expect(() => guard.checkProof(f.root, '2.1.1', f.proof, f.inspect, f.git)).toThrow('embeddedBundleSha256');
-  });
-  it('rejects uncommitted sources, a missing source commit, and an incompatible commit reader', () => {
-    const f = fixture();
-    expect(() => guard.recordProof(f.root, f.ipa, f.proof, f.inspect, (_: string, args: string[]) => {
-      if (args[0] === 'diff') throw new Error('dirty source'); return f.git(_, args);
-    })).toThrow('dirty source');
+    const oldProof = path.join(f.root, 'completed.json');
+    fs.writeFileSync(oldProof, JSON.stringify({ schemaVersion: 1, sourceCommit: commit }));
+    expect(() => guard.checkProof(f.root, '2.1.1', oldProof, f.inspect, f.git)).toThrow('unsupported or incomplete');
     expect(() => guard.verifySourceCommit(f.root, '')).toThrow('source commit required');
     expect(() => guard.verifySourceCommit(f.root, commit, (_: string, args: string[]) => args[0] === 'show' ? 'old reader' : '')).toThrow('reviewed ownership reader');
   });

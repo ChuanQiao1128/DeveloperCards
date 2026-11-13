@@ -48,13 +48,9 @@ if [ "${LOCAL_BUILD:-0}" = 1 ]; then
   if [ "${DRY_RUN:-0}" = 1 ]; then
     echo "DRY: eas build --platform ios --profile $PROFILE --local --non-interactive --output $OUTPUT"; exit 0
   fi
-  BUILD_SOURCE_COMMIT=$(git rev-parse HEAD)
-  git diff --quiet HEAD -- app.json package.json package-lock.json src/sync/progressSync.ts
+  # Ownership builds are handled only by the producer; this branch is retained
+  # for explicitly legacy format-0 release checkouts and never mints proof.
   eas build --platform ios --profile "$PROFILE" --local --non-interactive --output "$OUTPUT"
-  [ "$(git rev-parse HEAD)" = "$BUILD_SOURCE_COMMIT" ] || { echo 'ios-build: source commit changed during local build' >&2; exit 7; }
-  if [ "$PROFILE" = production ]; then
-    node "$HERE/queueOwnershipRollout.cjs" record "$OUTPUT" "${OWNERSHIP_BASELINE_PROOF:-$OUTPUT.ownership-baseline.json}"
-  fi
   echo "ARTIFACT=$OUTPUT"; echo "VERSION=$VERSION"; echo "BUILD_NUMBER=$BUILD"
   exit 0
 fi

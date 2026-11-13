@@ -62,7 +62,7 @@ with zipfile.ZipFile(sys.argv[1]) as z:
 function inspectIpa(ipa, app, run = execFileSync) {
   requireThat(typeof ipa === 'string' && path.isAbsolute(ipa) && fs.statSync(ipa).isFile(), 'baseline IPA must be an absolute local file');
   requireThat(fs.statSync(ipa).size <= 256 * 1024 * 1024, 'baseline IPA exceeds size limit');
-  const team = process.env.OWNERSHIP_APPLE_TEAM_ID ?? app.ios.appleTeamId;
+  const team = app.ios.appleTeamId;
   requireThat(typeof team === 'string' && /^[A-Z0-9]{10}$/.test(team), 'known Apple Team ID required (OWNERSHIP_APPLE_TEAM_ID)');
   requireThat(/^[A-Za-z0-9.-]+$/.test(app.ios.bundleIdentifier), 'invalid expected bundle identifier');
   const archiveSha256 = sha(fs.readFileSync(ipa));
@@ -86,7 +86,7 @@ function inspectIpa(ipa, app, run = execFileSync) {
     requireThat(fs.statSync(embeddedPath).size <= 64 * 1024 * 1024, 'embedded baseline exceeds size limit');
     const embedded = fs.readFileSync(embeddedPath);
     requireThat(MARKERS.every(marker => embedded.includes(Buffer.from(marker))), 'baseline embedded bundle lacks the ownership reader or full-queue guard');
-    return { runtime: RUNTIME, buildNumber: BUILD, bundleIdentifier: info.CFBundleIdentifier, appleTeamId: team, archiveSha256, embeddedBundleSha256: sha(embedded) };
+    return { signedProvenance: info.RecallSmithBuildProvenance ?? null, runtime: RUNTIME, buildNumber: BUILD, bundleIdentifier: info.CFBundleIdentifier, appleTeamId: team, archiveSha256, embeddedBundleSha256: sha(embedded) };
   } finally {
     fs.rmSync(temp, { recursive: true, force: true });
   }
@@ -100,46 +100,37 @@ function verifySourceCommit(root, commit, run = execFileSync) {
   const app = JSON.parse(run('git', ['show', `${commit}:mobile/app.json`], opts)).expo;
   requireThat(app.version === RUNTIME && app.ios.buildNumber === BUILD && app.runtimeVersion?.policy === 'appVersion' && app.extra?.progressQueueOwnershipFormat === 1, 'baseline commit lacks native ownership configuration');
 }
-function recordProof(root, ipa, proofFile, inspect = inspectIpa, run = execFileSync) {
-  const app = checkRuntime(root, RUNTIME);
-  requireThat(sha(fs.readFileSync(path.join(root, 'src/sync/progressSync.ts'))) === READER_SHA256, 'baseline source differs from the reviewed ownership reader');
-  const sourceCommit = String(run('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' })).trim();
-  run('git', ['diff', '--quiet', 'HEAD', '--', 'app.json', 'package.json', 'package-lock.json', 'src/sync/progressSync.ts'], { cwd: root });
-  verifySourceCommit(root, sourceCommit, run);
-  const artifact = inspect(ipa, app);
-  const proof = { schemaVersion: 1, sourceCommit, readerSha256: READER_SHA256, ipa: path.resolve(ipa), ...artifact };
-  fs.writeFileSync(proofFile, `${JSON.stringify(proof, null, 2)}\n`);
-  return proof;
-}
 function checkProof(root, targetRuntime, proofFile, inspect = inspectIpa, run = execFileSync) {
   const app = checkRuntime(root, targetRuntime);
-  requireThat(proofFile && fs.existsSync(proofFile), 'compatible embedded-baseline proof required; build/sign native 2.1.1 (26) locally first');
-  const proof = readJson(proofFile);
-  requireThat(proof.schemaVersion === 1 && proof.readerSha256 === READER_SHA256, 'unsupported or unreviewed ownership baseline proof');
-  verifySourceCommit(root, proof.sourceCommit, run);
-  const actual = inspect(proof.ipa, app);
-  for (const key of Object.keys(actual)) requireThat(proof[key] === actual[key], `baseline proof/artifact mismatch: ${key}`);
-  return actual;
+  requireThat(proofFile && fs.existsSync(proofFile), 'compatible embedded-baseline proof required; produce a local native baseline first');
+  return require('./nativeBuildProvenance.cjs').checkCompleted(root, proofFile, app, { inspect, run });
 }
-module.exports = { ownershipEnabled, checkRuntime, inspectIpa, verifySourceCommit, recordProof, checkProof };
+module.exports = { ownershipEnabled, checkRuntime, inspectIpa, verifySourceCommit, checkProof, READER_SHA256, sha };
 if (require.main === module) {
   try {
     const root = path.resolve(__dirname, '../..');
-    const [command, ipa, proofFile] = process.argv.slice(2);
-    if (command === 'record') {
-      requireThat(ipa && proofFile, 'usage: queueOwnershipRollout.cjs record <absolute signed IPA> <proof.json>');
-      recordProof(root, ipa, proofFile);
-      console.log(`OWNERSHIP_BASELINE_PROOF=${path.resolve(proofFile)}`);
+    const [command, ...args] = process.argv.slice(2);
+    const producer = () => require('./nativeBuildProvenance.cjs');
+    if (command === 'produce') {
+      requireThat(args.length === 4 && args[0] === '--commit' && args[2] === '--output-dir',
+        'usage: queueOwnershipRollout.cjs produce --commit <full reviewed SHA> --output-dir <new directory>');
+      const proof = producer().produce(root, args[1], path.resolve(args[3]));
+      console.log(`OWNERSHIP_BASELINE_PROOF=${proof}`);
+    } else if (command === 'inspect') {
+      requireThat(args.length === 1, 'usage: queueOwnershipRollout.cjs inspect <absolute IPA>');
+      const app = checkRuntime(root, RUNTIME);
+      app.ios.appleTeamId = process.env.OWNERSHIP_APPLE_TEAM_ID ?? app.ios.appleTeamId;
+      console.log(JSON.stringify(inspectIpa(args[0], app), null, 2));
     } else {
-      requireThat(command === 'check' || command === 'check-build', 'usage: queueOwnershipRollout.cjs check|check-build|record');
+      requireThat(command === 'check' || command === 'check-build', 'unsupported command; use produce, check or inspect (post-hoc record is forbidden)');
       const app = readJson(path.join(root, 'app.json')).expo;
       if (ownershipEnabled(root, app)) {
         if (command === 'check-build') {
-          requireThat(process.env.LOCAL_BUILD === '1', 'ownership native baseline requires LOCAL_BUILD=1; cloud builds are not authorized');
-          checkRuntime(root, app.version);
+          throw new Error('ownership builds require the trusted local producer: produce --commit <full reviewed SHA> --output-dir <new directory>; LOCAL_BUILD=1 alone is insufficient');
         } else {
-          checkProof(root, process.env.OTA_RUNTIME_VERSION ?? app.version, process.env.OWNERSHIP_BASELINE_PROOF);
-          console.log('ownership rollout: verified signed embedded baseline 2.1.1 (26)');
+          requireThat(args.length === 0 || (args.length === 4 && args[0] === '--proof' && args[2] === '--runtime'), 'usage: check --proof <completed.json> --runtime 2.1.1');
+          checkProof(root, args[3] ?? process.env.OTA_RUNTIME_VERSION ?? app.version, args[1] ?? process.env.OWNERSHIP_BASELINE_PROOF);
+          console.log('ownership rollout: verified producer-owned signed embedded baseline 2.1.1 (26)');
         }
       }
     }

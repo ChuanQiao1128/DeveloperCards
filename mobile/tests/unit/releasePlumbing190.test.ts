@@ -244,16 +244,15 @@ describe('ios-build.sh Sentry placeholder guard', { timeout: SPAWN_TIMEOUT_MS },
   it('rejects the ownership default cloud path before any EAS call', () => {
     const { res, log, diag } = runIosBuild({ org: 'example-org', project: 'example-project', ownership: true });
     expect(res.status, diag).toBe(7);
-    expect(res.stderr).toContain('requires LOCAL_BUILD=1');
+    expect(res.stderr).toContain('trusted local producer');
     expect(log).toBe('');
   });
 
-  it('allows only the local ownership build plan with stubbed EAS metadata', () => {
+  it('refuses the old LOCAL_BUILD ownership path before any EAS call', () => {
     const { res, log, diag } = runIosBuild({ org: 'example-org', project: 'example-project', ownership: true, local: true });
-    expect(res.status, diag).toBe(0);
-    expect(res.stdout).toContain('--local --non-interactive --output');
-    expect(log).toContain('whoami');
-    expect(log).not.toMatch(/^build /m);
+    expect(res.status, diag).toBe(7);
+    expect(res.stderr).toContain('trusted local producer');
+    expect(log).toBe('');
   });
 
   it('plans a local build without the paid remote build command', () => {
