@@ -17,7 +17,8 @@ public static class Readiness
       "select coalesce(max(version),0) from schema_migrations", []));
     // Probe an ordinary deployed data table as well as the migration ledger. No rows are disclosed.
     await DbUtil.ExecuteScalarAsync(conn, null, "select exists(select 1 from decks limit 1)", []);
-    var ok = version >= MinimumSchema;
-    return res.Raw(ok ? 200 : 503, new { ok, schemaVersion = version, minimumSchema = MinimumSchema });
+    var minimum = DbSafety.RuntimeIsolated ? 56 : MinimumSchema;
+    var ok = version >= minimum;
+    return res.Raw(ok ? 200 : 503, new { ok, schemaVersion = version, minimumSchema = minimum });
   }
 }

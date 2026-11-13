@@ -10,6 +10,9 @@ begin
  then raise exception 'Dedicated non-admin schema, maintenance and runtime roles required'; end if;
  if to_regclass('public.account_deletions') is null or to_regclass('public.publish_manifest_delivery') is null then
    raise exception 'Apply migrations 052 and 053 before cutover'; end if;
+ if to_regprocedure('public.content_release_rollback(bigint,text,text,text,text,text,text)') is null
+ or not exists(select 1 from schema_migrations where version=56) then
+   raise exception 'Apply migration 056 before isolated runtime cutover'; end if;
 end $preflight$;
 -- RDS master is not a PostgreSQL superuser; explicit membership permits ownership transfer.
 grant developercards_schema to current_user;
@@ -57,7 +60,8 @@ grant select, insert, update, delete on
 -- Append-only evidence and indefinite deletion fence: no UPDATE/DELETE/TRUNCATE/REFERENCES/TRIGGER.
 grant select, insert on admin_audit, ai_review_events, automation_decision_events,
  content_release_actions, content_review_receipts, content_review_revocations, account_deletions to developercards_app;
-grant select on schema_migrations to developercards_app;
+grant select on schema_migrations, content_rollback_actions to developercards_app;
+grant execute on function content_release_rollback(bigint,text,text,text,text,text,text) to developercards_app;
 grant execute on function content_editing_snapshot(bigint) to developercards_app;
 -- Existing optional search/embedding endpoints retain their extension operations.
 do $optional$

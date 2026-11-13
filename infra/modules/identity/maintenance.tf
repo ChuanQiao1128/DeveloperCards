@@ -23,7 +23,7 @@ resource "aws_iam_role_policy" "maintenance" {
   })
 }
 # Defense in depth, including future runtime policy additions. Version environments
-# contain distinct credentials, so runtime cannot inspect ANY Lambda configuration.
+# contain public maintenance PG/TLS data only; deny runtime configuration inspection as defense in depth.
 resource "aws_iam_role_policy" "runtime_no_maintenance" {
   for_each = { api = aws_iam_role.core_vpc.name, worker = aws_iam_role.worker.name }
   name     = "deny-maintenance-capabilities"
