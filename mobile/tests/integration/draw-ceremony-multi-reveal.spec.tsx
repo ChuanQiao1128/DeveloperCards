@@ -215,7 +215,7 @@ describe('DrawCeremony multi-pull reveal', () => {
     expect(gridPresent(tree)).toBe(false);
   });
 
-  it('reveal all walks every card through the spotlight in rising rarity and ends on the summary grid', () => {
+  it('reveal all presents the batch and spotlights only its highest card', () => {
     const rarities: Rarity[] = ['LEG', 'RAR', 'RAR', 'RAR', 'COM', 'COM', 'COM', 'COM', 'COM', 'COM'];
     const { tree } = renderScreen(rarities);
     reachTable(tree, rarities);
@@ -226,8 +226,8 @@ describe('DrawCeremony multi-pull reveal', () => {
 
     // The walk starts on the lowest rarity (Common) and progress counts from one.
     expect(advanceUntil(tree, () => bannerText(tree) !== null)).toBe(true);
-    expect(bannerText(tree)).toBe('Common');
-    expect(progressText(tree)).toBe('1 / 10');
+    expect(bannerText(tree)).toBe('Legendary');
+    expect(progressText(tree)).toBe('10 / 10');
 
     // It builds to the Legendary last, which is shown as card 10 of 10 and holds face up for a tap.
     expect(advanceUntil(tree, () => bannerText(tree) === 'Legendary')).toBe(true);
@@ -280,7 +280,7 @@ describe('DrawCeremony multi-pull reveal', () => {
       return banner === 'Legendary';
     };
     expect(advanceUntil(tree, record)).toBe(true);
-    expect(banners).toEqual(['1 / 5 Common', '2 / 5 Common', '3 / 5 Rare', '4 / 5 Rare', '5 / 5 Legendary']);
+    expect(banners).toEqual(['5 / 5 Legendary']);
 
     // The Legendary holds face up until it is tapped: a long wait leaves it there, no grid yet.
     expect(advanceUntil(tree, () => faceUp(tree))).toBe(true);
@@ -465,7 +465,7 @@ describe('DrawCeremony multi-pull reveal', () => {
     expect(rec.audio.filter((x) => x === 'hit:stinger-rar').length).toBe(1);
   });
 
-  it('plays a Common stinger when a Common card is revealed', () => {
+  it('keeps a Common reveal quiet apart from its flip', () => {
     const rarities: Rarity[] = ['COM', 'RAR'];
     const { tree } = renderScreen(rarities);
     reachTable(tree, rarities);
@@ -475,7 +475,8 @@ describe('DrawCeremony multi-pull reveal', () => {
       tree.root.findByProps({ testID: 'tap-card-0' }).props.onPress(); // the Common
     });
     advanceUntil(tree, () => rec.audio.filter((x) => x === 'hit:stinger-com').length > 0, 2000);
-    expect(rec.audio.filter((x) => x === 'hit:stinger-com').length).toBe(1);
+    expect(rec.audio.filter((x) => x === 'hit:stinger-com').length).toBe(0);
+    expect(rec.audio.filter((x) => x === 'hit:flip').length).toBe(1);
   });
 
   it('auto-reveals every card when autoReveal is on', () => {

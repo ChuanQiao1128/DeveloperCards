@@ -21,17 +21,7 @@ import { Reanimated } from './reanimatedGuard';
 import type { SharedValue } from './reanimatedGuard';
 import type { CeremonyPhase, PeakRarity, ResolvedCeremonyTimings } from '../../features/gacha/draw/ceremonyTimings';
 import {
-  BURST_CAMERA_PUNCH,
-  CHARGE_DIM,
-  CHARGE_PULSE_SCALE,
-  CHARGE_SHAKE_DEG,
-  CHARGE_SHAKE_MS,
-  CHARGE_SHAKE_PX,
-  FLASH_FADE_MS,
-  FLASH_HOLD_MS,
-  FLASH_RISE_MS,
   TELL_FRACTION_OF_HOLD,
-  chargePulseOffsets,
 } from '../../features/gacha/draw/ceremonyTimings';
 import type { SpillSchedule } from '../../features/gacha/draw/spillSchedule';
 
@@ -67,7 +57,7 @@ export type TimelineInput = {
 // ── Constants (B00 §2.10 verbatim) ───────────────────────────────────────────
 
 export const EASING = {
-  EMPHASIZED_OUT: 'bezier(0.05,0.7,0.1,1)', STANDARD: 'bezier(0.2,0,0,1)', LINEAR: 'linear', OUT_CUBIC: 'out(cubic)', OUT_QUAD: 'out(quad)',
+  EMPHASIZED_OUT: 'bezier(0.23,1,0.32,1)', STANDARD: 'bezier(0.77,0,0.175,1)', LINEAR: 'linear', OUT_CUBIC: 'out(cubic)', OUT_QUAD: 'out(quad)',
 } as const;
 export const TELL_COLORS = { NEUTRAL: '#FFF7EC', COM: '#FFF3E0', RAR: '#A78BD8', LEG: '#F5C95E' } as const;
 export const LEG_HIT_PAUSE_MS = 32;            // §3.1 S3
@@ -174,13 +164,11 @@ export function haloColorForTell(tell: number, peakRarity: PeakRarity): string {
 export function timelineTargets(
   input: Pick<TimelineInput, 'phase' | 'peakRarity' | 'isMulti' | 'reduceMotion' | 'tapFlow'>,
 ): TimelineTargets {
-  const { phase, peakRarity, isMulti: m, reduceMotion: rm, tapFlow = false } = input;
+  const { phase, peakRarity, reduceMotion: rm, tapFlow = false } = input;
   const C = peakRarity === 'COM';
-  const packAnticipate = rm ? 1 : m ? 1.1 : 1.12;
-  const raysAnticipate = m ? 0.26 : 0.22;
-  // v2 (I06): the stage goes to a dark stage for EVERY rarity, from the charge (approach)
-  // through the table; only 'swipe' stays undimmed.
-  const dimCharge = CHARGE_DIM;
+  const packAnticipate = rm ? 1 : 1.04;
+  const raysAnticipate = C ? 0 : peakRarity === 'RAR' ? 0.1 : 0.18;
+  const dimCharge = C ? 0.12 : peakRarity === 'RAR' ? 0.2 : 0.28;
   // The settle rim is the face-down rarity tell (0.55, COM none). It belongs to the Skia
   // stage's own table; when the RN tap table owns the cards the rim has nothing to sit
   // behind, so it is withheld in every phase.
@@ -195,7 +183,7 @@ export function timelineTargets(
     case 'tear-flip':
       return { tell: 1, dim: dimCharge, leak: 1, flash: 0, cameraScale: 1, packScale: packAnticipate, rays: raysAnticipate, halo: 0.6, peel: 1, cardOut: 1, rim: 0 };
     case 'flash-reveal':
-      return { tell: 1, dim: dimCharge, leak: 0, flash: rm ? 0 : 0.85, cameraScale: 1, packScale: 1, rays: raysAnticipate, halo: 0.6, peel: 1, cardOut: 1, rim: rm ? rimSettle : 0 };
+      return { tell: 1, dim: dimCharge, leak: 0, flash: 0, cameraScale: 1, packScale: 1, rays: raysAnticipate, halo: 0.6, peel: 1, cardOut: 1, rim: rm ? rimSettle : 0 };
     case 'settle':
     case 'cards-on-table':
     default:
@@ -341,14 +329,13 @@ export function useCeremonyTimeline(input: TimelineInput): CeremonyTimeline {
         const emph = { duration: timings.approach, easing: E(EASING.EMPHASIZED_OUT) };
         const std = { duration: timings.approach, easing: E(EASING.STANDARD) };
         packScale.value = withTiming(T.packScale, emph);
-        packY.value = withTiming(-24, emph); // glide to stage centre (px)
+        packY.value = withTiming(-12, emph);
         rays.value = withTiming(T.rays, std);
         halo.value = withTiming(T.halo, std);
         dim.value = withTiming(T.dim, std); // v2: the stage darkens from the charge
         // The tell is withheld here (§3.2): `tell` stays 0.
-        // The finger drove `seam` to 1 at commit; from here the hook owns the cut
-        // and relaxes it to the pre-cut nick so S3 has a sweep left to make (B00 §9 #14).
-        seam.value = withTiming(SEAM_PRECUT, { duration: SEAM_PRECUT_MS, easing: E(EASING.OUT_QUAD) });
+        // Continue the committed cut without closing it under the user's finger.
+        seam.value = withTiming(1, { duration: SEAM_PRECUT_MS, easing: E(EASING.OUT_QUAD) });
         break;
       }
       case 'hold': {
@@ -358,23 +345,7 @@ export function useCeremonyTimeline(input: TimelineInput): CeremonyTimeline {
         dim.value = withTiming(T.dim, tc);
         leak.value = withTiming(1, tc);
         halo.value = withTiming(0.6, tc);
-        // Silence beat (§2 "Silence before the hit"): the LEG pack shivers at the
-        // peak of the glow; nothing else moves and `seam` stays at SEAM_PRECUT.
-        if (peakRarity === 'LEG') {
-          const beatStart = Math.max(0, timings.hold - timings.beatMs);
-          const half = Math.round(1000 / SHIVER_HZ / 2);
-          shiver.value = withDelay(
-            beatStart,
-            withRepeat(
-              withSequence(
-                withTiming(SHIVER_PX, { duration: half, easing: E(EASING.LINEAR) }),
-                withTiming(-SHIVER_PX, { duration: half, easing: E(EASING.LINEAR) }),
-              ),
-              -1,
-              false,
-            ),
-          );
-        }
+        // Keep tension local to the foil; the camera and pack do not shake.
         break;
       }
       case 'tear-flip': {
@@ -395,18 +366,6 @@ export function useCeremonyTimeline(input: TimelineInput): CeremonyTimeline {
           pause + Math.round(tear * B.cardOutStart),
           withTiming(1, { duration: Math.round(tear * (B.cardOutEnd - B.cardOutStart)), easing: E(EASING.EMPHASIZED_OUT) }),
         );
-        // LEG decaying rock (§2 "Screenshake/rock decays and is reserved") — LEG only.
-        if (peakRarity === 'LEG') {
-          cameraRot.value = withDelay(
-            pause,
-            withSequence(
-              withTiming(-0.5, { duration: 90, easing: E(EASING.OUT_QUAD) }),
-              withTiming(0.4, { duration: 90, easing: E(EASING.OUT_QUAD) }),
-              withTiming(-0.25, { duration: 90, easing: E(EASING.OUT_QUAD) }),
-              withTiming(0, { duration: 90, easing: E(EASING.OUT_QUAD) }),
-            ),
-          );
-        }
         // Spill (multi only): each card flies from the centre to its table slot.
         if (spill) {
           for (const entry of spill.entries) {
@@ -422,16 +381,8 @@ export function useCeremonyTimeline(input: TimelineInput): CeremonyTimeline {
         break;
       }
       case 'flash-reveal': {
-        // v2 (I06): a full-screen burst flash envelope (rise / hold / fade) and a camera punch.
-        flash.value = withSequence(
-          withTiming(0.85, { duration: FLASH_RISE_MS, easing: E(EASING.LINEAR) }),
-          withTiming(0.85, { duration: FLASH_HOLD_MS, easing: E(EASING.LINEAR) }),
-          withTiming(0, { duration: FLASH_FADE_MS, easing: E(EASING.OUT_QUAD) }),
-        );
-        cameraScale.value = withSequence(
-          withTiming(BURST_CAMERA_PUNCH, { duration: FLASH_RISE_MS, easing: E(EASING.LINEAR) }),
-          withTiming(1, { duration: FLASH_HOLD_MS + FLASH_FADE_MS, easing: E(EASING.OUT_QUAD) }),
-        );
+        flash.value = withTiming(0, { duration: 0 });
+        cameraScale.value = withTiming(1, { duration: 160, easing: E(EASING.EMPHASIZED_OUT) });
         leak.value = withTiming(0, { duration: 200, easing: E(EASING.STANDARD) });
         packScale.value = withTiming(1, { duration: 200, easing: E(EASING.STANDARD) });
         break;
@@ -513,8 +464,8 @@ export function sequenceAt(steps: ReadonlyArray<SequenceStep>): unknown {
 }
 
 /**
- * Assign every shared value ONE `sequenceAt([...])` covering approach→settle, reproducing the
- * per-phase switch exactly (same targets, durations and easings). Called once at the tear by
+ * Assign the material opening once, so its cut, peel and card flight overlap on the UI thread.
+ * The per-phase path remains the reduced-motion / fast-forward fallback. Called at the tear by
  * DrawCeremonyScreen when motion is on; the per-phase effect then skips itself via `planned`.
  */
 export function playCeremonyTimeline(
@@ -527,204 +478,73 @@ export function playCeremonyTimeline(
     tapFlow?: boolean;
   },
 ): void {
-  const { peakRarity, isMulti, timings, spill, tapFlow = false } = input;
-  const E = resolveEasing;
-
-  const A = timings.approach;
-  const H = timings.hold;
-  const TF = timings.tearFlip;
-  const FR = timings.flashReveal;
-  const S = timings.settleMs;
-  const tHold = A;
-  const tTear = A + H;
-  const tFlash = tTear + TF;
-  const tSettle = tFlash + FR;
-  const tellMs = Math.round(H * TELL_FRACTION_OF_HOLD);
-  const pause = peakRarity === 'LEG' ? LEG_HIT_PAUSE_MS : 0;
+  const { peakRarity, isMulti, timings: t, spill, tapFlow = false } = input;
+  const out = resolveEasing(EASING.EMPHASIZED_OUT);
+  const move = resolveEasing(EASING.STANDARD);
+  const tearAt = t.approach + t.hold;
+  const landAt = tearAt + t.tearFlip;
+  const settleAt = landAt + t.flashReveal;
   const B = isMulti ? TEAR_BEATS.multi : TEAR_BEATS.single;
-  const n = timeline.rim.length;
-
-  const approachT = timelineTargets({ phase: 'approach', peakRarity, isMulti, reduceMotion: false, tapFlow });
-  const settleT = timelineTargets({ phase: 'settle', peakRarity, isMulti, reduceMotion: false, tapFlow });
-  const pulseOffsets = chargePulseOffsets(timings);
-  const shakeStep = Math.round(CHARGE_SHAKE_MS / 3);
-  const shakeLast = CHARGE_SHAKE_MS - 2 * shakeStep;
-  // One charge pulse on the camera: a quick scale punch that returns to rest.
-  const cameraPulse = (): unknown =>
-    withSequence(
-      withTiming(CHARGE_PULSE_SCALE, { duration: 60, easing: E(EASING.LINEAR) }),
-      withTiming(1, { duration: 120, easing: E(EASING.STANDARD) }),
-    );
-  const rotWobble = (): unknown =>
-    withSequence(
-      withTiming(CHARGE_SHAKE_DEG, { duration: shakeStep, easing: E(EASING.OUT_QUAD) }),
-      withTiming(-CHARGE_SHAKE_DEG, { duration: shakeStep, easing: E(EASING.OUT_QUAD) }),
-      withTiming(0, { duration: shakeLast, easing: E(EASING.OUT_QUAD) }),
-    );
-  const pxShake = (): unknown =>
-    withSequence(
-      withTiming(CHARGE_SHAKE_PX, { duration: shakeStep, easing: E(EASING.LINEAR) }),
-      withTiming(-CHARGE_SHAKE_PX, { duration: shakeStep, easing: E(EASING.LINEAR) }),
-      withTiming(0, { duration: shakeLast, easing: E(EASING.LINEAR) }),
-    );
-  const haloRingPunch = (): unknown =>
-    withSequence(
-      withTiming(0.9, { duration: 60, easing: E(EASING.LINEAR) }),
-      withTiming(0.6, { duration: 60, easing: E(EASING.STANDARD) }),
-    );
-  const burstPunch = (): unknown =>
-    withSequence(
-      withTiming(BURST_CAMERA_PUNCH, { duration: FLASH_RISE_MS, easing: E(EASING.LINEAR) }),
-      withTiming(1, { duration: FLASH_HOLD_MS + FLASH_FADE_MS, easing: E(EASING.OUT_QUAD) }),
-    );
-
-  // `sequenceAt` returns the opaque animation record the guard produces; assign it to the
-  // shared value through one typed cast so each call site stays a plain `assign(...)`.
+  const approach = timelineTargets({ phase: 'approach', peakRarity, isMulti, reduceMotion: false, tapFlow });
+  const settle = timelineTargets({ phase: 'settle', peakRarity, isMulti, reduceMotion: false, tapFlow });
   const assign = (sv: SharedValue<number>, steps: ReadonlyArray<SequenceStep>): void => {
     sv.value = sequenceAt(steps) as number;
   };
-
   assign(timeline.packScale, [
-    { at: 0, durationMs: A, animation: withTiming(approachT.packScale, { duration: A, easing: E(EASING.EMPHASIZED_OUT) }) },
-    { at: tFlash, durationMs: 200, animation: withTiming(1, { duration: 200, easing: E(EASING.STANDARD) }) },
+    { at: 0, durationMs: t.approach, animation: withTiming(approach.packScale, { duration: t.approach, easing: out }) },
+    { at: landAt, durationMs: 180, animation: withTiming(0.98, { duration: 180, easing: out }) },
   ]);
   assign(timeline.packY, [
-    { at: 0, durationMs: A, animation: withTiming(-24, { duration: A, easing: E(EASING.EMPHASIZED_OUT) }) },
+    { at: 0, durationMs: t.approach, animation: withTiming(-12, { duration: t.approach, easing: out }) },
+    { at: tearAt, durationMs: t.tearFlip, animation: withTiming(18, { duration: t.tearFlip, easing: move }) },
+  ]);
+  // The finger already opened the seam. Continue forward from its current position.
+  assign(timeline.seam, [{ at: 0, durationMs: 120, animation: withTiming(1, { duration: 120, easing: out }) }]);
+  assign(timeline.tell, [{ at: t.approach, durationMs: t.hold, animation: withTiming(1, { duration: t.hold, easing: out }) }]);
+  assign(timeline.dim, [{ at: 0, durationMs: 180, animation: withTiming(approach.dim, { duration: 180, easing: out }) }]);
+  assign(timeline.halo, [
+    { at: 0, durationMs: 180, animation: withTiming(0.32, { duration: 180, easing: out }) },
+    { at: tearAt, durationMs: 180, animation: withTiming(peakRarity === 'COM' ? 0.22 : 0.48, { duration: 180, easing: out }) },
+    { at: settleAt, durationMs: t.settleMs, animation: withTiming(settle.halo, { duration: t.settleMs, easing: out }) },
   ]);
   assign(timeline.rays, [
-    { at: 0, durationMs: A, animation: withTiming(approachT.rays, { duration: A, easing: E(EASING.STANDARD) }) },
-    { at: tSettle, durationMs: S, animation: withTiming(0.1, { duration: S, easing: E(EASING.STANDARD) }) },
-  ]);
-  assign(timeline.halo, [
-    { at: 0, durationMs: A, animation: withTiming(approachT.halo, { duration: A, easing: E(EASING.STANDARD) }) },
-    ...pulseOffsets.map((at) => ({ at, durationMs: CHARGE_SHAKE_MS, animation: haloRingPunch() })),
-    { at: tHold, durationMs: tellMs, animation: withTiming(0.6, { duration: tellMs, easing: E(EASING.STANDARD) }) },
-    { at: tSettle, durationMs: S, animation: withTiming(0.35, { duration: S, easing: E(EASING.STANDARD) }) },
-  ]);
-  assign(timeline.seam, [
-    { at: 0, durationMs: SEAM_PRECUT_MS, animation: withTiming(SEAM_PRECUT, { duration: SEAM_PRECUT_MS, easing: E(EASING.OUT_QUAD) }) },
-    {
-      at: tTear + pause,
-      durationMs: Math.round(TF * B.seamEnd),
-      animation: withTiming(1, { duration: Math.round(TF * B.seamEnd), easing: E(EASING.OUT_CUBIC) }),
-    },
-  ]);
-  assign(timeline.tell, [
-    { at: tHold, durationMs: tellMs, animation: withTiming(1, { duration: tellMs, easing: E(EASING.STANDARD) }) },
-  ]);
-  // v2 (I06): the stage darkens to the dark stage at once and stays there through the table.
-  assign(timeline.dim, [
-    { at: 0, durationMs: 200, animation: withTiming(CHARGE_DIM, { duration: 200, easing: E(EASING.STANDARD) }) },
+    { at: 0, durationMs: 180, animation: withTiming(approach.rays, { duration: 180, easing: out }) },
+    { at: settleAt, durationMs: t.settleMs, animation: withTiming(settle.rays, { duration: t.settleMs, easing: out }) },
   ]);
   assign(timeline.leak, [
-    { at: tHold, durationMs: tellMs, animation: withTiming(1, { duration: tellMs, easing: E(EASING.STANDARD) }) },
-    {
-      at: tTear + pause,
-      durationMs: 60,
-      animation: withSequence(withTiming(0.6, { duration: 0 }), withTiming(1, { duration: 60, easing: E(EASING.LINEAR) })),
-    },
-    { at: tFlash, durationMs: 200, animation: withTiming(0, { duration: 200, easing: E(EASING.STANDARD) }) },
+    { at: t.approach, durationMs: t.hold, animation: withTiming(0.6, { duration: t.hold, easing: out }) },
+    { at: landAt, durationMs: 160, animation: withTiming(0, { duration: 160, easing: out }) },
   ]);
-  // v2 (I06): the pack shakes ±CHARGE_SHAKE_PX on each of the three charge pulses (every rarity).
-  const shiverSteps: SequenceStep[] = pulseOffsets.map((at) => ({
-    at,
-    durationMs: CHARGE_SHAKE_MS,
-    animation: pxShake(),
-  }));
-  if (peakRarity === 'LEG' && timings.beatMs > 0) {
-    const half = Math.round(1000 / SHIVER_HZ / 2);
-    const reps = Math.max(1, Math.round(timings.beatMs / (2 * half)));
-    shiverSteps.push({
-      at: tHold + Math.max(0, H - timings.beatMs),
-      durationMs: reps * 2 * half,
-      animation: withRepeat(
-        withSequence(
-          withTiming(SHIVER_PX, { duration: half, easing: E(EASING.LINEAR) }),
-          withTiming(-SHIVER_PX, { duration: half, easing: E(EASING.LINEAR) }),
-        ),
-        reps,
-        false,
-      ),
-    });
-    shiverSteps.push({ at: tTear, durationMs: 40, animation: withTiming(0, { duration: 40, easing: E(EASING.LINEAR) }) });
-  }
-  assign(timeline.shiver, shiverSteps);
-  assign(timeline.peel, [
-    {
-      at: tTear + pause + Math.round(TF * B.peelStart),
-      durationMs: Math.round(TF * (B.peelEnd - B.peelStart)),
-      animation: withTiming(1, { duration: Math.round(TF * (B.peelEnd - B.peelStart)), easing: E(EASING.EMPHASIZED_OUT) }),
-    },
-  ]);
-  assign(timeline.cardOut, [
-    {
-      at: tTear + pause + Math.round(TF * B.cardOutStart),
-      durationMs: Math.round(TF * (B.cardOutEnd - B.cardOutStart)),
-      animation: withTiming(1, { duration: Math.round(TF * (B.cardOutEnd - B.cardOutStart)), easing: E(EASING.EMPHASIZED_OUT) }),
-    },
-  ]);
-  // v2 (I06): a ±CHARGE_SHAKE_DEG wobble on each charge pulse (every rarity); LEG keeps its
-  // decaying tear rock and the settle reset on top (sequenceAt resolves the overlaps).
-  const cameraRotSteps: SequenceStep[] = pulseOffsets.map((at) => ({
-    at,
-    durationMs: CHARGE_SHAKE_MS,
-    animation: rotWobble(),
-  }));
-  if (peakRarity === 'LEG') {
-    cameraRotSteps.push({
-      at: tTear + pause,
-      durationMs: 360,
-      animation: withSequence(
-        withTiming(-0.5, { duration: 90, easing: E(EASING.OUT_QUAD) }),
-        withTiming(0.4, { duration: 90, easing: E(EASING.OUT_QUAD) }),
-        withTiming(-0.25, { duration: 90, easing: E(EASING.OUT_QUAD) }),
-        withTiming(0, { duration: 90, easing: E(EASING.OUT_QUAD) }),
-      ),
-    });
-    cameraRotSteps.push({ at: tSettle, durationMs: S, animation: withTiming(0, { duration: S, easing: E(EASING.STANDARD) }) });
-  }
-  assign(timeline.cameraRot, cameraRotSteps);
+  assign(timeline.peel, [{
+    at: tearAt + Math.round(t.tearFlip * B.peelStart),
+    durationMs: Math.round(t.tearFlip * (B.peelEnd - B.peelStart)),
+    animation: withTiming(1, { duration: Math.round(t.tearFlip * (B.peelEnd - B.peelStart)), easing: out }),
+  }]);
+  assign(timeline.cardOut, [{
+    at: tearAt + Math.round(t.tearFlip * B.cardOutStart),
+    durationMs: Math.round(t.tearFlip * (B.cardOutEnd - B.cardOutStart)),
+    animation: withTiming(1, { duration: Math.round(t.tearFlip * (B.cardOutEnd - B.cardOutStart)), easing: out }),
+  }]);
+  // Stillness makes the foil and card the lead; no camera shake or full-screen flash.
+  for (const sv of [timeline.shiver, timeline.cameraRot, timeline.flash]) sv.value = withTiming(0, { duration: 0 });
+  timeline.cameraScale.value = withTiming(1, { duration: 0 });
   if (spill) {
     for (const entry of spill.entries) {
-      if (entry.index < n) {
-        const o = spillSlotOffset(entry.slot, n);
-        const at = tTear + pause + entry.leaveAt;
-        const dur = spill.travelMs;
-        assign(timeline.spill[entry.index].x, [
-          { at, durationMs: dur, animation: withTiming(o.x, { duration: dur, easing: E(EASING.EMPHASIZED_OUT) }) },
-        ]);
-        assign(timeline.spill[entry.index].y, [
-          { at, durationMs: dur, animation: withTiming(o.y, { duration: dur, easing: E(EASING.EMPHASIZED_OUT) }) },
-        ]);
-        assign(timeline.spill[entry.index].rot, [
-          { at, durationMs: dur, animation: withTiming((o.rot * Math.PI) / 180, { duration: dur, easing: E(EASING.EMPHASIZED_OUT) }) },
-        ]);
+      if (entry.index >= timeline.spill.length) continue;
+      const slot = spillSlotOffset(entry.slot, timeline.spill.length);
+      const at = tearAt + entry.leaveAt;
+      for (const [sv, target] of [
+        [timeline.spill[entry.index].x, slot.x],
+        [timeline.spill[entry.index].y, slot.y],
+        [timeline.spill[entry.index].rot, (slot.rot * Math.PI) / 180],
+      ] as const) {
+        assign(sv, [{ at, durationMs: spill.travelMs, animation: withTiming(target, { duration: spill.travelMs, easing: out }) }]);
       }
     }
   }
-  // Flash stays ONE step at tFlash (ceremonyTimelinePlan.test pins the delay): the burst
-  // envelope (rise / hold / fade).
-  assign(timeline.flash, [
-    {
-      at: tFlash,
-      durationMs: FLASH_RISE_MS + FLASH_HOLD_MS + FLASH_FADE_MS,
-      animation: withSequence(
-        withTiming(0.85, { duration: FLASH_RISE_MS, easing: E(EASING.LINEAR) }),
-        withTiming(0.85, { duration: FLASH_HOLD_MS, easing: E(EASING.LINEAR) }),
-        withTiming(0, { duration: FLASH_FADE_MS, easing: E(EASING.OUT_QUAD) }),
-      ),
-    },
-  ]);
-  // The camera pulses three times during the charge, then punches at the burst.
-  assign(timeline.cameraScale, [
-    ...pulseOffsets.map((at) => ({ at, durationMs: 180, animation: cameraPulse() })),
-    { at: tFlash, durationMs: FLASH_RISE_MS + FLASH_HOLD_MS + FLASH_FADE_MS, animation: burstPunch() },
-  ]);
-  for (let i = 0; i < n; i++) {
-    assign(timeline.rim[i], [
-      { at: tSettle + i * 40, durationMs: 200, animation: withTiming(settleT.rim, { duration: 200, easing: E(EASING.STANDARD) }) },
-    ]);
-  }
+  timeline.rim.forEach((rim, i) => {
+    assign(rim, [{ at: settleAt + Math.min(i, 4) * 30, durationMs: 180, animation: withTiming(settle.rim, { duration: 180, easing: out }) }]);
+  });
 }
 
 /** Cancel every in-flight animation the plan started, so the per-phase path can take back

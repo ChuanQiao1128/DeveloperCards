@@ -217,35 +217,26 @@ describe('DrawCeremony single-pull spotlight', () => {
     act(() => {
       tree.root.findByProps({ testID: 'reveal-spotlight-card' }).props.onPress();
     });
-    // Nothing has landed yet: the flip sound waits for flipStartMs (300).
-    expect(flip()).toBe(0);
-    advance(299);
-    expect(flip()).toBe(0);
-    advance(1); // flipStartMs = 300
+    // The physical flip responds immediately; the gold accent waits for edge-on.
     expect(flip()).toBe(1);
     expect(leg()).toBe(0);
-
-    advance(700 - 300); // midpointMs = 700
+    advance(329);
+    expect(leg()).toBe(0);
+    advance(1);
     expect(leg()).toBe(1);
+    advance(570 - 330);
     expect(success()).toBe(baseSuccess);
-
-    advance(950 - 700); // landMs = 950
-    expect(success()).toBe(baseSuccess + 1);
   });
 
-  it('fires a Common stinger at the flip midpoint', () => {
+  it('keeps a Common reveal quiet after the flip', () => {
     const { tree } = renderScreen('COM');
     reachTable(tree);
     const flip = () => rec.audio.filter((x) => x === 'hit:flip').length;
     const com = () => rec.audio.filter((x) => x === 'hit:stinger-com').length;
-    act(() => {
-      tree.root.findByProps({ testID: 'reveal-spotlight-card' }).props.onPress();
-    });
-    // COM flips at once (flipStartMs 0); its stinger waits for the midpoint (175).
+    act(() => { tree.root.findByProps({ testID: 'reveal-spotlight-card' }).props.onPress(); });
     expect(flip()).toBe(1);
+    advance(1000);
     expect(com()).toBe(0);
-    advance(175 + 5);
-    expect(com()).toBe(1);
   });
 
   it('renders the primary CTA inside the spotlight while it is visible', () => {

@@ -130,3 +130,12 @@ export function summaryGridLayout(
   const cellHeight = Math.round(cellWidth * 1.4);
   return { columns, rows, cellWidth, cellHeight, gap };
 }
+
+/** A batch opens together. Only its highest non-common card takes the spotlight. */
+export function batchSpotlightUid(cards: ReadonlyArray<{ stableUid: string; rarity: PeakRarity }>): string | null {
+  let best: { stableUid: string; rarity: PeakRarity } | null = null;
+  for (const card of cards) {
+    if (card.rarity !== 'COM' && (!best || REVEAL_RANK[card.rarity] > REVEAL_RANK[best.rarity])) best = card;
+  }
+  return best?.stableUid ?? null;
+}

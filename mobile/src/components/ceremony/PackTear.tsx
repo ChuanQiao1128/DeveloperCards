@@ -20,7 +20,7 @@ import { GestureHandler, Reanimated, SkiaModule, skiaAvailable, type SharedValue
 import { SWIPE_TRIGGER_DISTANCE, type CeremonyPhase } from '../../features/gacha/draw/ceremonyTimings';
 import { SEAM_BAND_RATIO, type PackPalette } from '../../theme/packArt';
 
-const { useSharedValue, useDerivedValue, withTiming, runOnJS } = Reanimated;
+const { useSharedValue, useDerivedValue, withTiming, withSpring, runOnJS } = Reanimated;
 const { PanHost, Gesture } = GestureHandler;
 const SkiaApi: any | null = SkiaModule ? SkiaModule.Skia : null;
 
@@ -37,6 +37,7 @@ export type PackTimeline = {
 export type PackTearProps = {
   width: number; height: number;                 // the pack SLOT (root View + canvas size); the pack body is packBodyRect() inside it.
   coverImage: ImageSourcePropType | undefined;
+  cardBackImage?: ImageSourcePropType;
   palette: PackPalette;
   phase: CeremonyPhase;
   isMulti: boolean;
@@ -179,10 +180,10 @@ function makeSeamEdgePath(api: any, points: ReadonlyArray<{ x: number; y: number
 // skiaAvailable && SkiaModule, so SkiaModule is non-null here. It takes only the props
 // it draws with and is memoised: the phase / disabled / handler churn that re-renders
 // the accessible root never re-reconciles the Skia pack (2026-09-21 perf).
-type PackCanvasProps = Pick<PackTearProps, 'width' | 'height' | 'coverImage' | 'palette' | 'isMulti' | 'pitySeal' | 'timeline'>;
+type PackCanvasProps = Pick<PackTearProps, 'width' | 'height' | 'coverImage' | 'cardBackImage' | 'palette' | 'isMulti' | 'pitySeal' | 'timeline'>;
 
 const PackCanvas: React.NamedExoticComponent<PackCanvasProps> = React.memo(function PackCanvas(props: PackCanvasProps): React.JSX.Element {
-  const { width, height, coverImage, palette, isMulti, pitySeal, timeline } = props;
+  const { width, height, coverImage, cardBackImage, palette, isMulti, pitySeal, timeline } = props;
   const { Canvas, Group, Rect, RoundedRect, Image, Path, Circle, useImage, vec, rrect, rect } = SkiaModule;
   const { seam, peel, cardOut, packScale, packY, shiver } = timeline;
 
@@ -192,6 +193,7 @@ const PackCanvas: React.NamedExoticComponent<PackCanvasProps> = React.memo(funct
   const stripPivot = vec(centre.x, body.y + body.height * SEAM_BAND_RATIO);
 
   const cover = useImage(coverImage ?? null);
+  const cardBack = useImage(cardBackImage ?? null);
 
   const packTransform = useDerivedValue(() => {
     'worklet';
@@ -211,11 +213,15 @@ const PackCanvas: React.NamedExoticComponent<PackCanvasProps> = React.memo(funct
   });
   const peelTransform = useDerivedValue(() => {
     'worklet';
-    return [{ perspective: PEEL_PERSPECTIVE }, { translateY: -PEEL_LIFT_PX * peel.value }, { rotateX: PEEL_ROTATE_X_RAD * peel.value }];
+    return [{ perspective: PEEL_PERSPECTIVE }, { translateX: 22 * peel.value }, { translateY: -PEEL_LIFT_PX * peel.value }, { rotateX: PEEL_ROTATE_X_RAD * peel.value }];
   });
   const stripOpacity = useDerivedValue(() => {
     'worklet';
-    return 1 - peel.value;
+    return 1 - peel.value * 0.7;
+  });
+  const coverOpacity = useDerivedValue(() => {
+    'worklet';
+    return 1 - cardOut.value;
   });
   const cardOutTransform = useDerivedValue(() => {
     'worklet';
@@ -232,7 +238,12 @@ const PackCanvas: React.NamedExoticComponent<PackCanvasProps> = React.memo(funct
           : null}
         {/* face-down card hint rising out of the seam */}
         <RoundedRect x={body.x + body.width * 0.1} y={body.y + body.height * 0.05} width={body.width * 0.8} height={body.height * 0.9} r={10} color={palette.ring} opacity={cardOut} transform={cardOutTransform} />
-        <Group clip={rrect(rect(body.x, body.y, body.width, body.height), PACK_CORNER_RADIUS, PACK_CORNER_RADIUS)}>
+        {cardBackImage && cardBack ? (
+          <Group transform={cardOutTransform} opacity={cardOut}>
+            <Image image={cardBack} x={body.x + body.width * 0.1} y={body.y + body.height * 0.05} width={body.width * 0.8} height={body.height * 0.9} fit="cover" />
+          </Group>
+        ) : null}
+        <Group clip={rrect(rect(body.x, body.y, body.width, body.height), PACK_CORNER_RADIUS, PACK_CORNER_RADIUS)} opacity={coverOpacity}>
           <Group clip={bodyClip}>
             {cover ? <Image image={cover} x={body.x} y={body.y} width={body.width} height={body.height} fit="cover" /> : <Rect x={body.x} y={body.y} width={body.width} height={body.height} color={palette.cover[1]} />}
           </Group>
@@ -253,7 +264,7 @@ const PackCanvas: React.NamedExoticComponent<PackCanvasProps> = React.memo(funct
 });
 
 export function PackTear(props: PackTearProps): React.JSX.Element {
-  const { width, height, coverImage, palette, phase, isMulti, pitySeal, disabled, timeline, onTear, onSeamProgress } = props;
+  const { width, height, coverImage, cardBackImage, palette, phase, isMulti, pitySeal, disabled, timeline, onTear, onSeamProgress } = props;
   const seam = timeline.seam;
 
   const committedRef = useRef(false);
@@ -281,26 +292,26 @@ export function PackTear(props: PackTearProps): React.JSX.Element {
     () =>
       Gesture.Pan()
         .enabled(!disabled)
+        .maxPointers(1)
         .activeOffsetX(8)
         .failOffsetY([-24, 24])
         .onUpdate((e: { translationX: number }) => {
           'worklet';
           const p = seamProgressFromDelta(e.translationX);
           seam.value = p;
-          const step = Math.round(p * 10);
-          if (step !== lastStep.value) {
-            lastStep.value = step;
+          if (lastStep.value < 0 && p > 0) {
+            lastStep.value = 1;
             runOnJS(report)(p);
           }
         })
-        .onEnd((e: { translationX: number }) => {
+        .onEnd((e: { translationX: number; velocityX?: number }) => {
           'worklet';
           lastStep.value = -1;
-          if (e.translationX >= SWIPE_TRIGGER_DISTANCE) {
+          if (e.translationX >= SWIPE_TRIGGER_DISTANCE || (e.translationX >= 24 && (e.velocityX ?? 0) >= 800)) {
             seam.value = 1;
             runOnJS(commit)();
           } else {
-            seam.value = withTiming(0, { duration: RELEASE_SNAP_BACK_MS });
+            seam.value = withSpring(0, { duration: 400, dampingRatio: 0.8, velocity: (e.velocityX ?? 0) / SWIPE_TRIGGER_DISTANCE, overshootClamping: true });
             runOnJS(report)(0);
           }
         }),
@@ -323,7 +334,7 @@ export function PackTear(props: PackTearProps): React.JSX.Element {
         style={{ width, height }}
       >
         {skiaAvailable && SkiaModule ? (
-          <PackCanvas width={width} height={height} coverImage={coverImage} palette={palette} isMulti={isMulti} pitySeal={pitySeal} timeline={timeline} />
+          <PackCanvas width={width} height={height} coverImage={coverImage} cardBackImage={cardBackImage} palette={palette} isMulti={isMulti} pitySeal={pitySeal} timeline={timeline} />
         ) : (
           <View style={{ flex: 1, margin: '15%', borderRadius: PACK_CORNER_RADIUS, backgroundColor: palette.cover[1] }} />
         )}
