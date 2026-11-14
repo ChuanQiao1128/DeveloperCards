@@ -1,0 +1,92 @@
+[
+  {
+    "uid": "aws-rb2-20261107-pack-cmp-m22",
+    "question": "Web应用由公网ALB接收请求，DNS由第三方托管。要启用Shield Advanced，应登记ALB还是Route 53，为什么？",
+    "answerZh": "登记实际接收请求的ALB；这里没有承载DNS的Route 53托管区域可替代它。",
+    "pointsEn": [
+      "Register the actual ALB rather than a Route 53 resource that is not used",
+      "Shield Advanced supports the ALB and requires explicit resource protection"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-cmp-m25",
+    "question": "Lambda或Managed Grafana有访问权限，要读取私有RDS。仅有IAM权限或创建RDS interface endpoint就够吗，应连接哪里？",
+    "answerZh": "不够。为函数或工作区配置VPC连接，选有目标私网路径的子网并放行实际安全组，连接数据库自己的私有endpoint和端口。",
+    "pointsEn": [
+      "Provide VPC routing and security-group connectivity",
+      "Connect to the database endpoint and port, not the RDS management-API endpoint"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-fh01",
+    "question": "VPC Flow Logs已写入CloudWatch Logs日志组，要近实时送到OpenSearch Service分析。有人提议直接经Kinesis Data Firehose把日志组记录送到OpenSearch。这条直接路径可行吗，应选什么？",
+    "answerZh": "不可行。CloudWatch Logs订阅记录把多条日志事件合并成一条记录，Firehose不支持把这种CloudWatch Logs输入直接交付到OpenSearch Service目的地；应选带实际消费者处理记录的受支持路径，如订阅到Kinesis Data Streams，由Lambda消费者解码并写入OpenSearch。",
+    "pointsEn": [
+      "The direct Firehose path is unsupported because subscriptions pack multiple events",
+      "Use a supported consumer path such as KDS plus Lambda decoding and OpenSearch writes"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-na03",
+    "question": "要看谁连接了哪块网卡、哪个端口，或要看ALB上的HTTP请求路径和响应，分别应查什么日志？",
+    "answerZh": "网络连接元数据看VPC Flow Logs；HTTP请求看ALB access logs，可把ALB日志投递到S3。VPC Flow Logs也可投递CloudWatch Logs或S3。",
+    "pointsEn": [
+      "VPC Flow Logs for network metadata",
+      "ALB access logs for HTTP paths and responses"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-nb03",
+    "question": "CloudFront要提供私有S3内容，也可能接收上传。客户已经有访问签名，就足够让CloudFront访问S3吗？",
+    "answerZh": "不够；为分发配置源站访问机制，在桶策略授权它执行所需S3动作。OAC为源站请求签名；旧OAI在其支持的S3读取场景中提供专用源站身份。",
+    "pointsEn": [
+      "Configure origin access and bucket-policy permissions for the distribution",
+      "Client signatures do not authorize the separate origin request; uploads need write permissions"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-nc03",
+    "question": "多客户数据必须分别加密、分别控制谁能解密。能否让所有客户共用一把具有相同权限的KMS key？",
+    "answerZh": "按客户建立适当的独立KMS key，并把各客户的用钥权限限制到对应数据边界。",
+    "pointsEn": [
+      "Independent keys per customer",
+      "Restrict key-use permissions to the corresponding customer data"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-nc05",
+    "question": "组织要少维护地开通和治理有共同审计基线的账户，只在Organizations创建账户和OU够吗，为什么？",
+    "answerZh": "不够；在管理账户建立Control Tower landing zone，启用所需CloudTrail等服务集成，并把新旧目标账户纳入管理。",
+    "pointsEn": [
+      "Use a Control Tower landing zone with required integrations",
+      "Enroll targeted accounts; Organizations membership alone does not provide the managed baseline"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-nc06",
+    "question": "公司要统一查看安全服务发现及安全标准控制状态，应该让一个新服务重新扫描所有威胁吗？",
+    "answerZh": "用Security Hub集中管理相应发现，并启用所需安全标准及账户范围；源检测仍由对应服务执行。",
+    "pointsEn": [
+      "Centralize findings and standards in Security Hub",
+      "Retain detection in the appropriate source services"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-new01",
+    "question": "root已经使用强而唯一的密码，还应怎样防止仅凭泄露密码就接管账户，并降低一个验证设备丢失带来的风险？",
+    "answerZh": "给root启用MFA，并预先登记不止一个受保护的MFA设备作为备用。",
+    "pointsEn": [
+      "Enable root MFA",
+      "Preregister multiple protected devices so another can serve as backup"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-new02",
+    "question": "ACM签发的公开证书希望尽量自动续期，应选DNS还是邮件验证，为什么？",
+    "answerZh": "选DNS验证，添加并保留ACM提供的CNAME，且满足证书在用等续期条件。",
+    "pointsEn": [
+      "DNS validation with retained CNAME and renewal eligibility",
+      "DNS supports automated validation; email renewal needs owner action"
+    ]
+  }
+]

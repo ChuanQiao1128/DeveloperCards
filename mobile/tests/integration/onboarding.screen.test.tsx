@@ -3,6 +3,12 @@ import renderer, { act } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const store = new Map<string, string>();
+let courseManifest = ['aws-saa-fundamentals', 'aws-saa-c03', 'claude-ccdv-f'].map((slug) => ({
+  slug, availability: 'live', downloadMode: 'public',
+}));
+vi.mock('../../src/content/visibleManifest', () => ({
+  listVisibleManifestDecks: vi.fn(async () => courseManifest),
+}));
 
 vi.mock('@react-native-async-storage/async-storage', () => ({
   default: {
@@ -58,6 +64,7 @@ describe('phase A onboarding screens', () => {
 
   beforeEach(() => {
     store.clear();
+    courseManifest = ['aws-saa-fundamentals', 'aws-saa-c03', 'claude-ccdv-f'].map((slug) => ({ slug, availability: 'live', downloadMode: 'public' }));
     recordFunnelEventMock.mockClear();
     (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
     errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -122,6 +129,19 @@ describe('phase A onboarding screens', () => {
   function goal(): { deckSlug: string; examDate: string | null } {
     return JSON.parse(store.get('recallsmith:study-goal:v1') ?? 'null');
   }
+
+  it('labels coming courses and prevents selecting them for the first lesson', async () => {
+    courseManifest = [{ slug: 'aws-saa-fundamentals', availability: 'live', downloadMode: 'public' },
+      { slug: 'claude-ccdv-f', availability: 'coming', downloadMode: 'none' }];
+    const tree = await renderWelcomeThenGoal(vi.fn());
+    const coming = tree.root.findAll((node) => typeof node.type === 'string' && node.props.testID === 'goal-choice-claude-ccdv-f')[0];
+    expect(coming.props.disabled).toBe(true);
+    expect(coming.props.accessibilityLabel).toContain('Coming soon');
+    await act(async () => coming.props.onPress());
+    await press(tree, 'Continue');
+    await press(tree, 'Finish setup');
+    expect(goal()?.deckSlug).toBe('aws-saa-fundamentals');
+  });
 
   it('asks what the learner wants to learn, not a content lane', async () => {
     const tree = await renderWelcomeThenGoal(vi.fn());

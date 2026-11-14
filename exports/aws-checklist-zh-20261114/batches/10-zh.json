@@ -1,0 +1,12 @@
+[
+  ["配置带服务端证书的 TLS 监听器", "由 NLB 监听器完成客户端 TLS 握手"],
+  ["使用 Network Firewall 域名允许列表，并丢弃不匹配的流量", "将流量路由经过防火墙；仅告警不会阻断流量"],
+  ["设备侧配置 GWLB，应用侧配置 GWLB endpoint", "通过这些端点路由需要检查的流量"],
+  ["使用通过邮件邀请的 CloudWatch dashboard sharing", "接收方用自己的密码和共享链接访问"],
+  ["在 HTTP 监听器上设置重定向到 HTTPS", "证书使 HTTPS 可用，而重定向才会改变 HTTP 客户端的请求目标"],
+  ["启用审计，并持续向 CloudWatch Logs 导出日志", "将日志保留期设为永不过期；备份不能替代操作日志"],
+  ["IAM 调用方：使用 AWS_IAM 并授予权限", "Webhook：使用 NONE、资源策略授权，并在函数内验证签名"],
+  ["使用 Transfer Family SFTP，配合 Directory Service 和 AD Connector", "为目录组授予文件访问权限，同时保留原有 AD 身份验证"],
+  ["企业私网路径：选择 Internal", "公网合作方：选择 Internet Facing，配置 EIP 和仅允许可信来源的安全组规则"],
+  ["DeleteObject 需要使用带 /* 后缀的对象 ARN", "ListBucket 仍使用桶 ARN，因为这两个动作面向不同资源类型"]
+]

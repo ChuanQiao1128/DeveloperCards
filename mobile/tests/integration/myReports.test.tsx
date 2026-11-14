@@ -273,6 +273,9 @@ describe('MyReportsScreen', () => {
     vi.mocked(getFreshAccessToken).mockResolvedValue(null);
     const tree = await renderReports();
     expect(textOf(byTestId(tree, 'my-reports-signed-out')[0])).toBe('Sign in to see your reports');
+    const cta = byTestId(tree, 'my-reports-sign-in')[0];
+    act(() => cta.props.onPress());
+    expect(tree.root.findByType(MyReportsScreen).props.navigation.navigate).toHaveBeenCalledWith('SignIn');
     expect(apiJson).not.toHaveBeenCalled();
   });
 

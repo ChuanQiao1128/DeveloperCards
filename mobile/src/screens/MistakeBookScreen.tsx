@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
+import { getAuthSessionGeneration, subscribeAuthIdentitySnapshot } from '../auth/sessionBoundary';
 import type { RootStackParamList } from '../navigation/types';
 import type { DeckExport } from '../types/deckExport';
 import { splitQuestionCode } from '../content/questionCode';
@@ -98,25 +99,22 @@ export function mistakeRowLabel(question: string, entry: MistakeEntry, now: numb
 
 /** Groups active mistakes per deck, decks ordered by their newest mistake (the input is newest first). */
 async function loadGroups(slug: string | undefined): Promise<DeckGroup[]> {
-  const book = await loadMistakeBook();
+  const book = await loadMistakeBook({ strict: true });
   const now = Date.now();
   const deckSlugs = new Set(activeMistakes(book, { deckSlug: slug, now }).map((entry) => entry.deckSlug));
   const groups: DeckGroup[] = [];
+  let missingDeck = false;
   for (const deckSlug of deckSlugs) {
     // 2026-10-14 three decks: a hidden deck's mistakes stay in the book but get no section.
     if (isHiddenDeck(deckSlug)) continue;
-    let deck: DeckExport | null = null;
-    try {
-      deck = await getCachedDeck(deckSlug);
-    } catch {
-      deck = null;
-    }
-    if (!deck) continue;
+    const deck = await getCachedDeck(deckSlug);
+    if (!deck) { missingDeck = true; continue; }
     // The same helper the Library pill counts with, so the pill and this list agree.
     const rows = resolveActiveMistakeRows(book, deck, now);
     const openToday = rows.filter((row) => isOpenToday(row.entry, now)).length;
     if (rows.length > 0) groups.push({ deck, rows, openToday });
   }
+  if (missingDeck && groups.length === 0) throw new Error('Mistake decks are not installed');
   return groups;
 }
 
@@ -126,33 +124,54 @@ export function MistakeBookScreen({ navigation, route }: Props) {
   const relatedCount = flags.mistakeBook?.relatedCount ?? RELATED_REVIEW_COUNT;
   const [groups, setGroups] = useState<DeckGroup[] | null>(null);
   const [now, setNow] = useState(() => Date.now());
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [reloadToken, setReloadToken] = useState(0);
   const [starting, setStarting] = useState<string | null>(null);
   const [doneToday, setDoneToday] = useState<ReadonlySet<string>>(() => new Set());
 
   // Load at mount and again on every focus: a focus run that clears mistakes returns here.
   useEffect(() => {
     let cancelled = false;
+    let focused = true;
+    let request = 0;
     const load = async () => {
+      const id = ++request;
+      const generation = getAuthSessionGeneration();
+      const stale = () => cancelled || !focused || id !== request || generation !== getAuthSessionGeneration();
       let next: DeckGroup[];
       try {
         next = await loadGroups(slug);
       } catch {
-        next = [];
+        if (!stale()) setLoadFailed(true);
+        return;
       }
-      if (cancelled) return;
+      if (stale()) return;
+      setLoadFailed(false);
       setNow(Date.now());
       setDoneToday(new Set());
       setGroups(next);
     };
     void load();
     const unsubscribe = navigation.addListener?.('focus', () => {
+      focused = true;
       void load();
+    });
+    const blur = navigation.addListener?.('blur', () => { focused = false; request += 1; });
+    const identity = subscribeAuthIdentitySnapshot(() => {
+      request += 1;
+      setGroups(null);
+      setLoadFailed(false);
+      // authStore increments its generation after the synchronous identity broadcast.
+      void Promise.resolve().then(() => { if (!cancelled && focused) void load(); });
     });
     return () => {
       cancelled = true;
+      request += 1;
+      identity();
       if (typeof unsubscribe === 'function') unsubscribe();
+      if (typeof blur === 'function') blur();
     };
-  }, [navigation, slug]);
+  }, [navigation, slug, reloadToken]);
 
   const startFocus = useCallback(
     async (group: DeckGroup) => {
@@ -216,7 +235,21 @@ export function MistakeBookScreen({ navigation, route }: Props) {
             {`Cards you missed in the last ${MISTAKE_WINDOW_DAYS} days. Two correct answers on different days clear a card.`}
           </Text>
 
-          {groups === null ? (
+          {loadFailed ? (
+            <View testID="mistake-book-error" style={styles.emptyCard}>
+              <Text style={styles.emptyTitle}>Couldn't load your mistakes</Text>
+              <Text style={styles.emptyBody}>Your saved mistakes haven't been changed. Please try again.</Text>
+              <Pressable testID="mistake-book-retry" accessibilityRole="button"
+                style={styles.primaryAction} onPress={() => setReloadToken((value) => value + 1)}>
+                <Text style={styles.primaryActionText}>Try again</Text>
+              </Pressable>
+              <Pressable testID="mistake-book-open-library" accessibilityRole="button" style={styles.secondaryAction}
+                onPress={() => navigation.navigate('Library')}>
+                <Text style={styles.primaryActionText}>Open library</Text>
+              </Pressable>
+            </View>
+          ) : null}
+          {groups === null && !loadFailed ? (
             <View
               testID="mistake-book-loading"
               accessible
@@ -226,7 +259,7 @@ export function MistakeBookScreen({ navigation, route }: Props) {
               <View style={styles.skeletonRow} />
               <View style={styles.skeletonRow} />
             </View>
-          ) : groups.length === 0 ? (
+          ) : groups === null || (loadFailed && groups.length === 0) ? null : groups.length === 0 ? (
             <View testID="mistake-book-empty" style={styles.emptyCard}>
               <Text style={styles.emptyTitle}>No mistakes to review</Text>
               <Text style={styles.emptyBody}>

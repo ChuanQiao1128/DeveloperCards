@@ -1,0 +1,92 @@
+[
+  {
+    "uid": "aws-rb2-20261107-pack-xb035",
+    "question": "Transfer Family上传订单文件后，应立即运行自定义处理，而不是每小时扫描目录。怎样触发处理，为什么？",
+    "answerZh": "给Transfer Family服务器关联上传完成后的managed workflow，用自定义步骤调用Lambda。",
+    "pointsEn": [
+      "Post-upload managed workflow with custom Lambda step",
+      "Upload event triggers immediate processing instead of periodic discovery"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xb037",
+    "question": "应用既要安全保管数据库密码，又要分批发布日志级别、功能开关等普通配置。普通配置应由什么管理，为什么不把一切都当秘密？",
+    "answerZh": "用AppConfig管理和发布普通应用配置；密码等敏感凭据仍放Secrets Manager。",
+    "pointsEn": [
+      "AppConfig for ordinary configuration, Secrets Manager for credentials",
+      "Configuration rollout/validation differs from secret access and rotation"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xb038",
+    "question": "多个账户/VPC中的Lambda和EKS微服务要用HTTPS互相调用，并能按服务名发现对方。只建立VPC路由够吗，应采用什么托管机制？",
+    "answerZh": "用VPC Lattice service network，把需要调用的VPC与服务关联；为服务配置HTTPS监听器及其实际计算目标。",
+    "pointsEn": [
+      "VPC Lattice service network with VPC/service associations, HTTPS listeners, and targets",
+      "Adds application discovery/routing beyond network routes"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xb041",
+    "question": "只需低延迟传输层转发、面对百万级请求/秒，或需要按HTTP路径/主机名选后端，负载均衡器怎样选？",
+    "answerZh": "前者评估NLB；按HTTP字段分流用ALB监听器规则。UDP也使用支持该协议的NLB。",
+    "pointsEn": [
+      "Transport forwarding: NLB",
+      "HTTP path/host routing: ALB, which understands request content"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xb044",
+    "question": "EKS使用Linux IPv4 EC2节点，Pod必须分配到与节点主网卡不同的指定子网。应在哪层配置，为什么不是给service account换IAM角色？",
+    "answerZh": "在Amazon VPC CNI启用并配置custom networking，为Pod的网络接口选择所需子网和安全组。",
+    "pointsEn": [
+      "VPC CNI custom networking",
+      "CNI controls addressing; IAM role controls API permissions"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xr001",
+    "question": "已获S3 Object Lambda使用资格的团队，希望读取同一原始对象时，按应用需要返回脱敏或筛选后的结果，又不预存多份副本。这项服务怎样完成？",
+    "answerZh": "让GET请求经过Object Lambda access point，由Lambda处理后再把结果返回应用。",
+    "pointsEn": [
+      "GET through Object Lambda access point and Lambda processing",
+      "Read-time transformation avoids prestored derived copies"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xr003",
+    "question": "Salesforce等受支持SaaS要把业务记录送到S3或Redshift，希望少写抓取代码且实际传输不走公网。应怎样接入？",
+    "answerZh": "使用AppFlow，并为支持的源连接选择基于PrivateLink的private flow；先确认SaaS账户和Region已支持该私有连接。",
+    "pointsEn": [
+      "Supported AppFlow PrivateLink private flow",
+      "Verify SaaS/account/Region eligibility for private business-data transfer"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xr101",
+    "question": "CloudWatch Logs已收到日志。要根据匹配事件的次数告警，和要把日志原文交给OpenSearch检索，两种需求应分别用什么处理方式？",
+    "answerZh": "计数告警用metric filter生成指标，再用CloudWatch metric alarm的SNS动作通知；原文检索用subscription filter，经受支持的转发路径送OpenSearch，例如官方Lambda订阅集成。",
+    "pointsEn": [
+      "Count alarms: metric filter, metric alarm, SNS",
+      "Raw search: subscription filter through supported forwarding"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gcl-001",
+    "question": "应用要向客户发送自定义HTML报告、订单确认或营销邮件。SNS发事件通知的邮件订阅就等价吗？",
+    "answerZh": "不等价；应评估SES等专门的邮件投递服务。",
+    "pointsEn": [
+      "Dedicated email service such as SES",
+      "Custom content/delivery control differs from event subscriptions"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gcl-002",
+    "question": "旧单体每改一个功能都要整体发布，希望尽量保留原代码，又能按功能独立更新。怎样逐步重构？",
+    "answerZh": "按业务边界拆成独立服务，并在适用情况下用容器封装既有执行环境。",
+    "pointsEn": [
+      "Independent services aligned to business boundaries, with suitable containerization",
+      "Service boundaries enable each feature to deploy and scale independently"
+    ]
+  }
+]

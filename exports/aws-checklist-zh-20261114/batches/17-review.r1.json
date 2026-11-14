@@ -1,0 +1,57 @@
+{
+  "batch": "17",
+  "inputSha256": "6bffe3f396fadcf35814977d39fb178701a22fc1edc623b08ddf9e175f69aef3",
+  "outputSha256": "8dadcd5fb5019bde7364d10830c717f9f47e3a85f4b28e496135f1666f0f5fd8",
+  "overall": "FAIL",
+  "cards": [
+    {
+      "uid": "aws-rb2-20261107-pack-vc-009",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-vc-015",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-ca13",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-ca16",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-ca17",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-cb16",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-cb18",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-cc03",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-cc17",
+      "verdict": "FAIL",
+      "note": "第2条未准确保留接收方决策与内容决策的职责分离。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-cc22",
+      "verdict": "PASS"
+    }
+  ],
+  "findings": [
+    {
+      "uid": "aws-rb2-20261107-pack-cc17",
+      "pointIndex": 1,
+      "description": "“input transformer …分别处理接收方和内容的选择”将接收方选择也归到 input transformer 下。原英文强调接收方决策与内容决策分离；结合前一条，事件模式筛选/路由，输入转换只调整目标负载。",
+      "suggestedChinese": "input transformer 调整发送给目标的负载，使接收方选择与发送内容的决定分开"
+    }
+  ]
+}

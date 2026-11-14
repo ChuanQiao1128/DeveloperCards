@@ -1,0 +1,92 @@
+[
+  {
+    "uid": "aws-rb2-20261107-pack-cc10",
+    "question": "要持续检查EBS卷是否加密、资源是否有标签等真实配置，并自动纠正不合规。只让Config把资源标红够吗，怎样分工？",
+    "answerZh": "用AWS Config匹配的规则评估实际配置；再关联Systems Manager Automation文档，执行所需的受支持或自定义整改动作。",
+    "pointsEn": [
+      "Config rules evaluate configuration",
+      "Associated Automation documents execute remediation; a noncompliant flag alone is insufficient"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-cc14",
+    "question": "S3已经保留文档版本，还想防止凭普通用户凭证意外永久删除版本，只给用户登录启用MFA就够吗？",
+    "answerZh": "启用适用的S3 MFA Delete保护；它依赖Versioning，不能由登录MFA自动替代。",
+    "pointsEn": [
+      "Sign-in MFA is insufficient; use S3 MFA Delete",
+      "Sign-in and permanent-version-deletion verification protect separate operations"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-cc16",
+    "question": "EC2要经指定VPC端点私下访问S3，同时防止请求绕过这个入口，只有端点够吗？",
+    "answerZh": "不够；建立所需端点路径，并在桶策略中限制允许的端点来源。",
+    "pointsEn": [
+      "Endpoint alone is insufficient",
+      "Combine the endpoint path with bucket-policy restrictions on endpoint origin"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-cc18",
+    "question": "两个Region的S3对象可能含PII或财务信息，需定期检查正文。查对象清单够吗，应在哪里运行什么发现作业？",
+    "answerZh": "在数据所在的每个Region配置适用的Macie敏感数据发现作业与识别器。",
+    "pointsEn": [
+      "An inventory does not inspect content",
+      "Run applicable Macie discovery in each data Region"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-cc19",
+    "question": "Lake Formation治理的数据湖中，不同团队应看同一数据的不同列或行，应该把敏感字段给所有人都删掉吗？",
+    "answerZh": "不应；用适用的Lake Formation细粒度授权或数据过滤，按身份提供允许的数据范围。",
+    "pointsEn": [
+      "Use identity-specific Lake Formation permissions or filters",
+      "Preserve the data and filter visibility instead of deleting fields globally"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-cc20",
+    "question": "外部用户只需在有限时间内读取一个私有S3对象，或浏览器应直接上传到S3，怎样避免公开桶和转发整个文件？",
+    "answerZh": "由有权限的应用签发限定对象、操作和期限的S3 presigned URL，让客户端直接请求S3。",
+    "pointsEn": [
+      "Issue an object-, operation-, and time-limited presigned URL",
+      "Client transfers directly with S3, without a public bucket or application relay"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-cc21",
+    "question": "内容经CloudFront分发，只给获授权客户访问。客户端不支持Cookie，与URL不可改动时，签名放在哪里？",
+    "answerZh": "不支持Cookie的客户端使用CloudFront signed URL；不能改变现有URL但能带Cookie的客户端用signed cookies。",
+    "pointsEn": [
+      "No cookies: signed URL",
+      "Unchanged URL with cookie support: signed cookies"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-cc23",
+    "question": "要查谁改了安全组，或谁读写了S3对象，该看哪类记录？配置快照够吗？",
+    "answerZh": "看CloudTrail：资源管理API使用相应management events；S3对象操作须选择相应data events。",
+    "pointsEn": [
+      "Management events for security-group changes",
+      "S3 data events for object operations; configuration snapshots alone are insufficient"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-cmp-m02",
+    "question": "本VPC应用访问同Region的S3或DynamoDB，与机房经已有专线访问S3，都要绕过IGW和NAT。应分别选哪类端点，为什么？",
+    "answerZh": "本VPC可用对应服务的gateway endpoint，关联实际调用子网的路由表；机房访问S3用可经专线到达的S3 interface endpoint。",
+    "pointsEn": [
+      "VPC: gateway endpoint with caller route tables",
+      "On premises: reachable S3 interface endpoint, because gateway endpoints do not extend on premises"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-cmp-m03",
+    "question": "数百万已有S3对象要补加密或改保留属性。修改桶的新默认就够吗，怎样批量改旧对象？",
+    "answerZh": "不够；对已有对象使用清单驱动的S3 Batch Operations及适用操作，需要自定义逻辑时调用Lambda。",
+    "pointsEn": [
+      "Defaults do not rewrite existing objects",
+      "Use manifest-driven Batch Operations, with Lambda for custom logic"
+    ]
+  }
+]

@@ -1,0 +1,92 @@
+[
+  {
+    "uid": "aws-rb2-20261107-pack-xa041",
+    "question": "对称客户管理KMS key被误计划删除，等待期还未结束。应执行什么操作保住key，真正删除后还能靠取消找回吗，为什么？",
+    "answerZh": "等待期内执行CancelKeyDeletion；真正删除后不能再靠取消恢复。",
+    "pointsEn": [
+      "CancelKeyDeletion before the waiting period ends",
+      "Actual destruction is irreversible through cancellation"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xa042",
+    "question": "应用要根据异常IP、设备或地点等登录风险追加验证。应在Cognito哪一层评估风险并按配置要求MFA，为什么？",
+    "answerZh": "在Cognito user pool启用支持的threat protection adaptive authentication，并按风险配置要求MFA。",
+    "pointsEn": [
+      "User-pool adaptive authentication with risk-based MFA configuration",
+      "User pool evaluates sign-in risk; identity pool exchanges AWS credentials"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xa044",
+    "question": "数百台受管EC2需要定期知道装了哪些软件和版本、哪些系统配置，怎样集中取得清单，为什么？",
+    "answerZh": "配置Systems Manager Inventory收集受管节点的元数据。",
+    "pointsEn": [
+      "Systems Manager Inventory",
+      "Collects software/version/configuration metadata centrally"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xa045",
+    "question": "组织在多个账户和Region都有S3桶，要集中看版本控制状态、未完成分块上传数量等指标。应汇总什么，而不是翻每条API日志？",
+    "answerZh": "使用适用范围的S3 Storage Lens指标汇总。",
+    "pointsEn": [
+      "S3 Storage Lens metrics",
+      "Aggregate current storage/protection state over the required scope"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xa047",
+    "question": "安全日志和事件来自多个账户、SaaS及本地环境，希望少开发地汇入统一可分析数据湖。应先选什么，为什么？",
+    "answerZh": "使用Amazon Security Lake收集受支持来源的安全数据。",
+    "pointsEn": [
+      "Amazon Security Lake",
+      "Collects and normalizes supported raw security logs/events into S3"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xa048",
+    "question": "要审查组织中IAM用户和角色是否长期拥有未使用的权限，应选权限分析还是软件漏洞扫描，为什么？",
+    "answerZh": "使用IAM Access Analyzer的unused access analysis，再据实际需要收敛权限。",
+    "pointsEn": [
+      "Access Analyzer unused access analysis",
+      "It analyzes IAM access usage rather than software vulnerabilities"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xa049",
+    "question": "账户A的SNS主题要调用账户B的Lambda。创建订阅的权限，和消息到达后调用函数的权限，分别在哪一侧授权，为什么？",
+    "answerZh": "A的主题资源策略允许B的订阅创建身份订阅；B的函数资源策略允许SNS服务从该主题调用函数。",
+    "pointsEn": [
+      "Topic policy permits the subscribing identity",
+      "Function resource policy permits SNS from that topic; creation and delivery are separate requests"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xa051",
+    "question": "多个团队共用支持runtime role的EMR集群，作业权限要各自隔离，也不能借节点元数据拿到整机权限。应怎样提交作业，为什么？",
+    "answerZh": "启用EMR runtime roles，为各团队授受限角色，并在提交作业时指定对应runtime role。",
+    "pointsEn": [
+      "Enable runtime roles and specify a restricted team role per job",
+      "Job identity replaces shared instance-role access and cannot access cluster IMDS"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xa053",
+    "question": "API要按来源IP准入。REST API资源策略，与HTTP API的Lambda authorizer，应怎样落实，能直接照搬配置吗？",
+    "answerZh": "REST API可用适用resource policy；HTTP API不支持这项策略，但可让Lambda authorizer用请求上下文来源IP判断是否允许。不能直接照搬REST策略。",
+    "pointsEn": [
+      "REST: resource policy; HTTP: Lambda authorizer using context source IP",
+      "HTTP does not support copying the REST resource policy"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xa054",
+    "question": "EKS managed node group由Auto Scaling启动节点，根EBS卷使用客户管理KMS key。除Pod角色外，应授权哪种角色使用这把key，为什么？",
+    "answerZh": "授权实际启动实例的Auto Scaling service-linked role使用该客户管理key。",
+    "pointsEn": [
+      "Actual Auto Scaling service-linked role",
+      "It creates the encrypted EBS volumes during launches"
+    ]
+  }
+]

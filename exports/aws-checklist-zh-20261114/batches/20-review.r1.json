@@ -1,0 +1,64 @@
+{
+  "batch": "20",
+  "inputSha256": "85f5f1ccc45fef491b3ab5b314bc19efa7a9a945abb4f02a39ad2e926e448291",
+  "outputSha256": "4e43b7994dc2d5bd9e2f5a18b69ae6f0d0c20e43821904bced7c7830e9d7c840",
+  "overall": "FAIL",
+  "cards": [
+    {
+      "uid": "aws-rb2-20261107-pack-xb006",
+      "verdict": "FAIL",
+      "note": "逻辑连接未与英文及已接受中文答案对齐，见 findings。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-xb010",
+      "verdict": "FAIL",
+      "note": "逻辑连接未与英文及已接受中文答案对齐，见 findings。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-xb011",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-xb013",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-xb019",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-xb020",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-xb029",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-xb031",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-xb032",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-xb034",
+      "verdict": "PASS"
+    }
+  ],
+  "findings": [
+    {
+      "uid": "aws-rb2-20261107-pack-xb006",
+      "pointIndex": 1,
+      "description": "英文 medical entity/PHI analysis 结合已接受答案为医疗实体或 PHI 分析。译文“医疗实体和 PHI”会把按需求选择分析类型变成两类都要分析，增加评分要求。",
+      "suggestedChinese": "先提取文本，再进行医疗实体或 PHI 分析"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-xb010",
+      "pointIndex": 0,
+      "description": "英文 Glue JDBC/blueprint ingestion path 指这一摄取路径，已接受答案明确为 Glue JDBC 连接和 Lake Formation 蓝图摄取。译成“Glue JDBC 或 blueprint”将组合路径改成二选一。",
+      "suggestedChinese": "复制到数据湖：通过 Glue JDBC 连接和蓝图摄取，建立实际写入 S3 的路径"
+    }
+  ]
+}

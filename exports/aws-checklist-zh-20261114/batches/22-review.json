@@ -1,0 +1,59 @@
+{
+  "batch": "22",
+  "inputSha256": "f3ef229118f4a164a70c3467396b950d427357fcb5ce192dbea40cf9e2d844d3",
+  "outputSha256": "61f0aa5769f0955b894963023ce8698640791145c1518b7e816f5363a8a644f1",
+  "overall": "PASS",
+  "cards": [
+    {
+      "uid": "aws-rb2-20261107-pack-gcl-004",
+      "verdict": "PASS",
+      "note": "内容未变，沿用22-review.r1.json有效结果。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gcl-006",
+      "verdict": "PASS",
+      "note": "内容未变，沿用22-review.r1.json有效结果。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gcl-007",
+      "verdict": "PASS",
+      "note": "内容未变，沿用22-review.r1.json有效结果。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gcl-008",
+      "verdict": "PASS",
+      "note": "内容未变，沿用22-review.r1.json有效结果。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gcl-009",
+      "verdict": "PASS",
+      "note": "内容未变，沿用22-review.r1.json有效结果。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gcl-010",
+      "verdict": "PASS",
+      "note": "本次仅局部复核所报逻辑或范围修订，已准确对齐；该卡未变条目沿用22-review.r1.json有效结果。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gcl-013",
+      "verdict": "PASS",
+      "note": "内容未变，沿用22-review.r1.json有效结果。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gcl-015",
+      "verdict": "PASS",
+      "note": "内容未变，沿用22-review.r1.json有效结果。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gcl-016",
+      "verdict": "PASS",
+      "note": "内容未变，沿用22-review.r1.json有效结果。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gcl-021",
+      "verdict": "PASS",
+      "note": "内容未变，沿用22-review.r1.json有效结果。"
+    }
+  ],
+  "findings": []
+}

@@ -1,0 +1,12 @@
+[
+  ["AWS 服务：消费方创建对应的 interface endpoint", "自建 TCP 服务：提供方发布由 NLB 支撑的 endpoint service，消费方用 interface endpoint 连接"],
+  ["用 SCP 对 RunInstances 设置显式 Deny，并使用 ec2:InstanceType 条件", "将 SCP 关联到开发账户或其独立 OU，因为继承关系决定限制范围"],
+  ["为 EC2 的 instance profile 或 Lambda 执行角色授予所需 S3 权限", "自动刷新的临时凭证避免分发长期用户密钥"],
+  ["使用 Secrets Manager，让获授权应用在运行时读取，并配置数据库密码轮换", "复制主 secret，并在主 secret 轮换，使更新传播到副本"],
+  ["layer 共享的是取值代码，不会自动更新打包进去的密码", "集中存储秘密，并在运行时读取"],
+  ["桶策略通过 aws:PrincipalOrgID 检查请求者所属组织", "应用角色通过 s3:ResourceAccount 拒绝访问其他账户拥有的资源"],
+  ["接收端放行实际上一跳及其访问的监听端口", "跨 Region 对等路径使用私有 IP 或 CIDR 作为来源，不能引用远端安全组"],
+  ["私网路径和静态加密不能替代 TLS", "启用客户端 TLS，并使用 RDS CA 证书包验证服务端"],
+  ["固定期限使用适用的 compliance 模式锁；无限期等待解除则使用 S3 legal hold", "Versioning 和 Lifecycle 不能实施同等的强制保留"],
+  ["SSE-C 不符合要求；应在存储收到数据前完成客户端加密", "EMRFS 的 CSE-Custom 配合自定义 key provider，可在上传前加密输出"]
+]

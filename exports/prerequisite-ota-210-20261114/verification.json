@@ -1,0 +1,231 @@
+{
+  "schema": "recallsmith-prerequisite-ota-v1",
+  "date": "2026-11-14",
+  "status": "published_delivery_verified",
+  "baseCommit": "650f8e50",
+  "coreCodeCommit": "6d4aba7b",
+  "finalCodeCommit": "aa9e8d3dc067e524a917cf54c718cb74bd105c32",
+  "runtimeVersion": "2.1.0",
+  "iosBuild": "25",
+  "compatibility": [
+    {
+      "path": "mobile/app.json",
+      "sha256": "580758b54926edae2a9e75c67607ca523819db907abdcf5dd57f3130f881aa68",
+      "equalsPriorRelease": true
+    },
+    {
+      "path": "mobile/package.json",
+      "sha256": "50c65220c266ac17e3616b29148930f4c38dcd6fbf3715582ab06df33a43fc4c",
+      "equalsPriorRelease": true
+    },
+    {
+      "path": "mobile/package-lock.json",
+      "sha256": "d0d596a32dd581955679d282e6425982c3b05bb3e850463f06bfd6b12e2fa97e",
+      "equalsPriorRelease": true
+    },
+    {
+      "path": "mobile/eas.json",
+      "sha256": "8ac21834060855ef708bad404084de4a71ec3d604e0a6618b4670d15446780cd",
+      "equalsPriorRelease": true
+    },
+    {
+      "path": "mobile/metro.config.js",
+      "sha256": "e9ddc3a479ab96024674025b2ce6f46ae0cca0eac61afd990da291c7e1faa922",
+      "equalsPriorRelease": true
+    },
+    {
+      "path": "mobile/scripts/release/ota.sh",
+      "sha256": "c56dfa6910c6781bee637eced7f667ba5e2126a326c7dc90085a407b4fd34dd0",
+      "equalsPriorRelease": true
+    },
+    {
+      "path": "mobile/src/auth/authStore.ts",
+      "sha256": "c85ec584ed145e34ea5c97cefc2b9fdd78fcfc3a1312e0e085314854907e71ff",
+      "equalsPriorRelease": true
+    },
+    {
+      "path": "mobile/src/sync/progressSync.ts",
+      "sha256": "81d93cf6cdaeffee3dae502c57b1bc64b31e493141028182d5e6ea1b9eab5fc3",
+      "equalsPriorRelease": true
+    },
+    {
+      "path": "mobile/src/sync/drawStateSync.ts",
+      "sha256": "8e41c6ad81730fa526da9fe22b24348c5a8da4bab74eebc1d9dac0e42874af6e",
+      "equalsPriorRelease": true
+    },
+    {
+      "path": "mobile/src/sync/syncGuard.ts",
+      "sha256": "11e4b3e4baaaec3061a21c8efb31ee9c2a388b13e394077eeb4d7d1b29af2185",
+      "equalsPriorRelease": true
+    },
+    {
+      "path": "mobile/src/review/storage.ts",
+      "sha256": "f58badd4250dfff7daa9af860d65ac3a829e0f4d307969353c8d481ec8b8091f",
+      "equalsPriorRelease": true
+    },
+    {
+      "path": "mobile/src/features/gacha/draw/drawStateStore.ts",
+      "sha256": "96db4b6870918a2fdd86bc0a058891ac8278a8f2708b48192801b09bc830df00",
+      "equalsPriorRelease": true
+    },
+    {
+      "path": "mobile/src/features/gacha/rewards/deckWallet.ts",
+      "sha256": "7f05c4fe597e43f12f9dabce2de91d6cc6b41459b94c8c9f957ae15fd7ad110d",
+      "equalsPriorRelease": true
+    },
+    {
+      "path": "mobile/src/features/gacha/starter/starterGate.ts",
+      "sha256": "c775b482d086f04133141623b23b2bd56458d999bf5c79f265b846223abee25c",
+      "equalsPriorRelease": true
+    },
+    {
+      "path": "mobile/src/screens/CardDetailScreen.tsx",
+      "sha256": "e5a65f0a1a1dddfa93529f20bd49eeba6600c60ff003aaf4d209068f91799771",
+      "equalsPriorRelease": true
+    }
+  ],
+  "tests": {
+    "typecheck": "PASS",
+    "unit": 2373,
+    "integration": 770,
+    "smoke": 1,
+    "total": 3144,
+    "postCopyTargetedTests": 29
+  },
+  "independentReview": {
+    "status": "PASS",
+    "commit": "6d4aba7b",
+    "targetedTests": 153,
+    "suites": 8,
+    "receipt": "review.md"
+  },
+  "content": {
+    "cards": 379,
+    "edges": 117,
+    "sourcePackReplaced": false,
+    "uidOrderRevisionAndProseChanged": false,
+    "sourceSha256": "c994e567628dbe7d9bcf1372ae8cb4ee610873fcf95196e637a15cb6fcca6e0b"
+  },
+  "qa": {
+    "appId": "com.timeawake.recallsmith.qa.prerequisites",
+    "device": "iPhone17 Pro / iOS26.5 Simulator",
+    "nativeShell": "2.1.0 / 25; production OTA disabled",
+    "data": "original public 379-card deck and synthetic guest only",
+    "newBundleSha256": "4db437bd5e80ffb6986076eaae7e46587d3094498b40d259c72c5688350b05d2",
+    "priorProductionBundleSha256": "8eb83bc19818ec2593da6684359e680de6edfb70f0ed802e02e2ea4f9497413e",
+    "oldSourceCommit": "82f246db778a8942bee41c0f2086f3c2788a4c83",
+    "flows": [
+      {
+        "name": "01-earned-foundation",
+        "status": "PASS",
+        "statuses": {
+          "COMPLETED": 29,
+          "SKIPPED": 1
+        },
+        "receipt": "evidence/01-earned-foundation-commands.json",
+        "sha256": "0c206912ae8e14aeaaab95647bb99d695c4cd3c6a0fb7141b1616c0f5d068593"
+      },
+      {
+        "name": "02-old-fallback",
+        "status": "PASS",
+        "statuses": {
+          "COMPLETED": 11
+        },
+        "receipt": "evidence/02-old-fallback-commands.json",
+        "sha256": "60cbf26b88ccece51c215c774263195c0258d3bd6f4608cf5e9f87684108cb3a"
+      },
+      {
+        "name": "03-foundation-first",
+        "status": "PASS",
+        "statuses": {
+          "COMPLETED": 14
+        },
+        "receipt": "evidence/03-foundation-first-commands.json",
+        "sha256": "0dab9044680518f3223d110537912c94281c7addd1aacf1e5213697300d905c6"
+      },
+      {
+        "name": "04-resume-and-complete",
+        "status": "PASS",
+        "statuses": {
+          "COMPLETED": 12
+        },
+        "receipt": "evidence/04-resume-and-complete-commands.json",
+        "sha256": "1b3fba8b1355b5828634cf7f92cb463b1e1cf0039d4cfea1d5b6dd698f347e68"
+      }
+    ],
+    "wallet": [
+      5,
+      4,
+      4,
+      5,
+      6
+    ],
+    "learned": [
+      18,
+      18,
+      18,
+      19,
+      20
+    ],
+    "owned": [
+      19,
+      20,
+      20,
+      20,
+      20
+    ],
+    "checkpointCleared": true,
+    "priorVersionStorageExactlyPreserved": true
+  },
+  "publication": {
+    "otaPublished": true,
+    "appStoreBinary": false,
+    "backendDeployed": false,
+    "contentPackReplaced": false,
+    "channel": "production",
+    "runtimeVersion": "2.1.0",
+    "sourceCommit": "1b3605c61191ca158866060cf637ca6a82a1d606",
+    "group": "dd2ad2ee-7ca5-4cf7-9165-9fe9215e8975",
+    "updateId": "01a1d65f-5762-7d7c-b1b2-587335c73f11",
+    "createdAt": "2026-11-13T19:25:34.946Z",
+    "sentrySourceMaps": "skipped-no-token",
+    "gitPushed": false
+  },
+  "limits": [
+    "Manual source-bundle swaps in a 2.1.0 simulator shell, not a signed embedded fallback or physical-device OTA test.",
+    "Previous OTA retains the new opaque fingerprint but cannot replay its new selection rule; the current reader replays both algorithms.",
+    "Existing in-progress checkpoints retain their card; dependency priority applies when choosing a new card.",
+    "Actual starter five are dependency-safe and remain unchanged; this change does not redesign onboarding for future content.",
+    "No real account, purchase, push or measured learning effectiveness in this run."
+  ],
+  "liveDelivery": {
+    "status": "PASS",
+    "channel": "production",
+    "runtimeVersion": "2.1.0",
+    "updateId": "01a1d65f-5762-7d7c-b1b2-587335c73f11",
+    "group": "dd2ad2ee-7ca5-4cf7-9165-9fe9215e8975",
+    "gitCommitHash": "1b3605c61191ca158866060cf637ca6a82a1d606",
+    "manifestHttpStatus": 200,
+    "bundleHttpStatus": 200,
+    "bundleBytes": 6040300,
+    "bundleSha256": "3153a0c157e6aeb219f58586f14845e268dca25cebea4787a7b929f234e35fb8",
+    "manifestHashMatched": true,
+    "localPublishedBundleMatched": true,
+    "bundleContentType": "application/javascript",
+    "createdAt": "2026-11-13T19:25:34.946Z"
+  },
+  "evidenceHashes": {
+    "evidence/01-earned-foundation-commands.json": "0c206912ae8e14aeaaab95647bb99d695c4cd3c6a0fb7141b1616c0f5d068593",
+    "evidence/02-old-fallback-commands.json": "60cbf26b88ccece51c215c774263195c0258d3bd6f4608cf5e9f87684108cb3a",
+    "evidence/03-foundation-first-commands.json": "0dab9044680518f3223d110537912c94281c7addd1aacf1e5213697300d905c6",
+    "evidence/04-resume-and-complete-commands.json": "1b3fba8b1355b5828634cf7f92cb463b1e1cf0039d4cfea1d5b6dd698f347e68",
+    "evidence/draw-result-copy.txt": "88ac12478474bc964afff76588569735ebb020808b9b332c4b37d342aefdaf40",
+    "evidence/graph-session-tests.txt": "6a0fe3fa71c3f604daa8a6574639f112ac29ab3875803c31d372685ab090d981",
+    "evidence/mobile-full.txt": "d26c7c4e7ae24ec1b5f49be498fa04254bdb562a7c02fada513b32c964d62e25",
+    "evidence/ota-dry-run.txt": "0ea15b6c75325ed6d3e44a48b732fc7cdabf656ff3e855a917585cbd1f282262",
+    "evidence/ota-publish.txt": "a6aaa12d6f3a923101b8fa7fc157d4194b10900135029a1b3e56e9be34cfb149",
+    "evidence/regression-green.txt": "17ebf13eb578f47bc834282dab6254e92f3fcc19007214cc0aa90b22cbc5bcec",
+    "evidence/regression-red.txt": "29045db097dedd8a660a05a90fcdc60518a486dda2471c96e938af7641710ef0",
+    "evidence/typecheck.txt": "2aa2275e846b658cb0664fae2c0cb81f02fb8374a7e004856e083beed141f977"
+  }
+}

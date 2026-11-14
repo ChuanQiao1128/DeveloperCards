@@ -1,0 +1,17 @@
+appId: com.timeawake.recallsmith.qa.prerequisites
+---
+- launchApp
+- assertVisible:
+    id: "screen-home-root"
+- tapOn:
+    id: "home-primary-cta"
+- assertVisible: "#043"
+- assertVisible: "Card 2 of 2"
+- assertVisible:
+    id: "learning-study-got-it"
+- tapOn:
+    id: "learning-study-got-it"
+- assertVisible:
+    id: "screen-session-summary-root"
+- assertVisible: "You studied 2 cards"
+- takeScreenshot: 06-completed-with-normal-rewards

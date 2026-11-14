@@ -1,0 +1,58 @@
+{
+  "appId": "com.timeawake.recallsmith.qa.prerequisites",
+  "wallet": {
+    "availablePulls": 4,
+    "reservePulls": 0
+  },
+  "ownedUids": [
+    "aws-rb2-20261107-pack-ca03",
+    "aws-rb2-20261107-pack-ca08",
+    "aws-rb2-20261107-pack-ca09",
+    "aws-rb2-20261107-pack-ca10",
+    "aws-rb2-20261107-pack-ca11",
+    "aws-rb2-20261107-pack-ca18",
+    "aws-rb2-20261107-pack-ca19",
+    "aws-rb2-20261107-pack-cb04",
+    "aws-rb2-20261107-pack-cb05",
+    "aws-rb2-20261107-pack-cb10",
+    "aws-rb2-20261107-pack-cb12",
+    "aws-rb2-20261107-pack-cb13",
+    "aws-rb2-20261107-pack-cb15",
+    "aws-rb2-20261107-pack-cb19",
+    "aws-rb2-20261107-pack-cc01",
+    "aws-rb2-20261107-pack-cc02",
+    "aws-rb2-20261107-pack-cc05",
+    "aws-rb2-20261107-pack-cc06",
+    "aws-rb2-20261107-pack-fh01",
+    "aws-rb2-20261107-pack-na03"
+  ],
+  "learnedUids": [
+    "aws-rb2-20261107-pack-ca03",
+    "aws-rb2-20261107-pack-ca08",
+    "aws-rb2-20261107-pack-ca09",
+    "aws-rb2-20261107-pack-ca10",
+    "aws-rb2-20261107-pack-ca11",
+    "aws-rb2-20261107-pack-ca18",
+    "aws-rb2-20261107-pack-ca19",
+    "aws-rb2-20261107-pack-cb04",
+    "aws-rb2-20261107-pack-cb05",
+    "aws-rb2-20261107-pack-cb10",
+    "aws-rb2-20261107-pack-cb12",
+    "aws-rb2-20261107-pack-cb13",
+    "aws-rb2-20261107-pack-cb15",
+    "aws-rb2-20261107-pack-cb19",
+    "aws-rb2-20261107-pack-cc01",
+    "aws-rb2-20261107-pack-cc02",
+    "aws-rb2-20261107-pack-cc05",
+    "aws-rb2-20261107-pack-cc06"
+  ],
+  "progressSha256": "7c3b39493b749b87ed6bbc5c5e39897d1a44059cd9864d996ca58877d40eb229",
+  "lastDrawnUids": [
+    "aws-rb2-20261107-pack-na03"
+  ],
+  "historySha256": "bc29295395aed7f8bc112950f547aa766bfe8edae0010240a862407329cc334a",
+  "historyPolicy": "ordered-v1",
+  "historyFingerprintPolicy": "prerequisites-v1",
+  "checkpoint": null,
+  "contentSha256": "c994e567628dbe7d9bcf1372ae8cb4ee610873fcf95196e637a15cb6fcca6e0b"
+}

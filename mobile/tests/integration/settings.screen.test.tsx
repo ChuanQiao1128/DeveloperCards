@@ -2,6 +2,10 @@ import React from 'react';
 import renderer, { act } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+vi.mock('../../src/content/visibleManifest', () => ({
+  listVisibleManifestDecks: vi.fn(async () => ['aws-saa-fundamentals', 'aws-saa-c03', 'claude-ccdv-f']
+    .map((slug) => ({ slug, availability: 'live', downloadMode: 'public' }))),
+}));
 const alertMock = vi.fn();
 const setAudiencePreferenceMock = vi.fn(async (next: string) => next);
 const getAudiencePreferenceMock = vi.fn(async () => 'both');

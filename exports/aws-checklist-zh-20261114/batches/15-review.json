@@ -1,0 +1,49 @@
+{
+  "batch": "15",
+  "inputSha256": "2d5425d7a915ed76b0c552c2f9bbb4c1a0d9cd06e671cb641dadb333bd02b813",
+  "outputSha256": "0972a2269aeed0a6757527b441476c15bc3fceebc0f6086a4be62de6a36b935f",
+  "overall": "PASS",
+  "cards": [
+    {
+      "uid": "aws-rb2-20261107-pack-gsc-056",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gsc-064",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gsc-065",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gsc-067",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gsc-068",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gsc-070",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gsc-071",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gsc-079",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gsc-081",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gsc-082",
+      "verdict": "PASS"
+    }
+  ],
+  "findings": []
+}

@@ -1,0 +1,59 @@
+{
+  "batch": "27",
+  "inputSha256": "d9295572488da64fa3e154d39d4f509414bee31831f47f9ab1a3482e665f622e",
+  "outputSha256": "de3b0e7a39187259a4d07b34ced56c0e517fcf2563563e672a9057a4902a22a2",
+  "overall": "PASS",
+  "cards": [
+    {
+      "uid": "aws-rb2-20261107-pack-gsc-055",
+      "verdict": "PASS",
+      "note": "内容未变，沿用27-review.r1.json有效结果。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gsc-057",
+      "verdict": "PASS",
+      "note": "内容未变，沿用27-review.r1.json有效结果。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gsc-060",
+      "verdict": "PASS",
+      "note": "内容未变，沿用27-review.r1.json有效结果。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gsc-061",
+      "verdict": "PASS",
+      "note": "内容未变，沿用27-review.r1.json有效结果。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gsc-062",
+      "verdict": "PASS",
+      "note": "内容未变，沿用27-review.r1.json有效结果。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gsc-066",
+      "verdict": "PASS",
+      "note": "本次仅局部复核所报第1条修订，已准确对齐；第2条沿用27-review.r1.json有效结果。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gsc-073",
+      "verdict": "PASS",
+      "note": "内容未变，沿用27-review.r1.json有效结果。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gsc-075",
+      "verdict": "PASS",
+      "note": "内容未变，沿用27-review.r1.json有效结果。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gsc-076",
+      "verdict": "PASS",
+      "note": "内容未变，沿用27-review.r1.json有效结果。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-gsc-077",
+      "verdict": "PASS",
+      "note": "内容未变，沿用27-review.r1.json有效结果。"
+    }
+  ],
+  "findings": []
+}

@@ -1,0 +1,12 @@
+[
+  ["使用上传后运行的托管工作流，并配置自定义 Lambda 步骤", "上传事件立即触发处理，而不是定期扫描发现"],
+  ["普通配置使用 AppConfig，凭据使用 Secrets Manager", "配置发布和验证，与秘密访问及轮换是不同职责"],
+  ["配置 VPC Lattice service network、VPC 和服务关联、HTTPS 监听器及目标", "在网络路由之外，提供应用发现和路由能力"],
+  ["传输层转发：选择 NLB", "按 HTTP 路径或主机名路由：选择理解请求内容的 ALB"],
+  ["使用 VPC CNI custom networking", "CNI 控制地址分配，IAM 角色控制 API 权限"],
+  ["通过 Object Lambda access point 发起 GET，由 Lambda 处理", "读取时转换，避免预先存储派生副本"],
+  ["使用受支持的 AppFlow PrivateLink 私有流", "核对 SaaS、账户和 Region 是否符合业务数据私有传输的适用条件"],
+  ["按数量告警：metric filter、metric alarm 和 SNS", "搜索原始记录：subscription filter 配合受支持的转发路径"],
+  ["使用 SES 等专用邮件服务", "自定义内容和投递控制，与事件订阅不同"],
+  ["按业务边界拆分独立服务，并采用适当的容器化", "服务边界使各功能可以独立部署和扩缩容"]
+]

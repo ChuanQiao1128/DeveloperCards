@@ -1,0 +1,96 @@
+[
+  {
+    "uid": "aws-rb2-20261107-pack-ca03",
+    "question": "管理员要进入私网EC2，不想分发共享SSH密钥或维护跳板机。SSM Agent已安装且能连接服务，还应怎样让实例接入并管理？",
+    "answerZh": "给实例关联具备SSM所需权限的实例角色，再用Session Manager并以IAM控制管理员会话访问。",
+    "pointsEn": [
+      "Attach an instance role carrying the SSM permissions",
+      "Use Session Manager with IAM controlling administrator session access"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-ca08",
+    "question": "外部账户的应用要访问本账户资源。需要代入本账户受限身份，与必须保留它原有身份时，授权路径有何不同？",
+    "answerZh": "代入目标身份时，在本账户建受限角色并信任调用方，调用方获准AssumeRole后取得临时凭证。若服务支持资源策略（例如SQS队列）、且要保留调用方身份，可直接在资源策略授权该外部身份，调用方也须获准该操作。",
+    "pointsEn": [
+      "AssumeRole path: a restricted role trusting the caller plus caller-side AssumeRole permission, yielding temporary credentials",
+      "Resource-policy path keeps the caller's own identity and requires the service to support resource policies",
+      "Both accounts' permissions must allow the access"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-ca09",
+    "question": "几名IAM用户要共享同一套人员权限，新人也能继承。怎样组织？若这组已获批准要访问全部AWS服务和资源，应选哪份托管策略，为什么？",
+    "answerZh": "把相应身份策略附给IAM组，再加入用户；确需全部服务和资源权限时使用AdministratorAccess。",
+    "pointsEn": [
+      "Attach the policy to an IAM group and add the users",
+      "AdministratorAccess fits approved full access because it grants Action:* and Resource:*"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-ca10",
+    "question": "员工要访问多个AWS账户，团队权限不同且经常有新人加入。怎样避免在每个账户重复建用户和授权？",
+    "answerZh": "用IAM Identity Center管理人员和团队组，为组分配permission set及目标账户，并接入既有身份源。",
+    "pointsEn": [
+      "Manage users and teams in IAM Identity Center",
+      "Assign permission sets to groups for target accounts"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-ca11",
+    "question": "应用有大量客户要登录；登录后还要让客户端以获准的权限直接访问S3。用户池的登录令牌能直接当AWS访问密钥吗？",
+    "answerZh": "不能。用户池负责客户登录；需要调用S3等AWS API时，通过Cognito身份池取得受IAM角色权限约束的临时AWS凭证。",
+    "pointsEn": [
+      "No: a user-pool login token is not an AWS credential",
+      "Use an identity pool to exchange the login for temporary AWS credentials",
+      "An IAM role constrains what the client can do on S3"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-ca18",
+    "question": "同一EKS集群里的不同Pod，需要按各自工作负载身份授予不同的AWS权限。权限怎样绑定？",
+    "answerZh": "为它们设置不同的Kubernetes service account，通过IRSA关联各自受限的IAM角色。",
+    "pointsEn": [
+      "Use a distinct Kubernetes service account per workload",
+      "Link the service account to its own restricted IAM role via IRSA",
+      "Pods no longer share the node role as the calling identity"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-ca19",
+    "question": "REST API要在业务处理前验证调用方。已有Cognito登录令牌、自定义令牌、IAM角色临时凭据，这些身份该怎样接入口验证？",
+    "answerZh": "Cognito令牌用适用的Cognito authorizer；自定义验证用Lambda authorizer；IAM凭据用AWS_IAM并签名请求。",
+    "pointsEn": [
+      "Cognito tokens go through a Cognito authorizer",
+      "Custom validation uses a Lambda authorizer",
+      "IAM credentials use AWS_IAM with request signing"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-cb04",
+    "question": "EC2后端必须保留在私有子网。面向互联网的网站和只供VPN办公室使用的网站，ALB入口应怎样选择？",
+    "answerZh": "互联网网站用公网子网中的internet-facing ALB；仅办公室使用的站点用internal ALB。后端实例保持私有。",
+    "pointsEn": [
+      "Internet-facing ALB in public subnets for the public site",
+      "Internal ALB for the office-only site"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-cb05",
+    "question": "VPC实例要主动访问互联网，又不允许互联网主动连入。出站流量分别为IPv4与IPv6时，各用什么网关？",
+    "answerZh": "IPv4使用公有NAT gateway；IPv6使用egress-only internet gateway，并配置相应的出站路由。",
+    "pointsEn": [
+      "IPv4 outbound uses a public NAT gateway in a public subnet",
+      "IPv6 outbound uses an egress-only internet gateway"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-cb10",
+    "question": "CloudFront、ALB或API Gateway REST API承载网站请求，要过滤SQL注入、XSS或按登记的客户端IP控制访问，应在哪里做？",
+    "answerZh": "在实际承载请求的受支持HTTP入口关联WAF web ACL，配置相应内容规则或IP set规则。",
+    "pointsEn": [
+      "Attach the WAF web ACL to the entry that actually serves the requests",
+      "Use content rules for SQL injection/XSS and IP sets for source-IP control"
+    ]
+  }
+]

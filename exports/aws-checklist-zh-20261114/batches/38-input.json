@@ -1,0 +1,83 @@
+[
+  {
+    "uid": "aws-rb2-20261108-pack-d1fix-msg-sse",
+    "question": "SNS主题或SQS队列里的消息要静态加密，并由公司控制KMS授权。只给应用增加读取消息权限够吗，怎样设置？",
+    "answerZh": "在相应主题或队列启用SSE-KMS，选择服务支持的客户管理key；给实际需要调用KMS的身份授权，例如SNS发布者、SQS生产者/消费者及必要服务身份。",
+    "pointsEn": [
+      "Enable service SSE-KMS with a supported customer managed key",
+      "Authorize the actual KMS-calling identities as well as message access"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261108-pack-d1fix-s3-sse-header",
+    "question": "S3新对象已有默认加密，但还要求上传请求明确指定服务器端加密。桶策略应检查哪类字段，ACL或TLS条件能代替吗？",
+    "answerZh": "检查x-amz-server-side-encryption请求参数，按要求拒绝缺少或不符合值的PutObject；例如AES256表示SSE-S3。",
+    "pointsEn": [
+      "Check the SSE request parameter and deny missing or disallowed values as required",
+      "ACL or TLS conditions do not replace an explicit SSE-request condition"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261108-d234fix-ec2-transfer",
+    "question": "EC2实例间要大量互传数据，且可用性已由其他措施满足。只把实例放同Region就能避免互传费用吗，怎样放置更省？",
+    "answerZh": "同Region仍可能跨AZ收费；可行时放同AZ并用私网地址互传。",
+    "pointsEn": [
+      "Same Region alone is insufficient; co-locate communicating EC2 instances in an AZ over private addresses where feasible",
+      "Same-AZ private EC2 transfers are free; cross-AZ EC2 transfers are generally charged"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261108-d234fix-dx-egress",
+    "question": "公司已有同Region地点的Direct Connect且容量足够，要把大量数据送回机房。比较这条现有链路和Internet，降低出站流量费用应怎样选，为什么？",
+    "answerZh": "按适用费率使用现有Direct Connect；其出站流量单价通常低于Internet出站。",
+    "pointsEn": [
+      "Use the existing applicable Direct Connect path for lower outbound transfer charges",
+      "The same outbound volume is billed at the applicable lower per-unit path rate"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261108-d234fix-approved-template",
+    "question": "成员账户必须在部署前阻止不合规IAM和EC2配置。SCP不能任意解析PolicyDocument正文时，怎样通过已审查的CloudFormation模板限制可走的部署路径？",
+    "answerZh": "把合规配置固化为批准模板，再用SCP按允许的CloudFormation动作和TemplateUrl（模板地址）限定入口；保护模板及依赖，并限制参数和可用执行角色，避免改写出违规配置。",
+    "pointsEn": [
+      "Use SCP conditions and permitted CloudFormation actions to admit only approved template URLs",
+      "Keep template/dependency content, variable inputs and execution roles within the approved configuration boundary; block bypass creation or modification paths"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261108-d234fix-lambda-invocation-duration",
+    "question": "一个连续20分钟的异步任务，能仅凭“Lambda最长15分钟”排除所有Lambda函数吗？普通模式与Managed Instances运行模式怎样区分？",
+    "answerZh": "不能笼统排除。普通函数单次最长15分钟；使用Lambda Managed Instances运行模式的异步调用可配置到90分钟。",
+    "pointsEn": [
+      "Ordinary functions have a 15-minute invocation limit, while asynchronous Managed Instances functions can reach 90 minutes",
+      "A 20-minute asynchronous task cannot be rejected solely by a universal 15-minute rule; identify the execution mode"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261108-d234fix-volume-read-charges",
+    "question": "Volume Gateway从AWS读回卷数据时“不收读取费”，是否等于网络传输也免费？应区分哪两笔费用？",
+    "answerZh": "不等于。网关读回本身不收读取费；数据传出费仍按路径和Region的传输规则判断。",
+    "pointsEn": [
+      "No Volume Gateway read fee does not imply free data transfer",
+      "Read charges and path-dependent data transfer charges are separate"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261108-d234fix-s3-local-client-versus-gateway",
+    "question": "现有Linux渲染程序只需受支持的open/read等文件操作，要在本机访问S3并缓存重复读取的数据，不需要SMB/NFS共享服务器。应选Mountpoint还是S3 File Gateway，为什么？",
+    "answerZh": "选择Mountpoint for Amazon S3，把桶挂载为本机文件系统，并启用本地缓存。",
+    "pointsEn": [
+      "Mountpoint with local caching fits the compatible local application",
+      "Mountpoint is a local S3 file client; File Gateway adds a network-share appliance and cache"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261108-d234fix-eventbridge-glue-workflow",
+    "question": "已确定沿用EventBridge Rules规则，定时启动Glue查询HTTP API。能把单个Glue job直接设为Rules原生目标吗？支持的触发路径是什么？",
+    "answerZh": "把事件送到Glue workflow，再由workflow的EVENT触发器启动Python shell job，由作业代码查询API。",
+    "pointsEn": [
+      "Rules targets a Glue workflow, whose EVENT trigger starts the job",
+      "The Python job performs the API query; the rule only routes the event"
+    ]
+  }
+]

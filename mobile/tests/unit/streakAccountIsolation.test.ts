@@ -35,6 +35,14 @@ describe('account-scoped learning statistics', () => {
     expect((await loadStreakSnapshot()).totalQualifiedSessions).toBe(2);
   });
 
+  it('surfaces read failures to strict summaries while preserving legacy best-effort readers', async () => {
+    vi.mocked(AsyncStorage.getItem).mockRejectedValueOnce(new Error('read failed'));
+    await expect(loadStreakSnapshot({ strict: true })).rejects.toThrow('read failed');
+    vi.mocked(AsyncStorage.getItem).mockRejectedValueOnce(new Error('read failed'));
+    expect((await loadStreakSnapshot()).currentDailyStreak).toBe(0);
+    expect((await loadStreakSnapshot({ strict: true })).currentDailyStreak).toBe(0);
+  });
+
   it('does not assign ownerless legacy totals to the first account or guest', async () => {
     store.set(base, JSON.stringify({ totalQualifiedSessions: 10, currentDailyStreak: 3 }));
     for (const owner of ['a', 'b', null]) {

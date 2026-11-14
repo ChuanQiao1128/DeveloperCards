@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
 import AppInfoScreen from '../components/AppInfoScreen';
 import {
   getAuthIdentitySnapshot,
+  getAuthSessionGeneration,
   subscribeAuthIdentitySnapshot,
   type AuthIdentitySnapshot,
 } from '../auth/sessionBoundary';
@@ -35,8 +36,10 @@ export function MoreScreen({ navigation }: Props) {
   const [snapshot, setSnapshot] = useState<StreakSnapshot | null>(null);
   const [collected, setCollected] = useState<number | null>(null);
   const [domainsSlug, setDomainsSlug] = useState<string | null>(null);
-  const [goalLine, setGoalLine] = useState<string>('Study goal: Not set');
-  const [mistakeCount, setMistakeCount] = useState<number>(0);
+  const [goalLine, setGoalLine] = useState<string>('Reading study goal');
+  const [mistakeCount, setMistakeCount] = useState<number | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [reloadToken, setReloadToken] = useState(0);
   const [auth, setAuth] = useState<AuthIdentitySnapshot>(() => getAuthIdentitySnapshot());
 
   // Read defensively: some suites mock the flags without the mistakeBook key.
@@ -46,80 +49,68 @@ export function MoreScreen({ navigation }: Props) {
   const showReports = flags.cardReport?.enabled === true;
 
   useEffect(() => {
-    setAuth(getAuthIdentitySnapshot());
-    return subscribeAuthIdentitySnapshot(setAuth);
-  }, []);
-
-  // Load stats once at mount and again on every focus. Once tab hops reuse the
-  // mounted More (pop-navigation, MSHELL-01), a mount-only effect would leave
-  // the streak/collection numbers stale after a review or a draw.
-  useEffect(() => {
     let cancelled = false;
-    const loadDomainsSlug = async () => {
-      const slug = await resolveDomainProgressSlug();
-      if (!cancelled) setDomainsSlug(slug);
-    };
-    const loadExtraContext = async () => {
-      try {
-        const { getStudyGoal } = await import('../features/goal/studyGoal');
-        const goal = await getStudyGoal();
-        if (!cancelled) {
-          setGoalLine(
-            goal
-              ? `Goal: ${goalDeckLabel(goal.deckSlug)} · ${describeGoalDate(goal.examDate, Date.now())}`
-              : 'Study goal: Not set',
-          );
-        }
-      } catch {
-        if (!cancelled) setGoalLine('Study goal: Not set');
-      }
-      try {
-        const { activeMistakes, loadMistakeBook } = await import('../features/gacha/mistakes/mistakeBook');
-        const book = await loadMistakeBook();
-        const count = activeMistakes(book, { now: Date.now() }).length;
-        if (!cancelled) setMistakeCount(count);
-      } catch {
-        if (!cancelled) setMistakeCount(0);
-      }
-      try {
-        const { getIsPremiumUser } = await import('../premium/premiumStore');
-        const isPrem = await getIsPremiumUser();
-        if (!cancelled && typeof isPrem === 'boolean') {
-          setAuth((prev) => (prev.isPremium === isPrem ? prev : { ...prev, isPremium: isPrem }));
-        }
-      } catch {
-        // ignore in test environments
-      }
-    };
+    let focused = true;
+    let request = 0;
     const load = async () => {
-      void loadDomainsSlug();
-      void loadExtraContext();
-      const [loadedSnapshot, collectedCount] = await Promise.all([
-        loadStreakSnapshot(),
-        (async () => {
-          try {
-            const slugs = await listDrawStateSlugs();
-            const records = await Promise.all(slugs.map(loadDrawState));
-            return records.reduce((sum, record) => sum + record.owned.length, 0);
-          } catch {
-            return 0;
-          }
-        })(),
+      const id = ++request;
+      const generation = getAuthSessionGeneration();
+      const stale = () => cancelled || !focused || id !== request || generation !== getAuthSessionGeneration();
+      void resolveDomainProgressSlug().then(value => { if (!stale()) setDomainsSlug(value); }).catch(() => {});
+      setLoadFailed(false);
+      const read = async <T,>(promise: Promise<T>, apply: (value: T) => void) => {
+        try {
+          const value = await promise;
+          if (!stale()) apply(value);
+        } catch {
+          if (!stale()) setLoadFailed(true);
+        }
+      };
+      await Promise.all([
+        read(loadStreakSnapshot({ strict: true }), setSnapshot),
+        read((async () => {
+          const slugs = await listDrawStateSlugs({ strict: true });
+          const records = await Promise.all(slugs.map(slug => loadDrawState(slug, { strict: true })));
+          return records.reduce((sum, record) => sum + record.owned.length, 0);
+        })(), setCollected),
+        read((async () => {
+          const { activeMistakes, loadMistakeBook } = await import('../features/gacha/mistakes/mistakeBook');
+          return activeMistakes(await loadMistakeBook({ strict: true }), { now: Date.now() }).length;
+        })(), setMistakeCount),
+        read((async () => {
+          const { getStudyGoal } = await import('../features/goal/studyGoal');
+          return getStudyGoal();
+        })(), goal => setGoalLine(goal
+          ? `Goal: ${goalDeckLabel(goal.deckSlug)} · ${describeGoalDate(goal.examDate, Date.now())}`
+          : 'Study goal: Not set')),
       ]);
-      if (cancelled) return;
-      setSnapshot(loadedSnapshot);
-      setCollected(collectedCount);
     };
     void load();
     const unsubscribe = navigation.addListener?.('focus', () => {
+      focused = true;
       setAuth(getAuthIdentitySnapshot());
       void load();
     });
+    const blur = navigation.addListener?.('blur', () => { focused = false; request += 1; });
+    const identity = subscribeAuthIdentitySnapshot(next => {
+      setAuth(next);
+      request += 1;
+      setSnapshot(null);
+      setCollected(null);
+      setMistakeCount(null);
+      setDomainsSlug(null);
+      setGoalLine('Reading study goal');
+      setLoadFailed(false);
+      // authStore advances the generation after its synchronous identity broadcast.
+      void Promise.resolve().then(() => { if (!cancelled && focused) void load(); });
+    });
     return () => {
       cancelled = true;
+      identity();
       if (typeof unsubscribe === 'function') unsubscribe();
+      if (typeof blur === 'function') blur();
     };
-  }, [navigation]);
+  }, [navigation, reloadToken]);
 
   // An em dash while the reads are in flight, never a fake number.
   const dayStreak = snapshot === null ? '—' : String(snapshot.currentDailyStreak);
@@ -130,12 +121,19 @@ export function MoreScreen({ navigation }: Props) {
       ? 'Reading weekly streak'
       : `${snapshot.weekCompletedDays} of 7 days this week · Best streak ${snapshot.longestDailyStreak}`;
   const mistakeSummaryLine =
-    mistakeCount > 0
+    mistakeCount === null ? 'Mistake Book unavailable' : mistakeCount > 0
       ? `${mistakeCount} ${mistakeCount === 1 ? 'card' : 'cards'} active in Mistake Book`
       : 'Mistake Book clear';
 
-  const openLink = (url: string) => {
-    void Linking.openURL(url).catch(() => undefined);
+  const openLink = async (url: string): Promise<void> => {
+    try {
+      await Linking.openURL(url);
+    } catch {
+      Alert.alert('Cannot open link', 'Please try again.', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Retry', onPress: () => { void openLink(url); } },
+      ]);
+    }
   };
 
   return (
@@ -198,6 +196,15 @@ export function MoreScreen({ navigation }: Props) {
           </View>
 
           <View style={styles.snapshotCard} testID="more-study-snapshot">
+            {loadFailed ? (
+              <View accessibilityRole="alert">
+                <Text style={styles.snapshotMeta}>Some study information could not be loaded. Saved records have not changed.</Text>
+                <Pressable testID="more-summary-retry" accessibilityRole="button" style={styles.row}
+                  onPress={() => setReloadToken(value => value + 1)}>
+                  <Text style={styles.rowTitle}>Try again</Text>
+                </Pressable>
+              </View>
+            ) : null}
             <Text style={styles.snapshotTitle} testID="more-week-summary">
               {weekSummaryLine}
             </Text>

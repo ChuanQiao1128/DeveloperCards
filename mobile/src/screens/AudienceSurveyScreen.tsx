@@ -8,7 +8,6 @@ import { setStudyGoal } from '../features/goal/studyGoal';
 import {
   DATE_PRESETS,
   DEFAULT_GOAL_DECK_SLUG,
-  GOAL_CHOICES,
   NO_DATE_LABEL,
   canStepExamDate,
   examDateForPreset,
@@ -16,6 +15,7 @@ import {
   stepExamDate,
   type DatePresetKey,
 } from '../features/gacha/audience/goalChoices';
+import { useGoalAvailability } from '../features/gacha/audience/useGoalAvailability';
 import { setActiveDeckSlug } from '../content/activeDeck';
 import { startStarterLesson } from '../features/gacha/onboarding/onboardingPrefs';
 import { recordFunnelEvent } from '../telemetry/funnel';
@@ -34,6 +34,7 @@ const FINISH_ERROR = "Couldn't save your choice. Please try again.";
 type DateChoice = { kind: 'none' } | { kind: 'preset'; preset: DatePresetKey; examDate: string };
 
 export function AudienceSurveyScreen({ navigation }: Props) {
+  const choices = useGoalAvailability();
   const [step, setStep] = useState<Step>('goal');
   const [deckSlug, setDeckSlug] = useState<string>(DEFAULT_GOAL_DECK_SLUG);
   const [dateChoice, setDateChoice] = useState<DateChoice>({ kind: 'none' });
@@ -41,7 +42,7 @@ export function AudienceSurveyScreen({ navigation }: Props) {
   const [finishError, setFinishError] = useState<string | null>(null);
 
   async function finish() {
-    if (saving) return;
+    if (saving || !choices.some((choice) => choice.deckSlug === deckSlug && choice.available)) return;
     setSaving(true);
     setFinishError(null);
     try {
@@ -81,7 +82,7 @@ export function AudienceSurveyScreen({ navigation }: Props) {
         <Text style={styles.body}>You can switch decks any time.</Text>
 
         <View style={styles.optionList} accessibilityRole="radiogroup">
-          {GOAL_CHOICES.map((choice) => {
+          {choices.map((choice) => {
             const active = deckSlug === choice.deckSlug;
             return (
               <Pressable
@@ -94,11 +95,13 @@ export function AudienceSurveyScreen({ navigation }: Props) {
                   pressed && styles.pressed,
                 ]}
                 accessibilityRole="radio"
-                accessibilityState={{ selected: active, checked: active }}
-                accessibilityLabel={choice.label}
-                onPress={() => setDeckSlug(choice.deckSlug)}
+                disabled={!choice.available}
+                accessibilityState={{ selected: active, checked: active, disabled: !choice.available }}
+                accessibilityLabel={`${choice.label}, ${choice.availabilityLabel}`}
+                onPress={() => { if (choice.available) setDeckSlug(choice.deckSlug); }}
               >
                 <Text style={[styles.optionTitle, active && styles.optionTitleActive]}>{choice.label}</Text>
+                <Text style={styles.availability}>{choice.availabilityLabel}</Text>
               </Pressable>
             );
           })}
@@ -107,7 +110,8 @@ export function AudienceSurveyScreen({ navigation }: Props) {
         <Pressable
           style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}
           accessibilityRole="button"
-          onPress={() => setStep('date')}
+          disabled={!choices.some((choice) => choice.deckSlug === deckSlug && choice.available)}
+          onPress={() => { if (choices.some((choice) => choice.deckSlug === deckSlug && choice.available)) setStep('date'); }}
         >
           <Text style={styles.primaryButtonText} maxFontSizeMultiplier={CHROME_MAX_FONT_SCALE}>Continue</Text>
         </Pressable>
@@ -182,7 +186,7 @@ export function AudienceSurveyScreen({ navigation }: Props) {
         <Pressable
           style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed, saving && styles.buttonDisabled]}
           accessibilityRole="button"
-          disabled={saving}
+          disabled={saving || !choices.some((choice) => choice.deckSlug === deckSlug && choice.available)}
           onPress={() => void finish()}
         >
           <Text style={styles.primaryButtonText} maxFontSizeMultiplier={CHROME_MAX_FONT_SCALE}>{saving ? 'Saving…' : 'Finish setup'}</Text>
@@ -262,6 +266,7 @@ const styles = StyleSheet.create({
   },
   optionTitle: { fontSize: 15, fontWeight: '900', color: colors.ink },
   optionTitleActive: { color: colors.gold },
+  availability: { marginTop: 6, fontSize: 13, color: colors.inkSecondary },
   presetRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   presetChip: {
     minHeight: 44,

@@ -1,0 +1,49 @@
+{
+  "batch": "05",
+  "inputSha256": "77a31056d77e61acc4528ab823666aef73eb078ee711f4f69e980a127f6ca4c0",
+  "outputSha256": "887a63022c630b2deb1d74454d645f42733d40c9bbee0a1516ed7517c9841b5b",
+  "overall": "PASS",
+  "cards": [
+    {
+      "uid": "aws-rb2-20261107-pack-cmp-m22",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-cmp-m25",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-fh01",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-na03",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-nb03",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-nc03",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-nc05",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-nc06",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-new01",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-new02",
+      "verdict": "PASS"
+    }
+  ],
+  "findings": []
+}

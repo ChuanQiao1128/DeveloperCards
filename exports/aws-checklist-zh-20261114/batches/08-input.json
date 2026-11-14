@@ -1,0 +1,92 @@
+[
+  {
+    "uid": "aws-rb2-20261107-pack-xa028",
+    "question": "公众浏览器访问ALB或CloudFront自定义域名，要用ACM证书且不增加证书费用，应选哪类证书，为什么？",
+    "answerZh": "选择供集成AWS服务使用的ACM non-exportable public certificate。",
+    "pointsEn": [
+      "Non-exportable ACM public certificate for integrated services",
+      "This certificate category has no additional certificate charge"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xa029",
+    "question": "法规要求实际密码密钥始终留在本地第三方密钥管理器，还要让AWS KMS衔接加解密。选哪类key store，为什么？",
+    "answerZh": "使用KMS external key store，由外部key manager保留并使用实际密钥。",
+    "pointsEn": [
+      "KMS external key store",
+      "External manager retains keys and performs operations through XKS proxy"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xa030",
+    "question": "全球办公室的CIDR经常变化，多账户安全组都要跟着更新。只需集中维护地址清单，怎样减少维护和额外治理服务费用？",
+    "answerZh": "建立customer-managed prefix list，经AWS RAM共享给相关账户；各安全组引用这份列表。",
+    "pointsEn": [
+      "Customer-managed prefix list shared with RAM",
+      "Security-group references follow central CIDR updates"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xa032",
+    "question": "EC2必须有Sensitivity标签，值只能是sensitive或nonsensitive，而且用户不能删除它。只启用Organizations tag policy够吗，为什么？",
+    "answerZh": "不够；tag policy规范受支持资源的标签值，再用SCP限制缺标签的创建请求与删除该标签的操作。",
+    "pointsEn": [
+      "Tag policy plus SCP restrictions",
+      "SCPs cover missing tags and deletion, which value validation alone does not"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xa033",
+    "question": "MSK Provisioned已满足公有子网路由和安全组条件。互联网客户要用证书验证身份并加密连接，集群入口还应怎样设置，为什么？",
+    "answerZh": "在集群创建后启用public access，并使用mTLS认证及TLS加密。",
+    "pointsEn": [
+      "Enable cluster public access after creation",
+      "mTLS authenticates certificates; TLS encrypts connections"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xa035",
+    "question": "新AWS账户的日常管理工作，应直接使用root吗？如何保留必要root能力又降低凭据暴露，为什么？",
+    "answerZh": "日常使用获授适当权限的人员身份；root仅用于确需root的任务，并保护其登录凭据。",
+    "pointsEn": [
+      "Delegate daily work to appropriately authorized identities",
+      "Protect root and reserve it for root-only tasks to reduce exposure"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xa037",
+    "question": "公司批准的AMI只应给开发OU中的账户启动，不能让整个组织都用。应怎样设定共享范围，为什么？",
+    "answerZh": "把开发OU的ARN加入AMI launch permissions。",
+    "pointsEn": [
+      "Development OU ARN in AMI launch permissions",
+      "OU scope excludes other organization accounts"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xa038",
+    "question": "EC2应用只准读取EFS参考数据，必须由IAM阻止它改写或删除。已使用EFS mount helper及IAM认证，应怎样限制，为什么？",
+    "answerZh": "在EFS文件系统资源策略中，对应用角色明确拒绝elasticfilesystem:ClientWrite。",
+    "pointsEn": [
+      "Resource-policy Deny for the role's ClientWrite",
+      "Enforces write restriction through IAM rather than a client mount option"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xa039",
+    "question": "Control Tower环境中，要在CloudFormation创建资源前检查配置，不合规就阻止部署。应选哪种control，为什么不是事后Config告警？",
+    "answerZh": "启用对应的proactive control。",
+    "pointsEn": [
+      "Proactive control",
+      "CloudFormation hook checks before create/update, unlike postdeployment evaluation"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-xa040",
+    "question": "Lambda需要使用环境变量中的敏感值，开发者能查看配置却不应看到明文。怎样让函数可用、开发者不可解密，为什么？",
+    "answerZh": "用KMS和Lambda encryption helpers做客户端加密；函数代码解密，执行角色获kms:Decrypt，开发者不获该解密权限。",
+    "pointsEn": [
+      "Client-side encrypt with KMS/Lambda helpers; code decrypts",
+      "Execution role gets kms:Decrypt while developers do not"
+    ]
+  }
+]

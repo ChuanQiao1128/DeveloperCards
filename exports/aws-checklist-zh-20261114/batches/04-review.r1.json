@@ -1,0 +1,57 @@
+{
+  "batch": "04",
+  "inputSha256": "6f0b56948cdb89b9e7ebb48027d6afcf353384392d6b6542cb2a0ecf5b5e4e47",
+  "outputSha256": "dc343ba7b1de21213347542a16fdeceb687413a3971e1f91cd51596f49d38640",
+  "overall": "FAIL",
+  "cards": [
+    {
+      "uid": "aws-rb2-20261107-pack-cmp-m04",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-cmp-m05",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-cmp-m06",
+      "verdict": "FAIL",
+      "note": "第1条混淆 instance profile 与实际获授权限的 IAM 角色。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-cmp-m07",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-cmp-m08",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-cmp-m09",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-cmp-m10",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-cmp-m11",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-cmp-m16",
+      "verdict": "PASS"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-cmp-m20",
+      "verdict": "PASS"
+    }
+  ],
+  "findings": [
+    {
+      "uid": "aws-rb2-20261107-pack-cmp-m06",
+      "pointIndex": 0,
+      "description": "“为 EC2 的 instance profile …授予所需 S3 权限”把权限授予对象明确写成 instance profile；结合本卡已接受中文答案，所需权限属于由 instance profile 交给 EC2 使用的 IAM 角色。应避免在评分项中把 instance profile 与角色混为一物。",
+      "suggestedChinese": "EC2 通过 instance profile 使用具备所需 S3 权限的 IAM 角色；Lambda 使用具备所需 S3 权限的执行角色"
+    }
+  ]
+}

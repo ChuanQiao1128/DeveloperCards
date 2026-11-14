@@ -1,0 +1,12 @@
+[
+  ["不能；符合停止条件的 RDS 实例在一段有限时间后会自动重启"],
+  ["选择匹配的 RDS Reserved DB Instances", "Compute Savings Plans 不覆盖 RDS 实例费用"],
+  ["使用 Aurora clone", "copy-on-write 避免初始的全量存储复制"],
+  ["比较 Aurora I/O-Optimized", "比较计算、存储和 I/O 的总费用，而不只比较实例价格"],
+  ["使用 DMS Serverless", "在限制范围内，按工作负载托管复制容量"],
+  ["比较合作伙伴 hosted connection 和 dedicated connection", "hosted connection 支持 200 Mbps 等更小容量"],
+  ["在靠近大型输入数据集的位置处理", "只把较小的结果跨越收费边界传输"],
+  ["优先在可重试的 task 节点上使用 Spot", "task 计算比关键控制职责或 HDFS 职责更容易恢复"],
+  ["比较资源配置和实测执行时长", "内存配置同时影响 CPU、执行时间和单位费率"],
+  ["选择可恢复且能容忍中断的任务", "对中断敏感的基础负载，使用适当的稳定容量"]
+]

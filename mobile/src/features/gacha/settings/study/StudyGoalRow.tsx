@@ -4,13 +4,13 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { clearStudyGoal, setStudyGoal, type StudyGoal } from '../../../goal/studyGoal';
 import {
   DATE_PRESETS,
-  GOAL_CHOICES,
   NO_DATE_LABEL,
   canStepExamDate,
   formatExamDate,
   stepExamDate,
   type DatePresetKey,
 } from '../../audience/goalChoices';
+import { useGoalAvailability } from '../../audience/useGoalAvailability';
 import { colors } from '../../../../theme/colors';
 import { spacing } from '../../../../theme/spacing';
 import { typography } from '../../../../theme/typography';
@@ -46,6 +46,8 @@ export function StudyGoalRow({ goal, fallbackDeckSlug, onSaved, now = Date.now }
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const editing = draft !== null;
+  const choices = useGoalAvailability(editing);
+  const canSave = !!draft && choices.some((choice) => choice.deckSlug === draft.deckSlug && choice.available);
 
   function open() {
     setError(null);
@@ -76,7 +78,7 @@ export function StudyGoalRow({ goal, fallbackDeckSlug, onSaved, now = Date.now }
   }
 
   function save() {
-    if (!draft) return;
+    if (!draft || !canSave) return;
     void run(() => setStudyGoal(goalFromDraft(draft)));
   }
 
@@ -135,20 +137,21 @@ export function StudyGoalRow({ goal, fallbackDeckSlug, onSaved, now = Date.now }
         <View style={styles.editor} testID="settings-study-goal-editor">
           <Text style={styles.heading}>{STUDY_GOAL_COPY.deckHeading}</Text>
           <View style={styles.optionList} accessibilityRole="radiogroup">
-            {GOAL_CHOICES.map((choice) => {
+            {choices.map((choice) => {
               const active = draft.deckSlug === choice.deckSlug;
               return (
                 <Pressable
                   key={choice.deckSlug}
                   testID={`settings-goal-deck-${choice.deckSlug}`}
                   accessibilityRole="radio"
-                  accessibilityState={{ selected: active, checked: active, disabled: saving }}
-                  accessibilityLabel={choice.label}
-                  disabled={saving}
-                  onPress={() => setDraft({ ...draft, deckSlug: choice.deckSlug })}
+                  accessibilityState={{ selected: active, checked: active, disabled: saving || !choice.available }}
+                  accessibilityLabel={`${choice.label}, ${choice.availabilityLabel}`}
+                  disabled={saving || !choice.available}
+                  onPress={() => { if (choice.available) setDraft({ ...draft, deckSlug: choice.deckSlug }); }}
                   style={({ pressed }) => [styles.option, active && styles.optionActive, pressed && styles.pressed]}
                 >
                   <Text style={[styles.optionText, active && styles.optionTextActive]}>{choice.label}</Text>
+                  <Text style={styles.rowBody}>{choice.availabilityLabel}</Text>
                 </Pressable>
               );
             })}
@@ -222,8 +225,8 @@ export function StudyGoalRow({ goal, fallbackDeckSlug, onSaved, now = Date.now }
             <Pressable
               testID="settings-study-goal-save"
               accessibilityRole="button"
-              accessibilityState={{ disabled: saving }}
-              disabled={saving}
+              accessibilityState={{ disabled: saving || !canSave }}
+              disabled={saving || !canSave}
               onPress={save}
               style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed, saving && styles.disabled]}
             >

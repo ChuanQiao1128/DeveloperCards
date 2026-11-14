@@ -1,0 +1,24 @@
+{
+  "status": "reviewed_not_published",
+  "cards": 379,
+  "points": 757,
+  "reviewedBatches": 38,
+  "sourceSha256": "c994e567628dbe7d9bcf1372ae8cb4ee610873fcf95196e637a15cb6fcca6e0b",
+  "onlyChangedCardField": "teaching.zh-CN.mustAnswer",
+  "preserved": [
+    "UIDs",
+    "order",
+    "revision",
+    "English fields",
+    "existing Chinese prose",
+    "source",
+    "tags",
+    "prerequisites"
+  ],
+  "artifactHashes": {
+    "public-deck.candidate.json": "2efebddaa972aff940a2f9121f54986eeabd12374591665c4b9fe672da512785",
+    "import-cards.candidate.json": "4670118c1184f1e5e84da633ed47de8da9655082be5a7563e6253b3aadfc1c98",
+    "translation-receipts.json": "7394a787cf1cb552055618bd63f46c252b732357012c9226019f757a90147f62"
+  },
+  "publication": "not_published"
+}

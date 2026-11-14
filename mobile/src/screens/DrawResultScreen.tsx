@@ -432,9 +432,12 @@ export function DrawResultScreen({ navigation, route }: Props) {
           {isCourse ? (
             <View style={{ gap: spacing.xs, marginBottom: spacing.md }}>
               <Text style={{ color: colors.ink, fontSize: typography.title3, fontWeight: '800' }}>
-                {`${cards.length} new card${cards.length === 1 ? '' : 's'} ready to learn`}
+                {`${cards.length} new card${cards.length === 1 ? '' : 's'} unlocked`}
               </Text>
               {primaryAction}
+              <Text testID="draw-result-course-order-note" style={{ color: colors.inkSecondary, fontSize: typography.bodySmall }}>
+                Study foundations before dependent new cards, including cards unlocked earlier.
+              </Text>
             </View>
           ) : null}
           <View

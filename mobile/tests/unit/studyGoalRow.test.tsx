@@ -2,6 +2,11 @@ import React from 'react';
 import renderer, { act } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+vi.mock('../../src/content/visibleManifest', () => ({
+  listVisibleManifestDecks: vi.fn(async () => ['aws-saa-fundamentals', 'aws-saa-c03', 'claude-ccdv-f']
+    .map((slug) => ({ slug, availability: 'live', downloadMode: 'public' }))),
+}));
+
 // U4: Settings › Study › Study goal — the onboarding goal, editable after onboarding, through the
 // same storage (STUDY_GOAL_KEY) and the same validation (setStudyGoal).
 
@@ -223,6 +228,6 @@ describe('StudyGoalRow', () => {
     await press(tree, 'settings-study-goal-save');
     expect(asyncStore.has(STUDY_GOAL_KEY)).toBe(false);
     expect(onSaved).not.toHaveBeenCalled();
-    expect(textOf(tree, 'settings-study-goal-error')).toBe("Couldn't save your goal. Please try again.");
+    expect(byTestID(tree, 'settings-study-goal-save')[0].props.disabled).toBe(true);
   });
 });

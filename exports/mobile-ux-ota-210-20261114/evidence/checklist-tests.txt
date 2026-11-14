@@ -1,0 +1,9 @@
+
+ RUN  v4.1.11 /Users/qc/.codex/worktrees/mobile-ux-ota-210-20261114/draw-motion-20261113/mobile
+
+
+ Test Files  2 passed (2)
+      Tests  18 passed (18)
+   Start at  07:41:57
+   Duration  293ms (transform 241ms, setup 81ms, import 296ms, tests 44ms, environment 0ms)
+

@@ -1,0 +1,92 @@
+[
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-147",
+    "question": "短期必须在指定AZ有EC2算力。Compute Savings Plans或Regional RI的价格折扣，能保证所需容量吗？",
+    "answerZh": "不能据此保证；应评估适用的On-Demand Capacity Reservation等容量预留。",
+    "pointsEn": [
+      "Applicable AZ capacity reservation",
+      "Price discounts alone do not guarantee the required capacity"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-149",
+    "question": "软件许可证按物理socket或core计量，还需可见并控制承载物理主机。普通Dedicated Instance就等价于Dedicated Host吗？",
+    "answerZh": "不等价；应评估满足授权条件的Dedicated Host。",
+    "pointsEn": [
+      "Suitable Dedicated Host",
+      "Physical-server visibility/control differs from Dedicated Instance"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-150",
+    "question": "Windows Fargate作业每10分钟触发一次，每次从拉取镜像到退出共1–3分钟。同规格下，任务完成即退出与容器始终运行等下次触发，计算费怎样比较？Batch/ECS编排免费能免掉它吗？",
+    "answerZh": "完成即退出可减少这段计算费：Windows Fargate每次至少计5分钟；持续运行则连等待间隔也计费。免费编排不免除底层计算费。",
+    "pointsEn": [
+      "Windows Fargate bills at least five minutes per task; exiting avoids billing the full idle interval in this scenario",
+      "Batch/ECS Fargate orchestration has no extra orchestration fee, but underlying compute still incurs charges"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-151",
+    "question": "想为EC2、EC2 Auto Scaling组、ECS的Fargate服务等受支持资源取得具体规格建议，只看监控图够吗？",
+    "answerZh": "评估AWS Compute Optimizer的适用资源建议。",
+    "pointsEn": [
+      "Compute Optimizer",
+      "Analyzes supported utilization into concrete sizing/configuration advice"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-152",
+    "question": "费用明显偏离平时模式，与费用达到明确月预算阈值，应该用同一种告警规则吗？",
+    "answerZh": "异常偏离评估Cost Anomaly Detection；明确预算阈值使用AWS Budgets。",
+    "pointsEn": [
+      "Pattern deviation: Cost Anomaly Detection",
+      "Explicit threshold: Budgets"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-153",
+    "question": "要交互分析历史费用或预测，与要逐行分析原始账单明细，Cost Explorer和CUR怎样分工？",
+    "answerZh": "交互分析及适用API查询用Cost Explorer；原始细粒度账单分析用CUR或相应账单数据导出。",
+    "pointsEn": [
+      "Interactive/forecast: Cost Explorer",
+      "Raw fine-grained records: CUR or appropriate export"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-154",
+    "question": "在组织集中计费下，资源已打业务部门标签，却不能据此正常分摊账单。还要由谁在费用管理侧做什么？",
+    "answerZh": "由组织管理账户在Billing激活相应cost allocation tag，再在Cost Explorer等费用视图按实际可用的该标签维度分组分析。",
+    "pointsEn": [
+      "Management account activates the tag in Billing",
+      "Then analyze by the available cost-allocation tag dimension"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-155",
+    "question": "已购Savings Plans承诺闲置，与用量没被折扣覆盖，需要哪种预算指标来分别监控并自动通知？",
+    "answerZh": "承诺闲置看utilization budget；适用用量没被覆盖看coverage budget。在AWS Budgets设置相应阈值及通知。",
+    "pointsEn": [
+      "Idle commitment: utilization budget",
+      "Uncovered usage: coverage budget, with thresholds/notifications"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-156",
+    "question": "组织已合并账单，是否就自动能跨账户查看所有资源的节省建议？",
+    "answerZh": "不自动等于能看全部；按优化服务配置组织接入、授权和适用账户范围。",
+    "pointsEn": [
+      "Configure optimization-service integration and permissions",
+      "Consolidated billing alone does not grant all recommendation access"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-vc-006",
+    "question": "归档文件必须在几分钟或一天内取回，只写“用Glacier”就够吗？为什么还要选取回档位？",
+    "answerZh": "不够。Flexible Retrieval的Expedited对小于250MB的对象通常1–5分钟，Standard通常3–5小时；Deep Archive的Standard通常12小时，Bulk通常48小时。",
+    "pointsEn": [
+      "Choose both archive class and retrieval tier matching the deadline",
+      "Different tiers have distinct wait/cost tradeoffs, not one universal Glacier time"
+    ]
+  }
+]

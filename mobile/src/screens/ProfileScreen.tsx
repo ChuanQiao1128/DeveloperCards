@@ -4,6 +4,7 @@ import type { RootStackParamList } from '../navigation/types';
 import AppInfoScreen from '../components/AppInfoScreen';
 import {
   getAuthIdentitySnapshot,
+  getAuthSessionGeneration,
   subscribeAuthIdentitySnapshot,
   type AuthIdentitySnapshot,
 } from '../auth/sessionBoundary';
@@ -25,19 +26,31 @@ export function ProfileScreen({ navigation }: Props) {
 
   useEffect(() => {
     let cancelled = false;
-    void (async () => {
-      const [loadedSnapshot, loadedAudience] = await Promise.all([
-        loadStreakSnapshot(),
-        getAudiencePreference(),
-      ]);
-      if (cancelled) return;
-      setSnapshot(loadedSnapshot);
-      setAudience(loadedAudience);
-    })();
+    let request = 0;
+    const generation = getAuthSessionGeneration();
+    setSnapshot(null);
+    setAudience(null);
+    const load = async () => {
+      const id = ++request;
+      try {
+        const [loadedSnapshot, loadedAudience] = await Promise.all([loadStreakSnapshot(), getAudiencePreference()]);
+        if (cancelled || id !== request || generation !== getAuthSessionGeneration()) return;
+        setSnapshot(loadedSnapshot);
+        setAudience(loadedAudience);
+      } catch {
+        if (!cancelled && id === request && generation === getAuthSessionGeneration()) {
+          setSnapshot(null);
+          setAudience(null);
+        }
+      }
+    };
+    void load();
+    const unsubscribe = navigation.addListener?.('focus', () => { void load(); });
     return () => {
       cancelled = true;
+      if (typeof unsubscribe === 'function') unsubscribe();
     };
-  }, []);
+  }, [navigation, auth.status, auth.email]);
 
   // An em dash while the read is in flight, not a zero. A zero is a claim
   // about the user ("you have no streak") and it would be wrong for exactly

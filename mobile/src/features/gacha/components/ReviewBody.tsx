@@ -49,6 +49,8 @@ export type ReviewBodyProps = {
   rank?: number | null;
   faceUp: boolean;
   onFlip: () => void;
+  onPressPrerequisite?: (uid: string) => void;
+  prerequisiteLabels?: Readonly<Record<string, string>>;
 };
 
 export const ReviewBody = React.memo(function ReviewBody(props: ReviewBodyProps) {
@@ -153,7 +155,7 @@ export const ReviewBody = React.memo(function ReviewBody(props: ReviewBodyProps)
               CODING SAMPLE / REAL USAGE, dividers, empty hint) live in the
               shared CardAnswerSections so the session reveal and CardDetail's
               "Show answer" render the exact same stack. */}
-          <CardAnswerSections card={card} />
+          <CardAnswerSections card={card} onPressPrerequisite={props.onPressPrerequisite} prerequisiteLabels={props.prerequisiteLabels} />
         </View>
       )}
     </View>

@@ -1,0 +1,64 @@
+{
+  "appId": "com.timeawake.recallsmith.qa.prerequisites",
+  "wallet": {
+    "availablePulls": 5,
+    "reservePulls": 0
+  },
+  "ownedUids": [
+    "aws-rb2-20261107-pack-ca03",
+    "aws-rb2-20261107-pack-ca08",
+    "aws-rb2-20261107-pack-ca09",
+    "aws-rb2-20261107-pack-ca10",
+    "aws-rb2-20261107-pack-ca11",
+    "aws-rb2-20261107-pack-ca18",
+    "aws-rb2-20261107-pack-ca19",
+    "aws-rb2-20261107-pack-cb04",
+    "aws-rb2-20261107-pack-cb05",
+    "aws-rb2-20261107-pack-cb10",
+    "aws-rb2-20261107-pack-cb12",
+    "aws-rb2-20261107-pack-cb13",
+    "aws-rb2-20261107-pack-cb15",
+    "aws-rb2-20261107-pack-cb19",
+    "aws-rb2-20261107-pack-cc01",
+    "aws-rb2-20261107-pack-cc02",
+    "aws-rb2-20261107-pack-cc05",
+    "aws-rb2-20261107-pack-cc06",
+    "aws-rb2-20261107-pack-fh01",
+    "aws-rb2-20261107-pack-na03"
+  ],
+  "learnedUids": [
+    "aws-rb2-20261107-pack-ca03",
+    "aws-rb2-20261107-pack-ca08",
+    "aws-rb2-20261107-pack-ca09",
+    "aws-rb2-20261107-pack-ca10",
+    "aws-rb2-20261107-pack-ca11",
+    "aws-rb2-20261107-pack-ca18",
+    "aws-rb2-20261107-pack-ca19",
+    "aws-rb2-20261107-pack-cb04",
+    "aws-rb2-20261107-pack-cb05",
+    "aws-rb2-20261107-pack-cb10",
+    "aws-rb2-20261107-pack-cb12",
+    "aws-rb2-20261107-pack-cb13",
+    "aws-rb2-20261107-pack-cb15",
+    "aws-rb2-20261107-pack-cb19",
+    "aws-rb2-20261107-pack-cc01",
+    "aws-rb2-20261107-pack-cc02",
+    "aws-rb2-20261107-pack-cc05",
+    "aws-rb2-20261107-pack-cc06",
+    "aws-rb2-20261107-pack-na03"
+  ],
+  "progressSha256": "675b67ec2928336175ea91c5d0ee52e4bf252254eac144244128cfecb5816f00",
+  "lastDrawnUids": [
+    "aws-rb2-20261107-pack-na03"
+  ],
+  "historySha256": "bc29295395aed7f8bc112950f547aa766bfe8edae0010240a862407329cc334a",
+  "historyPolicy": "ordered-v1",
+  "historyFingerprintPolicy": "prerequisites-v1",
+  "checkpoint": {
+    "uid": "aws-rb2-20261107-pack-fh01",
+    "showAnswer": true,
+    "sessionId": "aws-saa-fundamentals-1794597740204",
+    "completedCount": 1
+  },
+  "contentSha256": "c994e567628dbe7d9bcf1372ae8cb4ee610873fcf95196e637a15cb6fcca6e0b"
+}

@@ -26,7 +26,7 @@ export type RootStackParamList = {
   // pass uids: guessing from status is how a pull of card #37 used to
   // highlight card #1.
   Library: { focusSlug?: string; scrollToNew?: boolean; highlightUids?: string[] } | undefined;
-  CardDetail: { cardId: string };
+  CardDetail: { cardId: string; studyContext?: boolean };
   // K02: slug narrows the book to one deck; absent lists every deck.
   MistakeBook: { slug?: string } | undefined;
   // D02 (R24 §1.3): per-domain counts of one deck, with a Practice focus session per domain.

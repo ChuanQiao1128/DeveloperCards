@@ -1,0 +1,8 @@
+{
+  "path": "source-public-deck.json",
+  "sha256": "c994e567628dbe7d9bcf1372ae8cb4ee610873fcf95196e637a15cb6fcca6e0b",
+  "version": "20261109T004729Z-3b73803a",
+  "cardCount": 379,
+  "pointCount": 757,
+  "scope": "Translation only; preserve every English field and existing Chinese prose, UIDs, order, references and revision; no publication"
+}

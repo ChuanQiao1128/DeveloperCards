@@ -1,0 +1,92 @@
+[
+  {
+    "uid": "aws-rb2-20261107-pack-gcl-014",
+    "question": "要用AWS Backup恢复EC2实例配置以及附加EBS数据卷，应把EC2资源还是仅EBS卷纳入计划？",
+    "answerZh": "选择受支持的EC2实例资源备份，而不是只选择各卷。",
+    "pointsEn": [
+      "Select EC2 instance backup",
+      "Includes restoration configuration and supported attached volumes"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gcl-019",
+    "question": "备份放S3就能直接创建Aurora吗？原生快照、逻辑SQL dump与受支持物理备份怎样区分？",
+    "answerZh": "兼容版本的RDS MySQL原生快照可直接迁为Aurora MySQL；SQL dump通常用客户端逻辑导入；从S3恢复物理备份须符合目标引擎支持的格式。",
+    "pointsEn": [
+      "Native compatible RDS MySQL snapshot can migrate directly; SQL dump uses logical import",
+      "S3 physical restore needs target-supported format, not merely S3 storage"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gcl-022",
+    "question": "Lustre工作数据要长期使用，文件服务器故障也不能丢失该份数据。选scratch还是persistent？",
+    "answerZh": "选persistent。",
+    "pointsEn": [
+      "Persistent",
+      "Replicates data and replaces failed servers"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-002",
+    "question": "共享文件必须在一个AZ故障后仍可使用。EFS选Regional还是One Zone，为什么？",
+    "answerZh": "选Regional，并为客户端所在AZ安排挂载路径。",
+    "pointsEn": [
+      "Choose EFS Regional",
+      "Regional stores data across AZs; One Zone cannot protect against its storage AZ failing"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-008",
+    "question": "FSx for ONTAP已有跨Region SnapMirror副本，主Region故障后，要让应用在目标端写入，只有“复制完成”够吗？",
+    "answerZh": "不够；须按支持的灾备流程把目标副本激活为可写，并把应用接到目标存储。",
+    "pointsEn": [
+      "Activate the destination writable using supported DR steps",
+      "Reconnect applications; replication alone does not make a writable service"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-011",
+    "question": "机房不可用，要在EC2上继续使用Volume Gateway的备份卷。已有兼容的EBS快照，能把S3桶直接当磁盘挂载吗？",
+    "answerZh": "从快照创建EBS卷，再把卷挂到合适的EC2实例。",
+    "pointsEn": [
+      "Create EBS volumes from snapshots and attach to EC2",
+      "Snapshots must become block devices; directly mounting a bucket is insufficient"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-039",
+    "question": "多个Region的应用都要就近读写同一份DynamoDB业务数据，只部署一张区域表够吗？",
+    "answerZh": "考虑DynamoDB global tables，在所需Region建立受支持的副本。",
+    "pointsEn": [
+      "Global tables with regional replicas",
+      "Local replicas serve applications while managed replication shares data"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-045",
+    "question": "RDS读副本已建立，为什么仍可能读到旧数据？多加几个副本就能保证跟上主库吗？",
+    "answerZh": "不能保证；异步复制有延迟，副本也要有足够资源重放主库写入并服务读取。",
+    "pointsEn": [
+      "Asynchronous replication and replay capacity cause lag",
+      "Extra replicas share reads but cannot guarantee eliminating replay delay"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-047",
+    "question": "RDS既要恢复到近期某个误操作前的时刻，又要保留多年历史。只把自动备份窗口设大就够吗？",
+    "answerZh": "不够；近期用支持窗口内的PITR，多年历史另用手工快照或适用的长期备份保留策略。",
+    "pointsEn": [
+      "Recent recovery: supported PITR window",
+      "Years: manual snapshots or long-term backup strategy, beyond automatic PITR's window"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-053",
+    "question": "RDS实例或DynamoDB表已有备份，担心有人误发删除请求。备份就能阻止删除吗？",
+    "answerZh": "不能；启用该资源支持的删除保护，并正确限制管理权限。",
+    "pointsEn": [
+      "Backups do not prevent deletion",
+      "Enable supported deletion protection and restrict management permissions"
+    ]
+  }
+]

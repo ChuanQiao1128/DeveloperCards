@@ -1,0 +1,92 @@
+[
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-114",
+    "question": "消费者处理SQS工作，CPU还不高但排队越来越长。只按CPU扩容能准确反映积压吗？",
+    "answerZh": "不一定；用每实例积压量或等候时间等适合的工作量指标驱动伸缩。",
+    "pointsEn": [
+      "Use backlog per instance or suitable wait-time metrics",
+      "Relate pending work to processing capacity rather than CPU alone"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-117",
+    "question": "ASG把实例先初始化、放入warm pool候命。扩容时还要直接续用已加载的RAM状态，只用Stopped预热够吗？",
+    "answerZh": "不够；可评估支持休眠的Hibernated warm pool，把RAM状态也保存下来。",
+    "pointsEn": [
+      "Supported Hibernated warm pool",
+      "Hibernation saves RAM to EBS unlike ordinary stopping"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-119",
+    "question": "紧耦合计算要降低节点间通信延迟，与独立节点要分散硬件故障风险，placement策略取舍是什么？",
+    "answerZh": "通信密集可用cluster placement把节点集中；需要硬件隔离时用适用的spread等分散策略。",
+    "pointsEn": [
+      "Communication: cluster; isolation: applicable spread strategy",
+      "Proximity and dispersion address different objectives"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-120",
+    "question": "受支持Linux HPC节点频繁交换数据，瓶颈在通信栈，应用已有适用通信库。应评估哪种接口，为什么？",
+    "answerZh": "评估Elastic Fabric Adapter（EFA）。",
+    "pointsEn": [
+      "EFA",
+      "Supported libraries reduce kernel-path communication overhead"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-121",
+    "question": "EC2网络吞吐或每秒包数成了瓶颈。只多挂几块网卡就一定提高实例总网络上限吗？",
+    "answerZh": "不一定；应评估实例网络规格及适用的ENA等增强网络能力。",
+    "pointsEn": [
+      "Evaluate instance specifications and supported ENA",
+      "More interfaces alone do not increase every instance's total limit"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-123",
+    "question": "ALB监控中RequestCount（请求数）和TargetResponseTime（后端响应耗时）升高，部分目标积压。怎样让新请求避开仍有大量未完成工作的目标？",
+    "answerZh": "评估least outstanding requests算法，将新请求导向未完成请求较少的适用目标。",
+    "pointsEn": [
+      "Least outstanding requests",
+      "Routes by remaining work rather than simple rotation"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-124",
+    "question": "区域负载均衡要把流量送到已通过私网连通的机房服务器。能按AWS实例ID注册这台非EC2服务器吗？",
+    "answerZh": "不能；应使用服务支持的IP目标方式，注册允许范围内的可达目标地址。",
+    "pointsEn": [
+      "Supported IP target registration",
+      "Non-EC2 servers do not have the required AWS instance identity"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-127",
+    "question": "新版本只想先接收少量DNS流量，再逐步增加。按比例分流应使用哪类路由？",
+    "answerZh": "Route 53 weighted routing，给新旧入口设置相应权重。",
+    "pointsEn": [
+      "Weighted routing",
+      "Relative record weights support gradual DNS traffic shifts"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-128",
+    "question": "DNS希望一次回答多个健康服务地址，而不是始终只给一个地址。可以考虑什么路由，它等同真正负载均衡器吗？",
+    "answerZh": "可考虑Route 53 multivalue answer；它不等同连接层或HTTP负载均衡器。",
+    "pointsEn": [
+      "Multivalue answer",
+      "Returns healthy address choices rather than proxying business connections"
+    ]
+  },
+  {
+    "uid": "aws-rb2-20261107-pack-gsc-129",
+    "question": "公网域名的权威DNS要迁到Route 53。只让Resolver把查询转发给旧DNS，就完成权威托管迁移了吗？",
+    "answerZh": "没有；应建立public hosted zone和对应记录，并把域名的权威委派指向Route 53提供的名称服务器。",
+    "pointsEn": [
+      "Public hosted zone and records plus authoritative delegation",
+      "Forwarding queries does not move authoritative ownership"
+    ]
+  }
+]
