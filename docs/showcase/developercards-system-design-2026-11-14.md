@@ -1,6 +1,6 @@
 # DeveloperCards 系统设计与简历素材
 
-更新日期：2026-11-14。产品工程也使用 RecallSmith 名称。产品流程见 [产品设计](/Users/qc/.codex/worktrees/mobile-ux-ota-210-20261114/draw-motion-20261113/docs/showcase/developercards-product-design-2026-11-14.md)。
+更新日期：2026-11-14。产品工程也使用 RecallSmith 名称。产品流程见 [产品设计](developercards-product-design-2026-11-14.md)。
 
 ## 1. 版本与证据范围
 
@@ -252,33 +252,33 @@ OTA 脚本要求 production 环境，检查必要公开配置名称，按 `runti
 
 ## 13. 源码与发布证据索引
 
-- [最近热更新证据](/Users/qc/.codex/worktrees/mobile-ux-ota-210-20261114/draw-motion-20261113/exports/prerequisite-ota-210-20261114/verification.json)：当前 runtime、测试、模拟器与线上交付。
-- [项目总览](/Users/qc/.codex/worktrees/mobile-ux-ota-210-20261114/draw-motion-20261113/README.md)：个人项目、组成及退役分析管道。
-- [移动端依赖](/Users/qc/.codex/worktrees/mobile-ux-ota-210-20261114/draw-motion-20261113/mobile/package.json)：Expo、React Native、状态及动画技术。
-- [API 项目](/Users/qc/.codex/worktrees/mobile-ux-ota-210-20261114/draw-motion-20261113/src_C/Vpc/RecallSmith.Lambda.Vpc.csproj)：当前 C# 项目目标与包。
-- [Worker 项目](/Users/qc/.codex/worktrees/mobile-ux-ota-210-20261114/draw-motion-20261113/src_C/Worker/RecallSmith.Lambda.Worker.csproj)：SQS 消费者项目。
-- [进度同步客户端](/Users/qc/.codex/worktrees/mobile-ux-ota-210-20261114/draw-motion-20261113/mobile/src/sync/progressSync.ts)：批量、确认、上限及匿名归属取舍。
-- [服务端进度摄入](/Users/qc/.codex/worktrees/mobile-ux-ota-210-20261114/draw-motion-20261113/src_C/Vpc/Runtime/ProgressEvents.cs)：event ID 去重、单语句合并与最新事件规则。
-- [持有与余额同步](/Users/qc/.codex/worktrees/mobile-ux-ota-210-20261114/draw-motion-20261113/mobile/src/sync/drawStateSync.ts)：并集、LWW 和离线并发限制。
-- [评分恢复意图](/Users/qc/.codex/worktrees/mobile-ux-ota-210-20261114/draw-motion-20261113/mobile/src/review/pendingRating.ts)：可重试评分持久化。
-- [FSRS 实现](/Users/qc/.codex/worktrees/mobile-ux-ota-210-20261114/draw-motion-20261113/mobile/src/review/fsrs.ts)：本地 FSRS-5 纯函数。
-- [前置图遍历](/Users/qc/.codex/worktrees/mobile-ux-ota-210-20261114/draw-motion-20261113/mobile/src/features/gacha/draw/prerequisiteOrder.ts)：严格发卡图与宽容学习范围。
-- [授卡提交及重放](/Users/qc/.codex/worktrees/mobile-ux-ota-210-20261114/draw-motion-20261113/mobile/src/features/gacha/draw/drawCommit.ts)：持有提交、诊断历史及算法指纹。
-- [额度扣除边界](/Users/qc/.codex/worktrees/mobile-ux-ota-210-20261114/draw-motion-20261113/mobile/src/features/gacha/draw/acquireDraw.ts)：账户、内容、额度和串行执行。
-- [会话位置恢复](/Users/qc/.codex/worktrees/mobile-ux-ota-210-20261114/draw-motion-20261113/mobile/src/features/gacha/session/sessionCheckpoint.ts)：恢复条件及串行保存/清理。
-- [内容仓库](/Users/qc/.codex/worktrees/mobile-ux-ota-210-20261114/draw-motion-20261113/mobile/src/content/deckRepository.ts)：清单、版本、缓存和安装。
-- [编辑与导入](/Users/qc/.codex/worktrees/mobile-ux-ota-210-20261114/draw-motion-20261113/src_C/Vpc/Authoring/CardsImport.cs)：stable UID、事务与内容变更。
-- [发布入口](/Users/qc/.codex/worktrees/mobile-ux-ota-210-20261114/draw-motion-20261113/src_C/Vpc/Authoring/Publish.cs)：任务创建、发布门禁及排队。
-- [发布仓库](/Users/qc/.codex/worktrees/mobile-ux-ota-210-20261114/draw-motion-20261113/src_C/Worker/Repositories/JobRepository.cs)：条件认领与状态提交。
-- [发布指标恢复契约](/Users/qc/.codex/worktrees/mobile-ux-ota-210-20261114/draw-motion-20261113/docs/qa/career-readiness-20261026/publish-metrics.md)：重放、清单修复及指标偏差。
-- [AWS 受控发布](/Users/qc/.codex/worktrees/mobile-ux-ota-210-20261114/draw-motion-20261113/src_C/Vpc/Authoring/ContentRelease.cs)：审查身份、逐卡 hash 和版本围栏。
-- [本地制卡 MCP](/Users/qc/.codex/worktrees/mobile-ux-ota-210-20261114/draw-motion-20261113/tools/mcp-server/README.md)：受限工具及来源处理。
-- [AI QA](/Users/qc/.codex/worktrees/mobile-ux-ota-210-20261114/draw-motion-20261113/services/ai-qa/README.md)：实现结构与启用条件。
-- [有界内容工作台](/Users/qc/.codex/worktrees/mobile-ux-ota-210-20261114/draw-motion-20261113/tools/content-workbench/README.md)：canary 能力与排除范围。
-- [基础设施数据库](/Users/qc/.codex/worktrees/mobile-ux-ota-210-20261114/draw-motion-20261113/infra/modules/data/rds.tf)：私网、单 AZ、实例及备份配置。
-- [控制台安全响应头](/Users/qc/.codex/worktrees/mobile-ux-ota-210-20261114/draw-motion-20261113/infra/modules/edge/security_headers.tf)：CSP、HSTS 和 frame denial。
-- [持续交付](/Users/qc/.codex/worktrees/mobile-ux-ota-210-20261114/draw-motion-20261113/.github/workflows/cd.yml)：OIDC、审批、验证及回滚定义。
-- [OTA 发布脚本](/Users/qc/.codex/worktrees/mobile-ux-ota-210-20261114/draw-motion-20261113/mobile/scripts/release/ota.sh)：production 环境、runtime 及 source map 结果。
-- [历史性能记录](/Users/qc/.codex/worktrees/mobile-ux-ota-210-20261114/draw-motion-20261113/docs/low-latency-plan.md)：历史内部 benchmark 和测量边界。
-- [恢复演练记录](/Users/qc/.codex/worktrees/mobile-ux-ota-210-20261114/draw-motion-20261113/docs/ops/dr-restore-drill-2026-10-04.md)：一次演练的端到端 RTO 与 RPO，不作为持续保证。
-- [历史运行观察](/Users/qc/.codex/worktrees/mobile-ux-ota-210-20261114/draw-motion-20261113/docs/qa/career-readiness-20261026/operations.md)：有限运行样本及未核定事项。
+- [最近热更新证据](https://github.com/ChuanQiao1128/DeveloperCards/blob/b2a14d6641643ea728068049404fff07e4030a8d/exports/prerequisite-ota-210-20261114/verification.json)：当前 runtime、测试、模拟器与线上交付。
+- [项目总览](https://github.com/ChuanQiao1128/DeveloperCards/blob/b2a14d6641643ea728068049404fff07e4030a8d/README.md)：个人项目、组成及退役分析管道。
+- [移动端依赖](https://github.com/ChuanQiao1128/DeveloperCards/blob/b2a14d6641643ea728068049404fff07e4030a8d/mobile/package.json)：Expo、React Native、状态及动画技术。
+- [API 项目](https://github.com/ChuanQiao1128/DeveloperCards/blob/b2a14d6641643ea728068049404fff07e4030a8d/src_C/Vpc/RecallSmith.Lambda.Vpc.csproj)：当前 C# 项目目标与包。
+- [Worker 项目](https://github.com/ChuanQiao1128/DeveloperCards/blob/b2a14d6641643ea728068049404fff07e4030a8d/src_C/Worker/RecallSmith.Lambda.Worker.csproj)：SQS 消费者项目。
+- [进度同步客户端](https://github.com/ChuanQiao1128/DeveloperCards/blob/b2a14d6641643ea728068049404fff07e4030a8d/mobile/src/sync/progressSync.ts)：批量、确认、上限及匿名归属取舍。
+- [服务端进度摄入](https://github.com/ChuanQiao1128/DeveloperCards/blob/b2a14d6641643ea728068049404fff07e4030a8d/src_C/Vpc/Runtime/ProgressEvents.cs)：event ID 去重、单语句合并与最新事件规则。
+- [持有与余额同步](https://github.com/ChuanQiao1128/DeveloperCards/blob/b2a14d6641643ea728068049404fff07e4030a8d/mobile/src/sync/drawStateSync.ts)：并集、LWW 和离线并发限制。
+- [评分恢复意图](https://github.com/ChuanQiao1128/DeveloperCards/blob/b2a14d6641643ea728068049404fff07e4030a8d/mobile/src/review/pendingRating.ts)：可重试评分持久化。
+- [FSRS 实现](https://github.com/ChuanQiao1128/DeveloperCards/blob/b2a14d6641643ea728068049404fff07e4030a8d/mobile/src/review/fsrs.ts)：本地 FSRS-5 纯函数。
+- [前置图遍历](https://github.com/ChuanQiao1128/DeveloperCards/blob/b2a14d6641643ea728068049404fff07e4030a8d/mobile/src/features/gacha/draw/prerequisiteOrder.ts)：严格发卡图与宽容学习范围。
+- [授卡提交及重放](https://github.com/ChuanQiao1128/DeveloperCards/blob/b2a14d6641643ea728068049404fff07e4030a8d/mobile/src/features/gacha/draw/drawCommit.ts)：持有提交、诊断历史及算法指纹。
+- [额度扣除边界](https://github.com/ChuanQiao1128/DeveloperCards/blob/b2a14d6641643ea728068049404fff07e4030a8d/mobile/src/features/gacha/draw/acquireDraw.ts)：账户、内容、额度和串行执行。
+- [会话位置恢复](https://github.com/ChuanQiao1128/DeveloperCards/blob/b2a14d6641643ea728068049404fff07e4030a8d/mobile/src/features/gacha/session/sessionCheckpoint.ts)：恢复条件及串行保存/清理。
+- [内容仓库](https://github.com/ChuanQiao1128/DeveloperCards/blob/b2a14d6641643ea728068049404fff07e4030a8d/mobile/src/content/deckRepository.ts)：清单、版本、缓存和安装。
+- [编辑与导入](https://github.com/ChuanQiao1128/DeveloperCards/blob/b2a14d6641643ea728068049404fff07e4030a8d/src_C/Vpc/Authoring/CardsImport.cs)：stable UID、事务与内容变更。
+- [发布入口](https://github.com/ChuanQiao1128/DeveloperCards/blob/b2a14d6641643ea728068049404fff07e4030a8d/src_C/Vpc/Authoring/Publish.cs)：任务创建、发布门禁及排队。
+- [发布仓库](https://github.com/ChuanQiao1128/DeveloperCards/blob/b2a14d6641643ea728068049404fff07e4030a8d/src_C/Worker/Repositories/JobRepository.cs)：条件认领与状态提交。
+- [发布指标恢复契约](https://github.com/ChuanQiao1128/DeveloperCards/blob/b2a14d6641643ea728068049404fff07e4030a8d/docs/qa/career-readiness-20261026/publish-metrics.md)：重放、清单修复及指标偏差。
+- [AWS 受控发布](https://github.com/ChuanQiao1128/DeveloperCards/blob/b2a14d6641643ea728068049404fff07e4030a8d/src_C/Vpc/Authoring/ContentRelease.cs)：审查身份、逐卡 hash 和版本围栏。
+- [本地制卡 MCP](https://github.com/ChuanQiao1128/DeveloperCards/blob/b2a14d6641643ea728068049404fff07e4030a8d/tools/mcp-server/README.md)：受限工具及来源处理。
+- [AI QA](https://github.com/ChuanQiao1128/DeveloperCards/blob/b2a14d6641643ea728068049404fff07e4030a8d/services/ai-qa/README.md)：实现结构与启用条件。
+- [有界内容工作台](https://github.com/ChuanQiao1128/DeveloperCards/blob/b2a14d6641643ea728068049404fff07e4030a8d/tools/content-workbench/README.md)：canary 能力与排除范围。
+- [基础设施数据库](https://github.com/ChuanQiao1128/DeveloperCards/blob/b2a14d6641643ea728068049404fff07e4030a8d/infra/modules/data/rds.tf)：私网、单 AZ、实例及备份配置。
+- [控制台安全响应头](https://github.com/ChuanQiao1128/DeveloperCards/blob/b2a14d6641643ea728068049404fff07e4030a8d/infra/modules/edge/security_headers.tf)：CSP、HSTS 和 frame denial。
+- [持续交付](https://github.com/ChuanQiao1128/DeveloperCards/blob/b2a14d6641643ea728068049404fff07e4030a8d/.github/workflows/cd.yml)：OIDC、审批、验证及回滚定义。
+- [OTA 发布脚本](https://github.com/ChuanQiao1128/DeveloperCards/blob/b2a14d6641643ea728068049404fff07e4030a8d/mobile/scripts/release/ota.sh)：production 环境、runtime 及 source map 结果。
+- [历史性能记录](https://github.com/ChuanQiao1128/DeveloperCards/blob/b2a14d6641643ea728068049404fff07e4030a8d/docs/low-latency-plan.md)：历史内部 benchmark 和测量边界。
+- [恢复演练记录](https://github.com/ChuanQiao1128/DeveloperCards/blob/b2a14d6641643ea728068049404fff07e4030a8d/docs/ops/dr-restore-drill-2026-10-04.md)：一次演练的端到端 RTO 与 RPO，不作为持续保证。
+- [历史运行观察](https://github.com/ChuanQiao1128/DeveloperCards/blob/b2a14d6641643ea728068049404fff07e4030a8d/docs/qa/career-readiness-20261026/operations.md)：有限运行样本及未核定事项。

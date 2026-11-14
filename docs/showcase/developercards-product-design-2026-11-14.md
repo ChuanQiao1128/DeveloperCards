@@ -157,14 +157,14 @@ flowchart LR
 
 > DeveloperCards is an iOS flashcard learning product with a React administration console and an AWS backend. It combines bilingual AWS content, spaced repetition and earned card unlocks, with offline study and account-based synchronisation.
 
-工程亮点、可选英文经历条目及指标边界见 [系统设计与简历素材](/Users/qc/.codex/worktrees/mobile-ux-ota-210-20261114/draw-motion-20261113/docs/showcase/developercards-system-design-2026-11-14.md)。
+工程亮点、可选英文经历条目及指标边界见 [系统设计与简历素材](developercards-system-design-2026-11-14.md)。
 
 ## 10. 依据
 
-- [前置关系 OTA 验证](/Users/qc/.codex/worktrees/mobile-ux-ota-210-20261114/draw-motion-20261113/exports/prerequisite-ota-210-20261114/verification.json)：最近发布、3,144 项测试、四个模拟器流程及交付校验。
-- [学习体验 OTA 发布记录](/Users/qc/.codex/worktrees/mobile-ux-ota-210-20261114/draw-motion-20261113/exports/mobile-ux-ota-210-20261114/README.md)：中文自查、学习位置恢复及前一轮兼容修复。
-- [产品 FAQ](/Users/qc/.codex/worktrees/mobile-ux-ota-210-20261114/draw-motion-20261113/mobile/src/content/faq.ts)：当前课程、奖励、离线和 Premium 产品规则。
-- [移动端路由](/Users/qc/.codex/worktrees/mobile-ux-ota-210-20261114/draw-motion-20261113/mobile/src/navigation/types.ts)：已注册页面及参数。
-- [卡包钱包](/Users/qc/.codex/worktrees/mobile-ux-ota-210-20261114/draw-motion-20261113/mobile/src/features/gacha/rewards/deckWallet.ts)、[防断档规则](/Users/qc/.codex/worktrees/mobile-ux-ota-210-20261114/draw-motion-20261113/mobile/src/features/gacha/rewards/economyFloor.ts)、[评分奖励](/Users/qc/.codex/worktrees/mobile-ux-ota-210-20261114/draw-motion-20261113/mobile/src/features/gacha/rewards/sessionRewards.ts)：额度、课程衔接、保底和评分奖励。
-- [前置发卡](/Users/qc/.codex/worktrees/mobile-ux-ota-210-20261114/draw-motion-20261113/mobile/src/features/gacha/draw/orderedAcquisition.ts)、[学习排课](/Users/qc/.codex/worktrees/mobile-ux-ota-210-20261114/draw-motion-20261113/mobile/src/features/gacha/planner/sessionPlanner.ts)：前置发卡与新课排序。
-- [学习位置检查点](/Users/qc/.codex/worktrees/mobile-ux-ota-210-20261114/draw-motion-20261113/mobile/src/features/gacha/session/sessionCheckpoint.ts)、[中文自查匹配](/Users/qc/.codex/worktrees/mobile-ux-ota-210-20261114/draw-motion-20261113/mobile/src/content/checklistLocalization.ts)：本地恢复与自查本地化边界。
+- [前置关系 OTA 验证](https://github.com/ChuanQiao1128/DeveloperCards/blob/b2a14d6641643ea728068049404fff07e4030a8d/exports/prerequisite-ota-210-20261114/verification.json)：最近发布、3,144 项测试、四个模拟器流程及交付校验。
+- [学习体验 OTA 发布记录](https://github.com/ChuanQiao1128/DeveloperCards/blob/b2a14d6641643ea728068049404fff07e4030a8d/exports/mobile-ux-ota-210-20261114/README.md)：中文自查、学习位置恢复及前一轮兼容修复。
+- [产品 FAQ](https://github.com/ChuanQiao1128/DeveloperCards/blob/b2a14d6641643ea728068049404fff07e4030a8d/mobile/src/content/faq.ts)：当前课程、奖励、离线和 Premium 产品规则。
+- [移动端路由](https://github.com/ChuanQiao1128/DeveloperCards/blob/b2a14d6641643ea728068049404fff07e4030a8d/mobile/src/navigation/types.ts)：已注册页面及参数。
+- [卡包钱包](https://github.com/ChuanQiao1128/DeveloperCards/blob/b2a14d6641643ea728068049404fff07e4030a8d/mobile/src/features/gacha/rewards/deckWallet.ts)、[防断档规则](https://github.com/ChuanQiao1128/DeveloperCards/blob/b2a14d6641643ea728068049404fff07e4030a8d/mobile/src/features/gacha/rewards/economyFloor.ts)、[评分奖励](https://github.com/ChuanQiao1128/DeveloperCards/blob/b2a14d6641643ea728068049404fff07e4030a8d/mobile/src/features/gacha/rewards/sessionRewards.ts)：额度、课程衔接、保底和评分奖励。
+- [前置发卡](https://github.com/ChuanQiao1128/DeveloperCards/blob/b2a14d6641643ea728068049404fff07e4030a8d/mobile/src/features/gacha/draw/orderedAcquisition.ts)、[学习排课](https://github.com/ChuanQiao1128/DeveloperCards/blob/b2a14d6641643ea728068049404fff07e4030a8d/mobile/src/features/gacha/planner/sessionPlanner.ts)：前置发卡与新课排序。
+- [学习位置检查点](https://github.com/ChuanQiao1128/DeveloperCards/blob/b2a14d6641643ea728068049404fff07e4030a8d/mobile/src/features/gacha/session/sessionCheckpoint.ts)、[中文自查匹配](https://github.com/ChuanQiao1128/DeveloperCards/blob/b2a14d6641643ea728068049404fff07e4030a8d/mobile/src/content/checklistLocalization.ts)：本地恢复与自查本地化边界。
