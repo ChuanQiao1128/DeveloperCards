@@ -30,6 +30,7 @@ import { deckShortTitle } from '../content/deckShortTitle';
 import { hasKeyLine } from '../content/answerKeyLine';
 import { cardTranslationFor, hasCompleteTranslation, localizeForDisplay } from '../content/localizeCard';
 import type { CardProgress, ReviewRating } from '../review/model';
+import { compareReviewOrder } from '../review/model';
 import {
   loadDeckProgress,
   loadOrInitDailyStats,
@@ -1025,6 +1026,13 @@ export function SessionCardScreen({ navigation, route }: Props) {
               dueBefore: countDueToday(fresh, nowAtRating, ownedSet), remainingDueCount: state.remainingDueCount } };
           pendingRatingRef.current = intent;
         }
+        // The intent is the durable identity of this tap, including retries.
+        intent.state.updatedOne.lastReviewEventId = intent.eventId;
+        const currentFacts = fresh.find(p => p.stableUid === intent!.uid);
+        for (const key of ['reviewCount', 'status', 'lastSeenRevision'] as const) {
+          const value = currentFacts?.[key];
+          if (value != null && value > (intent.state.updatedOne[key] ?? -1)) intent.state.updatedOne[key] = value;
+        }
         await writePendingRating(deck.Slug, intent);
         const nextState = intent.state;
         const nowMs = intent.now.getTime();
@@ -1058,7 +1066,8 @@ export function SessionCardScreen({ navigation, route }: Props) {
         }
         // Keep other cards and any newer remote review's whole scheduler group.
         return fresh.map(p => p.stableUid === intent!.uid &&
-          (p.lastReviewedAt ?? 0) <= (nextState.updatedOne.lastReviewedAt ?? 0)
+          compareReviewOrder(nextState.updatedOne.lastReviewedAt ?? 0, nextState.updatedOne.lastReviewEventId,
+            p.lastReviewedAt ?? 0, p.lastReviewEventId) >= 0
             ? nextState.updatedOne : p);
       }, sub);
       const intent = pendingRatingRef.current!;

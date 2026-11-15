@@ -1,4 +1,4 @@
-import { loadDeckProgress } from '../../src/review/storage';
+import { loadDeckProgress, saveDeckProgress } from '../../src/review/storage';
 vi.mock('expo-crypto', () => ({ randomUUID: () => 'review-intent-id' }));
 import React from 'react';
 import renderer, { act } from 'react-test-renderer';
@@ -237,6 +237,7 @@ vi.mock('../../src/features/gacha/rewards/sessionRewards', () => {
   };
 });
 
+import { recordReviewEvent } from '../../src/sync/progressSync';
 import { SessionCardScreen } from '../../src/screens/SessionCardScreen';
 import { resolveDeckBySlug } from '../../src/content/deckRepository';
 import { countDueToday, pickNextCard, planChallengeRoute } from '../../src/features/gacha/planner/sessionPlanner';
@@ -353,6 +354,10 @@ describe('SessionCardScreen', () => {
       await Promise.resolve();
     });
 
+    const recorded = vi.mocked(recordReviewEvent).mock.calls[0][0] as any;
+    expect(recorded.progressAfter.lastReviewEventId).toBe(recorded.eventId);
+    const projected = vi.mocked(saveDeckProgress).mock.calls[0][1][0];
+    expect(projected.lastReviewEventId).toBe(recorded.eventId);
     expect(useSessionStore.getState().completedCount).toBe(1);
     expect(useSessionStore.getState().streakEarned).toBe(true);
     expect(navigation.replace).toHaveBeenCalledWith('SessionSummary', {

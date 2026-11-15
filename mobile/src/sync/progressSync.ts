@@ -19,7 +19,7 @@ import {
   setCachedQueue,
   invalidateProgressQueueCache,
 } from './progressQueueCache';
-import { clampStage, MAX_NEXT_REVIEW_HORIZON_MS } from '../review/model';
+import { clampStage, MAX_NEXT_REVIEW_HORIZON_MS, normalizeReviewEventId, compareReviewOrder } from '../review/model';
 import { isFsrsEnabled } from '../config/featureFlags';
 import type { CardProgress } from '../review/model';
 import { notifyProgressChanged } from './progressChanges';
@@ -86,6 +86,7 @@ type ProgressItem = {
   stableUid: string;
   status: number;
   reviewCount: number;
+  lastSeenRevision?: number | null;
   lastRating: number | null;
   lastReviewEventId?: string | null;
   lastReviewedAtMs: number | string | null;
@@ -1183,6 +1184,33 @@ function getDeckUidSet(deck: any): Set<string> {
   return set;
 }
 
+// Aggregate counters/revisions independently from the review that owns the
+// scheduler group. A losing snapshot can carry newer aggregate facts.
+const progressFactKeys = ['reviewCount', 'status', 'lastSeenRevision'] as const;
+function progressFacts(current: any, incoming: any): Partial<CardProgress> {
+  const patch: Partial<CardProgress> = {};
+  for (const key of progressFactKeys) {
+    const a = optionalNonNegativeInt(current?.[key]);
+    const b = optionalNonNegativeInt(incoming?.[key]);
+    if (b != null && (a == null || b > a)) patch[key] = b;
+  }
+  return patch;
+}
+
+function mergeProgressSnapshots(current: ProgressItem | undefined, incoming: ProgressItem): ProgressItem {
+  if (!current) return incoming;
+  const order = compareReviewOrder(toMs(incoming.lastReviewedAtMs) ?? 0, incoming.lastReviewEventId,
+    toMs(current.lastReviewedAtMs) ?? 0, current.lastReviewEventId);
+  // Old servers have no identity. Keep their updatedAt compatibility fallback;
+  // real event identities always decide before transport timestamps.
+  const incomingWins = order > 0 || (order === 0 && !normalizeReviewEventId(incoming.lastReviewEventId)
+    && (toMs(incoming.updatedAtMs) ?? 0) > (toMs(current.updatedAtMs) ?? 0));
+  const winner = incomingWins ? incoming : current;
+  const other = incomingWins ? current : incoming;
+  return { ...winner, ...progressFacts(winner, other),
+    updatedAtMs: Math.max(toMs(current.updatedAtMs) ?? 0, toMs(incoming.updatedAtMs) ?? 0) };
+}
+
 /**
  * Merge remote progress items into local CardProgress[].
  *
@@ -1206,75 +1234,17 @@ export function mergeRemoteIntoLocalProgress(
     row: ProgressItem;
   };
 
-  /** Total order on remote snapshots of one card. See the tie note below. */
-  function compareRemoteBest(a: RemoteBest, b: RemoteBest): number {
-    if (a.lastReviewedAt !== b.lastReviewedAt) return a.lastReviewedAt - b.lastReviewedAt;
-    const aid = (a.row.lastReviewEventId ?? '').toLowerCase();
-    const bid = (b.row.lastReviewEventId ?? '').toLowerCase();
-    if (aid !== bid) return aid < bid ? -1 : 1;
-    if (a.updatedAt !== b.updatedAt) return a.updatedAt - b.updatedAt;
-    if (a.nextReviewAt !== b.nextReviewAt) return a.nextReviewAt - b.nextReviewAt;
-    // stage entered the payload, so it has to enter the order too: two rows
-    // alike on the timestamps but differing on the rung would otherwise be a
-    // tie, and a tie is exactly where "first row in the array wins" comes back.
-    // -1 sorts a missing stage below every real rung (0..6).
-    if ((a.srsStage ?? -1) !== (b.srsStage ?? -1)) return (a.srsStage ?? -1) - (b.srsStage ?? -1);
-    const stateA = JSON.stringify(schedulerStatePatch(a.row.schedulerState, a.lastReviewedAt));
-    const stateB = JSON.stringify(schedulerStatePatch(b.row.schedulerState, b.lastReviewedAt));
-    if (stateA !== stateB) return stateA < stateB ? -1 : 1;
-    const au = String(a.row?.stableUid ?? '');
-    const bu = String(b.row?.stableUid ?? '');
-    return au < bu ? -1 : au > bu ? 1 : 0;
-  }
-
   const bestRemote = new Map<string, RemoteBest>();
-
   for (const r of remoteRows) {
     const uid = (r?.stableUid ?? '').trim();
-    if (!uid) continue;
-
-    const lastReviewedAt = toMs(r.lastReviewedAtMs) ?? 0;
-    const updatedAt = toMs(r.updatedAtMs) ?? 0;
-    if (lastReviewedAt <= 0 || updatedAt <= 0) continue;
-
-    const serverNext = toMs((r as any).nextReviewAtMs);
-    const hasNext = serverNext != null;
-    // Mirror of the ingest clamp in src_C/Vpc/Runtime/ProgressEvents.cs. It is
-    // not redundant with it: this device may be talking to a server that has
-    // not shipped that clamp, or reading a row stored before it existed (those
-    // are repaired by migration 015, but only once the migration has run). A
-    // due date past the horizon removes the card from the product with no error
-    // anywhere, and the client is the last place that can refuse it.
-    const nextReviewAt = hasNext
-      ? Math.min(serverNext as number, lastReviewedAt + MAX_NEXT_REVIEW_HORIZON_MS)
-      : lastReviewedAt;
-
-    const srsStage = optionalRemoteStage((r as any).srsStage);
-
-    const prev = bestRemote.get(uid);
-    const candidate: RemoteBest = { lastReviewedAt, updatedAt, hasNext, nextReviewAt, srsStage, row: r };
-
-    // remoteRows is a BAG, not a sequence: pages of one drain, a replay of the
-    // remote cache, a retried request. A strict `updatedAt > prev.updatedAt`
-    // means "the first row seen wins the tie", so the answer depended on array
-    // order and the merge was not commutative.
-    //
-    // Counterexample, from tests/unit/multiDeviceSync.sim.test.ts:
-    //   rows = [ {uid, updatedAt: T, lastReviewedAt: T-300},
-    //            {uid, updatedAt: T, lastReviewedAt: T} ]
-    //   merge(local, rows) kept T-300, merge(local, reversed) kept T.
-    // updatedAt ties are not exotic: the server stamps updated_at from a single
-    // now() per transaction and toMs() floors it to milliseconds, the same
-    // ms-granularity collision the keyset cursor already had to fix at
-    // microsecond precision.
-    //
-    // So compare a tuple that totally orders the rows instead. stableUid is the
-    // documented last component and is included for completeness, but it is
-    // constant inside a group (it is the map key), which is why the timestamps
-    // have to carry the tiebreak.
-    if (!prev || compareRemoteBest(candidate, prev) > 0) {
-      bestRemote.set(uid, candidate);
-    }
+    if (!uid || (toMs(r.lastReviewedAtMs) ?? 0) <= 0 || (toMs(r.updatedAtMs) ?? 0) <= 0) continue;
+    const row = mergeProgressSnapshots(bestRemote.get(uid)?.row, r);
+    const lastReviewedAt = toMs(row.lastReviewedAtMs)!;
+    const serverNext = toMs(row.nextReviewAtMs);
+    bestRemote.set(uid, { row, lastReviewedAt, updatedAt: toMs(row.updatedAtMs)!,
+      hasNext: serverNext != null,
+      nextReviewAt: serverNext != null ? Math.min(serverNext, lastReviewedAt + MAX_NEXT_REVIEW_HORIZON_MS) : lastReviewedAt,
+      srsStage: optionalRemoteStage(row.srsStage) });
   }
 
   if (bestRemote.size === 0) {
@@ -1293,6 +1263,15 @@ export function mergeRemoteIntoLocalProgress(
 
     const remoteLast = remote.lastReviewedAt;
     const remoteNext = remote.nextReviewAt > 0 ? remote.nextReviewAt : remote.lastReviewedAt;
+    const order = compareReviewOrder(remoteLast, remote.row.lastReviewEventId, localLast, p.lastReviewEventId);
+    const facts = progressFacts(p, remote.row);
+    const factsChanged = Object.keys(facts).length > 0;
+    const factResult = factsChanged ? { ...p, ...facts } : p;
+    if (factsChanged) { changed = true; appliedCount += 1; }
+    // The winner survives separate calls and restarts. A duplicate may advance
+    // independent counters, but must not replace the same event's scheduler.
+    if (order < 0 || (order === 0 && normalizeReviewEventId(p.lastReviewEventId))) return factResult;
+    const identityPatch = { lastReviewEventId: normalizeReviewEventId(remote.row.lastReviewEventId) };
 
     // The client mirror of the server's atomic group: wherever we accept the
     // remote due date we accept the remote stage in the same assignment, so a
@@ -1305,7 +1284,7 @@ export function mergeRemoteIntoLocalProgress(
     // Old rows remain null after migration. Do not erase the only surviving
     // model on an existing device when that row describes the same review.
     // A different winning review/schedule must never inherit that old model.
-    const modelPatch = remote.row.schedulerState != null || remoteLast > localLast
+    const modelPatch = remote.row.schedulerState != null || order > 0
       || (remoteLast === localLast && coreChanged)
       ? schedulerStatePatch(remote.row.schedulerState, remoteLast) : {};
     const modelChanged = schedulerStateKeys.some(key => key in modelPatch && p[key] !== modelPatch[key]);
@@ -1329,14 +1308,15 @@ export function mergeRemoteIntoLocalProgress(
     const keepLocalSchedule = demotedAt > remoteLast;
 
     // Case A: 远端更“新”
-    if (remoteLast > localLast) {
+    if (order > 0) {
       changed = true;
-      appliedCount += 1;
+      if (!factsChanged) appliedCount += 1;
       if (keepLocalSchedule) {
-        return { ...p, lastReviewedAt: remoteLast } as any;
+        return { ...factResult, lastReviewedAt: remoteLast, ...identityPatch } as any;
       }
       return {
-        ...p,
+        ...factResult,
+        ...identityPatch,
         lastReviewedAt: remoteLast,
         nextReviewAt: remoteNext,
         ...remoteStagePatch,
@@ -1352,16 +1332,17 @@ export function mergeRemoteIntoLocalProgress(
        (remote.srsStage != null && remote.srsStage !== p.stage) || modelChanged)
     ) {
       changed = true;
-      appliedCount += 1;
+      if (!factsChanged) appliedCount += 1;
       return {
-        ...p,
+        ...factResult,
+        ...identityPatch,
         nextReviewAt: remote.hasNext ? remoteNext : localNext,
         ...remoteStagePatch,
         ...modelPatch,
       } as any;
     }
 
-    return p;
+    return factResult;
   });
 
   // 兜底：补 local 不存在的 uid
@@ -1375,6 +1356,8 @@ export function mergeRemoteIntoLocalProgress(
 
     out.push({
       stableUid: uid,
+      ...progressFacts({}, remote.row),
+      lastReviewEventId: normalizeReviewEventId(remote.row.lastReviewEventId),
       lastReviewedAt: remote.lastReviewedAt,
       nextReviewAt: Math.max(next, remote.lastReviewedAt),
       // Same rule as above: adopt the server's rung when it has one, and stay
@@ -1520,11 +1503,9 @@ async function pullProgressPageAndApply(
         const uid = (r?.stableUid ?? '').trim();
         if (!uid) continue;
 
-        const newU = toMs(r.updatedAtMs) ?? 0;
-        const oldU = toMs(cache[uid]?.updatedAtMs) ?? 0;
-
-        if (!cache[uid] || newU > oldU) {
-          cache[uid] = r;
+        const merged = mergeProgressSnapshots(cache[uid], r);
+        if (JSON.stringify(merged) !== JSON.stringify(cache[uid])) {
+          cache[uid] = merged;
           cacheChanged = true;
         }
       }

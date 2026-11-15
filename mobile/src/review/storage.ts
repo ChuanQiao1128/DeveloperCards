@@ -2,7 +2,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { DeckExport } from '../types/deckExport';
 import type { CardProgress } from './model';
-import { formatDateKey, clampStage, inferStageFromIntervalMs } from './model';
+import { formatDateKey, clampStage, inferStageFromIntervalMs, normalizeReviewEventId } from './model';
 import { notifyProgressChanged } from '../sync/progressChanges';
 
 export type DailyStats = {
@@ -200,6 +200,9 @@ function normalizeProgressEntry(raw: any): CardProgress | null {
     stableUid,
     stage,
     lastReviewedAt,
+    lastReviewEventId: lastReviewedAt ? normalizeReviewEventId(raw.lastReviewEventId) : undefined,
+    reviewCount: normalizeNonNegative(raw.reviewCount),
+    status: normalizeNonNegative(raw.status),
     nextReviewAt,
     lastSeenRevision,
     lapses,
