@@ -133,14 +133,30 @@ public static class Migrate
   internal const string LiftTimeoutsSql =
     "set local statement_timeout = 0; set local idle_in_transaction_session_timeout = 0;";
 
+  private static async Task<string> ReadRollbackOwnerRepairAsync()
+  {
+    var bytes = await File.ReadAllBytesAsync(Path.Combine(MigrationsDir(), "060_rollback_owner_permissions.sql"));
+    var hash = Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(bytes));
+    if (hash != "23ba2f9850189e705218da549574bc428d357f76a4aa5032aa0da794294a4b65")
+      throw new InvalidOperationException("ROLLBACK_OWNER_REPAIR_HASH_MISMATCH");
+    return System.Text.Encoding.UTF8.GetString(bytes);
+  }
+
   private static async Task<bool> ApplyOne(NpgsqlConnection conn, Migration m, RecallSmith.Lambda.Vpc.Authoring.AdminAuditEntry? audit)
   {
-    var sql = await File.ReadAllTextAsync(m.FullPath);
+    var sql = m.Version == 60 ? await ReadRollbackOwnerRepairAsync() : await File.ReadAllTextAsync(m.FullPath);
 
     await using var tx = await conn.BeginTransactionAsync();
     try
     {
       await ExecuteAsync(conn, tx, LiftTimeoutsSql, []);
+      // 056 revoked the legacy owner's TRIGGER privilege; repair it before unchanged 059 installs its trigger.
+      // The same owner-checked additive repair is recorded normally as 060, including already-upgraded databases.
+      if (m.Version == 59)
+      {
+        var repair = await ReadRollbackOwnerRepairAsync();
+        await ExecuteAsync(conn, tx, repair, []);
+      }
       await ExecuteAsync(conn, tx, sql, []);
       await ExecuteAsync(
         conn,
@@ -338,6 +354,7 @@ public static class Migrate
       available = migrations.Select(m => new { version = m.Version, name = m.Name, file = m.File }).ToList(),
       applied,
       pending,
+      diagnostics = await MigrationDiagnostics.ReadAsync(conn),
     });
   }
 
