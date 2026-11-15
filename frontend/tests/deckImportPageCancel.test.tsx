@@ -9,6 +9,8 @@
 // pinned in deckImportBatchRunner.test.ts; this file mocks importCardsBatch and
 // asserts what the PAGE does with a run that is pending, cancelled or failed.
 
+import { webcrypto } from 'node:crypto';
+import { signInAsSuperAdmin, signOut } from './support/consoleSession';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -102,6 +104,9 @@ async function toPreview(user: ReturnType<typeof userEvent.setup>, doc: string):
 }
 
 beforeEach(() => {
+  Object.defineProperty(navigator, 'locks', { configurable: true, value: { request: (_name: string, _options: unknown, action: () => Promise<unknown>) => action() } });
+  signOut(); signInAsSuperAdmin();
+  vi.stubGlobal("crypto", webcrypto);
   api.fetchDeckById.mockResolvedValue(ok(deck));
   api.fetchCardsByDeck.mockResolvedValue(ok([]));
   api.importCardsBatch.mockResolvedValue(batchOk({ created: 2 }));
@@ -109,6 +114,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  signOut();
   vi.restoreAllMocks();
   vi.clearAllMocks();
 });

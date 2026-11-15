@@ -205,6 +205,9 @@ public sealed class VpcFunction
       // "/api/v1/authoring/cards", so the two never shadow each other — but the
       // more specific path stays first anyway, so a future prefix match cannot
       // quietly swallow it.
+      if (p.EndsWith("/api/v1/authoring/cards/import/receipt", StringComparison.OrdinalIgnoreCase))
+        return await Vpc.Authoring.CardsImportReceipt.Handle(req, res, auth);
+
       if (p.EndsWith("/api/v1/authoring/cards/import", StringComparison.OrdinalIgnoreCase))
       {
         return await Vpc.Authoring.CardsImport.HandleCardsImport(req, res, auth);

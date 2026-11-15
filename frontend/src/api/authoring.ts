@@ -682,12 +682,13 @@ export async function importCardsBatch(params: {
   operationId: string;
   cards: ImportCardInput[];
   signal?: AbortSignal;
+  serializedBody?: string;
 }): Promise<ApiResult<ImportCardsBatchResult>> {
   try {
     const resp = await http.post<ApiResult<Partial<ImportCardsBatchResult>>>(
       '/api/v1/authoring/cards/import',
-      { deckId: params.deckId, operationId: params.operationId, cards: params.cards },
-      { timeout: IMPORT_REQUEST_TIMEOUT_MS, signal: params.signal },
+      params.serializedBody ?? { deckId: params.deckId, operationId: params.operationId, cards: params.cards },
+      { timeout: IMPORT_REQUEST_TIMEOUT_MS, signal: params.signal, headers: { 'Content-Type': 'application/json' } },
     );
     const raw = resp.data;
 
@@ -836,4 +837,19 @@ export async function reapStuckPublishJobs(): Promise<ApiResult<PublishReapResul
   } catch (err) {
     return apiResultFromError<PublishReapResult>(err);
   }
+}
+
+
+/** Normal-console, permission-checked lookup; found:false is serialized with imports. */
+export async function lookupImportReceipt(params: {
+  deckId: number; operationId: string; cards: ImportCardInput[]; serializedBody?: string; signal?: AbortSignal;
+}): Promise<ApiResult<{ found: boolean; result?: ImportCardsBatchResult }>> {
+  try {
+    const response = await http.post<ApiResult<{ found: boolean; result?: ImportCardsBatchResult }>>(
+      '/api/v1/authoring/cards/import/receipt',
+      params.serializedBody ?? { deckId: params.deckId, operationId: params.operationId, cards: params.cards },
+      { timeout: IMPORT_REQUEST_TIMEOUT_MS, signal: params.signal, headers: { 'Content-Type': 'application/json' } },
+    );
+    return response.data;
+  } catch (err) { return apiResultFromError(err); }
 }

@@ -12,8 +12,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 
-import { fetchCardsByDeck, fetchDeckById, importCardsBatch } from '../api/authoring';
-import { getSessionGeneration } from '../auth/tokenStore';
+import { fetchCardsByDeck, fetchDeckById, importCardsBatch, lookupImportReceipt } from '../api/authoring';
+import { getSessionGeneration, subscribeSessionChanges } from '../auth/tokenStore';
+import { readSessionUser } from '../auth/sessionUser';
+import { createImportJournal, readImportJournal, hasPendingImport, withImportJournalLock, type ImportJournal } from '../lib/deckImportJournal';
 import { QueryKeys, useAppQueryClient } from '../api/queryClient';
 import { RarityDistribution } from '../components/RarityDistribution';
 import {
@@ -27,7 +29,7 @@ import {
 } from '../lib/deckImport';
 import {
   describeFailure,
-  runImport,
+  resumeImport,
   type ImportAction,
   type ImportRunResult,
 } from '../lib/deckImportRunner';
@@ -150,12 +152,38 @@ export function DeckImportPage() {
   const [cancelling, setCancelling] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
   const [runResult, setRunResult] = useState<ImportRunResult | null>(null);
+  const [sessionGeneration, setSessionGeneration] = useState(getSessionGeneration);
+  const [recovery, setRecovery] = useState<ImportJournal | null>(null);
+  const [recoveryError, setRecoveryError] = useState<string | null>(null);
+  const [recoveryLoading, setRecoveryLoading] = useState(true);
+  const account = readSessionUser()?.sub;
+
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   // The controller for the batch run in flight, so the Cancel button can abort
   // it. Held in a ref rather than state because pressing Cancel must not depend
   // on a re-render having landed first.
   const abortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => subscribeSessionChanges(() => {
+    abortRef.current?.abort();
+    setSessionGeneration(getSessionGeneration());
+    setRecovery(null); setRunResult(null); setPreview(null); setText(''); setStep('input'); setRunning(false);
+  }), []);
+
+  useEffect(() => {
+    let current = true;
+    setRecoveryLoading(true); setRecovery(null); setRecoveryError(null);
+    if (!account || invalidDeckId) { setRecoveryLoading(false); return; }
+    void readImportJournal(account, deckId).then(journal => {
+      if (current) setRecovery(journal && hasPendingImport(journal) ? journal : null);
+    }).catch(error => {
+      if (current) setRecoveryError(`Recovery storage failed: ${error instanceof Error ? error.message : 'Cannot read saved import.'}`);
+    }).finally(() => { if (current) setRecoveryLoading(false); });
+    return () => { current = false; };
+  }, [account, deckId, invalidDeckId, sessionGeneration]);
+
+  useEffect(() => () => abortRef.current?.abort(), []);
 
   // A run writes real cards, and leaving the page mid-run abandons a partially
   // written deck, so warn before the tab is closed or navigated away. Keyed on
@@ -231,7 +259,7 @@ export function DeckImportPage() {
    * runner an expectedVersion that is already wrong.
    */
   const buildPreview = useCallback(async () => {
-    if (!deck) return;
+    if (!deck || recovery || recoveryError || recoveryLoading) return;
 
     setPreviewing(true);
     setPreviewError(null);
@@ -260,7 +288,7 @@ export function DeckImportPage() {
     } finally {
       setPreviewing(false);
     }
-  }, [deck, text]);
+  }, [deck, text, recovery, recoveryError, recoveryLoading]);
 
   const actions = useMemo<ImportAction[]>(() => {
     if (!preview) return [];
@@ -296,17 +324,19 @@ export function DeckImportPage() {
   }
 
   const blocked = useMemo(() => {
-    if (!preview) return true;
+    if (!preview || recoveryLoading || recovery || recoveryError) return true;
     if (preview.parsed.errors.length > 0) return true;
     if (preview.plan.conflicts.length > 0) return true;
     if (preview.slugMismatch) return true;
     return false;
-  }, [preview]);
+  }, [preview, recoveryLoading, recovery, recoveryError]);
 
-  async function execute(toRun: readonly ImportAction[]) {
-    if (!deck || toRun.length === 0) return;
+  async function execute(toRun: readonly ImportAction[], saved?: ImportJournal) {
+    if (!deck || (!saved && toRun.length === 0) || running || recoveryError || recoveryLoading) return;
+    const owner = readSessionUser()?.sub;
+    if (!owner) { setRecoveryError("Sign in again before importing."); return; }
     const session = getSessionGeneration();
-    const isCurrent = () => session === getSessionGeneration();
+    const isCurrent = () => session === getSessionGeneration() && readSessionUser()?.sub === owner;
 
     const controller = new AbortController();
     abortRef.current = controller;
@@ -317,17 +347,28 @@ export function DeckImportPage() {
     setStep('result');
 
     try {
-      const result = await runImport(
-        deck.id,
-        toRun,
-        { importCards: importCardsBatch },
-        {
-          signal: controller.signal,
-          isCurrent,
-          onProgress: (p) => setProgress({ done: p.done, total: p.total }),
-        },
-      );
-      if (isCurrent()) setRunResult(result);
+      await withImportJournalLock(owner, deck.id, async () => {
+        if (!isCurrent()) return;
+        const journal = saved ? await readImportJournal(owner, deck.id) : await createImportJournal(owner, deck.id, toRun);
+        if (!journal || (saved && saved.runId !== journal.runId)) throw new Error('Saved import changed. Reload this page before continuing.');
+        if (!isCurrent()) return;
+        setRecovery(journal);
+        const result = await resumeImport(
+          journal,
+          { importCards: importCardsBatch, lookupReceipt: lookupImportReceipt },
+          {
+            signal: controller.signal,
+            isCurrent,
+            onProgress: (p) => setProgress({ done: p.done, total: p.total }),
+          },
+        );
+        if (isCurrent()) {
+          setRunResult(result);
+          setRecovery(hasPendingImport(journal) ? journal : null);
+        }
+      });
+    } catch (error) {
+      if (isCurrent()) setRecoveryError(`Import stopped: ${error instanceof Error ? error.message : 'Recovery storage is unavailable.'} Reload this page to recover safely.`);
     } finally {
       if (isCurrent()) {
         abortRef.current = null;
@@ -410,6 +451,16 @@ export function DeckImportPage() {
       </div>
 
       <div className="max-w-4xl mx-auto px-4 py-6 space-y-4">
+        {recoveryError ? <div role="alert" className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded text-sm">{recoveryError}</div> : null}
+        {recovery ? (
+          <section aria-label="Saved import recovery" className="bg-amber-50 border border-amber-200 text-amber-900 px-4 py-3 rounded space-y-3">
+            <p className="text-sm" role="status">A saved import needs recovery. Committed batches will be kept. Unconfirmed batches are checked before any resend.</p>
+            <button type="button" disabled={running || recoveryLoading || !!recoveryError}
+              className="px-3 py-2 rounded-md text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700 disabled:bg-slate-300 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              onClick={() => void execute([], recovery)}>{running ? 'Checking saved import...' : 'Recover saved import'}</button>
+          </section>
+        ) : null}
+
         {step === 'input' ? (
           <section className="bg-white rounded-lg shadow-sm border border-slate-200">
             <div className="px-4 py-3 border-b border-slate-100">
@@ -464,7 +515,7 @@ export function DeckImportPage() {
               <div className="flex items-center gap-3">
                 <button
                   type="button"
-                  disabled={previewing || !text.trim()}
+                  disabled={previewing || !text.trim() || recoveryLoading || !!recovery || !!recoveryError}
                   className="inline-flex items-center px-3 py-1.5 rounded-md text-sm font-medium
                              bg-indigo-600 text-white hover:bg-indigo-700 active:bg-indigo-800
                              disabled:bg-slate-300 disabled:cursor-not-allowed

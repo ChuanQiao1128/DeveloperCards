@@ -20,6 +20,8 @@
 // the plan is creates-then-updates, so only an assertion on ROW ORDER can see
 // toRows' sort.
 
+import { webcrypto } from 'node:crypto';
+import { signInAsSuperAdmin, signOut } from './support/consoleSession';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -237,6 +239,9 @@ async function toPreview(
 }
 
 beforeEach(() => {
+  Object.defineProperty(navigator, 'locks', { configurable: true, value: { request: (_name: string, _options: unknown, action: () => Promise<unknown>) => action() } });
+  signOut(); signInAsSuperAdmin();
+  vi.stubGlobal("crypto", webcrypto);
   api.fetchDeckById.mockResolvedValue(ok(deck));
   api.fetchCardsByDeck.mockResolvedValue(ok([A_STALE]));
   api.importCardsBatch.mockResolvedValue(ok({ created: 1, updated: 1, unchanged: 0 }));
@@ -244,6 +249,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  signOut();
   vi.restoreAllMocks();
   vi.clearAllMocks();
 });
