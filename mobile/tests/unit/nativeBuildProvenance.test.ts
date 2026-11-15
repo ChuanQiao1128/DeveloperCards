@@ -13,6 +13,9 @@ const producer = require(path.join(mobile, 'scripts/release/nativeBuildProvenanc
 const guard = require(path.join(mobile, 'scripts/release/queueOwnershipRollout.cjs'));
 const observer = require(path.join(mobile, 'scripts/release/observeNativeBundle.cjs'));
 const { sha } = guard;
+const originalColor = fs.readFileSync(path.join(mobile, 'tests/fixtures/revenuecat-5.50.1/PaywallColor.swift'));
+const fixedColor = fs.readFileSync(path.join(mobile, 'native-build-inputs/revenuecat-swift-compatibility/PaywallColor.swift'));
+const colorTarget = 'ios/Pods/RevenueCat/Sources/Paywalls/PaywallColor.swift';
 const dirs: string[] = [];
 const temp = () => { const p = fs.mkdtempSync(path.join(os.tmpdir(), 'native-provenance-STUB-')); dirs.push(p); return p; };
 afterEach(() => { vi.unstubAllEnvs(); dirs.splice(0).forEach(dir => fs.rmSync(dir, { force: true, recursive: true })); });
@@ -61,6 +64,8 @@ function fakeBuild(app: any, change?: (c: any) => void) {
     fs.mkdirSync(path.join(build, 'STUB.app'), { recursive: true });
     const pods = path.join(root, 'ios/Pods');
     write(path.join(pods, 'hermes-engine/destroot/bin/hermesc'), 'STUB Hermes compiler');
+    write(path.join(root, colorTarget), originalColor);
+    const revenueCatCompatibility = producer.applyRevenueCatCompatibility(root);
     // Run the real observer, injecting only its Metro/Hermes external process.
     observer.observe(root, { CONFIGURATION: 'Release', PLATFORM_NAME: 'iphoneos', CONFIGURATION_BUILD_DIR: build,
       UNLOCALIZED_RESOURCES_FOLDER_PATH: 'STUB.app', PODS_ROOT: pods }, (_command: string, _args: string[], opts: any) => {
@@ -76,7 +81,7 @@ function fakeBuild(app: any, change?: (c: any) => void) {
     return { publicSettingsSha256: sha(fs.readFileSync(path.join(c.runDir, 'public-build-settings.json'))), node: 'STUB node', npm: 'STUB npm', xcode: 'STUB Xcode', cocoapods: 'STUB pod', reactNative: '0.81.5',
       nativeLockSha256: sha(fs.readFileSync(path.join(root, 'native-build-inputs/Podfile.lock'))),
       nativeInputSha256: sha(fs.readFileSync(path.join(c.runDir, 'native-input.json'))),
-      dependencyInputSha256: sha(fs.readFileSync(path.join(c.runDir, 'dependency-input.json'))) };
+      dependencyInputSha256: sha(fs.readFileSync(path.join(c.runDir, 'dependency-input.json'))), revenueCatCompatibility };
   };
 }
 function produce(f: ReturnType<typeof fixture>, change?: (c: any) => void) {
@@ -84,6 +89,38 @@ function produce(f: ReturnType<typeof fixture>, change?: (c: any) => void) {
 }
 const completed = (f: ReturnType<typeof fixture>) => path.join(f.output, 'completed.json');
 function check(f: ReturnType<typeof fixture>) { return guard.checkProof(f.root, '2.1.1', completed(f), inspect); }
+
+describe('exact official RevenueCat Swift backport', () => {
+  it('produces the complete official file from the frozen locked original, then refuses cached fixed input', () => {
+    const f = fixture();
+    expect(sha(originalColor)).toBe('7d5eb572233ad587841d61be7294b32583d35724be6aa39006982d298774c511');
+    expect(sha(fixedColor)).toBe('c24c2c37e341bc2bd33dcdfeb9b0b6f394e1f5eb0609774c3aa50f41b3610344');
+    write(path.join(f.root, colorTarget), originalColor);
+    fs.chmodSync(path.join(f.root, colorTarget), 0o444);
+    const evidence = producer.applyRevenueCatCompatibility(f.root);
+    expect(fs.readFileSync(path.join(f.root, colorTarget))).toEqual(fixedColor);
+    expect(fs.statSync(path.join(f.root, colorTarget)).mode & 0o777).toBe(0o444);
+    expect(evidence).toMatchObject({ beforeSha256: sha(originalColor), afterSha256: sha(fixedColor) });
+    expect(() => producer.applyRevenueCatCompatibility(f.root)).toThrow('original source mismatch');
+  });
+  it.each(['missing', 'unexpected', 'asset', 'symlink'])('refuses %s source/asset before overwriting anything', fault => {
+    const f = fixture(); const target = path.join(f.root, colorTarget);
+    if (fault !== 'missing') write(target, fault === 'unexpected' ? Buffer.concat([originalColor, Buffer.from(' ')]) : originalColor);
+    if (fault === 'asset') fs.appendFileSync(path.join(f.root, 'native-build-inputs/revenuecat-swift-compatibility/PaywallColor.swift'), ' ');
+    if (fault === 'symlink') { fs.renameSync(target, `${target}.real`); fs.symlinkSync(`${target}.real`, target); }
+    const before = fs.existsSync(target) ? fs.readFileSync(target) : null;
+    expect(() => producer.applyRevenueCatCompatibility(f.root)).toThrow(fault === 'missing' ? 'ENOENT' : fault === 'unexpected' ? 'original source mismatch' : fault === 'asset' ? 'asset mismatch' : 'symlink refused');
+    expect(fs.existsSync(target) ? fs.readFileSync(target) : null).toEqual(before);
+  });
+  it('retains exactly the unchanged official private initializer and all other original bytes', () => {
+    const block = '    /// "Designated" initializer\n    private init(stringRepresentation: String, underlyingColor: (any Sendable)?) {\n        self.stringRepresentation = stringRepresentation\n        self._underlyingColor = underlyingColor\n    }\n';
+    const before = originalColor.toString(); const after = fixedColor.toString();
+    expect(before.split(block)).toHaveLength(2); expect(after.split(block)).toHaveLength(2);
+    expect(before.replace(`${block}\n`, '')).toBe(after.replace(block, ''));
+    expect(before.indexOf(block)).toBeGreaterThan(before.indexOf('private extension PaywallColor'));
+    expect(after.indexOf(block)).toBeLessThan(after.indexOf('// MARK: - Public constructors'));
+  });
+});
 
 describe('producer-owned local provenance orchestration (fake build/signature tools)', () => {
   it('rejects DRY_RUN at the production CLI without creating a run or invoking a build', () => {
@@ -147,19 +184,21 @@ describe('producer-owned local provenance orchestration (fake build/signature to
     expect(fs.existsSync(completed(f))).toBe(false);
     expect(() => produce(f)).toThrow();
   });
-  it('executes the actual fixed local npm/prebuild/pod/Xcode producer with only external tools stubbed', () => {
+  it.each(['success', 'pod-failure', 'native-lock-change', 'unexpected-source'])('executes the fixed local producer with external tools stubbed: %s', fault => {
     const f = fixture(); const calls: string[][] = [];
     const callerHome = path.join(f.dir, 'untrusted-caller-home');
     vi.stubEnv('HOME', callerHome);
     let prebuildEnvironment: Record<string, string> | undefined;
     const publicEnvironment = Object.fromEntries(['EXPO_PUBLIC_API_BASE', 'EXPO_PUBLIC_AWS_REGION', 'EXPO_PUBLIC_COGNITO_USER_POOL_ID',
       'EXPO_PUBLIC_COGNITO_USER_POOL_CLIENT_ID', 'EXPO_PUBLIC_RC_IOS_API_KEY', 'EXPO_PUBLIC_SENTRY_DSN', 'SENTRY_AUTH_TOKEN'].map(k => [k, `STUB_${k}`]));
-    producer.produce(f.root, f.commit, f.output, { inspect, build: (c: any) => {
+    const operation = () => producer.produce(f.root, f.commit, f.output, { inspect, build: (c: any) => {
       const root = path.join(c.buildTree, 'mobile');
       const tool = (command: string, args: string[], opts: any) => {
         calls.push([command, ...args]);
         expect(opts.cwd).toBe(root); expect(opts.env.EXPO_NO_DOTENV).toBe('1');
-        const signingXcode = command === '/usr/bin/xcodebuild' && (args.includes('archive') || args[0] === '-exportArchive');
+        const signingXcode = command === '/usr/bin/xcodebuild' && (args.includes('archive') || args.includes('-exportArchive'));
+        expect(opts.maxBuffer).toBe(8 * 1024 * 1024);
+        if (signingXcode) expect(args).toContain('-quiet');
         expect(opts.env.HOME).toBe(signingXcode ? os.userInfo().homedir : path.join(c.runDir, 'home'));
         expect(opts.env.HOME).not.toBe(callerHome);
         expect(opts.env.TMPDIR).toBe(path.join(c.runDir, 'tmp'));
@@ -182,7 +221,13 @@ describe('producer-owned local provenance orchestration (fake build/signature to
           expect(args).toEqual(['install', '--deployment', '--project-directory=ios']);
           expect(opts.env.CP_HOME_DIR).toBe(path.join(c.runDir, 'pod-cache'));
           write(path.join(root, 'ios/Pods/hermes-engine/destroot/bin/hermesc'), 'STUB Hermes compiler');
+          write(path.join(root, colorTarget), fault === 'unexpected-source' ? Buffer.concat([originalColor, Buffer.from(' ')]) : originalColor);
+          if (fault === 'pod-failure') throw new Error('STUB pod failure');
+          if (fault === 'native-lock-change') fs.appendFileSync(path.join(root, 'ios/Podfile.lock'), 'changed');
         } else if (args.includes('archive')) {
+          expect(fs.readFileSync(path.join(root, colorTarget))).toEqual(fixedColor);
+          const nativeInput = JSON.parse(fs.readFileSync(path.join(c.runDir, 'native-input.json'), 'utf8'));
+          expect(nativeInput[colorTarget.replace('ios/', '')].sha256).toBe(sha(fixedColor));
           expect(args).toContain('Release'); expect(args).toContain(`DEVELOPMENT_TEAM=${c.team}`);
           expect(args[args.indexOf('-derivedDataPath') + 1]).toBe(path.join(c.runDir, 'derived-data'));
           expect(args[args.indexOf('-archivePath') + 1]).toBe(path.join(c.runDir, 'native.xcarchive'));
@@ -192,7 +237,7 @@ describe('producer-owned local provenance orchestration (fake build/signature to
             UNLOCALIZED_RESOURCES_FOLDER_PATH: 'STUB.app', PODS_ROOT: path.join(root, 'ios/Pods') }, () => {
             write(path.join(staged, 'STUB.app/main.jsbundle'), hbc);
           });
-        } else if (args[0] === '-exportArchive') {
+        } else if (args.includes('-exportArchive')) {
           expect(args[args.indexOf('-archivePath') + 1]).toBe(path.join(c.runDir, 'native.xcarchive'));
           expect(args[args.indexOf('-exportOptionsPlist') + 1]).toBe(path.join(c.runDir, 'ExportOptions.plist'));
           expect(args[args.indexOf('-exportPath') + 1]).toBe(path.join(c.runDir, 'export'));
@@ -205,6 +250,15 @@ describe('producer-owned local provenance orchestration (fake build/signature to
         LANG: 'C', LC_ALL: 'C', LC_CTYPE: 'C', RUBYOPT: '-EUS-ASCII', NODE_OPTIONS: '--require malicious',
         BUNDLE_CONFIG: '/untrusted/metro.config.js', EAS_BUILD_PROFILE: 'evil' }, cache: null });
     } });
+    if (fault !== 'success') {
+      expect(operation).toThrow(fault === 'pod-failure' ? 'tool failed: pod' : fault === 'native-lock-change' ? 'native dependency lock changed' : 'original source mismatch');
+      expect(fs.existsSync(completed(f))).toBe(false);
+      expect(fs.existsSync(path.join(f.output, 'native-input.json'))).toBe(false);
+      expect(calls.some(call => call.includes('archive'))).toBe(false);
+      expect(fs.readFileSync(path.join(f.output, 'build/mobile', colorTarget))).toEqual(fault === 'unexpected-source' ? Buffer.concat([originalColor, Buffer.from(' ')]) : originalColor);
+      return;
+    }
+    operation();
     expect(check(f).embeddedBundleSha256).toBe(sha(hbc));
     expect(calls.some(call => call.includes('-exportArchive'))).toBe(true);
     expect(calls.some(call => call[0] === 'eas')).toBe(false);
@@ -212,6 +266,56 @@ describe('producer-owned local provenance orchestration (fake build/signature to
     const receipt = fs.readFileSync(completed(f), 'utf8');
     expect(receipt).not.toContain(publicEnvironment.SENTRY_AUTH_TOKEN);
     expect(receipt).not.toContain(sha(publicEnvironment.SENTRY_AUTH_TOKEN));
+  });
+  it.each(['safe-metadata', 'untrusted-metadata'])('withholds all tool output and error messages: %s', fault => {
+    const f = fixture(); const secret = 'STUB_PRIVATE_AUTHORIZATION_SENTINEL';
+    const error = Object.assign(new Error(secret), { stdout: Buffer.from(secret), stderr: secret,
+      code: fault === 'safe-metadata' ? 'ENOBUFS' : secret,
+      status: fault === 'safe-metadata' ? 65 : secret,
+      signal: fault === 'safe-metadata' ? 'SIGTERM' : secret,
+      env: { SENTRY_AUTH_TOKEN: secret } });
+    const env = Object.fromEntries(['EXPO_PUBLIC_API_BASE', 'EXPO_PUBLIC_AWS_REGION', 'EXPO_PUBLIC_COGNITO_USER_POOL_ID',
+      'EXPO_PUBLIC_COGNITO_USER_POOL_CLIENT_ID', 'EXPO_PUBLIC_RC_IOS_API_KEY', 'EXPO_PUBLIC_SENTRY_DSN', 'SENTRY_AUTH_TOKEN'].map(k => [k, secret]));
+    const c = { runDir: path.join(f.dir, 'failed-run'), buildTree: path.dirname(f.root), team: 'STUBTEAM01' };
+    fs.mkdirSync(c.runDir);
+    try {
+      producer.localBuild(c, () => { throw error; }, { platform: 'darwin', cache: null, environment: env });
+      throw new Error('expected tool failure');
+    } catch (actual: any) {
+      expect(actual.message).toBe(`local production tool failed: npm; code=${fault === 'safe-metadata' ? 'ENOBUFS' : 'unknown'}; status=${fault === 'safe-metadata' ? 65 : 'unknown'}; signal=${fault === 'safe-metadata' ? 'SIGTERM' : 'none'}; tool output withheld to protect authorization`);
+      expect(String(actual.stack)).not.toContain(secret);
+      expect(actual.cause).toBeUndefined();
+      expect(actual.stdout).toBeUndefined(); expect(actual.stderr).toBeUndefined();
+    }
+  });
+  it.each(['omitted', 'forged', 'unpatched'])('producer rejects %s compatibility evidence despite matching native manifest', fault => {
+    const f = fixture();
+    expect(() => producer.produce(f.root, f.commit, f.output, { inspect, build: (c: any) => {
+      const tools = fakeBuild(f.app)(c);
+      if (fault === 'omitted') delete tools.revenueCatCompatibility;
+      if (fault === 'forged') tools.revenueCatCompatibility.beforeSha256 = '0'.repeat(64);
+      if (fault === 'unpatched') {
+        write(path.join(c.buildTree, 'mobile', colorTarget), originalColor);
+        write(path.join(c.runDir, 'native-input.json'), producer.encode(producer.manifest(path.join(c.buildTree, 'mobile/ios'), false, c.buildTree)));
+        tools.nativeInputSha256 = sha(fs.readFileSync(path.join(c.runDir, 'native-input.json')));
+      }
+      return tools;
+    } })).toThrow(fault === 'unpatched' ? 'native source mismatch' : 'compatibility evidence mismatch');
+    expect(fs.existsSync(completed(f))).toBe(false);
+  });
+  it.each(['omitted', 'forged', 'unpatched'])('checker rejects %s compatibility evidence even when native manifest is rehashed', fault => {
+    const f = fixture(); produce(f);
+    const proof = JSON.parse(fs.readFileSync(completed(f), 'utf8'));
+    if (fault === 'omitted') delete proof.tools.revenueCatCompatibility;
+    if (fault === 'forged') proof.tools.revenueCatCompatibility.officialCommit = '0'.repeat(40);
+    if (fault === 'unpatched') {
+      write(path.join(f.output, 'build/mobile', colorTarget), originalColor);
+      write(path.join(f.output, 'native-input.json'), producer.encode(producer.manifest(path.join(f.output, 'build/mobile/ios'), false, path.join(f.output, 'build'))));
+      proof.tools.nativeInputSha256 = sha(fs.readFileSync(path.join(f.output, 'native-input.json')));
+    }
+    write(completed(f), JSON.stringify(proof)); const before = fs.readFileSync(completed(f));
+    expect(() => check(f)).toThrow(fault === 'unpatched' ? 'native source mismatch' : 'compatibility evidence mismatch');
+    expect(fs.readFileSync(completed(f))).toEqual(before);
   });
   it('refuses unavailable locked native inputs before any external build command', () => {
     const f = fixture();
