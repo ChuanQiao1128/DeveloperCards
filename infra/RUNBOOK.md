@@ -1164,8 +1164,8 @@ unset TEMP
 ```
 
 - The temporary password must meet the pool policy (8+ characters with upper case, lower case, a number and a symbol)
-  and expires after 7 days. Hand it over out of band. At first sign-in the editor sets a new password and an
-  authenticator app (the pool requires TOTP MFA).
+  and expires after 7 days. Hand it over out of band. At first sign-in the editor sets a new password. The owner's
+  requested MFA OFF policy takes effect only after the Console recovery run completes; confirm its result first.
 - To have Cognito generate the password and email the invitation instead, leave out `--temporary-password` and
   `--message-action SUPPRESS` (the pool sends with the Cognito default sender, 50 emails a day).
 - `super_admin` can drop the database from the console. edge-public refused to create one; add a `super_admin` only
@@ -1368,10 +1368,19 @@ recovery and private-log cleanup are unchanged. Dependencies pulled into the tar
 and allow-list gate; targeting alone is not a permission boundary.
 
 `tf-pipeline.py console-mfa-check` additionally requires the same existing pool identity, update or no-op actions,
-known MFA OFF / TOTP disabled values, and no imports, moves or replacements. An already OFF pool passes only with
+known MFA OFF / empty TOTP configuration values, and no imports, moves or replacements. An already OFF pool passes only with
 an empty plan after this value check; it performs no apply. The second plan repeats the value check and must be
 empty. Logs and summaries label this **Console user pool targeted scope only**: success does not resolve or verify
 the unrelated operator drift. Use default dispatch for a later full drift check; handle operator changes separately.
+
+Run [43709478919](https://github.com/ChuanQiao1128/DeveloperCards/actions/runs/43709478919) passed its plan gates but
+failed during `SetUserPoolMfaConfig` with HTTP 400. The provider's
+[v6.66.0 contract](https://github.com/hashicorp/terraform-provider-aws/blob/v6.66.0/website/docs/r/cognito_user_pool.html.markdown#L236-L240)
+requires removing the **entire** `software_token_mfa_configuration` block when disabling TOTP without SMS; an
+explicit `enabled=false` block is not equivalent. The correction keeps MFA OFF, removes that block, and requires
+an empty list in both plan value checks. The public diagnostic did not retain the precise AWS exception/message;
+do not describe it as a confirmed specific exception. Use a new saved plan from the corrected main, then verify
+provider readback and the empty second targeted plan. Do not retry the immutable failed run's old configuration.
 
 ### When a run stops
 

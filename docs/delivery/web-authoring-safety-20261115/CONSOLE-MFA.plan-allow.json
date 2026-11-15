@@ -6,5 +6,5 @@
       "keys": ["mfa_configuration", "software_token_mfa_configuration"]
     }
   },
-  "_note": "Owner requested Console MFA removal on 2026-11-15. Only the existing Console pool's MFA/TOTP settings may change. Applying this allow-list does not authorize pool replacement, password/login/client changes, mobile identity changes or operator IAM MFA changes. The existing infra-prod deployment approval remains required."
+  "_note": "Owner requested Console MFA removal on 2026-11-15. Provider 6.66.0 requires MFA OFF and removal of the entire software token block (not enabled=false) when SMS is absent. Only the existing Console pool's MFA/TOTP settings may change. Applying this allow-list does not authorize pool replacement, password/login/client changes, mobile identity changes or operator IAM MFA changes. The existing infra-prod deployment approval remains required."
 }
