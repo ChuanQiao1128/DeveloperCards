@@ -8,9 +8,16 @@ const guard = require('./queueOwnershipRollout.cjs');
 const { sha } = guard;
 const VERSION = 2;
 const CONTEXT = '.ownership-build.json';
+const REVENUECAT_COMPATIBILITY = Object.freeze({
+  target: 'ios/Pods/RevenueCat/Sources/Paywalls/PaywallColor.swift',
+  asset: 'native-build-inputs/revenuecat-swift-compatibility/PaywallColor.swift',
+  officialCommit: '870899891ac9a05118ae6ee16d4ae189b2c1eac2',
+  beforeSha256: '7d5eb572233ad587841d61be7294b32583d35724be6aa39006982d298774c511',
+  afterSha256: 'c24c2c37e341bc2bd33dcdfeb9b0b6f394e1f5eb0609774c3aa50f41b3610344',
+});
 const PRODUCER_FILES = ['app.config.js', 'plugins/withBuildProvenance.js',
   'scripts/release/nativeBuildProvenance.cjs', 'scripts/release/queueOwnershipRollout.cjs',
-  'scripts/release/observeNativeBundle.cjs'];
+  'scripts/release/observeNativeBundle.cjs', REVENUECAT_COMPATIBILITY.asset];
 const fail = (ok, message) => { if (!ok) throw new Error(message); };
 const json = file => JSON.parse(fs.readFileSync(file, 'utf8'));
 const encode = value => `${JSON.stringify(value, (_key, v) => v && typeof v === 'object' && !Array.isArray(v) ? Object.fromEntries(Object.keys(v).sort().map(k => [k, v[k]])) : v, 2)}\n`;
@@ -47,6 +54,33 @@ function manifest(root, generated = false, allowedLinkRoot = null) {
 }
 function producerHashes(root) {
   return Object.fromEntries(PRODUCER_FILES.map(name => [name, sha(regular(path.join(root, name)))]));
+}
+function revenueCatAsset(mobile) {
+  const bytes = regular(path.join(mobile, REVENUECAT_COMPATIBILITY.asset));
+  fail(sha(bytes) === REVENUECAT_COMPATIBILITY.afterSha256, 'RevenueCat compatibility asset mismatch');
+  return bytes;
+}
+function applyRevenueCatCompatibility(mobile) {
+  const fixed = revenueCatAsset(mobile);
+  const target = path.join(mobile, REVENUECAT_COMPATIBILITY.target);
+  // A previously patched cache is deliberately refused: each fresh locked pod
+  // install must supply the exact reviewed 5.50.1 original before this one edit.
+  fail(fs.realpathSync(target) === path.join(fs.realpathSync(mobile), REVENUECAT_COMPATIBILITY.target),
+    'RevenueCat compatibility target symlink refused');
+  fail(sha(regular(target)) === REVENUECAT_COMPATIBILITY.beforeSha256, 'RevenueCat compatibility original source mismatch');
+  // CocoaPods installs this file read-only. Replace our run-local copy while
+  // preserving its mode, without chmod/editing a shared pod cache or old run.
+  const pending = `${target}.ownership-compatibility`;
+  exclusive(pending, fixed); fs.chmodSync(pending, fs.statSync(target).mode & 0o777);
+  fs.renameSync(pending, target);
+  fail(regular(target).equals(fixed), 'RevenueCat compatibility output mismatch');
+  return { ...REVENUECAT_COMPATIBILITY };
+}
+function verifyRevenueCatCompatibility(mobile, evidence) {
+  revenueCatAsset(mobile);
+  fail(encode(evidence) === encode(REVENUECAT_COMPATIBILITY), 'RevenueCat compatibility evidence mismatch');
+  fail(sha(regular(path.join(mobile, REVENUECAT_COMPATIBILITY.target))) === REVENUECAT_COMPATIBILITY.afterSha256,
+    'RevenueCat compatibility native source mismatch');
 }
 const EXTRACT_SOURCE = `import pathlib,tarfile,sys
 root=pathlib.Path(sys.argv[2])
@@ -100,7 +134,12 @@ function buildEnvironment(runDir, team, inherited = process.env) {
 function localBuild(c, tooling, internal = {}) {
   const run = (command, args, options) => {
     try { return tooling(command, args, options); }
-    catch { throw new Error(`local production tool failed: ${path.basename(command)}; tool output withheld to protect authorization`); }
+    catch (error) {
+      const code = typeof error?.code === 'string' && (Object.hasOwn(os.constants.errno, error.code) || error.code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER') ? error.code : 'unknown';
+      const status = Number.isInteger(error?.status) && error.status >= -1 && error.status <= 255 ? error.status : 'unknown';
+      const signal = typeof error?.signal === 'string' && Object.hasOwn(os.constants.signals, error.signal) ? error.signal : 'none';
+      throw new Error(`local production tool failed: ${path.basename(command)}; code=${code}; status=${status}; signal=${signal}; tool output withheld to protect authorization`);
+    }
   };
   const mobile = path.join(c.buildTree, 'mobile');
   const nativeLock = path.join(mobile, 'native-build-inputs/Podfile.lock');
@@ -149,6 +188,7 @@ function localBuild(c, tooling, internal = {}) {
   const nativeLockSha256 = sha(regular(nativeLock));
   run('pod', ['install', '--deployment', '--project-directory=ios'], { ...opts, env: { ...env, CP_HOME_DIR: path.join(c.runDir, 'pod-cache') } });
   fail(sha(regular(path.join(mobile, 'ios/Podfile.lock'))) === nativeLockSha256, 'native dependency lock changed');
+  const revenueCatCompatibility = applyRevenueCatCompatibility(mobile);
   const workspaces = fs.readdirSync(path.join(mobile, 'ios')).filter(n => n.endsWith('.xcworkspace'));
   fail(workspaces.length === 1, 'expected one generated Xcode workspace');
   // The generated native project is a build input. Archive it before Xcode;
@@ -160,16 +200,16 @@ function localBuild(c, tooling, internal = {}) {
   // Apple signing discovery needs the OS user's HOME; Xcode scripts inherit it too.
   // Keep the sanitized environment and explicit run-local caches/output paths.
   const xcodeOpts = { ...opts, env: { ...env, HOME: os.userInfo().homedir } };
-  run('/usr/bin/xcodebuild', ['-workspace', `ios/${workspaces[0]}`, '-scheme', 'DeveloperCards', '-configuration', 'Release',
+  run('/usr/bin/xcodebuild', ['-quiet', '-workspace', `ios/${workspaces[0]}`, '-scheme', 'DeveloperCards', '-configuration', 'Release',
     '-sdk', 'iphoneos', '-destination', 'generic/platform=iOS', '-derivedDataPath', path.join(c.runDir, 'derived-data'),
     '-archivePath', path.join(c.runDir, 'native.xcarchive'), `DEVELOPMENT_TEAM=${c.team}`, 'archive'], xcodeOpts);
   fail(encode(manifest(path.join(mobile, 'ios'), false, c.buildTree)) === nativeBefore, 'native source mutated during Xcode build');
-  run('/usr/bin/xcodebuild', ['-exportArchive', '-archivePath', path.join(c.runDir, 'native.xcarchive'),
+  run('/usr/bin/xcodebuild', ['-quiet', '-exportArchive', '-archivePath', path.join(c.runDir, 'native.xcarchive'),
     '-exportOptionsPlist', exportOptions, '-exportPath', path.join(c.runDir, 'export')], xcodeOpts);
   const ipas = fs.readdirSync(path.join(c.runDir, 'export')).filter(n => n.endsWith('.ipa'));
   fail(ipas.length === 1, 'expected one newly exported IPA');
   exclusive(c.output, regular(path.join(c.runDir, 'export', ipas[0])));
-  return { ...versions, nativeLockSha256, nativeInputSha256: sha(nativeBefore) };
+  return { ...versions, nativeLockSha256, nativeInputSha256: sha(nativeBefore), revenueCatCompatibility };
 }
 function stageEvidence(runDir, expected) {
   const stageBytes = regular(path.join(runDir, 'bundle-stage.json'), 1024 * 1024);
@@ -258,6 +298,8 @@ function produce(root, commit, outputDir, deps = {}) {
     regular(path.join(runDir, 'dependency-input.json')).equals(Buffer.from(encode(manifest(path.join(buildTree, 'mobile/node_modules'), false, buildTree)))), 'dependency input changed during build');
   fail(tools.nativeInputSha256 === sha(regular(path.join(runDir, 'native-input.json'))) &&
     regular(path.join(runDir, 'native-input.json')).equals(Buffer.from(encode(manifest(path.join(buildTree, 'mobile/ios'), false, buildTree)))), 'native input changed during build');
+  verifyRevenueCatCompatibility(path.join(buildTree, 'mobile'), tools.revenueCatCompatibility);
+  revenueCatAsset(baselineMobile);
   fail(tools.publicSettingsSha256 === sha(regular(path.join(runDir, 'public-build-settings.json'))), 'public build settings changed');
   const completed = { ...pre, state: 'completed', preBuildSha256: sha(preBytes), ...actual,
     stageSha256: evidence.stageSha256, tools, ipa: 'baseline.ipa' };
@@ -298,6 +340,8 @@ function checkCompleted(root, proofFile, app, deps = {}) {
   fail(proof.tools.dependencyInputSha256 === sha(dependencyInput) && dependencyInput.equals(Buffer.from(encode(manifest(path.join(runDir, 'build/mobile/node_modules'), false, path.join(runDir, 'build'))))), 'dependency input evidence mismatch');
   const nativeInput = regular(path.join(runDir, 'native-input.json'));
   fail(nativeInput.equals(Buffer.from(encode(manifest(path.join(runDir, 'build/mobile/ios'), false, path.join(runDir, 'build'))))), 'native input tree mismatch');
+  verifyRevenueCatCompatibility(path.join(runDir, 'build/mobile'), proof.tools.revenueCatCompatibility);
+  revenueCatAsset(path.join(source, 'mobile'));
   fail(proof.tools.publicSettingsSha256 === sha(regular(path.join(runDir, 'public-build-settings.json'))), 'public build settings evidence mismatch');
   const knownTeam = process.env.OWNERSHIP_APPLE_TEAM_ID ?? app.ios.appleTeamId;
   fail(/^[A-Z0-9]{10}$/.test(knownTeam ?? '') && proof.team === knownTeam, 'baseline signed by unknown Apple team');
@@ -308,4 +352,4 @@ function checkCompleted(root, proofFile, app, deps = {}) {
   fail(encode(actual.signedProvenance) === encode(signedContext(c)), 'signed provenance mismatch');
   return actual;
 }
-module.exports = { produce, checkCompleted, validateContext, signedContext, manifest, encode, regular, exclusive, stageEvidence, localBuild, buildEnvironment, PRODUCER_FILES };
+module.exports = { produce, checkCompleted, validateContext, signedContext, manifest, encode, regular, exclusive, stageEvidence, localBuild, buildEnvironment, applyRevenueCatCompatibility, PRODUCER_FILES };

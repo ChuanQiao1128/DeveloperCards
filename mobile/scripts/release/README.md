@@ -85,6 +85,19 @@ uses `-allowProvisioningUpdates`. It requires the existing public production set
 upload authorization, preserves the configured Sentry org/project checks, and never records the
 upload token or a hash of it. EAS remote environment configuration cannot replace these inputs.
 
+After locked pod installation, the producer applies the exact official RevenueCat
+[Swift initializer backport](../../native-build-inputs/revenuecat-swift-compatibility/README.md)
+to its fresh native tree, keeping all dependency versions unchanged. Exact original
+and replacement hashes are mandatory; already-patched cache input is refused.
+The native manifest captures the fixed file, and completion/read-only verification
+check both actual fixed source and the source-bound compatibility record.
+Archive/export use Xcode's documented `-quiet` option to limit output volume while
+retaining the existing 8 MiB capture bound. This is output control; the confirmed
+Swift initializer collision is the reason for the RevenueCat backport. On tool
+failure, the producer reports only the tool name, known OS/error code, bounded
+numeric exit status and known signal; stdout, stderr, original error text and
+environment remain withheld.
+
 The dynamic Expo config preserves the resolved normal config when no producer context exists. During
 production it merges reserved signed native provenance, the observer plugin and the explicit
 `expo-channel-name: production` update request header, preserving other update settings.
