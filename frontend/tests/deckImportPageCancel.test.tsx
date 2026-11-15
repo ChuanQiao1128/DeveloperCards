@@ -133,6 +133,8 @@ describe('cancelling a run', () => {
 
     await toPreview(user, genDoc(501));
     await user.click(screen.getByRole('button', { name: /^Import \d+ card/ }));
+    // Journal hashing can still be running while Cancel is visible; hold an actual in-flight batch.
+    await waitFor(() => expect(api.importCardsBatch).toHaveBeenCalledTimes(1));
 
     const cancel = await screen.findByRole('button', { name: 'Cancel import' });
     await user.click(cancel);
