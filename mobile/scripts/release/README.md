@@ -76,8 +76,10 @@ caller files are excluded by a retained full Git archive; submodules, symlinks, 
 archive filters and archived dotenv/generated native/dependency trees are refused. The run owns
 its nonce, snapshot, build tree, temporary/cache/DerivedData paths and output. npm installs offline
 from the integrity-checked lock into a fresh tree. Missing cached inputs fail rather than resolving new
-versions. Native resolution also requires a reviewed `native-build-inputs/Podfile.lock`; **this
-repository currently has no such lock, so an actual production build remains closed**. Existing
+versions. Native resolution uses the committed `native-build-inputs/Podfile.lock`, resolved
+from the current npm lock and checked with `pod install --deployment`. The producer copies it
+into the generated project and refuses any native dependency change. A real signed build and
+its completed provenance record are still required before OTA publication. Existing
 signing/provisioning must already be available locally; the producer never registers credentials or
 uses `-allowProvisioningUpdates`. It requires the existing public production settings and Sentry
 upload authorization, preserves the configured Sentry org/project checks, and never records the
