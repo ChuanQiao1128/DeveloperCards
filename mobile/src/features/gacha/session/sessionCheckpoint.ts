@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getUserScopedKey } from '../../../review/storage';
+import { validSessionNavigation, type SessionNavigation } from './sessionNavigation';
 import type { CardProgress } from '../../../review/model';
 import type { ReviewRating } from '../../../review/model';
 import type { OwnedGate } from '../contracts';
@@ -23,6 +24,7 @@ export type SessionCheckpoint = {
   v: 1;
   dateKey: string;
   deckVersion: string;
+  navigation?: SessionNavigation | null;
   context: string;
   progressStamp: string;
   currentUid: string;
@@ -80,7 +82,7 @@ function valid(raw: any): raw is SessionCheckpoint {
       ? ['sure', 'unsure'].includes(m.confidence) && ['correct', 'partial', 'wrong'].includes(m.verdict) &&
         ['again', 'hard', 'good', 'easy'].includes(m.mappedRating) && text(m.scheduleLine)
       : m.confidence === null && m.verdict === null && m.mappedRating === null && m.scheduleLine === null));
-  return raw?.v === 1 && text(raw.dateKey) && text(raw.deckVersion) && typeof raw.context === 'string' && raw.context.length <= 16000 &&
+  return (raw?.navigation == null || validSessionNavigation(raw.navigation)) && raw?.v === 1 && text(raw.dateKey) && text(raw.deckVersion) && typeof raw.context === 'string' && raw.context.length <= 16000 &&
     typeof raw.progressStamp === 'string' && raw.progressStamp.length <= 800000 && text(raw.currentUid) &&
     typeof raw.showAnswer === 'boolean' && count(raw.limit) && raw.limit > 0 && count(raw.minimumGoal) &&
     strings(raw.focusRatedUids) && Array.isArray(raw.attempts) && raw.attempts.length <= 1000 &&
@@ -102,11 +104,13 @@ function valid(raw: any): raw is SessionCheckpoint {
 export async function saveSessionCheckpoint(sub: string, slug: string, checkpoint: SessionCheckpoint): Promise<void> {
   if (!valid(checkpoint) || checkpoint.session.slug !== slug) throw new Error('Invalid study position');
   const key = await getUserScopedKey(PREFIX + slug, sub);
-  await serialized(key, () => AsyncStorage.setItem(key, JSON.stringify(checkpoint)));
+  const json = JSON.stringify(checkpoint);
+  if (json.length > 1000000) throw new Error('Study position too large');
+  await serialized(key, () => AsyncStorage.setItem(key, json));
 }
 
 export async function loadSessionCheckpoint(sub: string, slug: string, expected: {
-  deckVersion: string; context: string; progressStamp: string;
+  deckVersion: string; context: string; progressStamp: string; navigation?: SessionNavigation | null;
 }): Promise<SessionCheckpoint | null> {
   const key = await getUserScopedKey(PREFIX + slug, sub);
   return serialized(key, async () => {
@@ -115,7 +119,10 @@ export async function loadSessionCheckpoint(sub: string, slug: string, expected:
     let value: unknown;
     try { value = JSON.parse(raw); } catch { return null; }
     if (!valid(value) || value.session.slug !== slug || value.dateKey !== checkpointDate() ||
-      value.deckVersion !== expected.deckVersion || value.context !== expected.context ||
+      (value.navigation
+        ? !expected.navigation || value.navigation.core !== expected.navigation.core ||
+          JSON.stringify(value.navigation.cards.map(c => c.uid).sort()) !== JSON.stringify(expected.navigation.cards.map(c => c.uid).sort())
+        : value.deckVersion !== expected.deckVersion) || value.context !== expected.context ||
       value.progressStamp !== expected.progressStamp) return null;
     return value;
   });

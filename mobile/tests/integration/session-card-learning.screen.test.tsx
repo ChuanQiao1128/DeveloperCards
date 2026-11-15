@@ -1,5 +1,6 @@
 import { writePendingRating } from '../../src/review/pendingRating';
-vi.mock('expo-crypto', () => ({ randomUUID: () => 'review-intent-id' }));
+vi.mock('expo-crypto', () => ({ randomUUID: () => 'review-intent-id', CryptoDigestAlgorithm: { SHA256: 'SHA256' },
+  digestStringAsync: async (_: string, text: string) => (await import('node:crypto')).createHash('sha256').update(text).digest('hex') }));
 import React from 'react';
 import renderer, { act } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -16,6 +17,7 @@ beforeEach(() => {
   invalidateDeckCache();
 });
 
+const appStates = vi.hoisted(() => new Set<(state: string) => void>());
 const announceMock = vi.hoisted(() => vi.fn());
 
 vi.mock('react-native', () => {
@@ -51,6 +53,9 @@ vi.mock('react-native', () => {
     },
     useWindowDimensions: () => ({ width: 390, height: 844 }),
     Alert: { alert: vi.fn() },
+    AppState: { currentState: 'active', addEventListener: (_: string, handler: (state: string) => void) => {
+      appStates.add(handler); return { remove: () => appStates.delete(handler) };
+    } },
     StyleSheet: { create: (styles: any) => styles },
     // Read through readRN('AccessibilityInfo', null) at module level, so it must exist at import time.
     AccessibilityInfo: { announceForAccessibility: (text: string) => announceMock(text) },
@@ -447,6 +452,63 @@ describe('SessionCardScreen learning step (R22 §6: teach before testing; 2026-1
     await flush();
     expect([...store.keys()].some(key => key.includes('session-checkpoint:v1:'))).toBe(false);
     await act(async () => second.tree.unmount());
+  });
+
+  it('resumes the original learning plan across an installed prerequisite/order update and restart', async () => {
+    const third = { ...NEW_A, StableUid: 'new-c', OrderInDeck: 3, Question: 'Third card?' };
+    const teaching = { schema: 'teaching-v1', answer: 'Use the topic.', keyPoint: 'Fan-out delivers copies.', mustAnswer: ['Use the topic'] };
+    const secondCard = { ...NEW_B, Teaching: { ...teaching, prerequisites: [] } };
+    serve([NEW_A, secondCard, third], [fresh('new-a'), fresh('new-b'), fresh('new-c')], 3);
+    const initialDeck = await vi.mocked(resolveDeckBySlug).getMockImplementation()!('csharp');
+    vi.mocked(resolveDeckBySlug).mockResolvedValue({ ...initialDeck!, Slug: 'aws-saa-fundamentals' } as any);
+    const first = await mount('learn-new');
+    await study(first.tree);
+    await press(first.tree, 'Show answer');
+    await act(async () => { for (const handler of appStates) handler('background'); });
+    await flush();
+    const previousState = { ...useSessionStore.getState() };
+    const progressBefore = structuredClone(vi.mocked(saveDeckProgress).mock.calls.at(-1)?.[1]);
+    await act(async () => first.tree.unmount());
+    // The installed slug now resolves new bytes; no old file remains to pin.
+    vi.mocked(resolveDeckBySlug).mockResolvedValue({ ...initialDeck!, Slug: 'aws-saa-fundamentals', Version: '2',
+      Cards: [NEW_A, { ...secondCard, OrderInDeck: 9, Teaching: { ...teaching, prerequisites: ['new-c'] } }, third] } as any);
+    invalidateDeckCache();
+    const restored = await mount('learn-new');
+    expect(questionShown(restored.tree)).toBe(NEW_B.Question);
+    expect(subtitle(restored.tree)).toBe('Card 2 of 3');
+    expect(useSessionStore.getState()).toEqual(expect.objectContaining({ sessionId: previousState.sessionId,
+      route: previousState.route, currentIndex: previousState.currentIndex, sessionRatings: previousState.sessionRatings }));
+    expect(await vi.mocked(loadDeckProgress).getMockImplementation()!({} as any)).toEqual(progressBefore);
+    expect(pressables(restored.tree, 'Got it')).toHaveLength(1);
+    await press(restored.tree, 'Got it');
+    expect(questionShown(restored.tree)).toBe(third.Question);
+    await study(restored.tree);
+    await act(async () => restored.tree.unmount());
+    vi.mocked(loadDeckProgress).mockResolvedValue([fresh('new-a'), fresh('new-b'), fresh('new-c')] as any);
+    const next = await mount('learn-new');
+    await study(next.tree);
+    expect(questionShown(next.tree)).toBe(third.Question);
+    await act(async () => next.tree.unmount());
+  });
+
+  it.each(['question', 'scoring', 'deleted'])('rejects unsafe %s changes after installing new deck bytes', async (change) => {
+    serve([NEW_A, NEW_B], [fresh('new-a'), fresh('new-b')], 2);
+    const original = await vi.mocked(resolveDeckBySlug).getMockImplementation()!('csharp');
+    const first = await mount('learn-new');
+    await study(first.tree);
+    const previousSession = useSessionStore.getState().sessionId;
+    await act(async () => first.tree.unmount());
+    vi.setSystemTime(FIXED_NOW_MS + 1000);
+    const changed = { ...NEW_B, ...(change === 'question' ? { Question: 'Changed question' } : {}),
+      ...(change === 'scoring' ? { Teaching: { schema: 'teaching-v1', answer: 'Changed', keyPoint: 'Changed', mustAnswer: ['Changed'] } } : {}) };
+    vi.mocked(resolveDeckBySlug).mockResolvedValue({ ...original!, Version: '2',
+      Cards: change === 'deleted' ? [NEW_A] : [NEW_A, changed] } as any);
+    invalidateDeckCache();
+    const next = await mount('learn-new');
+    expect(useSessionStore.getState().sessionId).not.toBe(previousSession);
+    expect(useSessionStore.getState().completedCount).toBe(0);
+    if (change !== 'deleted') expect(questionShown(next.tree)).toBe(changed.Question);
+    await act(async () => next.tree.unmount());
   });
 
   it('keeps the in-progress card usable and retries a failed position save', async () => {

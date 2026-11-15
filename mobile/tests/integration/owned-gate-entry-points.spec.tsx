@@ -1,4 +1,5 @@
-vi.mock('expo-crypto', () => ({ randomUUID: () => 'review-intent-id' }));
+vi.mock('expo-crypto', () => ({ randomUUID: () => 'review-intent-id', CryptoDigestAlgorithm: { SHA256: 'SHA256' },
+  digestStringAsync: async (_: string, text: string) => (await import('node:crypto')).createHash('sha256').update(text).digest('hex') }));
 import React from 'react';
 import renderer, { act } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';

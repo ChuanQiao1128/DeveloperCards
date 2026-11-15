@@ -81,6 +81,7 @@ import {
 import { getAuthSessionGeneration } from '../auth/sessionBoundary';
 import { buildPrerequisiteLabels } from '../features/gacha/components/prerequisiteLabels';
 import { resetSessionStore, useSessionStore } from '../features/gacha/session/sessionStore';
+import { captureSessionNavigation, restoreSessionNavigation, type SessionNavigation } from '../features/gacha/session/sessionNavigation';
 import { checkpointDate, checkpointProgressStamp, clearSessionCheckpoint, loadSessionCheckpoint, saveSessionCheckpoint } from '../features/gacha/session/sessionCheckpoint';
 import { useScrollToTopOnChange } from '../features/gacha/session/useScrollToTopOnChange';
 import SessionProgressHeader from '../features/gacha/components/SessionProgressHeader';
@@ -249,6 +250,7 @@ export function SessionCardScreen({ navigation, route }: Props) {
   const [checkpointFailed, setCheckpointFailed] = useState(false);
   const [checkpointRetry, setCheckpointRetry] = useState(0);
   const [checkpointReadFailed, setCheckpointReadFailed] = useState(false);
+  const sessionNavigation = useRef<SessionNavigation | null>(null);
   const checkpointOwner = useRef<{ sub: string; generation: number } | null>(null);
   // R22 §4: the deck is being downloaded before the run can start (the starter lesson's first run
   // on a fresh install), and whether the current load error belongs to the starter lesson.
@@ -374,7 +376,7 @@ export function SessionCardScreen({ navigation, route }: Props) {
       if (owner.generation !== getAuthSessionGeneration()) return;
       void saveSessionCheckpoint(owner.sub, deck.Slug, {
       v: 1, dateKey: checkpointDate(new Date(state.startedAt ?? Date.now())),
-      deckVersion: deck.Version, context: studyContext, progressStamp: checkpointProgressStamp(progress, ownedSet),
+      deckVersion: deck.Version, navigation: sessionNavigation.current, context: studyContext, progressStamp: checkpointProgressStamp(progress, ownedSet),
       currentUid: current.card.StableUid, showAnswer, limit: sessionLimit, minimumGoal: plannedMinimumGoal ?? 1,
       focusRatedUids: [...focusRatedUidsRef.current], attempts: [...attemptIndexRef.current],
       mcqRun: { ...mcqRunRef.current }, picks: { ...picksRef.current }, loadForecast,
@@ -695,7 +697,7 @@ export function SessionCardScreen({ navigation, route }: Props) {
           const previewCount = isTrial
             ? Math.max(0, Math.min(previewLimit, fullCards.length || previewLimit))
             : 0;
-          const deckForStudy = isTrial ? buildPreviewDeck(resolved, previewCount) : resolved;
+          let deckForStudy = isTrial ? buildPreviewDeck(resolved, previewCount) : resolved;
           cardIndexRef.current = {
             deckSlug: deckForStudy.Slug,
             cards: sortCards(deckForStudy),
@@ -793,10 +795,11 @@ export function SessionCardScreen({ navigation, route }: Props) {
             ownedSet: nextOwned,
             mode,
           });
+          const navigationSnapshot = await captureSessionNavigation(deckForStudy);
           let checkpoint;
           try {
             checkpoint = await loadSessionCheckpoint(subAtLoad, resolved.Slug, {
-              deckVersion: resolved.Version, context: studyContext,
+              deckVersion: resolved.Version, navigation: navigationSnapshot, context: studyContext,
               progressStamp: checkpointProgressStamp(nextProgress, nextOwned),
             });
           } catch {
@@ -805,6 +808,16 @@ export function SessionCardScreen({ navigation, route }: Props) {
           }
           if (cancelled || loadGeneration !== getAuthSessionGeneration() || await captureProgressUserSub(true) !== subAtLoad) return;
           checkpointOwner.current = { sub: subAtLoad, generation: loadGeneration };
+          sessionNavigation.current = checkpoint?.navigation ?? navigationSnapshot;
+          if (checkpoint?.navigation) {
+            deckForStudy = restoreSessionNavigation(deckForStudy, checkpoint.navigation);
+            setDeck(deckForStudy);
+            cardIndexRef.current = focusIndex ? buildFocusIndex(deckForStudy, focusUids, nextOwned) : {
+              deckSlug: deckForStudy.Slug, cards: sortCards(deckForStudy), cardMap: buildCardMap(deckForStudy),
+            };
+            focusIndexRef.current = focusIndex ? cardIndexRef.current as FocusIndex : null;
+            rankMapRef.current = rankCardsByOrder(deckForStudy.Cards);
+          }
           const savedCard = checkpoint ? deckForStudy.Cards.find(card => card.StableUid === checkpoint.currentUid) : null;
           if (checkpoint && savedCard && (nextOwned === null || nextOwned.has(savedCard.StableUid))) {
             const savedProgress = nextProgress.find(row => row.stableUid === savedCard.StableUid);
