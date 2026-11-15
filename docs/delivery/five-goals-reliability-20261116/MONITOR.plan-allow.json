@@ -1,0 +1,11 @@
+{
+  "tags_only_updates": false,
+  "changes": {
+    "module.observability.aws_cloudwatch_dashboard.prod": {
+      "action": "update",
+      "keys": ["dashboard_body"]
+    }
+  },
+  "outputs": [],
+  "_note": "Source-declared expectation for removing the three misleading 100% low-sample fallbacks from existing error-budget widgets. Only the existing dashboard body may update. No metric, alarm, schedule, retention, IAM, compute or data resource is added or changed. This is not an observed AWS plan or owner approval. Any extra address, output, attribute, create, delete or replacement must fail the existing plan gate. No production plan or apply was run."
+}
