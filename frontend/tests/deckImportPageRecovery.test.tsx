@@ -33,6 +33,13 @@ it('recovers after a lost response and reload using the saved identity without a
   await user.click(screen.getByRole('button', { name: 'Preview import' }));
   await user.click(await screen.findByRole('button', { name: 'Import 1 card' }));
   await screen.findByText('Result unconfirmed', { exact: false });
+  expect(screen.getByText('Needs confirmation')).not.toBeNull();
+  expect(screen.queryByText('Finished')).toBeNull();
+  expect(screen.getByText('failed', { exact: true }).parentElement?.textContent).toBe('0failed');
+  expect(screen.getByText('unconfirmed', { exact: true }).parentElement?.textContent).toBe('1unconfirmed');
+  expect(screen.getByText('1 card needs confirmation')).not.toBeNull();
+  expect(screen.getByRole('list', { name: 'Import batch results' }).textContent).toContain(api.importCardsBatch.mock.calls[0][0].operationId);
+
   expect(api.lookupImportReceipt).toHaveBeenCalledTimes(1);
   const sent = api.importCardsBatch.mock.calls[0][0];
   page.unmount();

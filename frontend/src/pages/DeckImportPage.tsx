@@ -391,6 +391,9 @@ export function DeckImportPage() {
     setProgress({ done: 0, total: 0 });
   }
 
+  const unconfirmedCards = runResult?.batches.filter(batch => batch.state === 'unknown').reduce((count, batch) => count + batch.cards, 0) ?? 0;
+  const failedCards = runResult?.batches.filter(batch => batch.state === 'failed').reduce((count, batch) => count + batch.cards, 0) ?? 0;
+
   const backLink = invalidDeckId ? '/' : `/decks/cards?deckId=${deckId}`;
 
   if (deckState.loading) {
@@ -718,7 +721,7 @@ export function DeckImportPage() {
             <div className="p-4 space-y-4">
               <div>
                 <div className="flex items-center justify-between text-sm text-slate-600 mb-1">
-                  <span>{running ? 'Writing cards...' : 'Finished'}</span>
+                  <span>{running ? 'Writing cards...' : unconfirmedCards > 0 ? 'Needs confirmation' : 'Finished'}</span>
                   <span className="font-mono text-xs">
                     {progress.done} / {progress.total}
                   </span>
@@ -762,8 +765,8 @@ export function DeckImportPage() {
                   <div className="flex flex-wrap gap-2">
                     <Badge label="created" count={runResult.created} tone={ACTION_CLASSES.create} />
                     <Badge label="updated" count={runResult.updated} tone={ACTION_CLASSES.update} />
-                    <Badge label="failed" count={runResult.failures.filter(f => f.code !== 'IMPORT_UNCONFIRMED' && f.code !== 'IMPORT_CANCELLED').length} tone={ACTION_CLASSES.conflict} />
-                    <Badge label="unconfirmed" count={runResult.batches.filter(b => b.state === 'unknown').reduce((n, b) => n + b.cards, 0)} tone={ACTION_CLASSES.conflict} />
+                    <Badge label="failed" count={failedCards} tone={ACTION_CLASSES.conflict} />
+                    <Badge label="unconfirmed" count={unconfirmedCards} tone={ACTION_CLASSES.conflict} />
                     <span className="text-xs text-slate-500 self-center">
                       counts describe the most recent run
                     </span>
@@ -780,8 +783,9 @@ export function DeckImportPage() {
                   {runResult.failures.length > 0 ? (
                     <div className="bg-red-50 border border-red-200 rounded px-3 py-2">
                       <div className="font-semibold text-sm text-red-800 mb-1">
-                        {runResult.failures.length} card
-                        {runResult.failures.length === 1 ? '' : 's'} {runResult.batches.some(b => b.state === 'unknown') ? 'need attention' : 'failed'}
+                        {unconfirmedCards > 0
+                          ? `${unconfirmedCards} card${unconfirmedCards === 1 ? ' needs' : 's need'} confirmation`
+                          : `${failedCards} card${failedCards === 1 ? '' : 's'} failed`}
                       </div>
                       <ul className="text-xs text-red-800 space-y-1 max-h-64 overflow-y-auto">
                         {runResult.failures.map((failure) => (
