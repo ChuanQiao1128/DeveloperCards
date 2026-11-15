@@ -1,0 +1,77 @@
+{
+  "sourceCommit": "7267253d913fd4362f3af74d064efee3192b2337",
+  "identity": "synthetic local fixture",
+  "rawAttachmentCount": 5,
+  "identicalAttachmentsDeduplicated": 1,
+  "results": [
+    {
+      "deckId": 8,
+      "cards": [
+        {
+          "id": 1,
+          "stable_uid": "local-card",
+          "question": "Preserved local draft",
+          "explanation": "Original answer",
+          "version": 4,
+          "order_in_deck": 5
+        }
+      ],
+      "receipts": []
+    },
+    {
+      "deckId": 9,
+      "cards": [
+        {
+          "id": 2,
+          "stable_uid": "local-card",
+          "question": "Saved after preview",
+          "explanation": "Original answer",
+          "version": 2,
+          "order_in_deck": 5
+        }
+      ],
+      "receipts": []
+    },
+    {
+      "deckId": 10,
+      "cards": [
+        {
+          "id": 3,
+          "stable_uid": "local-card",
+          "question": "Edit after import commit",
+          "explanation": "Original answer",
+          "version": 3,
+          "order_in_deck": 5
+        },
+        {
+          "id": 4,
+          "stable_uid": "added-card",
+          "question": "New question",
+          "explanation": "New answer",
+          "version": 1,
+          "order_in_deck": 10
+        }
+      ],
+      "receipts": [
+        {
+          "action_id": "01b4e815-14bb-4af5-a4e6-6f667d8d29c6",
+          "kind": "cards/import"
+        }
+      ]
+    },
+    {
+      "deckId": 11,
+      "cards": [
+        {
+          "id": 6,
+          "stable_uid": "local-card",
+          "question": "Original question",
+          "explanation": "Original answer",
+          "version": 1,
+          "order_in_deck": 5
+        }
+      ],
+      "receipts": []
+    }
+  ]
+}

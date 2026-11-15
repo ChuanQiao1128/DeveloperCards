@@ -142,7 +142,7 @@ describe('runImport in batches', () => {
     expect(rec.batches).toHaveLength(1);
     expect(rec.batches[0].deckId).toBe(DECK_ID);
     expect(rec.batches[0].cards.map((c) => c.stableUid)).toEqual(['cs-async-001', 'cs-span-002']);
-    expect(result).toEqual({ created: 2, updated: 0, failures: [], cancelled: false, notRun: 0 });
+    expect(result).toMatchObject({ created: 2, updated: 0, failures: [], cancelled: false, notRun: 0 });
   });
 
   it('splits at IMPORT_BATCH_MAX_CARDS cards', async () => {
@@ -235,7 +235,7 @@ describe('runImport in batches', () => {
     expect(spy.slept).toEqual([1000, 2000, 4000]);
     expect(rec.batches).toHaveLength(4);
     expect(result.failures.map((f) => f.stableUid)).toEqual(['cs-async-001', 'cs-span-002']);
-    expect(result.failures.every((f) => f.code === 'TIMEOUT')).toBe(true);
+    expect(result.failures.every((f) => f.code === 'IMPORT_UNCONFIRMED')).toBe(true);
     expect(result.created).toBe(0);
   });
 

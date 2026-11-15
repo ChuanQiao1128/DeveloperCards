@@ -1,0 +1,10 @@
+{
+  "tags_only_updates": false,
+  "changes": {
+    "module.identity.aws_cognito_user_pool.console[0]": {
+      "action": "update",
+      "keys": ["mfa_configuration", "software_token_mfa_configuration"]
+    }
+  },
+  "_note": "Owner requested Console MFA removal on 2026-11-15. Only the existing Console pool's MFA/TOTP settings may change. Applying this allow-list does not authorize pool replacement, password/login/client changes, mobile identity changes or operator IAM MFA changes. The existing infra-prod deployment approval remains required."
+}

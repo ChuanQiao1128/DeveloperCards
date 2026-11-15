@@ -1,0 +1,333 @@
+{
+  "request_id": "web-authoring-safety-repaired-20261115",
+  "artifact_version": "7267253d913fd4362f3af74d064efee3192b2337",
+  "base_version": "d3f049efe12ff171da8b4eb1fa5401a2c62a4f91",
+  "review_kind": "one_narrow_repair_rereview",
+  "overall_verdict": "UNKNOWN",
+  "summary": "F1 and F2 are closed on the frozen repaired source. R1-R9 pass within the scoped local Web editor/import milestone. No unresolved code findings were identified in the repair or affected callers. R10 remains UNKNOWN solely because final delivery manifest and reviewable PR have not yet been supplied; this does not certify deployment or provider/native behavior.",
+  "scope": "One permitted narrow re-review of F1/F2 and affected editor/import callers, plus CI/local test output separation. All seven changed paths since the initial review inspected. No repository edits or target-code execution by reviewer; only this review artifact is written.",
+  "skills": [
+    "data-module-review",
+    "security-audit (focused guidance only)"
+  ],
+  "execution_limit": "Reviewer did not execute target code because the security guidance requires an OS-enforced isolated-network/allowlisted-environment/read-only-source/resource-limited sandbox and that capability was not established. Existing parent/worker raw logs were inspected as evidence without claiming independently sandboxed execution.",
+  "out_of_scope": [
+    "Native clients",
+    "Production deployment/topology",
+    "Cognito/API Gateway JWT verification in the local test host",
+    "Full codebase security audit"
+  ],
+  "rules": [
+    {
+      "id": "R1",
+      "verdict": "PASS",
+      "assessment": "Single-card CAS and explicit conflict comparison/retry remain intact. Atomic authorization changes preserve version checking; final real Chromium/PG editor test confirms draft preservation, second conflict, and final version 4.",
+      "evidence_refs": [
+        {
+          "file": "/Users/qc/.codex/worktrees/web-authoring-safety/recallsmith-aws-basic-release379/frontend/src/pages/EditCardPage.tsx",
+          "lines": "194-288"
+        },
+        {
+          "file": "/Users/qc/.codex/worktrees/web-authoring-safety/recallsmith-aws-basic-release379/src_C/Vpc/Authoring/Cards.cs",
+          "lines": "443-494"
+        },
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/browser-repaired.command.json",
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/browser-repaired.log"
+      ]
+    },
+    {
+      "id": "R2",
+      "verdict": "PASS",
+      "assessment": "Generic batch validates all expected versions before writes under deck/card locks, uses CAS upsert for create races, and transaction disposal rolls back current batch. Earlier committed batches remain. Relevant import, replay, schema and UI implementation bytes are unchanged from initial review; frozen full backend/frontend and real browser checks pass with repaired single-card caller.",
+      "evidence_refs": [
+        {
+          "file": "/Users/qc/.codex/worktrees/web-authoring-safety/recallsmith-aws-basic-release379/src_C/Vpc/Authoring/CardsImport.cs",
+          "lines": "295-451,453-577"
+        },
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/I1/final-impacted-343.log",
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/backend-final.log",
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/backend-repaired.command.json",
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/backend-repaired.log",
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/frontend-repaired.log",
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/browser-repaired.log"
+      ]
+    },
+    {
+      "id": "R3",
+      "verdict": "PASS",
+      "assessment": "Replay key is deck + SHA256 actor subject namespace + normalized operation UUID, with canonical payload hash, immutable persisted result, permission checks before replay, and one transaction commit. Replay suppresses duplicate ledger side effect. Relevant import, replay, schema and UI implementation bytes are unchanged from initial review; frozen full backend/frontend and real browser checks pass with repaired single-card caller.",
+      "evidence_refs": [
+        {
+          "file": "/Users/qc/.codex/worktrees/web-authoring-safety/recallsmith-aws-basic-release379/src_C/Vpc/Authoring/CardsImport.cs",
+          "lines": "312-359,564-577"
+        },
+        {
+          "file": "/Users/qc/.codex/worktrees/web-authoring-safety/recallsmith-aws-basic-release379/src_C/Vpc/Authoring/ContentRelease.cs",
+          "lines": "45-54"
+        },
+        {
+          "file": "/Users/qc/.codex/worktrees/web-authoring-safety/recallsmith-aws-basic-release379/src_C/Vpc/Db/Migrations/050_codex_content_release.sql",
+          "lines": "7-11,130-131"
+        },
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/I1/final-impacted-343.log",
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/browser-final.log",
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/backend-repaired.command.json",
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/backend-repaired.log",
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/frontend-repaired.log",
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/browser-repaired.log"
+      ]
+    },
+    {
+      "id": "R4",
+      "verdict": "PASS",
+      "assessment": "F1 closed. Originating session now crosses TanStack scheduling, actual API completion, cache callbacks and public promise completion. Previous HTTP/refresh/OAuth guards and AuthProvider remount implementation are byte-identical. Tests include both public mutation methods, all card mutations, global callback awaits, and ordinary refresh compatibility.",
+      "evidence_refs": [
+        {
+          "file": "/Users/qc/.codex/worktrees/web-authoring-safety/recallsmith-aws-basic-release379/frontend/src/hooks/useCards.ts",
+          "lines": "61-125,131-230"
+        },
+        {
+          "file": "/Users/qc/.codex/worktrees/web-authoring-safety/recallsmith-aws-basic-release379/frontend/src/pages/EditCardPage.tsx",
+          "lines": "210-287"
+        },
+        {
+          "file": "/Users/qc/.codex/worktrees/web-authoring-safety/recallsmith-aws-basic-release379/frontend/tests/cardMutationSessionIsolation.test.tsx",
+          "lines": "44-116"
+        },
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/C0/repair-R4/revert-to-frozen-red.log",
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/C0/repair-R4/revert-restored-green.log",
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/C0/repair-R4/source-and-negative-control.json",
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/frontend-repaired.command.json",
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/frontend-repaired.log"
+      ]
+    },
+    {
+      "id": "R5",
+      "verdict": "PASS",
+      "assessment": "F2 closed. Actual card ownership, permission and CAS are checked under transaction locks held through write/commit. Import authorization/replay and protected AWS gates are unchanged. Direct-call and deterministic concurrency tests pass.",
+      "evidence_refs": [
+        {
+          "file": "/Users/qc/.codex/worktrees/web-authoring-safety/recallsmith-aws-basic-release379/src_C/Vpc/Authoring/Cards.cs",
+          "lines": "317-340,443-510"
+        },
+        {
+          "file": "/Users/qc/.codex/worktrees/web-authoring-safety/recallsmith-aws-basic-release379/src_C/Tests/RecallSmith.Lambda.IntegrationTests/GuardedCardWritesTests.cs",
+          "lines": "34-80"
+        },
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/I1/repair-R5/red.log",
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/I1/repair-R5/green-impacted.command.json",
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/I1/repair-R5/green-impacted.log",
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/backend-repaired.command.json",
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/backend-repaired.log",
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/browser-repaired.log"
+      ]
+    },
+    {
+      "id": "R6",
+      "verdict": "PASS",
+      "assessment": "Bounded four attempts reuse one UUID, ambiguous transport/cancel outcomes remain unknown, subsequent batches stop on unknown, and UI distinguishes committed/rejected/unknown/not attempted. Relevant import, replay, schema and UI implementation bytes are unchanged from initial review; frozen full backend/frontend and real browser checks pass with repaired single-card caller.",
+      "evidence_refs": [
+        {
+          "file": "/Users/qc/.codex/worktrees/web-authoring-safety/recallsmith-aws-basic-release379/frontend/src/lib/deckImportRunner.ts",
+          "lines": "283-375"
+        },
+        {
+          "file": "/Users/qc/.codex/worktrees/web-authoring-safety/recallsmith-aws-basic-release379/frontend/src/pages/DeckImportPage.tsx",
+          "lines": "711-759"
+        },
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/frontend-all-2.log",
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/browser-final.log",
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/backend-repaired.command.json",
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/backend-repaired.log",
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/frontend-repaired.log",
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/browser-repaired.log"
+      ]
+    },
+    {
+      "id": "R7",
+      "verdict": "PASS",
+      "assessment": "No migration changed in candidate. Existing additive migration 050 supplies the immutable receipt table; absent table is explicitly rejected. Old generic clients lacking operation/version are rejected; no legacy unsafe upsert bypass was introduced. Existing rows are not migrated or rewritten by this change. Relevant import, replay, schema and UI implementation bytes are unchanged from initial review; frozen full backend/frontend and real browser checks pass with repaired single-card caller.",
+      "evidence_refs": [
+        {
+          "file": "/Users/qc/.codex/worktrees/web-authoring-safety/recallsmith-aws-basic-release379/src_C/Vpc/Authoring/CardsImport.cs",
+          "lines": "342-359"
+        },
+        {
+          "file": "/Users/qc/.codex/worktrees/web-authoring-safety/recallsmith-aws-basic-release379/src_C/Vpc/Db/Migrations/050_codex_content_release.sql",
+          "lines": "1-11"
+        },
+        {
+          "file": "/Users/qc/.codex/worktrees/web-authoring-safety/recallsmith-aws-basic-release379/src_C/Tests/RecallSmith.Lambda.IntegrationTests/GuardedCardsImportTests.cs",
+          "lines": "28-47"
+        },
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/backend-final.log",
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/backend-repaired.command.json",
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/backend-repaired.log",
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/frontend-repaired.log",
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/browser-repaired.log"
+      ]
+    },
+    {
+      "id": "R8",
+      "verdict": "PASS",
+      "assessment": "Final frozen-source raw checks: 1857 frontend tests, 3296 PostgreSQL backend tests, 17 existing mocked/CSP browser smoke tests, and 4 real Chromium→production handler→disposable PostgreSQL tests pass. Build passes. Each final command record names the repaired SHA, exit 0, and matches its raw log SHA-256. Original and repaired negative controls retained. Synthetic identity injection/local-only host scope remains explicit; provider/deployed/native behavior is outside this milestone.",
+      "evidence_refs": [
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/frontend-repaired.command.json",
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/frontend-repaired.log",
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/frontend-build.command.json",
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/frontend-build.log",
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/backend-repaired.command.json",
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/backend-repaired.log",
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/browser-smoke.command.json",
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/browser-smoke.log",
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/browser-repaired.command.json",
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/browser-repaired.log",
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/C0/repair-R4/revert-to-frozen-red.log",
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/I1/repair-R5/red.log",
+        {
+          "file": "/Users/qc/.codex/worktrees/web-authoring-safety/recallsmith-aws-basic-release379/src_C/Tests/RecallSmith.Authoring.LocalHost/Program.cs",
+          "lines": "9-94"
+        },
+        {
+          "file": "/Users/qc/.codex/worktrees/web-authoring-safety/recallsmith-aws-basic-release379/src_C/Tests/RecallSmith.Lambda.IntegrationTests/IntegrationTestBase.cs",
+          "lines": "45-95"
+        }
+      ]
+    },
+    {
+      "id": "R9",
+      "verdict": "PASS",
+      "assessment": "Repair changes only card mutation/session binding, single-card authorization, their tests, existing CI browser-job steps, local output directory, and delivery documentation. No fixed cloud resource, schedule, paid API, content or learner-record change. Previous logs and initial review are retained. New browser CI work is on the existing runner/job; no zero-increment billing claim.",
+      "evidence_refs": [
+        {
+          "file": "/Users/qc/.codex/worktrees/web-authoring-safety/recallsmith-aws-basic-release379/.github/workflows/ci.yml",
+          "lines": "185-194"
+        },
+        {
+          "file": "/Users/qc/.codex/worktrees/web-authoring-safety/recallsmith-aws-basic-release379/frontend/playwright.local.config.ts",
+          "lines": "4-8"
+        },
+        {
+          "file": "/Users/qc/.codex/worktrees/web-authoring-safety/recallsmith-aws-basic-release379/docs/delivery/web-authoring-safety-20261115/README.md",
+          "lines": "15-29,53-57"
+        },
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/review/initial.json",
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/I1/repair-R5/red.log",
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/C0/repair-R4/revert-to-frozen-red.log"
+      ]
+    },
+    {
+      "id": "R10",
+      "verdict": "UNKNOWN",
+      "assessment": "Frozen repaired SHA and clean tracked state verified; five final local check records are SHA-bound and their log hashes match. Initial failures and this re-review are retained. Final validation.json, reviewable PR identity/head, and remote CI outcome are not yet supplied/inspected; root must close these delivery-only items without implying merge/deploy.",
+      "evidence_refs": [
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/frontend-repaired.command.json",
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/frontend-build.command.json",
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/backend-repaired.command.json",
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/browser-smoke.command.json",
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/browser-repaired.command.json",
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/review/initial.json",
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/review/repaired.json"
+      ]
+    }
+  ],
+  "findings": [],
+  "raw_results_observed": {
+    "frontend-repaired": {
+      "tests_passed": 1857,
+      "failed": 0,
+      "sha256_matches_command_record": true,
+      "commit": "7267253d913fd4362f3af74d064efee3192b2337"
+    },
+    "backend-repaired": {
+      "tests_passed": 3296,
+      "failed": 0,
+      "sha256_matches_command_record": true,
+      "commit": "7267253d913fd4362f3af74d064efee3192b2337"
+    },
+    "browser-smoke": {
+      "tests_passed": 17,
+      "failed": 0,
+      "sha256_matches_command_record": true,
+      "commit": "7267253d913fd4362f3af74d064efee3192b2337"
+    },
+    "browser-repaired": {
+      "tests_passed": 4,
+      "failed": 0,
+      "sha256_matches_command_record": true,
+      "commit": "7267253d913fd4362f3af74d064efee3192b2337"
+    },
+    "frontend-build": {
+      "exit_code": 0,
+      "sha256_matches_command_record": true,
+      "commit": "7267253d913fd4362f3af74d064efee3192b2337"
+    }
+  },
+  "previous_artifact_version": "8a87801e5ffe2c6c31c1ae1bac50d4631048bc62",
+  "source_review_verdict": "PASS",
+  "delivery_verdict": "PENDING_R10",
+  "resolved_findings": [
+    {
+      "id": "F1",
+      "rule": "R4",
+      "verdict": "PASS",
+      "resolution": "useSessionCardMutation captures generation synchronously in the public mutate/mutateAsync wrapper before TanStack awaits; bound variables are checked before API dispatch, after API completion, at success/settled hooks, per-call callbacks, and final promise continuation. All three card mutation hooks use it. EditCardPage retains its own post-await generation checks and AuthProvider remounts on session replacement. Same-session refresh remains supported.",
+      "evidence_refs": [
+        {
+          "file": "/Users/qc/.codex/worktrees/web-authoring-safety/recallsmith-aws-basic-release379/frontend/src/hooks/useCards.ts",
+          "lines": "61-125,131-230"
+        },
+        {
+          "file": "/Users/qc/.codex/worktrees/web-authoring-safety/recallsmith-aws-basic-release379/frontend/src/pages/EditCardPage.tsx",
+          "lines": "210-287"
+        },
+        {
+          "file": "/Users/qc/.codex/worktrees/web-authoring-safety/recallsmith-aws-basic-release379/frontend/tests/cardMutationSessionIsolation.test.tsx",
+          "lines": "44-116"
+        },
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/C0/repair-R4/revert-to-frozen-red.log",
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/C0/repair-R4/revert-restored-green.log",
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/C0/repair-R4/source-and-negative-control.json",
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/frontend-repaired.command.json",
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/frontend-repaired.log"
+      ],
+      "negative_control": "Old frozen useCards source fails 12 of 13 new runtime hook tests; repaired hook/test source SHA-256 matches recorded source hashes. Final full frontend run passes."
+    },
+    {
+      "id": "F2",
+      "rule": "R5",
+      "verdict": "PASS",
+      "resolution": "PUT now locks source/destination decks in sorted order, then actual card row, rejects actual-deck drift, holds matching can_write permission FOR SHARE through transaction commit, and updates using id + expected version + original authorized deck. Source-deck move and revocation races no longer pass authorization outside the write transaction. Deadlock errors return conflict with rollback.",
+      "evidence_refs": [
+        {
+          "file": "/Users/qc/.codex/worktrees/web-authoring-safety/recallsmith-aws-basic-release379/src_C/Vpc/Authoring/Cards.cs",
+          "lines": "317-340,443-510"
+        },
+        {
+          "file": "/Users/qc/.codex/worktrees/web-authoring-safety/recallsmith-aws-basic-release379/src_C/Tests/RecallSmith.Lambda.IntegrationTests/GuardedCardWritesTests.cs",
+          "lines": "34-80"
+        },
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/I1/repair-R5/red.log",
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/I1/repair-R5/green-impacted.command.json",
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/I1/repair-R5/green-impacted.log",
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/backend-repaired.command.json",
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/backend-repaired.log"
+      ],
+      "negative_control": "Old source returns 200 where concurrent-move test expects 409 and revocation test expects 403. Repaired 218-test affected set passes; its source/log hashes match. Frozen full backend suite passes 3296 tests."
+    }
+  ],
+  "carry_forward": {
+    "initial_review": "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/review/initial.json",
+    "method": "Compared frozen Git object bytes with current files before carrying forward semantic evidence; affected full suites rerun on repaired SHA.",
+    "unchanged_verified": [
+      "frontend/src/pages/EditCardPage.tsx",
+      "frontend/src/pages/DeckImportPage.tsx",
+      "frontend/src/lib/deckImportRunner.ts",
+      "frontend/src/api/http.ts",
+      "frontend/src/auth/AuthContext.tsx",
+      "src_C/Vpc/Authoring/CardsImport.cs",
+      "src_C/Vpc/Db/Migrations/050_codex_content_release.sql",
+      "src_C/Tests/RecallSmith.Authoring.LocalHost/Program.cs"
+    ]
+  }
+}

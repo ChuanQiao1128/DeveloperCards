@@ -1,0 +1,260 @@
+{
+  "schemaVersion": 1,
+  "scope": "First Web editing/import milestone; local implementation and source review. Production/mobile/real-user work deferred.",
+  "baseCommit": "d3f049efe12ff171da8b4eb1fa5401a2c62a4f91",
+  "sourceCommit": "7267253d913fd4362f3af74d064efee3192b2337",
+  "pullRequest": "https://github.com/ChuanQiao1128/DeveloperCards/pull/840",
+  "checkedAtUtc": "2026-11-15T09:46:03.561144+00:00",
+  "counts": {
+    "backend": 3296,
+    "frontend": 1857,
+    "browserSmoke": 17,
+    "browserRealApiPostgreSql": 4
+  },
+  "checks": [
+    {
+      "name": "frontend-build",
+      "cwd": "/Users/qc/.codex/worktrees/web-authoring-safety/recallsmith-aws-basic-release379/frontend",
+      "argv": [
+        "npm",
+        "run",
+        "build"
+      ],
+      "commit": "7267253d913fd4362f3af74d064efee3192b2337",
+      "started_at": "2026-11-15T09:35:17.270351+00:00",
+      "exit_code": 0,
+      "finished_at": "2026-11-15T09:35:27.240034+00:00",
+      "log_sha256": "0c05974c7138e652bc8d888019850b6ce96eba95abf13fd015e3965d2ab51d5e"
+    },
+    {
+      "name": "frontend-lint",
+      "cwd": "/Users/qc/.codex/worktrees/web-authoring-safety/recallsmith-aws-basic-release379/frontend",
+      "argv": [
+        "npm",
+        "run",
+        "lint"
+      ],
+      "commit": "7267253d913fd4362f3af74d064efee3192b2337",
+      "started_at": "2026-11-15T09:36:46.857282+00:00",
+      "exit_code": 0,
+      "finished_at": "2026-11-15T09:36:54.237142+00:00",
+      "log_sha256": "ebd4dc8591390f7807da6865f4136e32b85c3f66feaadab57482cc0f30eed2f8"
+    },
+    {
+      "name": "frontend-repaired",
+      "cwd": "/Users/qc/.codex/worktrees/web-authoring-safety/recallsmith-aws-basic-release379/frontend",
+      "argv": [
+        "npm",
+        "test"
+      ],
+      "commit": "7267253d913fd4362f3af74d064efee3192b2337",
+      "started_at": "2026-11-15T09:35:36.197534+00:00",
+      "exit_code": 0,
+      "finished_at": "2026-11-15T09:35:56.160987+00:00",
+      "log_sha256": "569d51d081d7ddcc5c2de2f909b410599236b25b88146ca86e7cdba87179a070"
+    },
+    {
+      "name": "backend-repaired",
+      "cwd": "/Users/qc/.codex/worktrees/web-authoring-safety/recallsmith-aws-basic-release379/src_C",
+      "argv": [
+        "/Users/qc/.dotnet/dotnet",
+        "test",
+        "Tests/RecallSmith.Lambda.IntegrationTests",
+        "--logger",
+        "console;verbosity=minimal"
+      ],
+      "commit": "7267253d913fd4362f3af74d064efee3192b2337",
+      "started_at": "2026-11-15T09:35:17.270344+00:00",
+      "exit_code": 0,
+      "finished_at": "2026-11-15T09:37:18.299170+00:00",
+      "log_sha256": "4e38490b9e3796542ba90830ea02ed9a5910b80ed601f911fef6f94925dd7d2a"
+    },
+    {
+      "name": "browser-smoke",
+      "cwd": "/Users/qc/.codex/worktrees/web-authoring-safety/recallsmith-aws-basic-release379/frontend",
+      "argv": [
+        "node",
+        "node_modules/@playwright/test/cli.js",
+        "test"
+      ],
+      "commit": "7267253d913fd4362f3af74d064efee3192b2337",
+      "started_at": "2026-11-15T09:37:08.873918+00:00",
+      "exit_code": 0,
+      "finished_at": "2026-11-15T09:37:24.809901+00:00",
+      "log_sha256": "a89ca21057ec7927bd99b7a8388d3389df3ddd7ef4b28533a0ff458be5a59407"
+    },
+    {
+      "name": "browser-repaired",
+      "cwd": "/Users/qc/.codex/worktrees/web-authoring-safety/recallsmith-aws-basic-release379/frontend",
+      "argv": [
+        "node",
+        "node_modules/@playwright/test/cli.js",
+        "test",
+        "--config",
+        "playwright.local.config.ts"
+      ],
+      "commit": "7267253d913fd4362f3af74d064efee3192b2337",
+      "started_at": "2026-11-15T09:38:28.102987+00:00",
+      "exit_code": 0,
+      "finished_at": "2026-11-15T09:38:47.545822+00:00",
+      "log_sha256": "12b614efd5f6761eb291dc5813d1514aa8d42e8760ffc3e20a7edd9610d0e13e"
+    },
+    {
+      "name": "browser-artifacts",
+      "cwd": "/Users/qc/.codex/worktrees/web-authoring-safety/recallsmith-aws-basic-release379/frontend",
+      "argv": [
+        "env",
+        "PLAYWRIGHT_JSON_OUTPUT_FILE=/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/local-browser-results.json",
+        "node",
+        "node_modules/@playwright/test/cli.js",
+        "test",
+        "--config",
+        "playwright.local.config.ts",
+        "--reporter=list,json"
+      ],
+      "commit": "7267253d913fd4362f3af74d064efee3192b2337",
+      "started_at": "2026-11-15T09:41:49.149212+00:00",
+      "exit_code": 0,
+      "finished_at": "2026-11-15T09:42:08.739186+00:00",
+      "log_sha256": "4950da6382d0988a02b1b0750603c504a506a25f47c1a2456d103e523e6fbfd9"
+    }
+  ],
+  "sourceFileSha256": {
+    ".github/workflows/ci.yml": "22666516b77fd13a27c7230b66410752ea8183519b4e90d7f74465b0203bd661",
+    "frontend/playwright.local.config.ts": "cb743ca24ff41f67a395c2a29dea7f580789b88f699a42038608451018151788",
+    "frontend/src/api/authoring.ts": "d3dc039a18a93c63f4d3a12d7ed29327207b12e7de514cf618ddf302bad930e4",
+    "frontend/src/api/http.ts": "d2b6692e54d05d25be704bda5709027b403bc5dfd0bcfaa1fd16e82ebd56b570",
+    "frontend/src/api/httpFailure.ts": "947ec4f0f10286c3920867fa05868d6f1c2c97c37f017e24f97755bf8976b6ca",
+    "frontend/src/api/queryClient.ts": "3e53e9836f8a4724103924a968871dd8427553152b54563897d6b773117ce984",
+    "frontend/src/auth/AuthContext.tsx": "569fcd843f3963dba79b03dd37dceaeb982cdd3597b836e521f7c9a848e1d54a",
+    "frontend/src/auth/tokenStore.ts": "0cb6f14224fa0245ef997e3bbb5dbb2310cec6c1cf8758b6c3184b004d934e1a",
+    "frontend/src/hooks/useCards.ts": "e64e58f8b9792770ac520f2f66129469f5e9d58d4f28a3357526f6e35f6baaec",
+    "frontend/src/lib/deckImport.ts": "f2b73a1eed380d30eb673a3a1658bbe2fdc3c7fa85860c47c9c369ec94b06f60",
+    "frontend/src/lib/deckImportRunner.ts": "a337abd778fda179abefc44047e53b39c8642d1593e89995cba7b2ac62b96eff",
+    "frontend/src/pages/AuthCallbackPage.tsx": "3b669e1409c6a7d9e19717a47dd1f7d30de8f0489535af82a3cb2f1deab6fa2b",
+    "frontend/src/pages/DeckImportPage.tsx": "aadde2340d75e88f72df0c093cd650d444d79a47fe025f2e380016ca1e45907b",
+    "frontend/src/pages/EditCardPage.tsx": "2068f463635d112c56d516e0d0a5fefd33733f459ff06a129f612b9f4f6fe955",
+    "frontend/tests/authLateOAuthIsolation.test.tsx": "ef827dc04e71bac38ca2be1dec0aaeca2b8c30a1db81c17f50db1a72ab418370",
+    "frontend/tests/authSessionBoundary.test.tsx": "b77e8bbecd54fe8bfad43ce54e202355f191f5b8f0e1b6d40c3878304e45a148",
+    "frontend/tests/authSessionIsolation.test.ts": "9636e024af19c959ca5ec9215b78dcde84da038908d2c5b6db469cdc8b253b6a",
+    "frontend/tests/authTokenRefresh.test.ts": "89cae2d005a2b6d80a406231eadd303b8fbf6ef993155c5bc51edea4b96005fc",
+    "frontend/tests/bundleFirstLoad.test.ts": "f23d96b1c7956df414523e41dd4ca11e540e048ecd69a6c890a3f889e6c5d77f",
+    "frontend/tests/cardMutationSessionIsolation.test.tsx": "5cfc195ec26eaecf7f1f4d6972e5796a926045985b991ab18db7fcd7af0aa77b",
+    "frontend/tests/contentContractGolden.test.ts": "8defa5296245da7085faa7b4608e77ac5648910a75bac56e033a5698a1ec2f71",
+    "frontend/tests/deckImport.topic.test.ts": "83ed6adaa9d569d28195dd1fbee557cae5597b09db6148c71214528cb0f754ce",
+    "frontend/tests/deckImportBatchRunner.test.ts": "a1520bf599c867fb8be89e0b04d0654b0115aca4a79c2ca9722059de53a21849",
+    "frontend/tests/deckImportRunner.test.ts": "7459e95bfbc658c05f6746ed85d9f959fe60905966e8cd9603489ec38fc09c47",
+    "frontend/tests/editCardVersionConflict.test.tsx": "159e15c95efceae94a192c98ca54f18ad57711595d8f34bbd889b777aedb3392",
+    "frontend/tests/fullstack/authoringSafety.spec.ts": "4277890be6824cbeb0872b54ae5b4aede8ae7bb6d4d9fe21e9a1cce22b1310dc",
+    "frontend/tests/importCardsBatchRequest.test.ts": "69c26d4decdb4319ddc22caf44370374754331d0c90ce20b5e14510c346e876e",
+    "frontend/tests/importSafety.test.ts": "04566fa94d7ab9753dbe54bc5c27f86f36a75e4e3bbfda6824410e8e3e0a7799",
+    "frontend/tests/runnerSeparation.test.ts": "2c8173351d792433e2cd90392d4a731a7ca7dc5ea5efefb1e04a02f0bb0e0e33",
+    "frontend/tests/translationsApi.test.ts": "ee670ba728d6905f2c6c4c80b63ef22a1a97e283f5055b5bde6bb591e4cc478e",
+    "frontend/tsconfig.node.json": "20d83f9eea6d75ec0c010004e91ea3b386918e5a8b05a7a8e97cd726404210db",
+    "src_C/Tests/RecallSmith.Authoring.LocalHost/Program.cs": "b2e09463b99ce994b7d4b5e13002e3419ab241a98b7bf4a069540a577c78727c",
+    "src_C/Tests/RecallSmith.Authoring.LocalHost/RecallSmith.Authoring.LocalHost.csproj": "7a142e11505c88e29055104bd9e335a3506e1aaed4789d6f6c67307b61b17944",
+    "src_C/Tests/RecallSmith.Lambda.IntegrationTests/AutomationLedgerTests.cs": "3baf6a9b79a0431f37e2a2cb54b1b3fe6516f94501ec6cf0e7897c4195d04d07",
+    "src_C/Tests/RecallSmith.Lambda.IntegrationTests/CardsImportTests.cs": "b05878132dab2061b0490273efe7e942a43edb39c22407a9b3235f6da0fd3cac",
+    "src_C/Tests/RecallSmith.Lambda.IntegrationTests/ContentReferencePublishTests.cs": "be0e585ce50c1565bab257be91ab7e1bddc97d0255813dfa44f39da5b399cf2e",
+    "src_C/Tests/RecallSmith.Lambda.IntegrationTests/FrontHelpFieldTests.cs": "c64836ed872d13e4bd08f1516bc8d8debd314355aab662dbe4329bb3cf2c677b",
+    "src_C/Tests/RecallSmith.Lambda.IntegrationTests/GenericImportTestKit.cs": "2db36550580b31fce3ac81dbc3983fd8c782ad8490ad24e18017a2cc42816a8f",
+    "src_C/Tests/RecallSmith.Lambda.IntegrationTests/GuardedCardWritesTests.cs": "e87d289505d0be9592a742a54ab8ce5303784c25c8077827b5e65e15f99c5677",
+    "src_C/Tests/RecallSmith.Lambda.IntegrationTests/GuardedCardsImportTests.cs": "86488582f81160021bf7e4266fc3b3f5265aeb5a2036dc260d5a4aafec0bb219",
+    "src_C/Tests/RecallSmith.Lambda.IntegrationTests/SourceFieldTests.cs": "e3dbaa850782f5b843dcc23ba53e867eea873fa87608a6c734e920e67782e3a4",
+    "src_C/Tests/RecallSmith.Lambda.IntegrationTests/TeachingFieldTests.cs": "73997997856fc902f07cb87eeb495ed53c507f1ba556d3fa250de8c4a24aef58",
+    "src_C/Tests/RecallSmith.Lambda.IntegrationTests/TranslationFieldTests.cs": "42a386a5297d3fd317122187a50358ef2fb1524c8f2a8e0c4a2331c0f07adf45",
+    "src_C/Tests/RecallSmith.Lambda.IntegrationTests/WebhookEventsTests.cs": "c2fcf22ffc4dd56586f53bcbe15fc180e51acb2de328bf255255f009110c76d1",
+    "src_C/Vpc/Authoring/Cards.cs": "7692ba5cc95ad9f6a9f59719514db043475289ef805334fb6397eb72745979ee",
+    "src_C/Vpc/Authoring/CardsImport.cs": "a197273e6ef098474d436e672e609974e81d29d50f80d94024e5ef944fe4c9b8"
+  },
+  "negativeControls": [
+    {
+      "path": "evidence/C0/red-http.log",
+      "expected_exit": 1,
+      "reason": "Originating HTTP session guards absent; deferred response/refresh tests fail.",
+      "sha256": "218e40001deb562503feaab7daf5aff1c2c859e5b7529e1781e2bc584a56ee46"
+    },
+    {
+      "path": "evidence/C0/oauth-without-guards-red.log",
+      "expected_exit": 1,
+      "reason": "Late OAuth completion/failure and stale context actions fail without guards.",
+      "sha256": "5c6380a182c80119918a607109584a72f5ace53096e31864e10bec5d8604d4c4"
+    },
+    {
+      "path": "evidence/C0/repair-R4/revert-to-frozen-red.log",
+      "expected_exit": 1,
+      "reason": "Queued mutation session guards absent; 12 failures, ordinary refresh remains valid.",
+      "sha256": "5998acfee98cb777c3803e882186531fff1256763b39c0c025989e01391b2217"
+    },
+    {
+      "path": "evidence/I1/final-guard-removal-isolated-red-with-fixture.log",
+      "expected_exit": 1,
+      "reason": "Final import version guards removed in isolated copy: stale import returns200 instead of409.",
+      "sha256": "b81dc9416a20596df4f5bc7fa2849b3137ef093ad01c17f972a6110b3df3c50a"
+    },
+    {
+      "path": "evidence/I1/repair-R5/red.log",
+      "expected_exit": 1,
+      "reason": "Real move/revocation races fail before atomic authorization.",
+      "sha256": "bbc099176329f7aa680621165dcf51c001099fb71d367be458c044dcb03336ef"
+    }
+  ],
+  "independentReview": {
+    "initial": "review-initial.json",
+    "repaired": "review-repaired.json",
+    "initialFindings": [
+      "F1 deferred card mutations",
+      "F2 atomic actual-card authorization"
+    ],
+    "status": "PASS R1-R10; F1/F2 closed; docs-only HEAD CI tracked separately",
+    "deliveryReadback": "delivery-readback.json"
+  },
+  "compatibility": {
+    "ordinaryImportMinimumMigration": 50,
+    "newMigrations": [],
+    "newTables": [],
+    "protectedAwsReleaseContract": "unchanged",
+    "legacyOrdinaryImport": "missing operationId/expectedVersion rejected safely",
+    "apiRollback": "retain guarded API; suspend authoring writes or forward-fix before reverting to unguarded API"
+  },
+  "cost": {
+    "newFixedCloudResources": 0,
+    "newSchedules": 0,
+    "paidApiCalls": 0,
+    "newCiJobs": 0,
+    "rawEagerBundleBudgetBytes": 490000,
+    "previousRawEagerBundleBudgetBytes": 488000,
+    "billingAndQuota": "not queried; bounded extra CI work and existing-database receipt storage"
+  },
+  "boundary": {
+    "real": [
+      "Chromium",
+      "built console",
+      "production VpcFunction dispatcher/handlers",
+      "disposable PostgreSQL",
+      "post-commit response drop followed by real API edit"
+    ],
+    "synthetic": [
+      "fixed local test identities; JWT/API Gateway not verified"
+    ],
+    "production": "NOT_EXECUTED",
+    "native": "NOT_EXECUTED",
+    "cloudBilling": "NOT_QUERIED",
+    "learnerRecords": "UNCHANGED"
+  },
+  "rawEvidenceDirectory": "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence",
+  "localBrowserArtifacts": {
+    "databaseStates": 4,
+    "screenshots": [
+      "frontend/test-results/local/authoringSafety-two-real-e-94aa8--a-second-concurrent-change-chromium/conflict-desktop.png",
+      "frontend/test-results/local/authoringSafety-two-real-e-94aa8--a-second-concurrent-change-chromium/conflict-mobile.png"
+    ],
+    "databaseStateFile": "browser-final-states.json"
+  },
+  "ci": {
+    "status": "all checks passed on source commit 7267253d913fd4362f3af74d064efee3192b2337",
+    "checks": 23,
+    "record": "Final documentation-only head will be checked separately; this record does not claim unknown future CI.",
+    "sourceRollupSha256": "c42c537eb6530b2dd11e08e5230409d8055ff944cc5afd667aa01a5af7feeaf1"
+  }
+}

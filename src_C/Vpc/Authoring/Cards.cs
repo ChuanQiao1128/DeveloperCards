@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
 using Amazon.Lambda.APIGatewayEvents;
+using Npgsql;
 using RecallSmith.Lambda.Common;
 using RecallSmith.Lambda.Db;
 
@@ -300,9 +301,6 @@ public static class Cards
         var deckIdFromDb = await Helpers.GetDeckIdByCardId(conn, idInt);
         if (deckIdFromDb is null) return res.NotFound("Card not found");
 
-        var denyDeck = await Helpers.RequireDeckWrite(conn, adminSub, deckIdFromDb.Value, isSuperAdmin, res);
-        if (denyDeck is not null) return denyDeck;
-
         long? nextDeckId = null;
         if (body.TryGetProperty("deckId", out var nextDeckEl) &&
             nextDeckEl.ValueKind != JsonValueKind.Null &&
@@ -316,15 +314,30 @@ public static class Cards
           return res.Forbidden("Moving cards between decks requires super_admin");
         }
 
-        var stored = await DbUtil.QueryAsync(conn, null,
+        await using var tx = await conn.BeginTransactionAsync(RequestBudget.Token);
+        // Match the publish/import deck→card order, including both ends of an authorized move.
+        var deckIds = new[] { deckIdFromDb.Value, nextDeckId ?? deckIdFromDb.Value }.Distinct().Order().ToArray();
+        await DbUtil.QueryAsync(conn, tx, "select id from decks where id=any($1) order by id for update", [deckIds]);
+
+        var stored = await DbUtil.QueryAsync(conn, tx,
           """
-          select question, explanation, real_world_usage as "realWorldUsage", difficulty, mcq,
+          select deck_id as "deckId", question, explanation, real_world_usage as "realWorldUsage", difficulty, mcq,
             nullif(to_jsonb(cards) -> 'front_help', 'null'::jsonb) as "frontHelp",
             nullif(to_jsonb(cards) -> 'translations', 'null'::jsonb) as translations
-          from cards where id = $1
+          from cards where id = $1 for update
           """, [idInt]);
         if (stored.Count == 0) return res.NotFound("Card not found");
         var storedRow = stored[0];
+        if (Convert.ToInt64(storedRow["deckId"], CultureInfo.InvariantCulture) != deckIdFromDb.Value)
+          return Helpers.ErrorEnvelope(res, 409, "VERSION_CONFLICT", "Card moved to another deck. Compare the latest saved copy before retrying.");
+        if (!isSuperAdmin)
+        {
+          if (string.IsNullOrEmpty(adminSub)) return res.Forbidden("Requires authenticated admin user");
+          var permission = await DbUtil.QueryAsync(conn, tx,
+            "select deck_id from admin_deck_permissions where admin_sub=$1 and deck_id=$2 and can_write=1 for share",
+            [adminSub, deckIdFromDb.Value]);
+          if (permission.Count == 0) return res.Forbidden("No permission for this deck (write)");
+        }
         var effectiveQuestion = body.TryGetProperty("question", out var qEl) && qEl.ValueKind != JsonValueKind.Null
           ? qEl.ToString().Trim()
           : storedRow["question"] as string ?? string.Empty;
@@ -359,7 +372,7 @@ public static class Cards
         var incomingFrontHelp = FrontHelpValidation.Read(body, out var frontHelpSent);
         var effectiveFrontHelp = frontHelpSent ? incomingFrontHelp
           : Helpers.JsonbElement(storedRow, "frontHelp") is { } storedHelp ? FrontHelpValidation.Canonicalize(storedHelp) : null;
-        var frontHelpReady = !frontHelpSent || await Helpers.ColumnExistsAsync(conn, null, "cards", "front_help");
+        var frontHelpReady = !frontHelpSent || await Helpers.ColumnExistsAsync(conn, tx, "cards", "front_help");
         if (!frontHelpReady && effectiveFrontHelp is not null) return Helpers.FrontHelpNotMigrated(res);
         var english = new TranslationValidation.EnglishCard(effectiveQuestion, effectiveExplanation, effectiveRealWorldUsage, effectiveMcq, effectiveFrontHelp);
         var effectiveDeckLocale = await Helpers.DeckLocaleAsync(conn, nextDeckId ?? deckIdFromDb.Value);
@@ -371,7 +384,7 @@ public static class Cards
           translations = TranslationValidation.Canonicalize(trEl, english, effectiveDeckLocale);
           translationBasis = TranslationValidation.BasisJson(translations, english);
           // Before migration 047 there is nothing to clear; a translation to store needs the columns.
-          writeTranslations = await Helpers.ColumnExistsAsync(conn, null, "cards", "translations");
+          writeTranslations = await Helpers.ColumnExistsAsync(conn, tx, "cards", "translations");
           if (!writeTranslations && translations is not null) return Helpers.TranslationsNotMigrated(res);
         }
         else if (Helpers.JsonbElement(storedRow, "translations") is { } storedTranslations)
@@ -399,7 +412,7 @@ public static class Cards
         if (frontHelpSent && frontHelpReady) spec.Add(new("frontHelp", "front_help", _ => effectiveFrontHelp, "::jsonb"));
         var incomingTeaching = TeachingValidation.Read(body, out var teachingSent);
         var incomingTags = TagsValidation.Read(body, out var tagsSent);
-        var teachingReady = !teachingSent || await Helpers.ColumnExistsAsync(conn, null, "cards", "teaching");
+        var teachingReady = !teachingSent || await Helpers.ColumnExistsAsync(conn, tx, "cards", "teaching");
         if (!teachingReady && (incomingTeaching is not null || incomingTags is not null)) return Helpers.TeachingNotMigrated(res);
         if (teachingSent && teachingReady) spec.Add(new("teaching", "teaching", _ => incomingTeaching, "::jsonb"));
         if (tagsSent && teachingReady) spec.Add(new("tags", "tags", _ => incomingTags, "::jsonb"));
@@ -433,7 +446,7 @@ public static class Cards
         var sql = $"""
           update cards
           set {string.Join(", ", fields)}
-          where id = ${parameters.Count + 1} and version = ${parameters.Count + 2}
+          where id = ${parameters.Count + 1} and version = ${parameters.Count + 2} and deck_id = ${parameters.Count + 3}
           returning
             id,
             deck_id       as "deckId",
@@ -462,19 +475,21 @@ public static class Cards
 
         parameters.Add(idInt);
         parameters.Add(expectedVersionInt);
+        parameters.Add(deckIdFromDb.Value);
 
-        var rows = await DbUtil.QueryAsync(conn, null, sql, parameters);
+        var rows = await DbUtil.QueryAsync(conn, tx, sql, parameters);
         if (rows.Count == 0)
         {
-          var check = await DbUtil.QueryAsync(conn, null, "select version from cards where id = $1", [idInt]);
+          var check = await DbUtil.QueryAsync(conn, tx, "select version from cards where id = $1", [idInt]);
           if (check.Count == 0) return res.NotFound("Card not found");
-          return Helpers.ErrorEnvelope(res, 409, "VERSION_CONFLICT", "Card has been modified by another user. Please reload and try again.");
+          return Helpers.ErrorEnvelope(res, 409, "VERSION_CONFLICT", "Card has been modified by another user. Compare the latest saved copy before retrying.");
         }
 
         TranslationValidation.ShapeRow(rows[0]);
         Helpers.JsonbCell(rows[0], "mcq");
         Helpers.JsonbCell(rows[0], "source");
         if (ignoredFields.Count > 0) rows[0]["ignoredFields"] = ignoredFields;
+        await tx.CommitAsync(RequestBudget.Token);
         return res.Ok(rows[0]);
       }
       catch (McqValidationError ex)
@@ -488,6 +503,10 @@ public static class Cards
       catch (Exception ex) when (ex is ValidationError)
       {
         return res.BadRequest("VALIDATION_ERROR", ex.Message);
+      }
+      catch (PostgresException ex) when (ex.SqlState == "40P01")
+      {
+        return Helpers.ErrorEnvelope(res, 409, "VERSION_CONFLICT", "A concurrent write conflicted with this edit; nothing was written. Compare the latest saved copy before retrying.");
       }
       catch (Exception ex)
       {

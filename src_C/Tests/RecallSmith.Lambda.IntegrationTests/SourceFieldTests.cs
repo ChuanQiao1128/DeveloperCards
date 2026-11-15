@@ -93,7 +93,7 @@ public class SourceFieldTests
 
   private static async Task<APIGatewayProxyResponse> ImportAsync(long deckId, object[] cards)
   {
-    var req = new LambdaRequest(Event("POST", ImportPath, null, JsonSerializer.Serialize(new { deckId, cards })));
+    var req = new LambdaRequest(Event("POST", ImportPath, null, await GenericImportTestKit.JsonAsync(deckId, cards)));
     var res = new Res(req.TraceId);
     return await CardsImport.HandleCardsImport(req, res, await Auth.GetAuthContextAsync(req));
   }

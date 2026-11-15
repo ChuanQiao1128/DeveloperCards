@@ -181,7 +181,7 @@ export interface ImportUpdate {
   kind: 'update';
   card: ParsedCard;
   existingId: number;
-  /** Server version at plan time, passed straight to updateCard for CAS. */
+  /** Server version captured by preview and sent with the transactional batch. */
   expectedVersion: number;
   changedFields: ComparableField[];
   /**

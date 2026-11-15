@@ -31,5 +31,5 @@
      one is the only place the preview port, the build mode and the testMatch
      glob are written down. It was added here in the same change that created
      it; tests/runnerSeparation.test.ts fails if it drops out again. */
-  "include": ["vite.config.ts", "vitest.config.ts", "playwright.config.ts"]
+  "include": ["vite.config.ts", "vitest.config.ts", "playwright.config.ts", "playwright.local.config.ts"]
 }

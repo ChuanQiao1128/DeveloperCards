@@ -59,7 +59,7 @@ public class CardsImportTests
 
   private static async Task<APIGatewayProxyResponse> ImportAsync(long deckId, object[] cards, string[]? groups = null, string? sub = null)
   {
-    var body = JsonSerializer.Serialize(new { deckId, cards });
+    var body = await GenericImportTestKit.JsonAsync(deckId, cards);
     var req = new LambdaRequest(Event("POST", ImportPath, sub ?? NewSub(), groups ?? ["super_admin"], body));
     var res = new Res(req.TraceId);
     return await CardsImport.HandleCardsImport(req, res, await Auth.GetAuthContextAsync(req));
@@ -198,7 +198,7 @@ public class CardsImportTests
     var scratchCs = await _db.CreateScratchDatabaseAsync("f01_drift042");
     await using var conn = new NpgsqlConnection(scratchCs);
     await conn.OpenAsync();
-    await PostgresFixture.ApplyMigrationsAsync(conn, maxVersion: 41);
+    await PostgresFixture.ApplyMigrationsAsync(conn, maxVersion: 50);
     await DbUtil.ExecuteAsync(conn, null,
       "create unique index uq_cards_deck_order_in_deck on cards (deck_id, order_in_deck) where is_deleted = 0", []);
     await DbUtil.ExecuteAsync(conn, null,
@@ -433,7 +433,7 @@ public class CardsImportTests
   public async Task Import_IsRoutedByVpcFunction()
   {
     var deckId = await NewDeckAsync();
-    var body = JsonSerializer.Serialize(new { deckId, cards = new[] { Card("a", 5) } });
+    var body = await GenericImportTestKit.JsonAsync(deckId, [Card("a", 5)]);
     var evt = Event("POST", ImportPath, NewSub(), ["super_admin"], body);
 
     var resp = await new RecallSmith.Lambda.VpcFunction().Handler(evt);

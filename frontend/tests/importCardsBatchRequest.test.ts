@@ -21,6 +21,7 @@ function response(data: unknown) {
 
 function card(stableUid: string, orderInDeck: number): ImportCardInput {
   return {
+    expectedVersion: 0,
     stableUid,
     question: 'q',
     explanation: 'e',
@@ -49,12 +50,12 @@ describe('importCardsBatch', () => {
     const controller = new AbortController();
     const cards = [card('cs-a-001', 5), card('cs-b-002', 10)];
 
-    await importCardsBatch({ deckId: 7, cards, signal: controller.signal });
+    await importCardsBatch({ deckId: 7, operationId: '00000000-0000-4000-8000-000000000001', cards, signal: controller.signal });
 
     expect(httpMock.post).toHaveBeenCalledTimes(1);
     const [url, body, config] = httpMock.post.mock.calls[0];
     expect(url).toBe('/api/v1/authoring/cards/import');
-    expect(body).toEqual({ deckId: 7, cards });
+    expect(body).toEqual({ deckId: 7, operationId: '00000000-0000-4000-8000-000000000001', cards });
     expect(config).toMatchObject({ timeout: IMPORT_REQUEST_TIMEOUT_MS, signal: controller.signal });
     // The long timeout is the point: API Gateway cuts off at 30 s.
     expect(IMPORT_REQUEST_TIMEOUT_MS).toBe(29_000);
@@ -65,7 +66,7 @@ describe('importCardsBatch', () => {
       response({ deckId: 7, created: 3, updated: 2, unchanged: 5, cards: [] }),
     );
 
-    const result = await importCardsBatch({ deckId: 7, cards: [card('cs-a-001', 5)] });
+    const result = await importCardsBatch({ deckId: 7, operationId: '00000000-0000-4000-8000-000000000001', cards: [card('cs-a-001', 5)] });
 
     expect(result.success).toBe(true);
     expect(result.data).toEqual({ created: 3, updated: 2, unchanged: 5 });
@@ -74,7 +75,7 @@ describe('importCardsBatch', () => {
   it('defaults a missing count to zero', async () => {
     httpMock.post.mockResolvedValue(response({ deckId: 7, created: 4 }));
 
-    const result = await importCardsBatch({ deckId: 7, cards: [card('cs-a-001', 5)] });
+    const result = await importCardsBatch({ deckId: 7, operationId: '00000000-0000-4000-8000-000000000001', cards: [card('cs-a-001', 5)] });
 
     expect(result.data).toEqual({ created: 4, updated: 0, unchanged: 0 });
   });

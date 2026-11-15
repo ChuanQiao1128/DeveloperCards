@@ -63,10 +63,10 @@ type PlaywrightListing = {
 };
 
 /** What Playwright itself says it would collect, resolved to FRONTEND-relative paths. */
-function playwrightListing(): { rootDir: string; testMatch: string[]; files: string[] } {
+function playwrightListing(config?: string): { rootDir: string; testMatch: string[]; files: string[] } {
   const stdout = execFileSync(
     process.execPath,
-    [PLAYWRIGHT_CLI, 'test', '--list', '--reporter=json'],
+    [PLAYWRIGHT_CLI, 'test', '--list', '--reporter=json', ...(config ? ['--config', config] : [])],
     { cwd: FRONTEND, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 },
   );
 
@@ -160,7 +160,7 @@ describe('the vitest and Playwright collectors', () => {
     expect(strayUnitTestInE2e, 'a *.test.ts under tests/e2e is run by neither runner').toEqual([]);
 
     const straySpecOutsideE2e = onDisk.filter(
-      file => file.endsWith('.spec.ts') && !file.startsWith('tests/e2e/'),
+      file => file.endsWith('.spec.ts') && !file.startsWith('tests/e2e/') && !file.startsWith('tests/fullstack/'),
     );
     expect(straySpecOutsideE2e, 'a *.spec.ts outside tests/e2e is run by neither runner').toEqual(
       [],
@@ -182,5 +182,15 @@ describe('the Playwright config itself', () => {
 
     const include = (parsed.config as { include?: string[] }).include ?? [];
     expect(include).toContain('playwright.config.ts');
+  });
+});
+
+
+describe('the local PostgreSQL browser suite', () => {
+  it('collects all fullstack specs separately from the mocked browser suite', () => {
+    const listing = playwrightListing('playwright.local.config.ts');
+    expect(listing.rootDir).toBe('tests/fullstack/');
+    expect(listing.files).toEqual(sourceFilesUnder(`${TESTS_DIR}/fullstack`).filter(f => f.endsWith('.spec.ts')));
+    expect(listing.files.every(f => !f.startsWith('tests/e2e/'))).toBe(true);
   });
 });

@@ -24,7 +24,7 @@
 // user touches a field, and quietly wrong afterwards.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { renderAt } from './support/routerProbe';
@@ -122,6 +122,34 @@ afterEach(() => {
 });
 
 describe('a save that lost a version race', () => {
+  it('keeps the form version even when a background read refreshes the cache', async () => {
+    await mountLoaded();
+    await retypeQuestion('Draft based on version four');
+    act(() => queryClient.setQueryData(['card', CARD_ID], card(9)));
+    api.updateCard.mockResolvedValueOnce(refused<Card>('VERSION_CONFLICT', STALE_MESSAGE));
+    await userEvent.click(saveButton());
+    await screen.findByText(new RegExp(STALE_MESSAGE));
+    expect(sentVersion(1)).toBe(4);
+    expect(questionBox().value).toBe('Draft based on version four');
+  });
+
+  it('shows the server copy beside the preserved draft, and a second race still conflicts', async () => {
+    await mountLoaded();
+    await retypeQuestion('My preserved draft');
+    api.fetchCardById.mockResolvedValue(ok(card(9, { question: 'Current server question', explanation: 'Current server explanation' })));
+    api.updateCard.mockResolvedValueOnce(refused<Card>('VERSION_CONFLICT', STALE_MESSAGE));
+    await userEvent.click(saveButton());
+    expect(await screen.findByRole('region', { name: 'Current server copy' })).not.toBeNull();
+    expect(screen.getByText('Current server question')).not.toBeNull();
+    expect(screen.getByText('Current server explanation')).not.toBeNull();
+    expect(questionBox().value).toBe('My preserved draft');
+    api.fetchCardById.mockResolvedValue(ok(card(10, { question: 'Changed again during confirmation' })));
+    api.updateCard.mockResolvedValueOnce(refused<Card>('VERSION_CONFLICT', STALE_MESSAGE));
+    await userEvent.click(screen.getByRole('button', { name: RETRY_LABEL }));
+    await screen.findByText('Changed again during confirmation');
+    expect(sentVersion(2)).toBe(9);
+    expect(questionBox().value).toBe('My preserved draft');
+  });
   it('re-reads the card and retries with the version the server is holding', async () => {
     await mountLoaded();
 

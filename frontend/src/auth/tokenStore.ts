@@ -18,6 +18,35 @@ export type SessionUser = {
 
 const TOKEN_KEY = 'devcards:tokens';
 const EXPIRY_SKEW_MS = 30_000;
+let sessionGeneration = 0;
+const sessionListeners = new Set<() => void>();
+
+export class SessionChangedError extends Error {
+  readonly code = 'SESSION_CHANGED';
+  constructor() {
+    super('The session changed. Please try again in the current session.');
+    this.name = 'SessionChangedError';
+  }
+}
+
+export function getSessionGeneration(): number {
+  return sessionGeneration;
+}
+
+export function assertSessionGeneration(expected: number): void {
+  if (expected !== sessionGeneration) throw new SessionChangedError();
+}
+
+export function subscribeSessionChanges(listener: () => void): () => void {
+  sessionListeners.add(listener);
+  return () => { sessionListeners.delete(listener); };
+}
+
+function sessionChanged(): void {
+  sessionGeneration += 1;
+  clearSessionCaches();
+  for (const listener of sessionListeners) listener();
+}
 
 function safeJsonParse<T>(raw: string): T | null {
   try {
@@ -57,21 +86,7 @@ export function isExpired(tokens: StoredTokens): boolean {
 
 export function clearTokens(): void {
   sessionStorage.removeItem(TOKEN_KEY);
-  // The session's cached data dies with the session's tokens.
-  //
-  // Here rather than in the two sign-out buttons because this function is the
-  // narrow waist every ending passes through: the buttons on DeckListPage and
-  // DeckEditPage, the interceptor in src/api/http.ts when a refresh token will
-  // not refresh or a 401 arrives, and getTokens() below when what is left in
-  // storage cannot be revived. Clearing at the buttons would have covered two
-  // of five, and the three it missed are exactly the endings nobody chose --
-  // the ones after which the next person to open this browser is most likely to
-  // be somebody else.
-  //
-  // What it clears is DeckListPage's localStorage deck and manifest lists. They
-  // are keyed by the owner's `sub` as well, so this is the second of two
-  // independent guards rather than the only one.
-  clearSessionCaches();
+  sessionChanged();
 }
 
 /** Legacy name for clearTokens(). */
@@ -158,7 +173,9 @@ export function saveTokens(input: {
   tokenType?: string;
   expiresIn: number;
   expiresAt?: number;
-}): StoredTokens {
+}, refreshSession?: number): StoredTokens {
+  // Refresh replaces credentials inside a session; sign-in creates a new one.
+  if (refreshSession !== undefined) assertSessionGeneration(refreshSession);
   const expiresAt =
     typeof input.expiresAt === 'number'
       ? input.expiresAt
@@ -174,6 +191,7 @@ export function saveTokens(input: {
   };
 
   sessionStorage.setItem(TOKEN_KEY, JSON.stringify(stored));
+  if (refreshSession === undefined) sessionChanged();
   return stored;
 }
 
@@ -190,21 +208,7 @@ export function setStoredTokens(input: StoredTokens | {
   expiresIn: number;
   expiresAt?: number;
 }): StoredTokens {
-  const v = input as StoredTokens;
-  if (typeof v.expiresAt === 'number' && typeof v.expiresIn === 'number') {
-    sessionStorage.setItem(TOKEN_KEY, JSON.stringify(v));
-    return v;
-  }
-
-  const i = input as {
-    accessToken: string;
-    idToken: string;
-    refreshToken?: string;
-    tokenType?: string;
-    expiresIn: number;
-    expiresAt?: number;
-  };
-  return saveTokens(i);
+  return saveTokens(input);
 }
 
 /** Watch out: groups may live on the access token, not necessarily the id token. */

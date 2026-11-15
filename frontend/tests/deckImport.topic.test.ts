@@ -296,6 +296,6 @@ describe('runImport with topic', () => {
     if (!created || !updated) throw new Error('expected both cards in the batch');
     expect(created).toMatchObject({ stableUid: 'a-2', topic: '' });
     expect(updated).toMatchObject({ stableUid: 'a-1', topic: 'Networking' });
-    expect(result).toEqual({ created: 1, updated: 1, failures: [], cancelled: false, notRun: 0 });
+    expect(result).toMatchObject({ created: 1, updated: 1, failures: [], cancelled: false, notRun: 0 });
   });
 });

@@ -2,12 +2,12 @@ resource "aws_cognito_user_pool" "console" {
   count                    = var.manage_cognito ? 1 : 0
   auto_verified_attributes = ["email"]
   deletion_protection      = "ACTIVE"
-  mfa_configuration        = "ON"
+  mfa_configuration        = "OFF"
   name                     = "User pool - Console for DeveloperCards"
   user_pool_tier           = "ESSENTIALS"
   username_attributes      = ["email"]
   software_token_mfa_configuration {
-    enabled = true
+    enabled = false
   }
   account_recovery_setting {
     recovery_mechanism {

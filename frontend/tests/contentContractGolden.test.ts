@@ -15,7 +15,7 @@ describe('shared content-v1 golden contract', () => {
   it('keeps teaching, prerequisites, tags and translations on the actual JSON import transport', async () => {
     httpMock.post.mockResolvedValue({ data: { success: true, data: { created: 2 }, error: null, traceId: 'fixture' } });
     const cards = deck.cards as ImportCardInput[];
-    await importCardsBatch({ deckId: 7, cards });
+    await importCardsBatch({ operationId: '00000000-0000-4000-8000-000000000001', deckId: 7, cards });
     const [, body] = httpMock.post.mock.calls.at(-1)!;
     expect(JSON.stringify(body.cards)).toBe(JSON.stringify(deck.cards));
     expect(body.cards[1].teaching.prerequisites).toEqual(['fixture-base']);
@@ -26,7 +26,7 @@ describe('shared content-v1 golden contract', () => {
 
   it('keeps omission distinct from null in the JSON transport', async () => {
     httpMock.post.mockResolvedValue({ data: { success: true, data: {}, error: null, traceId: 'fixture' } });
-    await importCardsBatch({ deckId: 7, cards: [deck.cards[0], { ...deck.cards[0], teaching: null, tags: null }] });
+    await importCardsBatch({ operationId: '00000000-0000-4000-8000-000000000001', deckId: 7, cards: [deck.cards[0], { ...deck.cards[0], teaching: null, tags: null }] });
     const [, body] = httpMock.post.mock.calls.at(-1)!;
     expect(body.cards[0]).not.toHaveProperty('teaching');
     expect(body.cards[1]).toHaveProperty('teaching', null);

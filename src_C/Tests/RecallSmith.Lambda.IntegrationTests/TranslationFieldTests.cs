@@ -110,8 +110,8 @@ public class TranslationFieldTests
   private static Task<APIGatewayProxyResponse> CardsAsync(string method, object? body, IDictionary<string, string>? query = null) =>
     AutomationTestKit.CallAsync(Cards.HandleAuthoringCards, method, CardsPath, body, SuperAdmin(), query);
 
-  private static Task<APIGatewayProxyResponse> ImportAsync(long deckId, params object[] cards) =>
-    AutomationTestKit.CallAsync(CardsImport.HandleCardsImport, "POST", ImportPath, new { deckId, cards }, SuperAdmin());
+  private static async Task<APIGatewayProxyResponse> ImportAsync(long deckId, params object[] cards) =>
+    await AutomationTestKit.CallAsync(CardsImport.HandleCardsImport, "POST", ImportPath, await GenericImportTestKit.JsonAsync(deckId, cards), SuperAdmin());
 
   private static Task<APIGatewayProxyResponse> PublishAsync(long deckId, string? mode = null) =>
     AutomationTestKit.CallAsync(Publish.HandleAuthoringPublish, "POST", PublishPath, new { deckId }, SuperAdmin(),
@@ -674,7 +674,7 @@ public class TranslationFieldTests
   // ---------------------------------------------------------------- before migration 047
 
   [Fact]
-  public async Task Pre047Schema_RoutesWorkWithoutTranslations_AndRefuseOnlyTranslationWrites()
+  public async Task Pre047Schema_ReadsAndSingleSavesWork_ImportRequiresMigration050()
   {
     await InScratchAsync("it_tr_pre047", 46, async conn =>
     {
@@ -687,8 +687,9 @@ public class TranslationFieldTests
       Assert.Equal(JsonValueKind.Null, posted.GetProperty("translations").ValueKind);
       Data(await CardsAsync("PUT", new { id = posted.GetProperty("id").GetInt64(), expectedVersion = posted.GetProperty("version").GetInt64(), explanation = "Edited." }));
       Data(await CardsAsync("GET", null, new Dictionary<string, string> { ["deckId"] = deckId.ToString(CultureInfo.InvariantCulture) }));
-      Data(await ImportAsync(deckId, ImportCard("pre-2", 2, null)));
-      Data(await ImportAsync(deckId, ImportCard("pre-2", 2, null, includeTranslations: false)));
+      Assert.Equal("MIGRATION_REQUIRED", Error(await ImportAsync(deckId, ImportCard("pre-2", 2, null)), 503).Code);
+      Assert.Equal("MIGRATION_REQUIRED", Error(await ImportAsync(deckId, ImportCard("pre-2", 2, null, includeTranslations: false)), 503).Code);
+      Assert.Equal(1L, Convert.ToInt64(await DbUtil.ExecuteScalarAsync(conn, null, "select count(*) from cards where deck_id=$1", [deckId])));
 
       // A translation write needs the columns.
       Assert.Equal("MIGRATION_REQUIRED", Error(await CardsAsync("POST", CardBody(deckId, "pre-3", 3, Zh())), 503).Code);

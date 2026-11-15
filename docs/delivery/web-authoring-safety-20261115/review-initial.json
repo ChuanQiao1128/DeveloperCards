@@ -1,0 +1,273 @@
+{
+  "request_id": "web-authoring-safety-initial-20261115",
+  "artifact_version": "8a87801e5ffe2c6c31c1ae1bac50d4631048bc62",
+  "base_version": "d3f049efe12ff171da8b4eb1fa5401a2c62a4f91",
+  "review_kind": "initial_independent_security_data",
+  "overall_verdict": "FAIL",
+  "summary": "Two blocking source-confirmed races remain: mutation operations are not session-bound before TanStack scheduling, and single-card ownership authorization is not atomic with CAS writing. Generic import CAS/replay and tested local browser flows are otherwise supported by source and raw evidence.",
+  "scope": "First commercial authoring hardening milestone only; no code changes or target-code execution by reviewer. Read-only source/raw evidence review plus this authorized review artifact.",
+  "skills": [
+    "data-module-review",
+    "security-audit (focused guidance only)"
+  ],
+  "execution_limit": "Reviewer did not execute target code because the security guidance requires an OS-enforced isolated-network/allowlisted-environment/read-only-source/resource-limited sandbox and that capability was not established. Existing parent/worker raw logs were inspected as evidence without claiming independently sandboxed execution.",
+  "out_of_scope": [
+    "Native clients",
+    "Production deployment/topology",
+    "Cognito/API Gateway JWT verification in the local test host",
+    "Full codebase security audit"
+  ],
+  "rules": [
+    {
+      "id": "R1",
+      "verdict": "PASS",
+      "assessment": "Single-card server CAS and explicit conflict comparison/retry preserve local draft; a second conflict is observed in real Chromium/PostgreSQL. Session-switch exceptions are F1/R4.",
+      "evidence_refs": [
+        {
+          "file": "/Users/qc/.codex/worktrees/web-authoring-safety/recallsmith-aws-basic-release379/frontend/src/pages/EditCardPage.tsx",
+          "lines": "194-288"
+        },
+        {
+          "file": "/Users/qc/.codex/worktrees/web-authoring-safety/recallsmith-aws-basic-release379/src_C/Vpc/Authoring/Cards.cs",
+          "lines": "433-471"
+        },
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/browser-final.log"
+      ]
+    },
+    {
+      "id": "R2",
+      "verdict": "PASS",
+      "assessment": "Generic batch validates all expected versions before writes under deck/card locks, uses CAS upsert for create races, and transaction disposal rolls back current batch. Earlier committed batches remain.",
+      "evidence_refs": [
+        {
+          "file": "/Users/qc/.codex/worktrees/web-authoring-safety/recallsmith-aws-basic-release379/src_C/Vpc/Authoring/CardsImport.cs",
+          "lines": "295-451,453-577"
+        },
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/I1/final-impacted-343.log",
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/backend-final.log"
+      ]
+    },
+    {
+      "id": "R3",
+      "verdict": "PASS",
+      "assessment": "Replay key is deck + SHA256 actor subject namespace + normalized operation UUID, with canonical payload hash, immutable persisted result, permission checks before replay, and one transaction commit. Replay suppresses duplicate ledger side effect.",
+      "evidence_refs": [
+        {
+          "file": "/Users/qc/.codex/worktrees/web-authoring-safety/recallsmith-aws-basic-release379/src_C/Vpc/Authoring/CardsImport.cs",
+          "lines": "312-359,564-577"
+        },
+        {
+          "file": "/Users/qc/.codex/worktrees/web-authoring-safety/recallsmith-aws-basic-release379/src_C/Vpc/Authoring/ContentRelease.cs",
+          "lines": "45-54"
+        },
+        {
+          "file": "/Users/qc/.codex/worktrees/web-authoring-safety/recallsmith-aws-basic-release379/src_C/Vpc/Db/Migrations/050_codex_content_release.sql",
+          "lines": "7-11,130-131"
+        },
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/I1/final-impacted-343.log",
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/browser-final.log"
+      ]
+    },
+    {
+      "id": "R4",
+      "verdict": "FAIL",
+      "assessment": "HTTP and refresh generation checks and auth remounts are effective at their tested boundaries, but mutation invocation and post-HTTP callback awaits remain unbound (F1).",
+      "evidence_refs": [
+        {
+          "file": "/Users/qc/.codex/worktrees/web-authoring-safety/recallsmith-aws-basic-release379/frontend/src/hooks/useCards.ts",
+          "lines": "90-102"
+        },
+        {
+          "file": "/Users/qc/.codex/worktrees/web-authoring-safety/recallsmith-aws-basic-release379/frontend/src/api/http.ts",
+          "lines": "29-33"
+        },
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/C0/oauth-without-guards-red.log",
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/C0/green-focused-final.log"
+      ]
+    },
+    {
+      "id": "R5",
+      "verdict": "FAIL",
+      "assessment": "Import checks permissions inside its transaction and protected AWS gates remain present. Single-card permission/ownership is a non-atomic read-before-write, allowing the concurrent move case F2.",
+      "evidence_refs": [
+        {
+          "file": "/Users/qc/.codex/worktrees/web-authoring-safety/recallsmith-aws-basic-release379/src_C/Vpc/Authoring/Cards.cs",
+          "lines": "300-304,433-466"
+        },
+        {
+          "file": "/Users/qc/.codex/worktrees/web-authoring-safety/recallsmith-aws-basic-release379/src_C/Vpc/Authoring/CardsImport.cs",
+          "lines": "312-340"
+        },
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/browser-final.log"
+      ]
+    },
+    {
+      "id": "R6",
+      "verdict": "PASS",
+      "assessment": "Bounded four attempts reuse one UUID, ambiguous transport/cancel outcomes remain unknown, subsequent batches stop on unknown, and UI distinguishes committed/rejected/unknown/not attempted.",
+      "evidence_refs": [
+        {
+          "file": "/Users/qc/.codex/worktrees/web-authoring-safety/recallsmith-aws-basic-release379/frontend/src/lib/deckImportRunner.ts",
+          "lines": "283-375"
+        },
+        {
+          "file": "/Users/qc/.codex/worktrees/web-authoring-safety/recallsmith-aws-basic-release379/frontend/src/pages/DeckImportPage.tsx",
+          "lines": "711-759"
+        },
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/frontend-all-2.log",
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/browser-final.log"
+      ]
+    },
+    {
+      "id": "R7",
+      "verdict": "PASS",
+      "assessment": "No migration changed in candidate. Existing additive migration 050 supplies the immutable receipt table; absent table is explicitly rejected. Old generic clients lacking operation/version are rejected; no legacy unsafe upsert bypass was introduced. Existing rows are not migrated or rewritten by this change.",
+      "evidence_refs": [
+        {
+          "file": "/Users/qc/.codex/worktrees/web-authoring-safety/recallsmith-aws-basic-release379/src_C/Vpc/Authoring/CardsImport.cs",
+          "lines": "342-359"
+        },
+        {
+          "file": "/Users/qc/.codex/worktrees/web-authoring-safety/recallsmith-aws-basic-release379/src_C/Vpc/Db/Migrations/050_codex_content_release.sql",
+          "lines": "1-11"
+        },
+        {
+          "file": "/Users/qc/.codex/worktrees/web-authoring-safety/recallsmith-aws-basic-release379/src_C/Tests/RecallSmith.Lambda.IntegrationTests/GuardedCardsImportTests.cs",
+          "lines": "28-47"
+        },
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/backend-final.log"
+      ]
+    },
+    {
+      "id": "R8",
+      "verdict": "PASS",
+      "assessment": "Observed final raw logs: 4 real Chromium tests through production VpcFunction handlers to disposable PG, and 3293 backend tests. Test host injects fixed synthetic claims; Cognito/API Gateway JWT verification, native and production topology are not asserted. Version-removal and account/OAuth-removal negative controls are retained; newly found F1/F2 boundaries remain uncovered.",
+      "evidence_refs": [
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/browser-final.command.json",
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/browser-final.log",
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/backend-final.command.json",
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/backend-final.log",
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/I1/final-guard-removal-isolated-red-with-fixture.log",
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/C0/oauth-without-guards-red.log",
+        {
+          "file": "/Users/qc/.codex/worktrees/web-authoring-safety/recallsmith-aws-basic-release379/src_C/Tests/RecallSmith.Authoring.LocalHost/Program.cs",
+          "lines": "9-94"
+        },
+        {
+          "file": "/Users/qc/.codex/worktrees/web-authoring-safety/recallsmith-aws-basic-release379/src_C/Tests/RecallSmith.Lambda.IntegrationTests/IntegrationTestBase.cs",
+          "lines": "45-95"
+        }
+      ]
+    },
+    {
+      "id": "R9",
+      "verdict": "PASS",
+      "assessment": "Frozen diff changes authoring, auth, tests and local test host only; no cloud/infra/schedules/content/learner records changed. No production execution was performed in this independent review. Historical failed logs remain present.",
+      "evidence_refs": [
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/backend-all-1.log",
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/I1/concurrent-create-red.log",
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/C0/red-http.log"
+      ]
+    },
+    {
+      "id": "R10",
+      "verdict": "UNKNOWN",
+      "assessment": "Frozen SHA and clean worktree verified; final backend/browser command records bind this SHA and their log hashes match. Initial independent review now bound to the SHA. Final PR and complete delivery evidence manifest have not yet been inspected, so final delivery closure is pending.",
+      "evidence_refs": [
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/backend-final.command.json",
+        "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/browser-final.command.json"
+      ]
+    }
+  ],
+  "findings": [
+    {
+      "id": "F1",
+      "rule": "R4",
+      "severity": "P1",
+      "status": "confirmed_by_source_trace",
+      "title": "Capture session before the mutation scheduler, and check it at cache callbacks",
+      "location": {
+        "file": "/Users/qc/.codex/worktrees/web-authoring-safety/recallsmith-aws-basic-release379/frontend/src/hooks/useCards.ts",
+        "lines": "90-102"
+      },
+      "related": [
+        {
+          "file": "/Users/qc/.codex/worktrees/web-authoring-safety/recallsmith-aws-basic-release379/frontend/src/pages/EditCardPage.tsx",
+          "lines": "210,231-240"
+        },
+        {
+          "file": "/Users/qc/.codex/worktrees/web-authoring-safety/recallsmith-aws-basic-release379/frontend/src/api/http.ts",
+          "lines": "29-33"
+        },
+        {
+          "file": "/Users/qc/.codex/worktrees/web-authoring-safety/recallsmith-aws-basic-release379/frontend/src/api/queryClient.ts",
+          "lines": "81-85"
+        },
+        {
+          "file": "/Users/qc/.codex/worktrees/web-authoring-safety/recallsmith-aws-basic-release379/frontend/node_modules/@tanstack/query-core/src/mutation.ts",
+          "lines": "213-246"
+        },
+        {
+          "file": "/Users/qc/.codex/worktrees/web-authoring-safety/recallsmith-aws-basic-release379/frontend/node_modules/@tanstack/query-core/src/mutationCache.ts",
+          "lines": "190-197"
+        }
+      ],
+      "impact": "An edit initiated in A can be dispatched with B credentials after a session boundary; a settled A mutation can also invalidate/remove B cache entries after HTTP generation checking has completed. Clearing the mutation cache does not cancel executing mutations.",
+      "repro": [
+        "Mount the real useUpdateCard hook under A and start mutateAsync with a card edit.",
+        "Before its mutationFn continuation, clear A tokens and save B tokens in the same turn. TanStack execute awaits onMutate even when undefined.",
+        "mutationFn calls updateCard after this await; the HTTP proxy captures B generation and uses B access token for A parameters. The page generation check executes only after the API has completed.",
+        "Separately, gate MutationCache.onSuccess after HTTP success, switch B, then release: the hook onSuccess still invalidates B card caches."
+      ],
+      "suggested_fix": "Bind the originating generation synchronously when mutate/mutateAsync is invoked (or explicitly pass it from the page), assert it before any mutation API dispatch and before mutation cache callbacks. Cover shared create/update/delete hooks used across authoring. Retain the page continuation checks.",
+      "validation": "Static trace against frozen application and installed TanStack source; reviewer did not execute target code. Existing HTTP-only isolation and remount tests do not cover this scheduling boundary."
+    },
+    {
+      "id": "F2",
+      "rule": "R5",
+      "severity": "P1",
+      "status": "confirmed_by_source_trace",
+      "title": "Make card ownership authorization atomic with the single-card write",
+      "location": {
+        "file": "/Users/qc/.codex/worktrees/web-authoring-safety/recallsmith-aws-basic-release379/src_C/Vpc/Authoring/Cards.cs",
+        "lines": "300-304,433-466"
+      },
+      "related": [
+        {
+          "file": "/Users/qc/.codex/worktrees/web-authoring-safety/recallsmith-aws-basic-release379/src_C/Vpc/Authoring/Helpers.cs",
+          "lines": "308-319,347-351"
+        },
+        {
+          "file": "/Users/qc/.codex/worktrees/web-authoring-safety/recallsmith-aws-basic-release379/src_C/Vpc/Db/Migrations/053_publish_delivery_recovery.sql",
+          "lines": "21-32"
+        }
+      ],
+      "impact": "A non-super-admin can write a card after it has moved to a deck they cannot write, by supplying the anticipated post-move version. The final UPDATE checks only id and version, not the deck authorized earlier. Permission revocation after the separate permission read is likewise not held through the write.",
+      "repro": [
+        "Create card C at version 1 in deck A; editor E can write A but not B.",
+        "Start E PUT {id:C, expectedVersion:2, question:\"unauthorized\"}, omitting deckId. Gate execution after GetDeckIdByCardId/RequireDeckWrite return A/allowed.",
+        "Concurrently move C to deck B with the authorized super-admin PUT using expectedVersion 1, producing version 2.",
+        "Resume E. The final WHERE id=C AND version=2 matches the B card; current triggers serialize deck operations but do not recheck E permissions or the originally authorized deck."
+      ],
+      "suggested_fix": "Use a transaction that locks the actual card identity/version and appropriate deck/permission rows in a consistent order, then validate write permission and CAS under those locks; at minimum the write must stay bound to the authorized actual deck. Add a deterministic gated concurrent-move and revocation test against PostgreSQL.",
+      "validation": "Source-confirmed interleaving; no runtime reproduction was executed by this reviewer. Current direct-call browser tests cover ordinary reader/outsider refusal, not authorization/write races. This is pre-existing caller code in the mandatory R5 hardening scope."
+    }
+  ],
+  "raw_results_observed": {
+    "backend_final": {
+      "tests_passed": 3293,
+      "failed": 0,
+      "sha256_matches_command_record": true
+    },
+    "browser_final": {
+      "tests_passed": 4,
+      "failed": 0,
+      "sha256_matches_command_record": true
+    },
+    "frontend_all_2": {
+      "tests_passed": 1842,
+      "test_files": 178,
+      "binding": "Historical log, not itself a final frozen-SHA command record"
+    }
+  }
+}

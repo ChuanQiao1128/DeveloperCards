@@ -91,7 +91,7 @@ describe('cards: translations and translationStatus', () => {
       source: null,
       difficulty: 1,
     };
-    await authoring.importCardsBatch({
+    await authoring.importCardsBatch({ operationId: '00000000-0000-4000-8000-000000000001',
       deckId: 7,
       cards: [
         { ...base, stableUid: 'a', orderInDeck: 5, translations: ZH },
