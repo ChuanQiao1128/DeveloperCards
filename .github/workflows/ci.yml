@@ -185,6 +185,12 @@ jobs:
       # VITE_BUILD_ID: that build is thrown away when the job ends, and a smoke
       # run is not a deploy whose reports anyone will look up by sha.
       - run: npx playwright test
+      # Reuse this runner/browser for the real API + disposable PostgreSQL path.
+      # Synthetic loopback identities require no Cognito or AWS credentials.
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5.4.0
+        with:
+          global-json-file: src_C/global.json
+      - run: npx playwright test --config playwright.local.config.ts
       # Only on failure, because a browser failure is the one kind in this
       # repository that cannot be reproduced by reading the log: the trace has
       # the DOM, the network and a screenshot at the failing step.

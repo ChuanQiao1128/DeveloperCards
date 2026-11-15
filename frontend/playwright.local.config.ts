@@ -5,6 +5,7 @@ export default defineConfig({
   testMatch: '**/*.spec.ts',
   fullyParallel: false,
   workers: 1,
+  outputDir: 'test-results/local',
   retries: 0,
   use: { baseURL: 'http://127.0.0.1:5187', trace: 'retain-on-failure', screenshot: 'only-on-failure' },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],

@@ -1,4 +1,5 @@
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, type MutateOptions, type QueryClient, type UseMutationResult } from '@tanstack/react-query';
+import { assertSessionGeneration, getSessionGeneration } from '../auth/tokenStore';
 import { createCard, deleteCard, fetchCardById, fetchCardsByDeck, updateCard } from '../api/authoring';
 import { apiFailure } from '../api/errors';
 import { QueryKeys, useAppQueryClient } from '../api/queryClient';
@@ -57,13 +58,80 @@ export function useCard(cardId: number) {
   );
 }
 
+type SessionVariables<T> = { session: number; variables: T };
+
+/** Bind before TanStack's first await, then guard each deferred side effect. */
+function useSessionCardMutation<TData, TVariables>(
+  options: {
+    mutationFn: (variables: TVariables) => Promise<TData>;
+    onSuccess: (data: TData) => void;
+  },
+  client: QueryClient,
+): UseMutationResult<TData, Error, TVariables> {
+  const mutation = useMutation<TData, Error, SessionVariables<TVariables>>({
+    mutationFn: async ({ session, variables }) => {
+      assertSessionGeneration(session);
+      try {
+        const data = await options.mutationFn(variables);
+        assertSessionGeneration(session);
+        return data;
+      } catch (error) {
+        assertSessionGeneration(session);
+        throw error;
+      }
+    },
+    onSuccess: (data, { session }) => {
+      assertSessionGeneration(session);
+      options.onSuccess(data);
+    },
+    onSettled: (_data, error, { session }) => {
+      // Do not publish stale success after global onSettled awaited. The error
+      // path must not throw again: TanStack reports callback failures separately.
+      if (!error) assertSessionGeneration(session);
+    },
+  }, client);
+
+  const mutateAsync = (
+    variables: TVariables,
+    callbacks?: MutateOptions<TData, Error, TVariables>,
+  ): Promise<TData> => {
+    const session = getSessionGeneration();
+    const current = () => session === getSessionGeneration();
+    return mutation.mutateAsync({ session, variables }, {
+      onSuccess: (data, bound, context, meta) => {
+        if (current()) callbacks?.onSuccess?.(data, bound.variables, context, meta);
+      },
+      onError: (error, bound, context, meta) => {
+        if (current()) callbacks?.onError?.(error, bound.variables, context, meta);
+      },
+      onSettled: (data, error, bound, context, meta) => {
+        if (current()) callbacks?.onSettled?.(data, error, bound.variables, context, meta);
+      },
+    }).then(data => {
+      // Global mutation callbacks can await again after our onSuccess guard.
+      assertSessionGeneration(session);
+      return data;
+    }, error => {
+      assertSessionGeneration(session);
+      throw error;
+    });
+  };
+
+  return {
+    ...mutation,
+    variables: mutation.variables?.variables,
+    mutateAsync,
+    mutate: (variables, callbacks) => { void mutateAsync(variables, callbacks).catch(() => {}); },
+  } as UseMutationResult<TData, Error, TVariables>;
+}
+
 type CreateCardParams = Parameters<typeof createCard>[0];
 type UpdateCardParams = Parameters<typeof updateCard>[0];
 
 export function useCreateCard() {
   const queryClient = useAppQueryClient();
 
-  return useMutation(
+  return useSessionCardMutation(
     {
       // Deliberately does NOT throw on !success, for the reason spelled out on
       // useDeleteCard below.
@@ -87,7 +155,7 @@ export function useCreateCard() {
 export function useUpdateCard() {
   const queryClient = useAppQueryClient();
 
-  return useMutation(
+  return useSessionCardMutation(
     {
       mutationFn: async (params: UpdateCardParams) => {
         const result = await updateCard(params);
@@ -109,7 +177,7 @@ export function useUpdateCard() {
 export function useDeleteCard() {
   const queryClient = useAppQueryClient();
 
-  return useMutation(
+  return useSessionCardMutation(
     {
       // Deliberately does NOT throw on !success.
       //
