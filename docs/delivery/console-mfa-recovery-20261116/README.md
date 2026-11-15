@@ -13,12 +13,14 @@ apply, state recovery and private-log cleanup remain in place.
 The recovery also checks the existing pool identity, update/no-op actions, known MFA OFF and TOTP disabled values,
 and absence of imports/moves/replacements. Extra resource, field or output changes still fail the existing gate.
 An already OFF pool needs no apply. Dispatch applies are included when refusing stale older commits, including
-partly failed applies. A targeted empty second plan does not establish that the rest of production is in sync.
+partly failed applies. History is paginated up to 1000 runs and fails closed if truncated. Historical runs still
+execute their old script: do not approve them; use the updated workflow from current main (RUNBOOK §15). A targeted
+empty second plan does not establish that the rest of production is in sync.
 
 Local checks:
 
 - Regression checks failed against the original workflow/helper, then passed after the fix.
-- `python3 -m unittest discover -s infra/scripts/tests`: 299 passed, offline synthetic plans and mocked Actions API.
+- `python3 -m unittest discover -s infra/scripts/tests`: 303 passed, offline synthetic plans and mocked Actions API.
 - `actionlint .github/workflows/terraform.yml`: passed.
 - `tf-pipeline.py preflight`, `pr-check --base origin/main`, Terraform fmt and `git diff --check`: passed.
 

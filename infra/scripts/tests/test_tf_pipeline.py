@@ -487,6 +487,36 @@ class StaleTest(InRepo):
             self.assertEqual(rc, 1, out)
             self.assertNotIn("event=push", api.calls[0])
 
+    def test_applying_dispatch_on_page_two_is_not_hidden_by_plan_only_runs(self):
+        first = [self.run_entry(i, self.new, event="workflow_dispatch") for i in range(100, 200)]
+        calls = []
+
+        def api(path):
+            calls.append(path)
+            if "/jobs" in path:
+                if "/runs/7/" in path:
+                    return {"jobs": self.applied("failure", "failure")}
+                return {"jobs": [{"name": "plan only (infra-prod)", "conclusion": "success"}]}
+            return {"workflow_runs": first if path.endswith("&page=1") else
+                    [self.run_entry(7, self.new, event="workflow_dispatch")]}
+
+        rc, out = capture(tfp.stale, self.old, REPO, "9", api)
+        self.assertEqual(rc, 1, out)
+        self.assertIn("already applied", out)
+        self.assertTrue(any("page=2" in path for path in calls))
+
+    def test_truncated_history_fails_closed(self):
+        calls = []
+
+        def api(path):
+            calls.append(path)
+            return {"workflow_runs": [self.run_entry(i, self.old) for i in range(100)]}
+
+        with self.assertRaisesRegex(tfp.UsageError, "history is truncated"):
+            tfp.stale(self.old, REPO, "9", api)
+        self.assertEqual(len(calls), 10)
+        self.assertTrue(calls[-1].endswith("page=10"))
+
     def test_gh_api_without_the_workflow_on_record(self):
         # The first push of terraform.yml: GitHub may not list the workflow yet (404) -> no run, nothing applied.
         bindir = tempfile.mkdtemp(prefix="tfp-gh-")

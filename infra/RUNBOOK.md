@@ -1397,10 +1397,19 @@ run would put its older configuration back, sometimes within its own allow-list.
 refuses a commit when a later push **or dispatch** run of `terraform.yml` on `main` changed AWS: its `apply (infra-prod)` job
 succeeded (an empty plan confirms the checked scope), or its step `apply the saved plan` ran at all, whatever the
 run's colour (a red second plan, an apply that failed part-way or was cancelled), in any attempt. It reads the newest
-100 runs and their jobs from the Actions API (which a token cannot forge), in **select** and again in **apply**
+1000 runs, in pages of 100, and their jobs from the Actions API (which a token cannot forge), in **select** and again in **apply**
 before any credential. A plan-only dispatch has no apply job and does not count. A re-run of the latest run goes ahead past this check; it still applies only when its plan
 matches its allow-list, so it helps after a transient error, a lock or an approval that timed out, not after an
 apply that stopped part-way (When a run stops, above).
+
+If 1000 runs are read without exhausting the history or finding a later apply, the check refuses: truncated history
+cannot prove that the commit is current. Investigate the history before retrying; do not turn this error into a pass.
+
+**Transition restriction:** a re-run checks out its original commit, including its old stale-check script. Runs
+created before the Console recovery fix only recognize push applies, not later dispatch applies. Do not approve
+such historical runs, including failed run 43707294567. Recover by dispatching the updated workflow from current
+`main`. The existing required owner approval is the control for this restriction; the new script cannot
+retroactively protect an old immutable checkout. Confirm there are no historical pending approvals before recovery.
 
 ### Queueing
 

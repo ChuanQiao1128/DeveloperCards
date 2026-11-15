@@ -636,29 +636,33 @@ def changed_aws(jobs):
 def newer_applied(sha, repo, run_id=None, api=gh_api):
     """The newest terraform.yml push/dispatch run on main, other than RUN_ID, whose commit descends from SHA and which
     changed AWS (changed_aws, in any of its attempts), or None. Any conclusion: a run that went red after its apply
-    step counts. The newest 100 runs are read; the runs that matter are the ones after SHA's own."""
-    runs = api("repos/%s/actions/workflows/terraform.yml/runs?branch=main&per_page=100"
-               % repo).get("workflow_runs") or []
-    for run in runs:
-        if run_id is not None and str(run.get("id")) == str(run_id):
-            continue
-        if (run.get("path") != WORKFLOW_PATH or run.get("event") not in ("push", "workflow_dispatch") or run.get("head_branch") != "main"
-                or (run.get("head_repository") or {}).get("full_name") != repo):
-            continue
-        head = run.get("head_sha") or ""
-        if not head or head == sha:
-            continue
-        later = is_ancestor(sha, head)
-        if later is None:
-            warn("run %s: commit %s is not in this clone; ignored" % (run.get("id"), head[:12]))
-            continue
-        if not later:
-            continue
-        # filter=all: an earlier attempt may have applied before a re-run went red at the gate.
-        jobs = api("repos/%s/actions/runs/%s/jobs?filter=all&per_page=100" % (repo, run.get("id"))).get("jobs") or []
-        if changed_aws(jobs):
-            return run
-    return None
+    step counts. Pages of 100 runs are read, at most 1000; truncated history fails closed."""
+    for page in range(1, 11):
+        runs = api("repos/%s/actions/workflows/terraform.yml/runs?branch=main&per_page=100&page=%d"
+                   % (repo, page)).get("workflow_runs") or []
+        for run in runs:
+            if run_id is not None and str(run.get("id")) == str(run_id):
+                continue
+            if (run.get("path") != WORKFLOW_PATH or run.get("event") not in ("push", "workflow_dispatch") or run.get("head_branch") != "main"
+                    or (run.get("head_repository") or {}).get("full_name") != repo):
+                continue
+            head = run.get("head_sha") or ""
+            if not head or head == sha:
+                continue
+            later = is_ancestor(sha, head)
+            if later is None:
+                warn("run %s: commit %s is not in this clone; ignored" % (run.get("id"), head[:12]))
+                continue
+            if not later:
+                continue
+            # filter=all: an earlier attempt may have applied before a re-run went red at the gate.
+            jobs = api("repos/%s/actions/runs/%s/jobs?filter=all&per_page=100" % (repo, run.get("id"))).get("jobs") or []
+            if changed_aws(jobs):
+                return run
+        if len(runs) < 100:
+            return None
+    raise UsageError("stale check history is truncated after 1000 runs; cannot prove this commit is current. "
+                     "Nothing is applied; investigate the history before retrying (%s)" % RUNBOOK)
 
 
 def stale(sha, repo, run_id=None, api=gh_api):
