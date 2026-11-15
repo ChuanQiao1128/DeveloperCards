@@ -15,7 +15,7 @@ const timeout = { success: false as const, data: null, error: { code: 'TIMEOUT',
 describe('import safety at the writer boundary', () => {
   it('binds every create to absence and keeps one operation ID across retries', async () => {
     const write = vi.fn<ImportBatchWriter['importCards']>().mockResolvedValueOnce(timeout).mockResolvedValue(ok);
-    await runImport(7, actions(), { importCards: write }, { sleep: async () => {} });
+    await runImport(7, actions(), { importCards: write, lookupReceipt: async () => ({ success: true, data: { found: false }, error: null, traceId: 't' }) }, { sleep: async () => {} });
     expect(write.mock.calls).toHaveLength(2);
     const first = write.mock.calls[0][0];
     expect(first).toHaveProperty('operationId', expect.stringMatching(/^[0-9a-f-]{36}$/));
@@ -35,7 +35,7 @@ describe('import safety at the writer boundary', () => {
   it('records exhausted transport errors as unknown and stops later batches', async () => {
     const write = vi.fn<ImportBatchWriter['importCards']>().mockResolvedValue(timeout);
     const result = await runImport(7, actions(501), { importCards: write }, { sleep: async () => {} });
-    expect(write).toHaveBeenCalledTimes(4);
+    expect(write).toHaveBeenCalledTimes(1);
     expect(result.notRun).toBe(1);
     expect(result.batches).toMatchObject([{ state: 'unknown', operationId: expect.any(String) }]);
     expect(result.failures[0].code).toBe('IMPORT_UNCONFIRMED');

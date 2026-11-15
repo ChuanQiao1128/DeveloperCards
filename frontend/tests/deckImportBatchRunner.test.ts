@@ -217,6 +217,7 @@ describe('runImport in batches', () => {
       call < 2 ? fail('TIMEOUT', 'The request timed out.') : ok({ created: batch.cards.length }),
     );
 
+    rec.writer.lookupReceipt = async () => ({ success: true, data: { found: false }, error: null, traceId: 't' });
     const result = await runImport(DECK_ID, actionsFor(SMALL_DOC), rec.writer, { sleep: spy.sleep });
 
     expect(spy.slept).toEqual([1000, 2000]);
@@ -230,6 +231,7 @@ describe('runImport in batches', () => {
     const spy = sleepSpy();
     const rec = recorder(() => fail('TIMEOUT', 'The request timed out.'));
 
+    rec.writer.lookupReceipt = async () => ({ success: true, data: { found: false }, error: null, traceId: 't' });
     const result = await runImport(DECK_ID, actionsFor(SMALL_DOC), rec.writer, { sleep: spy.sleep });
 
     expect(spy.slept).toEqual([1000, 2000, 4000]);

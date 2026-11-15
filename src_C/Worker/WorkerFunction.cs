@@ -1,10 +1,7 @@
 using System.Globalization;
-using System.Net;
 using System.Text.Json;
 using Amazon.Lambda.Core;
 using Amazon.Lambda.SQSEvents;
-using Amazon.S3;
-using Amazon.S3.Model;
 using RecallSmith.Lambda.Common;
 using RecallSmith.Lambda.Db;
 using RecallSmith.Lambda.Worker.Models;
@@ -116,7 +113,7 @@ public class WorkerFunction
         await _processor.ProcessAsync(jobId, receiveCount);
         replayOutcome = (_processor as IReplayOutcome)?.LastCallReplayOutcome ?? PublishReplayOutcome.None;
 
-        // Step 6: 发布成功后在进程内重建 Manifest（completedAtMs 用于 metadata 证据判定）
+        // Step 6: 发布成功后在进程内重建 Manifest（仅用时间戳不能证明内容版本）
         var completedAtMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
         LogWithJobId(jobId, "Triggering manifest rebuild");
         var manifestDelivered = true;
@@ -196,54 +193,17 @@ public class WorkerFunction
     return new SQSBatchResponse { BatchItemFailures = failures };
   }
 
-  /// <summary>
-  /// True when the manifest already reflects this job's commit, so a rebuild would be redundant:
-  /// the object exists, was written in the last 10 s, AND carries a generated-at stamp that started
-  /// after this job committed (completedAtMs + 1000 ms, 1 s absorbing clock skew). A 404, a manifest
-  /// without the stamp, or an older stamp all return false → rebuild.
-  /// </summary>
-  public static bool ManifestCoversJob(DateTime? lastModifiedUtc, string? generatedAtMsMeta, long completedAtMs, DateTime utcNow)
-  {
-    if (lastModifiedUtc is null) return false;
-    if (lastModifiedUtc.Value <= utcNow - TimeSpan.FromSeconds(10)) return false;
-    if (!long.TryParse(generatedAtMsMeta, NumberStyles.Integer, CultureInfo.InvariantCulture, out var generatedAtMs)) return false;
-    return generatedAtMs >= completedAtMs + 1000;
-  }
+  /// <summary>Compatibility helper: timestamps cannot prove that a particular DB commit is present.</summary>
+  public static bool ManifestCoversJob(DateTime? lastModifiedUtc, string? generatedAtMsMeta, long completedAtMs, DateTime utcNow) => false;
 
-  /// <summary>
-  /// The default in-process rebuild hook. Debounces on the manifest's LastModified + generated-at
-  /// metadata (see <see cref="ManifestCoversJob"/>); when it does not already cover this job, rebuilds
-  /// through the shared <see cref="ManifestBuilder"/>.
-  /// </summary>
+  /// <summary>Durable delivery suppresses duplicate work; the builder conditionally writes current DB pointers.</summary>
   private static async Task RebuildManifestAfterAsync(long completedAtMs)
   {
     var bucket = Environment.GetEnvironmentVariable("CONTENT_BUCKET");
     if (string.IsNullOrEmpty(bucket)) throw new InvalidOperationException("Missing env CONTENT_BUCKET");
-
     var contentPrefix = ManifestBuilder.NormalizePrefix(Environment.GetEnvironmentVariable("CONTENT_PREFIX"), "content");
     var premiumPrefix = ManifestBuilder.NormalizePrefix(Environment.GetEnvironmentVariable("PREMIUM_PREFIX"), "premium");
-    var key = ManifestBuilder.ManifestKey(contentPrefix);
-
     var s3 = ManifestBuilder.S3();
-    GetObjectMetadataResponse? head;
-    try
-    {
-      head = await s3.GetObjectMetadataAsync(new GetObjectMetadataRequest { BucketName = bucket, Key = key });
-    }
-    catch (AmazonS3Exception ex) when (ex.StatusCode == HttpStatusCode.NotFound)
-    {
-      head = null;
-    }
-
-    var meta = head is not null && head.Metadata.Keys.Contains("x-amz-meta-generated-at-ms")
-      ? head.Metadata["generated-at-ms"]
-      : null;
-
-    if (ManifestCoversJob(head?.LastModified?.ToUniversalTime(), meta, completedAtMs, DateTime.UtcNow))
-    {
-      Console.WriteLine("manifest already covers this job; skipping rebuild");
-      return;
-    }
 
     await using var conn = await Pg.OpenConnectionOrNullAsync();
     if (conn is null) throw new InvalidOperationException("Missing PG env vars");

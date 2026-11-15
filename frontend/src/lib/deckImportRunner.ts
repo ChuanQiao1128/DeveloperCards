@@ -5,6 +5,7 @@ import { VERSION_CONFLICT } from '../api/errors';
 import type { ImportCardInput, ImportCardsBatchResult } from '../api/authoring';
 import type { ApiError, ApiResult } from '../types/api';
 import type { ImportCreate, ImportUpdate } from './deckImport';
+import { saveImportJournal, validateImportJournal, IMPORT_JOURNAL_RETENTION_MS, type ImportJournal, type JournalStorage } from './deckImportJournal';
 
 export type ImportAction = ImportCreate | ImportUpdate;
 
@@ -45,7 +46,9 @@ export interface ImportBatchWriter {
     operationId: string;
     cards: ImportCardInput[];
     signal?: AbortSignal;
+    serializedBody?: string;
   }): Promise<ApiResult<ImportCardsBatchResult>>;
+  lookupReceipt?(params: { deckId: number; operationId: string; cards: ImportCardInput[]; serializedBody?: string; signal?: AbortSignal }): Promise<ApiResult<{ found: boolean; result?: ImportCardsBatchResult }>>;
 }
 
 export interface RunImportOptions {
@@ -105,7 +108,7 @@ function optionalText(value: string | null): string {
  * explicit value (null on a Q/A card), source is explicit too (null without
  * SOURCE:), and expectedVersion binds the write to the preview.
  */
-function cardInputFor(action: ImportAction): ImportCardInput {
+export function cardInputFor(action: ImportAction): ImportCardInput {
   const card = action.card;
   return {
     expectedVersion: action.kind === 'update' ? action.expectedVersion : 0,
@@ -349,7 +352,15 @@ export async function runImport(
           result.notRun = total - (done + chunk.length);
           return result;
         }
-        continue;
+        if (writer.lookupReceipt) {
+          const receipt = await writer.lookupReceipt({ deckId, operationId, cards, signal });
+          if (!isCurrent()) return result;
+          if (receipt.success && receipt.data?.found && receipt.data.result) {
+            batch.state = 'committed'; result.created += receipt.data.result.created; result.updated += receipt.data.result.updated;
+            break;
+          }
+          if (receipt.success && receipt.data?.found === false) continue;
+        }
       }
 
       // A lost response never proves rollback. Stop rather than submit more work.
@@ -372,5 +383,86 @@ export async function runImport(
     onProgress?.({ done, total, current: chunk[chunk.length - 1] });
   }
 
+  return result;
+}
+
+
+/** Recover a durable run. Pending -> unknown is saved BEFORE send; only a serialized
+ * receipt absence permits unknown -> send. A rejection stops all dependent batches. */
+export async function resumeImport(
+  journal: ImportJournal,
+  writer: ImportBatchWriter,
+  options: RunImportOptions & { storage?: JournalStorage } = {},
+): Promise<ImportRunResult> {
+  const { isCurrent = () => true, signal, storage } = options;
+  await validateImportJournal(journal);
+  const result: ImportRunResult = { created: 0, updated: 0, failures: [], cancelled: false, notRun: 0, batches: [] };
+  const total = journal.batches.reduce((sum, b) => sum + b.actions.length, 0);
+  let done = 0;
+  for (const batch of journal.batches) {
+    const body = JSON.parse(batch.body) as { deckId: number; operationId: string; cards: ImportCardInput[] };
+    const entry = { operationId: body.operationId, state: 'unknown' as 'committed' | 'failed' | 'unknown', cards: batch.actions.length };
+    result.batches.push(entry);
+    if (batch.state === 'committed') {
+      entry.state = 'committed'; result.created += batch.result!.created; result.updated += batch.result!.updated;
+      done += batch.actions.length;
+      continue;
+    }
+    if (!isCurrent() || signal?.aborted) { result.cancelled = true; result.notRun = total - done; return result; }
+    if (batch.state === 'rejected') {
+      entry.state = 'failed'; pushChunkFailures(result, batch.actions, batch.error?.code ?? 'IMPORT_REJECTED', batch.error?.message ?? 'Preview the current deck before importing again.');
+      result.notRun = total - done - batch.actions.length; return result;
+    }
+    const params = { ...body, serializedBody: batch.body, signal };
+    let outcome: ApiResult<ImportCardsBatchResult> | undefined;
+    const reconcile = async (): Promise<boolean> => {
+      if (!isCurrent() || signal?.aborted || !writer.lookupReceipt) return false;
+      try {
+        const receipt = await writer.lookupReceipt(params);
+        if (!isCurrent() || signal?.aborted) return false;
+        if (receipt.success && receipt.data?.found === true && receipt.data.result) {
+          outcome = { ...receipt, data: receipt.data.result }; return true;
+        }
+        if (receipt.success && receipt.data?.found === false) return true;
+        batch.error = { code: receipt.error?.code ?? 'IMPORT_UNCONFIRMED', message: receipt.error?.message ?? 'Receipt lookup failed. Recover this import again.' };
+      } catch { batch.error = { code: 'IMPORT_UNCONFIRMED', message: 'Receipt lookup failed. Recover this import again.' }; }
+      return false;
+    };
+    let maySend = batch.state === 'pending' && Date.now() - journal.createdAt <= IMPORT_JOURNAL_RETENTION_MS;
+    if (!maySend) maySend = await reconcile();
+    if (maySend && !outcome && Date.now() - journal.createdAt > IMPORT_JOURNAL_RETENTION_MS) {
+      outcome = { success: false, data: null, traceId: '', error: { code: 'IMPORT_EXPIRED', message: 'Saved preview expired. Preview the current deck before importing again.' } };
+    }
+    if (maySend && !outcome && isCurrent() && !signal?.aborted) {
+      // A quota failure here throws before any request. A failure after send leaves
+      // the durable state unknown, so reload always reconciles rather than guessing.
+      batch.state = 'unknown'; saveImportJournal(journal, storage);
+      if (!isCurrent() || signal?.aborted) { result.notRun = total - done; return result; }
+      try { outcome = await writer.importCards(params); }
+      catch { outcome = undefined; }
+      if (!isCurrent()) { result.notRun = total - done; return result; }
+      if (!outcome?.success && (!outcome || isRetryableImportFailure(outcome.error) || outcome.error?.code === 'CANCELLED')) {
+        outcome = undefined;
+        await reconcile();
+      }
+    }
+    if (!isCurrent()) { result.notRun = total - done; return result; }
+    if (outcome?.success && outcome.data) {
+      batch.state = 'committed'; batch.result = outcome.data; delete batch.error;
+      entry.state = 'committed'; result.created += outcome.data.created; result.updated += outcome.data.updated;
+      saveImportJournal(journal, storage);
+      done += batch.actions.length;
+      options.onProgress?.({ done, total, current: batch.actions[batch.actions.length - 1] });
+      continue;
+    }
+    if (outcome && !outcome.success) {
+      batch.state = 'rejected'; batch.error = { code: outcome.error?.code ?? 'IMPORT_REJECTED', message: outcome.error?.message ?? 'Import rejected. Preview again.' };
+      entry.state = 'failed';
+    }
+    saveImportJournal(journal, storage);
+    pushChunkFailures(result, batch.actions, batch.error?.code ?? 'IMPORT_UNCONFIRMED', batch.error?.message ?? 'Result unconfirmed. Use Recover saved import before starting another import.');
+    result.notRun = total - done - batch.actions.length; result.cancelled = signal?.aborted ?? false;
+    return result;
+  }
   return result;
 }

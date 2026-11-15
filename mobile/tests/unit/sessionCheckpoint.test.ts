@@ -2,6 +2,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { EMPTY_REWARD_OUTCOME } from '../../src/features/gacha/rewards/rewardResolver';
 
+vi.mock('expo-crypto', () => ({ CryptoDigestAlgorithm: { SHA256: 'SHA256' },
+  digestStringAsync: async (_: string, text: string) => (await import('node:crypto')).createHash('sha256').update(text).digest('hex') }));
+
 const data = new Map<string, string>();
 vi.mock('@react-native-async-storage/async-storage', () => ({ default: {
   getItem: vi.fn(async (key: string) => data.get(key) ?? null),
@@ -13,6 +16,8 @@ vi.mock('../../src/review/storage', () => ({
 }));
 import { checkpointDate, checkpointProgressStamp, clearSessionCheckpoint, loadSessionCheckpoint,
   saveSessionCheckpoint, type SessionCheckpoint } from '../../src/features/gacha/session/sessionCheckpoint';
+
+import { captureSessionNavigation, restoreSessionNavigation } from '../../src/features/gacha/session/sessionNavigation';
 
 const expected = { deckVersion: 'r2', context: 'mixed', progressStamp: 'progress-and-ownership' };
 const value = (): SessionCheckpoint => ({
@@ -66,6 +71,41 @@ describe('durable study position', () => {
     vi.mocked(AsyncStorage.getItem).mockRejectedValueOnce(new Error('disk unavailable'));
     await expect(loadSessionCheckpoint('a', 'aws', expected)).rejects.toThrow('disk unavailable');
     expect([...data]).toEqual(before);
+  });
+
+  it('allows only navigation changes with matching core, scheduler, ownership and context', async () => {
+    const deck: any = { Slug: 'aws', Version: '1', Cards: [
+      { StableUid: 'previous', OrderInDeck: 1, Question: 'First?', Revision: 2 },
+      { StableUid: 'next', OrderInDeck: 2, Question: 'Next?', Revision: 2, Version: 1, UpdatedAt: 'before',
+        Teaching: { schema: 'teaching-v1', answer: 'Yes', keyPoint: 'Because', mustAnswer: ['Yes'], prerequisites: [] } },
+    ] };
+    const navigation = (await captureSessionNavigation(deck))!;
+    await saveSessionCheckpoint('a', 'aws', { ...value(), navigation });
+    const updated = { ...deck, Version: '3', Cards: [deck.Cards[0], { ...deck.Cards[1], OrderInDeck: 0, Version: 2, UpdatedAt: 'after',
+      Teaching: { ...deck.Cards[1].Teaching, prerequisites: ['previous'] } }] };
+    const compatible = { ...expected, deckVersion: '3', navigation: await captureSessionNavigation(updated) };
+    const loaded = await loadSessionCheckpoint('a', 'aws', compatible);
+    expect(loaded?.session.sessionId).toBe('session');
+    expect(restoreSessionNavigation(updated, loaded!.navigation!).Cards[1]).toEqual({ ...deck.Cards[1], Version: 2, UpdatedAt: 'after' });
+    for (const field of ['context', 'progressStamp']) {
+      expect(await loadSessionCheckpoint('a', 'aws', { ...compatible, [field]: 'changed' })).toBeNull();
+    }
+    expect(await loadSessionCheckpoint('b', 'aws', compatible)).toBeNull();
+    const changes = [
+      { ...deck.Cards[1], Question: 'Different question' },
+      { ...deck.Cards[1], Explanation: 'Different answer' },
+      { ...deck.Cards[1], Revision: 3 },
+      { ...deck.Cards[1], Mcq: { options: [{ key: 'a', correct: true }] } },
+      { ...deck.Cards[1], Teaching: { ...deck.Cards[1].Teaching, mustAnswer: ['Different scoring'] } },
+    ];
+    for (const card of changes) {
+      expect(await loadSessionCheckpoint('a', 'aws', { ...compatible,
+        navigation: await captureSessionNavigation({ ...updated, Cards: [deck.Cards[0], card] }) })).toBeNull();
+    }
+    expect(await loadSessionCheckpoint('a', 'aws', { ...compatible,
+      navigation: await captureSessionNavigation({ ...updated, Cards: [deck.Cards[0]] }) })).toBeNull();
+    expect(await captureSessionNavigation({ ...deck, Cards: [deck.Cards[0], deck.Cards[0]] })).toBeNull();
+    expect(await captureSessionNavigation({ ...deck, Cards: [{ ...deck.Cards[0], Question: 'x'.repeat(2000001) }] })).toBeNull();
   });
 
   it('serializes completion after pending writes, so a late write cannot resurrect the position', async () => {

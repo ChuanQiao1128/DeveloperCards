@@ -15,11 +15,20 @@ public static partial class ContentRelease
     {
       var release=Required(body,"releaseId");var action=Required(body,"actionId");var target=Required(body,"buildId");
       var expected=Required(body,"expectedCurrent");var targetHash=HashField(body,"expectedRestoreHash");var hash=PayloadHash(body);
+      var reason=body.TryGetProperty("reason",out _) ? Required(body,"reason",1000) : "legacy caller: reason not supplied";
+      var durable=await DbUtil.ExecuteScalarAsync(conn,null,"select exists(select 1 from information_schema.columns where table_schema='public' and table_name='content_rollback_actions' and column_name='actor_sub')",[]) is true;
       APIGatewayProxyResponse result;
       await using(var tx=await conn.BeginTransactionAsync(RecallSmith.Lambda.Common.RequestBudget.Token))
       {
         await Lock(conn,tx,id);
-        var replay=await Replay(conn,tx,id,release,action,hash);if(replay is not null)return replay;
+        var replay=await Replay(conn,tx,id,release,action,hash);
+        if(replay is not null)
+        {
+          await tx.CommitAsync(RecallSmith.Lambda.Common.RequestBudget.Token);
+          if(durable)await DeliverRollbackManifest(conn,id,target,rebuild);
+          return replay;
+        }
+        if(durable)await DbUtil.ExecuteAsync(conn,tx,"select set_config('recallsmith.rollback_actor',$1,true),set_config('recallsmith.rollback_reason',$2,true)",[auth.UserSub,reason]);
         var authoritative = await DbUtil.ExecuteScalarAsync(conn,tx,
           "select to_regprocedure('public.content_release_rollback(bigint,text,text,text,text,text,text)') is not null",[]) is true;
         if(authoritative)
@@ -52,7 +61,9 @@ public static partial class ContentRelease
         }
         await Save(conn,tx,id,release,action,"rollback",hash,result);await tx.CommitAsync(RecallSmith.Lambda.Common.RequestBudget.Token);
       }
-      await rebuild(conn);return result;
+      if(durable)await DeliverRollbackManifest(conn,id,target,rebuild);
+      else await rebuild(conn);
+      return result;
     }
     catch(PostgresException e) when(e.SqlState=="P0001")
     {
@@ -62,4 +73,10 @@ public static partial class ContentRelease
     }
     catch(ValidationError e){return Helpers.ErrorEnvelope(res,e.Message.StartsWith("IDEMPOTENCY_CONFLICT")?409:400,"RELEASE_VALIDATION",e.Message);}
   }
+  private static async Task DeliverRollbackManifest(NpgsqlConnection conn,long id,string target,DeckRollback.ManifestRebuildFn rebuild)
+  {
+    var job=await DbUtil.ExecuteScalarAsync(conn,null,"select job_id from deck_publishes where deck_id=$1 and build_id=$2 and status='SUCCESS'",[id,target]) as string;
+    if(job is not null)await PublishDelivery.DeliverManifest(conn,job,async()=>{await rebuild(conn);});
+  }
+
 }

@@ -1,6 +1,6 @@
 locals {
-  # Q1 (R18I I03): a budget reads 100 % until its 28-day window holds this many events, so one bad event is at most
-  # 10 % of the budget (N = 10 / budget); the widget shows the event count beside it.
+  # A budget is unknown until its 28-day window holds this many events.
+  # IF without a false value drops the datum; never invent healthy data for an empty/small window.
   slo_budget_min_events = {
     api     = 2000
     sync    = 200
@@ -179,7 +179,7 @@ locals {
       width  = 24
       height = 2
       properties = {
-        markdown = "## SLOs (R18H) — rolling 28 days: API availability 99.5 %, sync latency 95 % ≤ 2 s, publish success 95 %; fast burn ≥ 14.4, slow burn ≥ 6"
+        markdown = "## SLOs (R18H) — rolling 28 days: API availability 99.5 %, sync latency 95 % ≤ 2 s, publish success 95 %; fast burn ≥ 14.4, slow burn ≥ 6. Unknown (no value) below the displayed sample floor. These are historical budgets, not current availability: missing or stale telemetry cannot establish health. Offline queued progress is pending work, not an API failure. Check the 15-minute synthetic heartbeat for current monitoring freshness."
       }
     },
     {
@@ -206,7 +206,7 @@ locals {
           ["AWS/ApiGateway", "4xx", "ApiId", var.api_id, "Stage", var.api_stage_name, "Resource", "/api/v1/sync/{proxy+}", "Method", "ANY", { stat = "Sum", id = "s4xx", visible = false }],
           [{ expression = local.slo_api_user_total, label = "requests in window, synthetic check excluded (budget counts from ${local.slo_budget_min_events.api})", id = "user_total" }],
           [{ expression = local.slo_api_user_bad, id = "user_bad", visible = false }],
-          [{ expression = "IF(user_total >= ${local.slo_budget_min_events.api}, 100 * (1 - (user_bad / user_total) / 0.005), 100)", label = "API availability budget remaining % (synthetic check excluded)", id = "budget" }],
+          [{ expression = "IF(user_total >= ${local.slo_budget_min_events.api}, 100 * (1 - (user_bad / user_total) / 0.005))", label = "API availability budget remaining % (synthetic check excluded)", id = "budget" }],
         ]
       }
     },
@@ -230,7 +230,7 @@ locals {
           [
             [{ expression = local.slo_sync_total, label = "sync requests in window (budget counts from ${local.slo_budget_min_events.sync})", id = "total" }],
             [{ expression = local.slo_sync_bad, id = "bad", visible = false }],
-            [{ expression = "IF(total >= ${local.slo_budget_min_events.sync}, 100 * (1 - (bad / total) / 0.05), 100)", label = "Sync latency budget remaining %", id = "budget" }],
+            [{ expression = "IF(total >= ${local.slo_budget_min_events.sync}, 100 * (1 - (bad / total) / 0.05))", label = "Sync latency budget remaining %", id = "budget" }],
           ],
         )
       }
@@ -256,7 +256,7 @@ locals {
           [{ expression = "FILL(succeeded, 0)", id = "good", visible = false }],
           [{ expression = "FILL(failed, 0)", id = "bad", visible = false }],
           [{ expression = "good + bad", label = "publish jobs in window (budget counts from ${local.slo_budget_min_events.publish})", id = "total" }],
-          [{ expression = "IF(total >= ${local.slo_budget_min_events.publish}, 100 * (1 - (bad / total) / 0.05), 100)", label = "Publish success budget remaining %", id = "budget" }],
+          [{ expression = "IF(total >= ${local.slo_budget_min_events.publish}, 100 * (1 - (bad / total) / 0.05))", label = "Publish success budget remaining %", id = "budget" }],
         ]
       }
     },
@@ -277,7 +277,7 @@ locals {
           ["AWS/ApiGateway", "5xx", "ApiId", var.api_id, "Stage", var.api_stage_name, { stat = "Sum", id = "e5xx", visible = false }],
           ["AWS/ApiGateway", "Count", "ApiId", var.api_id, "Stage", var.api_stage_name, { stat = "Sum", id = "total", visible = false }],
           [{ expression = "FILL(e5xx, 0)", id = "bad", visible = false }],
-          [{ expression = "IF(total >= 16 AND bad >= 2, (bad / total) / 0.005, 0)", label = "burn rate (1 h)", id = "burn" }],
+          [{ expression = "IF(total >= 16, (bad / total) / 0.005)", label = "burn rate (1 h)", id = "burn" }],
         ]
       }
     },
@@ -299,7 +299,7 @@ locals {
           [
             [{ expression = local.slo_sync_total, id = "total", visible = false }],
             [{ expression = local.slo_sync_bad, id = "bad", visible = false }],
-            [{ expression = "IF(total >= 6, (bad / total) / 0.05, 0)", label = "burn rate (1 h)", id = "burn" }],
+            [{ expression = "IF(total >= 6, (bad / total) / 0.05)", label = "burn rate (1 h)", id = "burn" }],
           ],
         )
       }
@@ -322,7 +322,7 @@ locals {
           [var.metrics_namespace, "PublishJobsFailed", { stat = "Sum", id = "failed", visible = false }],
           [{ expression = "FILL(succeeded, 0)", id = "good", visible = false }],
           [{ expression = "FILL(failed, 0)", id = "bad", visible = false }],
-          [{ expression = local.slo_publish_burn, label = "burn rate (1 h)", id = "burn" }],
+          [{ expression = "IF(good + bad >= 6, (bad / (good + bad)) / 0.05)", label = "burn rate (1 h)", id = "burn" }],
         ]
       }
     },

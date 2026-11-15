@@ -93,6 +93,7 @@ type ServerRow = {
   status: number;
   reviewCount: number;
   lastRating: number;
+  lastReviewEventId: string;
   lastReviewedAtMs: number;
   dueAtMs: number;
   srsStage: number | null;
@@ -150,8 +151,7 @@ class FakeServer {
       // the same event_id tiebreak this replica uses; the two are meant to be
       // read side by side. What the replica CANNOT prove is that Postgres
       // honours it on the real query plan, so that half waits on Testcontainers.
-      // Ties across separate transactions are a different case and stay
-      // arrival-ordered by design, asserted in the "documented boundary" test.
+      // The same event identity now participates in the cross-batch upsert.
       const last = group.reduce((a, b) =>
         b.eventTimeMs > a.eventTimeMs ||
         (b.eventTimeMs === a.eventTimeMs && b.eventId > a.eventId)
@@ -164,6 +164,7 @@ class FakeServer {
         status: 1,
         reviewCount: inc,
         lastRating: RATING_VALUE[last.rating],
+        lastReviewEventId: last.eventId,
         lastReviewedAtMs: last.eventTimeMs,
         dueAtMs: last.nextReviewAtMs,
         srsStage: last.srsStage,
@@ -181,13 +182,15 @@ class FakeServer {
       // three "state as of the last review" columns follow event time -- one
       // predicate for all three, so the rung can never come from a different
       // review than the due date next to it.
-      const excludedWins = excluded.lastReviewedAtMs >= current.lastReviewedAtMs;
+      const excludedWins = excluded.lastReviewedAtMs > current.lastReviewedAtMs ||
+        (excluded.lastReviewedAtMs === current.lastReviewedAtMs && excluded.lastReviewEventId > current.lastReviewEventId);
       this.rows.set(uid, {
         stableUid: uid,
         status: Math.max(current.status, excluded.status),
         reviewCount: current.reviewCount + excluded.reviewCount,
         lastReviewedAtMs: Math.max(current.lastReviewedAtMs, excluded.lastReviewedAtMs),
         lastRating: excludedWins ? excluded.lastRating : current.lastRating,
+        lastReviewEventId: excludedWins ? excluded.lastReviewEventId : current.lastReviewEventId,
         dueAtMs: excludedWins ? excluded.dueAtMs : current.dueAtMs,
         srsStage: excludedWins ? excluded.srsStage : current.srsStage,
         updatedAtMs: nowMs,
@@ -203,6 +206,7 @@ class FakeServer {
       status: r.status,
       reviewCount: r.reviewCount,
       lastRating: r.lastRating,
+      lastReviewEventId: r.lastReviewEventId,
       lastReviewedAtMs: r.lastReviewedAtMs,
       nextReviewAtMs: r.dueAtMs,
       srsStage: r.srsStage,
@@ -464,6 +468,20 @@ describe('multi-device sync simulation', () => {
     expect(reverse.merged[0].stage).toBe(2);
   });
 
+  it('client snapshot order is total across a legacy-null baseline and tied event IDs', () => {
+    const local: CardProgress[] = [{ stableUid: 'uid-a', stage: 0, nextReviewAt: 0 }];
+    const rows = [null, '10000000-0000-4000-8000-000000000001', 'f0000000-0000-4000-8000-000000000001'].map((lastReviewEventId, i) => ({
+      deckSlug: DECK, stableUid: 'uid-a', status: 1, reviewCount: 2, lastRating: i + 1,
+      lastReviewedAtMs: T0, nextReviewAtMs: T0 + (i + 1) * 86_400_000, srsStage: i,
+      lastReviewEventId, updatedAtMs: T0 + 10 - i,
+    }));
+    for (const order of [[0,1,2], [0,2,1], [1,0,2], [1,2,0], [2,0,1], [2,1,0]]) {
+      const result = mergeRemoteIntoLocalProgress(local, order.map(i => rows[i]));
+      expect(result.merged[0].stage).toBe(2);
+      expect(result.merged[0].nextReviewAt).toBe(rows[2].nextReviewAtMs);
+    }
+  });
+
   it('stage converges: two devices with different review counts agree after pull', () => {
     // The hole the old syncedState() comment described, now driven end to end.
     // d0 reviews the card three times and reaches rung 3; d1 reviews it once,
@@ -637,20 +655,7 @@ describe('multi-device sync simulation', () => {
     expect(forward.semanticState()).toBe(reverse.semanticState());
   });
 
-  it('documented boundary: an event_time tie ACROSS transactions IS arrival ordered', () => {
-    // Not a bug report, a contract, and the half the event_id tiebreak does not
-    // reach. Inside one batch `distinct on ... order by event_time desc,
-    // event_id desc` now picks deterministically, but two events that arrive in
-    // separate pushes never meet in that CTE: they meet in the upsert, whose
-    // predicate is `excluded.last_reviewed_at >= current`, and `>=` means the
-    // later arrival wins the tie. So two devices rating the same card in the
-    // same millisecond, pushing separately, is still the one input where the
-    // server's answer depends on which push landed first.
-    //
-    // Nothing upstream prevents it (event_id dedupe only removes identical
-    // events, not simultaneous ones), which is exactly why it is pinned here:
-    // if someone later makes the upsert tie-break too, this test fails and the
-    // reviewer has to decide deliberately instead of accidentally.
+  it('cross-batch timestamp ties use the same event ID order as one batch', () => {
     const at = T0 + 1_000;
     const mk = (id: string, rating: ReviewRating): SyncEvent => ({
       eventId: id,
@@ -670,13 +675,11 @@ describe('multi-device sync simulation', () => {
     b.ingest([mk('e1', 'again')], at + 2);
 
     expect(a.rows.get('uid-a')!.lastRating).toBe(RATING_VALUE.easy);
-    expect(b.rows.get('uid-a')!.lastRating).toBe(RATING_VALUE.again);
-    // srs_stage joined the same group, so it swings with its rating rather
-    // than drifting onto its own answer: the group moves as one.
+    expect(b.rows.get('uid-a')!.lastRating).toBe(RATING_VALUE.easy);
+    // Stage and due date follow the same event in either arrival order.
     expect(a.rows.get('uid-a')!.srsStage).toBe(RATING_VALUE.easy);
-    expect(b.rows.get('uid-a')!.srsStage).toBe(RATING_VALUE.again);
-    // The order-insensitive columns still agree, which is the point: the
-    // asymmetry is confined to the LWW group.
+    expect(b.rows.get('uid-a')!.srsStage).toBe(RATING_VALUE.easy);
+    expect(a.semanticState()).toBe(b.semanticState());
     expect(a.rows.get('uid-a')!.reviewCount).toBe(b.rows.get('uid-a')!.reviewCount);
     expect(a.rows.get('uid-a')!.lastReviewedAtMs).toBe(b.rows.get('uid-a')!.lastReviewedAtMs);
   });

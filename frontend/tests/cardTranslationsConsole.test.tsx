@@ -14,6 +14,7 @@
 //
 // Every surface must stay invisible on a deck without translations.
 
+import { webcrypto } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -130,6 +131,8 @@ function card(over: Partial<Card> = {}): Card {
 }
 
 beforeEach(() => {
+  vi.stubGlobal('crypto', webcrypto);
+  Object.defineProperty(navigator, 'locks', { configurable: true, value: { request: (_name: string, _options: unknown, action: () => Promise<unknown>) => action() } });
   signOut();
   signInAsSuperAdmin();
   api.fetchDeckById.mockResolvedValue(ok(translatedDeck));

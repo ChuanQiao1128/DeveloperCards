@@ -139,6 +139,7 @@ public class RouteMetricsTests
   [InlineData("/api/v1/sync/push")]
   [InlineData("/api/v1/sync/progress/events")]
   [InlineData("/api/v1/authoring/cards")]
+  [InlineData("/api/v1/authoring/cards/import/receipt")]
   [InlineData("/api/v1/authoring/cards/page")]
   [InlineData("/api/v1/admin/permissions")]
   [InlineData("/api/v1/admin/permissions/bulk")]
@@ -159,6 +160,18 @@ public class RouteMetricsTests
     // shortest-match implementation reports the specific one as the general one -- which
     // looks right on a dashboard and hides the new route's latency inside the old route's.
     Assert.Equal(path, RouteMetrics.RouteFor(path));
+  }
+
+  [Fact]
+  public void ImportReceiptRoute_UsesOneBoundedLabel()
+  {
+    const string receipt = "/api/v1/authoring/cards/import/receipt";
+    Assert.Equal(receipt, RouteMetrics.RouteFor("/stage" + receipt));
+    Assert.Equal("/api/v1/authoring/cards/import", RouteMetrics.RouteFor("/api/v1/authoring/cards/import"));
+    var labels = Enumerable.Range(0, 100)
+      .Select(i => RouteMetrics.RouteFor(receipt + "/" + i))
+      .Distinct(StringComparer.Ordinal).ToList();
+    Assert.Equal([RouteMetrics.UnmatchedRoute], labels);
   }
 
   [Fact]

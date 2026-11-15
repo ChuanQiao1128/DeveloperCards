@@ -4,6 +4,11 @@ export type ReviewRating = 'again' | 'hard' | 'good' | 'easy';
 export interface CardProgress {
   stableUid: string;
   stage: number; // interval bucket
+  /** Server snapshots and local review intents share this winner identity. */
+  lastReviewEventId?: string;
+  /** Independent server facts; not part of the winning scheduler snapshot. */
+  reviewCount?: number;
+  status?: number;
   lastReviewedAt?: number; // ms epoch; absent => never learned
   nextReviewAt: number; // ms epoch; 0 => unscheduled/unlearned
 
@@ -97,6 +102,20 @@ export function isDue(p: CardProgress, now: Date): boolean {
  * stages 0-2 saturate at 0 anyway, so a genuinely unknown card still ends up at
  * the bottom after two failures.
  */
+export function normalizeReviewEventId(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const id = value.trim().toLowerCase();
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(id) ? id : undefined;
+}
+
+/** The server UUID order, with a legacy-null identity below any real event. */
+export function compareReviewOrder(at: number, aid: unknown, bt: number, bid: unknown): number {
+  if (at !== bt) return at - bt;
+  const a = normalizeReviewEventId(aid) ?? '';
+  const b = normalizeReviewEventId(bid) ?? '';
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
 export function scheduleNextReview(p: CardProgress, rating: ReviewRating, now: Date): CardProgress {
   const nowMs = now.getTime();
 

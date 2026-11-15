@@ -14,7 +14,7 @@ import { applyRemoteFeatures } from '../../src/config/featureFlags';
 const T = 1_790_000_000_000;
 const state = { lapses: 1, hardStreak: 0, fsrsStability: 0.39150242161493015,
   fsrsDifficulty: 6.607035107311108, fsrsAnchorAt: T, fsrsReviewedAt: T };
-const reviewed = { stableUid: 'one', stage: 0, lastReviewedAt: T, nextReviewAt: T + 600_000, ...state };
+const reviewed = { reviewCount: 2, status: 1, stableUid: 'one', stage: 0, lastReviewedAt: T, nextReviewAt: T + 600_000, ...state };
 function row(extra: object = {}) { return { deckSlug: 'deck', stableUid: 'one', status: 1,
   reviewCount: 2, lastRating: 1, lastReviewedAtMs: T, nextReviewAtMs: T + 600_000,
   srsStage: 0, updatedAtMs: T + 1, schedulerState: state, ...extra }; }
