@@ -30,7 +30,9 @@ function observe(root, env = process.env, run = execFileSync) {
     'SENTRY_BINARY_PATH', 'SENTRY_PROPERTIES', 'SENTRY_DOTENV_PATH',
     'SENTRY_CLI_EXTRA_ARGS', 'SENTRY_CLI_RN_XCODE_EXTRA_ARGS', 'SENTRY_COLLECT_MODULES', 'SENTRY_RN_PACKAGE_PATH',
     'SENTRY_DISABLE_AUTO_UPLOAD', '__SENTRY_RN_WRAP_XCODE_CALL', 'SENTRY_RN_REAL_NODE_BINARY', 'SENTRY_RN_REAL_HERMES_CLI_PATH', 'SENTRY_RN_SOURCEMAP_REPORT'];
-  const override = overrides.find(key => env[key]);
+  // Rust's env::var branches treat empty values as active wrapper controls.
+  const sentryControls = ['SENTRY_RN_BUNDLE_COMMAND', 'SENTRY_RN_NO_DEBUG_ID', 'NO_AUTO_RELEASE', 'AUTO_RELEASE', 'SENTRY_RELEASE', 'SENTRY_DIST'];
+  const override = overrides.find(key => env[key]) || sentryControls.find(key => Object.hasOwn(env, key));
   if (override) throw new Error(`uncontrolled bundle override: ${override}`);
   const cli = require.resolve('@expo/cli', { paths: [path.join(root, 'node_modules/expo/package.json')] });
   const hermes = path.join(env.PODS_ROOT, 'hermes-engine/destroot/bin/hermesc');

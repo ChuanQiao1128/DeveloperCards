@@ -109,6 +109,8 @@ The observer invokes the locked Sentry 7.2.0 shell with the RN 0.81.5 script fro
 `ios` directory, preserving Sentry CLI 2.55.0 discovery, source-map reporting and enabled uploads.
 It supplies the real Node/Hermes tools before Sentry installs its own wrappers; caller-supplied
 wrapper markers, tool/report paths and bundling overrides are refused (diagnostics name keys only).
+Incoming bundle-command/debug-ID, auto-release argument/state and release/distribution controls
+are also refused when present, including empty values that activate Sentry's environment branches.
 Existing `SENTRY_ALLOW_FAILURE` production behavior is preserved. The observer waits for the complete
 Sentry → RN → Hermes → source-map/module-collection chain, refuses a pre-existing/skipped bundle,
 and retains the final Hermes bytes before signing. A nonzero chain result creates no observation.

@@ -56,7 +56,9 @@ function fixture() {
       const result=cp.spawnSync(compiling?env.SENTRY_RN_REAL_HERMES_CLI_PATH:env.SENTRY_RN_REAL_NODE_BINARY,args,{env,stdio:'inherit'});
       if (result.status!==0) process.exit(result.status??1);
       const report=JSON.parse(fs.readFileSync(env.SENTRY_RN_SOURCEMAP_REPORT));
-      if (args.includes('--bundle-output')) { report.packager_bundle_path=args[args.indexOf('--bundle-output')+1]; report.packager_sourcemap_path=args[args.indexOf('--sourcemap-output')+1]; }
+      // xcode.rs 419,435-438: a present value, even empty, replaces recognition.
+      const bundleCommand=Object.hasOwn(env,'SENTRY_RN_BUNDLE_COMMAND')?env.SENTRY_RN_BUNDLE_COMMAND:'export:embed';
+      if (args.includes(bundleCommand) && args.includes('--bundle-output')) { report.packager_bundle_path=args[args.indexOf('--bundle-output')+1]; report.packager_sourcemap_path=args[args.indexOf('--sourcemap-output')+1]; }
       if (compiling) report.hermes_bundle_path=args[args.indexOf('-out')+1];
       if (args.includes('-o')) report.hermes_sourcemap_path=args[args.indexOf('-o')+1];
       fs.writeFileSync(env.SENTRY_RN_SOURCEMAP_REPORT,JSON.stringify(report)); process.exit(0);
@@ -73,6 +75,8 @@ function fixture() {
       SENTRY_RN_SOURCEMAP_REPORT:reportFile,__SENTRY_RN_WRAP_XCODE_CALL:'1'};
     const result=cp.spawnSync(args[2],[],{env:injected,stdio:'inherit'}); if(result.status!==0)process.exit(result.status??1);
     const report=JSON.parse(fs.readFileSync(reportFile));
+    // xcode.rs 292-297 returns success before upload when detection is missing.
+    if(!report.packager_bundle_path || !report.packager_sourcemap_path) { log('sentry-no-packager-report'); process.exit(0); }
     for(const key of ['packager_bundle_path','packager_sourcemap_path','hermes_bundle_path','hermes_sourcemap_path']) assert(report[key]);
     assert.equal(fs.readFileSync(report.hermes_sourcemap_path,'utf8'),'FAKE composed source map');
     if(env.FAKE_SENTRY_FAILURE) { console.error('FAKE_PRIVATE_OUTPUT'); process.exit(9); }
@@ -130,6 +134,32 @@ describe('outer native observer with the locked Sentry injection protocol (fake 
     expect(fs.existsSync(path.join(f.dir, 'bundle-stage.json'))).toBe(false);
     expect(fs.existsSync(path.join(f.dir, 'observed-main.jsbundle'))).toBe(false);
   });
+  it.each(['', 'unrecognized-command'])('models the upstream missing-report success when bundle recognition is overridden (%j)', value => {
+    const f = fixture();
+    // Bypass the observer to exhibit the locked CLI's presence-sensitive branch
+    // in the fake protocol; this produces no observer/release proof.
+    const result = spawnSync('/bin/sh', [path.join(f.root, 'node_modules/@sentry/react-native/scripts/sentry-xcode.sh'),
+      path.join(f.root, 'node_modules/react-native/scripts/react-native-xcode.sh')], { cwd: f.env.PROJECT_DIR, encoding: 'utf8',
+      env: { ...f.env, SENTRY_RN_BUNDLE_COMMAND: value, BUNDLE_COMMAND: 'export:embed',
+        HERMES_CLI_PATH: path.join(f.env.PODS_ROOT, 'hermes-engine/destroot/bin/hermesc') } });
+    expect(result.status, result.stderr).toBe(0);
+    const events = fs.readFileSync(f.log, 'utf8').trim().split('\n').map(line => JSON.parse(line));
+    expect(events).toContain('sentry-no-packager-report');
+    expect(events).not.toContain('sentry-report-upload-attempt');
+    expect(events).toContain('sentry-collect');
+    expect(fs.readFileSync(path.join(f.build, 'FAKE.app/main.jsbundle'))).toEqual(hbc);
+    expect(fs.existsSync(path.join(f.dir, 'bundle-stage.json'))).toBe(false);
+  });
+  it.each(['SENTRY_RN_BUNDLE_COMMAND', 'SENTRY_RN_NO_DEBUG_ID', 'NO_AUTO_RELEASE', 'AUTO_RELEASE', 'SENTRY_RELEASE', 'SENTRY_DIST']
+    .flatMap(key => ['', key === 'AUTO_RELEASE' ? 'false' : 'SECRET_SENTINEL_DO_NOT_PRINT'].map(value => ({ key, value, presence: value ? 'nonempty' : 'empty' }))))(
+    'rejects presence of $key ($presence)', ({ key, value }) => {
+      const f = fixture(); let error: any;
+      try { observe(f.root, { ...f.env, [key]: value }); } catch (e) { error = e; }
+      expect(error?.message).toBe(`uncontrolled bundle override: ${key}`);
+      expect(fs.existsSync(f.log)).toBe(false);
+      expect(fs.existsSync(path.join(f.dir, 'bundle-stage.json'))).toBe(false);
+      expect(fs.existsSync(path.join(f.dir, 'observed-main.jsbundle'))).toBe(false);
+    });
   it.each(['NODE_OPTIONS', 'NODE_ARGS', 'EXTRA_PACKAGER_ARGS', 'BUNDLE_CONFIG', 'CONFIG_CMD', 'CONFIG_JSON', 'HERMES_CLI_PATH',
     'COMPOSE_SOURCEMAP_PATH', 'SOURCEMAP_FILE', 'SOURCE_MAP_PATH', 'MODULES_PATHS', 'SENTRY_CLI_EXECUTABLE', 'SENTRY_CLI_PACKAGE_PATH',
     'SENTRY_BINARY_PATH', 'SENTRY_PROPERTIES', 'SENTRY_DOTENV_PATH', 'SENTRY_CLI_EXTRA_ARGS', 'SENTRY_CLI_RN_XCODE_EXTRA_ARGS',
