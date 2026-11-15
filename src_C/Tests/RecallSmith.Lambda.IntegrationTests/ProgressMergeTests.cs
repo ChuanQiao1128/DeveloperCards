@@ -21,7 +21,8 @@ public class ProgressMergeTests
   // all, the legacy row): that pair is the reason the recency comparison had to
   // grow a stage component when stage joined the LWW group.
   private static readonly ProgressState[] States =
-  [
+  new ProgressState[]
+  {
     new(Status: 0, ReviewCount: 0, LastRating: null, LastReviewedAtMs: 0, DueAtMs: 0, LastSeenRevision: 0, SrsStage: null),
     new(Status: 1, ReviewCount: 1, LastRating: 1, LastReviewedAtMs: T, DueAtMs: T + 600_000, LastSeenRevision: 0, SrsStage: 0),
     new(Status: 1, ReviewCount: 1, LastRating: 4, LastReviewedAtMs: T, DueAtMs: T + 86_400_000, LastSeenRevision: 3, SrsStage: 2),
@@ -30,7 +31,7 @@ public class ProgressMergeTests
     new(Status: 2, ReviewCount: 3, LastRating: 3, LastReviewedAtMs: T + 90_000, DueAtMs: T + 172_800_000, LastSeenRevision: 7, SrsStage: 4),
     new(Status: 1, ReviewCount: 1, LastRating: 3, LastReviewedAtMs: T + 90_000, DueAtMs: T + 172_800_000, LastSeenRevision: 7, SrsStage: 3),
     new(Status: 1, ReviewCount: 1, LastRating: 3, LastReviewedAtMs: T + 90_000, DueAtMs: T + 172_800_000, LastSeenRevision: 7, SrsStage: null),
-  ];
+  }.Select((state, i) => i == 0 ? state : state with { LastReviewEventId = $"00000000-0000-4000-8000-{i:000000000000}", SchedulerState = $"state-{i}", SchedulerVersion = $"v{i}" }).ToArray();
 
   [Fact]
   public void Merge_IsCommutative()

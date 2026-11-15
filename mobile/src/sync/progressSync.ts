@@ -77,6 +77,8 @@ type PushResp = {
   acceptedCount: number;
   acceptedEventIds: string[];
   duplicateEventIds: string[];
+  rejectedEventIds?: string[];
+  rejected?: { index: number; eventId?: string | null; code: string }[];
 };
 
 type ProgressItem = {
@@ -85,6 +87,7 @@ type ProgressItem = {
   status: number;
   reviewCount: number;
   lastRating: number | null;
+  lastReviewEventId?: string | null;
   lastReviewedAtMs: number | string | null;
 
   // Phase 3
@@ -128,6 +131,7 @@ export type ProgressEvent = {
   dwellTimeMs?: number | null;
   offlineQueueDelayMs?: number | null;
   schedulerVersion?: string | null;
+  syncRejection?: { code: string };
 };
 
 /**
@@ -587,7 +591,7 @@ async function writeQueue(userSub: string, arr: ProgressEvent[]): Promise<void> 
 
 // Every queue mutation below is a read-modify-write over one AsyncStorage key,
 // and single-threaded JS does not make that safe: a race needs two awaits, not
-// two threads. The push-ack path (removeProgressEventsById, inside a sync round)
+// two threads. The push-ack path (settleProgressEvents, inside a sync round)
 // and the rating path (enqueueProgressEvent) routinely overlap, and whoever read
 // first writes last, silently deleting the other's event. That loss is invisible
 // locally because deck progress was already saved, so it only surfaces as a
@@ -703,19 +707,33 @@ export async function purgeClaimedPendingProgressEvents(userSub: string): Promis
 async function peekProgressEvents(userSub: string, limit: number): Promise<ProgressEvent[]> {
   return withQueueLock(async () => {
     const q = await readQueue(userSub);
-    return q.slice(0, Math.max(0, limit));
+    return q.filter(ev => !ev.syncRejection).slice(0, Math.max(0, limit));
   });
 }
 
-async function removeProgressEventsById(userSub: string, ids: string[]): Promise<void> {
-  if (!ids || ids.length === 0) return;
-  const idSet = new Set(ids.map(String));
+// One durable replacement keeps rejected facts and removes only matching,
+// dispatched acknowledgements. Old servers also list rejections as duplicates.
+async function settleProgressEvents(userSub: string, batch: ProgressEvent[], response: PushResp, generation: number): Promise<number> {
+  const dispatched = new Set(batch.map(ev => ev.eventId));
+  const rejected = new Map<string, string>();
+  for (const id of response.rejectedEventIds ?? []) {
+    if (dispatched.has(id)) rejected.set(id, 'REJECTED');
+  }
+  for (const item of response.rejected ?? []) {
+    const ev = Number.isInteger(item.index) ? batch[item.index] : undefined;
+    if (ev && (!item.eventId || item.eventId === ev.eventId)) rejected.set(ev.eventId, item.code || 'REJECTED');
+  }
+  const acknowledged = new Set([...(response.acceptedEventIds ?? []), ...(response.duplicateEventIds ?? [])]
+    .filter(id => dispatched.has(id) && !rejected.has(id)));
   return withQueueLock(async () => {
-    const q = await readQueue(userSub);
-    const out = q.filter((ev) => !idSet.has(String(ev?.eventId)));
-    if (out.length !== q.length) {
-      await writeQueue(userSub, out);
-    }
+    const current = () => generation === getAuthSessionGeneration() && _userSubMem === userSub && !isSyncBlocked();
+    if (!current()) return 0;
+    const queue = await readQueue(userSub);
+    if (!current()) return 0;
+    const out = queue.filter(ev => !acknowledged.has(ev.eventId)).map(ev =>
+      rejected.has(ev.eventId) ? { ...ev, syncRejection: { code: rejected.get(ev.eventId)! } } : ev);
+    if (acknowledged.size || rejected.size) await writeQueue(userSub, out);
+    return queue.length - out.length;
   });
 }
 
@@ -1190,8 +1208,11 @@ export function mergeRemoteIntoLocalProgress(
 
   /** Total order on remote snapshots of one card. See the tie note below. */
   function compareRemoteBest(a: RemoteBest, b: RemoteBest): number {
-    if (a.updatedAt !== b.updatedAt) return a.updatedAt - b.updatedAt;
     if (a.lastReviewedAt !== b.lastReviewedAt) return a.lastReviewedAt - b.lastReviewedAt;
+    const aid = (a.row.lastReviewEventId ?? '').toLowerCase();
+    const bid = (b.row.lastReviewEventId ?? '').toLowerCase();
+    if (aid !== bid) return aid < bid ? -1 : 1;
+    if (a.updatedAt !== b.updatedAt) return a.updatedAt - b.updatedAt;
     if (a.nextReviewAt !== b.nextReviewAt) return a.nextReviewAt - b.nextReviewAt;
     // stage entered the payload, so it has to enter the order too: two rows
     // alike on the timestamps but differing on the rung would otherwise be a
@@ -1667,11 +1688,10 @@ async function syncProgressOnce(
     });
 
     if (!isCurrent()) return stopped(pushed);
-    const ackIds = [...(resp.data.acceptedEventIds || []), ...(resp.data.duplicateEventIds || [])];
-    if (ackIds.length === 0) break;
-
-    await removeProgressEventsById(userSub, ackIds);
-    pushed += ackIds.length;
+    const acknowledged = await settleProgressEvents(userSub, batch, resp.data, generation);
+    pushed += acknowledged;
+    // Rejected records stay durable with a reason and are skipped on retries.
+    if (acknowledged === 0 && !resp.data.rejected?.length && !resp.data.rejectedEventIds?.length) break;
     if (!isCurrent() || isSyncBlocked() || _userSubMem !== userSub) return stopped(pushed);
     const adopted = await adoptPendingProgressEvents(userSub, false);
     if (!isCurrent()) return stopped(pushed);
@@ -2028,13 +2048,15 @@ export async function getProgressSyncStatus(): Promise<{
   lastAttemptAtMs?: number; lastPushAtMs?: number; lastPullAtMs?: number;
 }> {
   const sub = _userSubMem;
-  const pending = await progressQueueSize(sub ?? PENDING_SUB);
-  if (!sub) return { signedIn: false, pending, error: false, syncing: false };
+  const queue = await withQueueLock(() => readQueue(sub ?? PENDING_SUB));
+  const pending = queue.length;
+  const hasRejected = queue.some(ev => !!ev.syncRejection);
+  if (!sub) return { signedIn: false, pending, error: hasRejected, syncing: false };
   const [raw, error] = await Promise.all([
     AsyncStorage.getItem(kStatus(sub)), AsyncStorage.getItem(kLastError(sub)),
   ]);
   const status = raw ? JSON.parse(raw) : {};
-  return { ...status, signedIn: true, pending, error: !!error,
+  return { ...status, signedIn: true, pending, error: !!error || hasRejected,
     syncing: _inFlight || _recovery?.reason === 'sync_confirmation',
     automaticRetry: _recovery?.userSub === sub && _recovery.reason === 'automatic_retry',
   };

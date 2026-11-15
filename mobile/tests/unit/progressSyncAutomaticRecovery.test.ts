@@ -2,17 +2,23 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const net = vi.hoisted(() => ({
   store: new Map<string, string>(),
-  mode: 'online' as 'online' | 'offline' | 'lost-ack' | 'bad-request',
+  mode: 'online' as 'online' | 'offline' | 'lost-ack' | 'bad-request' | 'rejected' | 'malicious',
   attempts: [] as string[],
   attemptTimes: [] as number[],
   accepted: new Set<string>(),
   pulls: 0,
   user: 'A',
   pullGate: undefined as Promise<void> | undefined,
+  pushGate: undefined as Promise<void> | undefined,
+  onPush: undefined as (() => Promise<void>) | undefined,
+  failQueueWrite: false,
 }));
 vi.mock('@react-native-async-storage/async-storage', () => ({ default: {
   getItem: async (key: string) => net.store.get(key) ?? null,
-  setItem: async (key: string, value: string) => { net.store.set(key, value); },
+  setItem: async (key: string, value: string) => {
+    if (net.failQueueWrite && key.includes('progressQueue')) throw new Error('Disk unavailable');
+    net.store.set(key, value);
+  },
   removeItem: async (key: string) => { net.store.delete(key); },
   getAllKeys: async () => [...net.store.keys()],
   multiRemove: async (keys: string[]) => { keys.forEach(key => net.store.delete(key)); },
@@ -34,12 +40,20 @@ vi.mock('../../src/api/apiClient', () => ({ apiJson: async (path: string, opts: 
     const ids = opts.body.events.map((event: any) => event.eventId) as string[];
     net.attempts.push(...ids);
     net.attemptTimes.push(Date.now());
-    if (net.mode === 'offline') throw Object.assign(new Error('Network request failed'), { kind: 'offline' });
-    if (net.mode === 'bad-request') throw Object.assign(new Error('Invalid event'), { status: 400 });
+    const mode = net.mode;
+    const gate = net.pushGate; net.pushGate = undefined;
+    if (gate) await gate;
+    const callback = net.onPush; net.onPush = undefined;
+    if (callback) await callback();
+    if (mode === 'rejected') return ok({ acceptedEventIds: [], duplicateEventIds: ids,
+      rejectedEventIds: ids, rejected: ids.map((eventId, index) => ({ eventId, index, code: 'TOO_LONG' })) });
+    if (mode === 'malicious') return ok({ acceptedEventIds: [...ids, 'later-id', 'later-id'], duplicateEventIds: ids });
+    if (mode === 'offline') throw Object.assign(new Error('Network request failed'), { kind: 'offline' });
+    if (mode === 'bad-request') throw Object.assign(new Error('Invalid event'), { status: 400 });
     const duplicateEventIds = ids.filter(id => net.accepted.has(id));
     const acceptedEventIds = ids.filter(id => !net.accepted.has(id));
     ids.forEach(id => net.accepted.add(id));
-    if (net.mode === 'lost-ack') {
+    if (mode === 'lost-ack') {
       net.mode = 'online';
       throw Object.assign(new Error('Request timed out'), { kind: 'timeout' });
     }
@@ -63,7 +77,7 @@ beforeEach(async () => {
   net.store.clear(); net.mode = 'online'; net.attempts = []; net.accepted.clear(); net.pulls = 0;
   net.user = 'A';
   net.attemptTimes = [];
-  net.pullGate = undefined;
+  net.pullGate = undefined; net.pushGate = undefined; net.onPush = undefined; net.failQueueWrite = false;
   sync = await import('../../src/sync/progressSync');
   guard = await import('../../src/sync/syncGuard');
   await sync.setActiveUserSub('A');
@@ -71,6 +85,7 @@ beforeEach(async () => {
   await vi.advanceTimersByTimeAsync(1);
 });
 afterEach(async () => {
+  net.failQueueWrite = false;
   await sync.setSyncAccessToken(null);
   vi.clearAllTimers(); vi.useRealTimers(); vi.restoreAllMocks();
 });
@@ -82,6 +97,66 @@ async function rateAndFlush() {
 }
 
 describe('automatic progress sync recovery', () => {
+  it('ignores unsent and repeated ACK ids while a new event is enqueued during push', async () => {
+    net.mode = 'malicious';
+    net.onPush = async () => { await sync.recordReviewEvent({ deckSlug: 'test-deck', stableUid: 'later', rating: 'good', reviewedAtMs: Date.now(), eventId: 'later-id' }); };
+    const first = await rateAndFlush();
+    const queue = JSON.parse(net.store.get('devcards:u:A:sync:progressQueue:v1')!);
+    expect(queue.map((event: any) => event.eventId)).toEqual(['later-id']);
+    expect(net.attempts).toEqual([first]);
+    const debug = await sync.getProgressSyncDebugState();
+    expect(debug.last.pushed).toBe(1);
+  });
+
+  it('persists rejected facts and exposes an error even when old servers call them duplicates', async () => {
+    net.mode = 'rejected';
+    const id = await rateAndFlush();
+    let queue = JSON.parse(net.store.get('devcards:u:A:sync:progressQueue:v1')!);
+    expect(queue[0]).toMatchObject({ eventId: id, syncRejection: { code: 'TOO_LONG' } });
+    expect((await sync.getProgressSyncStatus())).toMatchObject({ pending: 1, error: true });
+    await vi.advanceTimersByTimeAsync(2_001);
+    sync.scheduleProgressSync({ delayMs: 0, reason: 'manual' });
+    await vi.advanceTimersByTimeAsync(1);
+    expect(net.attempts).toEqual([id]);
+    expect((await sync.getProgressSyncStatus()).error).toBe(true);
+    // A process restart must retain both the original event and rejection reason.
+    await sync.setSyncAccessToken(null);
+    vi.resetModules();
+    sync = await import('../../src/sync/progressSync');
+    await sync.setActiveUserSub('A');
+    queue = JSON.parse(net.store.get('devcards:u:A:sync:progressQueue:v1')!);
+    expect(queue[0].syncRejection.code).toBe('TOO_LONG');
+    expect((await sync.getProgressSyncStatus()).error).toBe(true);
+  });
+
+  it('retains an acknowledged event if the durable queue replacement fails', async () => {
+    const id = await sync.recordReviewEvent('test-deck', 'card-1', 'good', Date.now());
+    net.failQueueWrite = true;
+    sync.scheduleProgressSync({ delayMs: 0, reason: 'manual' });
+    await vi.advanceTimersByTimeAsync(1);
+    expect(JSON.parse(net.store.get('devcards:u:A:sync:progressQueue:v1')!)[0].eventId).toBe(id);
+    expect((await sync.getProgressSyncStatus()).pending).toBe(1);
+    net.failQueueWrite = false;
+    sync.scheduleProgressSync({ delayMs: 0, reason: 'manual' });
+    await vi.advanceTimersByTimeAsync(1);
+    expect((await sync.getProgressSyncStatus()).pending).toBe(0);
+    expect(net.accepted.size).toBe(1);
+  });
+
+  it('a late A push cannot acknowledge A or B after switching to B', async () => {
+    let release!: () => void;
+    net.pushGate = new Promise<void>(resolve => { release = resolve; });
+    const id = await rateAndFlush();
+    net.user = 'B'; net.mode = 'offline';
+    await sync.setActiveUserSub('B');
+    await sync.setSyncAccessToken('token-B');
+    const other = await sync.recordReviewEvent({ deckSlug: 'test-deck', stableUid: 'b', rating: 'good', reviewedAtMs: Date.now(), eventId: 'b-event' });
+    release();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(JSON.parse(net.store.get('devcards:u:A:sync:progressQueue:v1')!)[0].eventId).toBe(id);
+    expect(JSON.parse(net.store.get('devcards:u:B:sync:progressQueue:v1')!)[0].eventId).toBe(other);
+  });
+
   it('an empty follow-up does not invalidate a successful readback', async () => {
     const first = await sync.getProgressSyncStatus();
     expect(first.lastPullAtMs).toBeGreaterThan(0);

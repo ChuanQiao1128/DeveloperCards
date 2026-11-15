@@ -48,6 +48,7 @@ public static class ProgressGet
         status,
         review_count as "reviewCount",
         last_rating as "lastRating",
+        to_jsonb(user_progress) ->> 'last_review_event_id' as "lastReviewEventId",
         (extract(epoch from last_reviewed_at) * 1000)::bigint as "lastReviewedAtMs",
         (extract(epoch from due_at) * 1000)::bigint as "nextReviewAtMs",
         last_seen_revision as "lastSeenRevision",

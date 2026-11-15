@@ -96,6 +96,60 @@ public class ProgressEventsIntegrationTests
       .ToList();
   }
 
+  [Fact]
+  public async Task CrossBatchEqualTimestamps_PreserveOneTotalWinnerAndUniqueCounts()
+  {
+    // Fixed legacy baseline; every permutation must add two unique events.
+    foreach (var mode in new[] { "high-first", "low-first", "one-batch", "concurrent" })
+    {
+      var user = NewUser("cross-tie-" + mode);
+      await using var conn = await _db.OpenAsync();
+      await RecallSmith.Lambda.Db.DbUtil.ExecuteAsync(conn, null,
+        "insert into users(user_sub) values($1)", [user]);
+      await RecallSmith.Lambda.Db.DbUtil.ExecuteAsync(conn, null,
+        """
+        insert into user_progress(user_sub, deck_slug, stable_uid, status, review_count, last_reviewed_at, due_at, srs_stage, scheduler_state)
+        values($1, 'csharp-basics', 'tie', 2, 7, to_timestamp($2/1000.0), to_timestamp($2/1000.0), 3, '{"lapses":7}')
+        """, [user, Base]);
+      var baseline = (await _db.QueryAsync("select last_review_event_id, scheduler_state::text as state from user_progress where user_sub=$1", user)).Single();
+      Assert.Null(baseline["last_review_event_id"]);
+      Assert.Contains("7", baseline["state"]!.ToString());
+      var suffix = Guid.NewGuid().ToString("D")[1..];
+      object Review(string id, int rating, long due, int stage, string version, int revision) => new {
+        eventId = id, deckSlug = Deck, stableUid = "tie", rating, eventTimeMs = Base,
+        nextReviewAtMs = due, schedulerVersion = version,
+        progressAfter = new { stage, lastSeenRevision = revision, lapses = rating, hardStreak = stage,
+          fsrsStability = (double)rating, fsrsDifficulty = 5.0, fsrsAnchorAt = Base, fsrsReviewedAt = Base }
+      };
+      var low = Review("1" + suffix, 1, Base + OneDayMs, 0, "low", 9);
+      var high = Review("f" + suffix, 4, Base + 2 * OneDayMs, 6, "high", 2);
+      if (mode == "one-batch") await PostAsync(user, [low, high]);
+      else if (mode == "concurrent") await Task.WhenAll(PostAsync(user, [high]), PostAsync(user, [low]));
+      else
+      {
+        await PostAsync(user, mode == "high-first" ? [high] : [low]);
+        await PostAsync(user, mode == "high-first" ? [low] : [high]);
+      }
+      await PostAsync(user, [low, high, high]);
+      var row = (await _db.QueryAsync("select status, review_count, last_rating, srs_stage, last_scheduler_version, last_seen_revision, scheduler_state::text as state, last_review_event_id::text as winner, (extract(epoch from due_at)*1000)::bigint as due from user_progress where user_sub=$1", user)).Single();
+      Assert.Equal(9, AsInt(row["review_count"]));
+      Assert.Equal(2, AsInt(row["status"]));
+      Assert.Equal("f" + suffix, row["winner"]);
+      var state = JsonDocument.Parse((string)row["state"]!).RootElement;
+      Assert.Equal(4, state.GetProperty("lapses").GetInt32());
+      Assert.Equal(6, state.GetProperty("hardStreak").GetInt32());
+      Assert.Equal(4.0, state.GetProperty("fsrsStability").GetDouble());
+      Assert.Equal(5.0, state.GetProperty("fsrsDifficulty").GetDouble());
+      Assert.Equal(Base, state.GetProperty("fsrsAnchorAt").GetInt64());
+      Assert.Equal(Base, state.GetProperty("fsrsReviewedAt").GetInt64());
+      Assert.Equal(4, AsInt(row["last_rating"]));
+      Assert.Equal(6, AsInt(row["srs_stage"]));
+      Assert.Equal("high", row["last_scheduler_version"]);
+      Assert.Equal(9, AsInt(row["last_seen_revision"]));
+      Assert.Equal(Base + 2 * OneDayMs, Convert.ToInt64(row["due"]));
+    }
+  }
+
   // ------------------------------------------------------------------ T1
 
   [Fact]
