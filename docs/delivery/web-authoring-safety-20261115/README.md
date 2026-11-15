@@ -26,7 +26,7 @@ The local suite uses real Chromium, the built console, the production `VpcFuncti
 
 Four browser cases cover competing editors including a second conflict, stale import atomicity, a response dropped after a committed import followed by another real API edit, and forbidden direct API writes. Database-state JSON and desktop/mobile conflict captures are attached to the browser result. Existing mocked browser/CSP smoke tests remain a separate suite. The local suite is added to the same CI browser job, without a new runner/job.
 
-Initial failing reproductions and isolated guard-removal controls are retained outside the repository. The initial independent review identified two additional boundaries in mutation scheduling and atomic card authorization; both must be closed before this delivery is accepted. Exact final source/check/review bindings are recorded in `validation.json`.
+Initial failing reproductions and isolated guard-removal controls are retained outside the repository. The initial independent review identified two additional boundaries in mutation scheduling and atomic card authorization; both were reproduced and closed in the bounded repair and independent re-review. Exact source/check/review bindings are recorded in [validation.json](validation.json), with retained synthetic [database outcomes](browser-final-states.json). The source-reviewed commit is `7267253d913fd4362f3af74d064efee3192b2337`. Backend 3,296, console 1,857, existing browser smoke 17, and real API/PostgreSQL browser 4 checks passed, along with build and lint. Initial failure and repaired reviews are retained beside the validation manifest. No test total is substituted for the final-state and guard-removal evidence.
 
 ## Running the checks
 

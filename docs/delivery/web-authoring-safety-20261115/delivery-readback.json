@@ -1,0 +1,324 @@
+{
+  "request_id": "web-authoring-safety-delivery-readback-20261115",
+  "artifact_version": "7267253d913fd4362f3af74d064efee3192b2337",
+  "review_kind": "delivery_only_R10_readback",
+  "checked_at_utc": "2026-11-15T09:45:22.013946+00:00",
+  "R10": "PASS",
+  "overall_verdict": "PASS",
+  "scope": "Readback of the exact source/evidence/PR snapshot below. No additional code-review cycle and no production/provider/device acceptance. Future documentation-only commit and its remote CI are not certified by this receipt.",
+  "findings": [],
+  "verified": {
+    "product_source_drift": false,
+    "non_delivery_changes_in_working_tree": false,
+    "all_changed_product_and_test_paths_in_manifest": true,
+    "source_file_hashes_matching_working_tree_and_frozen_git_objects": 46,
+    "command_records_matching_manifest": 7,
+    "raw_check_log_hashes_matching": 7,
+    "negative_control_hashes_matching": 5,
+    "review_copies_byte_identical": true,
+    "raw_database_attachments": 5,
+    "unique_database_outcomes": 4,
+    "exact_duplicate_database_attachments": 1,
+    "retained_database_outcomes_match_reporter": true,
+    "input_final_state_linkage": "The frozen authoringSafety.spec.ts defines four scenarios. Raw reporter test titles map respectively to deck IDs 8/9/10/11: preserved draft version 4; stale-import existing version 2 with zero new row/receipt; lost-response later edit version 3 plus one new row and one import receipt; forbidden direct writes preserving original version 1 with zero receipts."
+  },
+  "reviewed_file_sha256": {
+    "docs/delivery/web-authoring-safety-20261115/README.md": "83e4095347087c22a222a4286b93dd80e63a7bff9b9a2fefe2c1759cfb6a1d3d",
+    "docs/delivery/web-authoring-safety-20261115/browser-final-states.json": "b5ed67f80aba8859e979b83f1c928a957f33d8d91b73f1b6ff1d0c33d1128373",
+    "docs/delivery/web-authoring-safety-20261115/review-initial.json": "e14a1867f5f43186fabecdc31634264457e01c3232a4f35461af2cde08e05d96",
+    "docs/delivery/web-authoring-safety-20261115/review-repaired.json": "ca7e8cd8e5b53662d905dbbe0b8ce80fc2d7f583bfd6e2b4d66772c658a3c68d",
+    "docs/delivery/web-authoring-safety-20261115/validation.json": "5c1819e720ccd9afc88f78da4a8d08485b7e8843d85ab65dfd47d362dbbd3150"
+  },
+  "raw_evidence_file_sha256": {
+    "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/local-browser-results.json": "bc87575d265db95369a337aad68e0d754d34ca0b3fc22ad6d1993ea8022ed3ce",
+    "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/frontend-build.command.json": "fa3ea480da3d725b8a9eb47290b6648b6ab6873a6ed273eef65b15f47c704ff1",
+    "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/frontend-build.log": "0c05974c7138e652bc8d888019850b6ce96eba95abf13fd015e3965d2ab51d5e",
+    "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/frontend-lint.command.json": "16f69679673d327cedf3646780e580a1c84feb5781a712a30722a4d65e9ddfb2",
+    "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/frontend-lint.log": "ebd4dc8591390f7807da6865f4136e32b85c3f66feaadab57482cc0f30eed2f8",
+    "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/frontend-repaired.command.json": "2d79ecc1f1e99a32262128ec3279158b026660e28b63ec4e718582f201c2f1bc",
+    "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/frontend-repaired.log": "569d51d081d7ddcc5c2de2f909b410599236b25b88146ca86e7cdba87179a070",
+    "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/backend-repaired.command.json": "37c1c7d7f237de2cb8c49da1501b1edb6edb71216f68fb1f52243daf520488ff",
+    "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/backend-repaired.log": "4e38490b9e3796542ba90830ea02ed9a5910b80ed601f911fef6f94925dd7d2a",
+    "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/browser-smoke.command.json": "d293b9b536112ce11a521d3e75b60fca7520f6ba738f8aadc6058334f0a19fb5",
+    "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/browser-smoke.log": "a89ca21057ec7927bd99b7a8388d3389df3ddd7ef4b28533a0ff458be5a59407",
+    "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/browser-repaired.command.json": "e8a1214d84d0250dc3f65f340d18c7d99e85e7274a9eb3f41be5c45cca9c64fb",
+    "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/browser-repaired.log": "12b614efd5f6761eb291dc5813d1514aa8d42e8760ffc3e20a7edd9610d0e13e",
+    "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/browser-artifacts.command.json": "9e0e3827c6bcd0c132a1df6fc2fc5ea9f6d98346af87fabae3ac8c086fc81f00",
+    "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/browser-artifacts.log": "4950da6382d0988a02b1b0750603c504a506a25f47c1a2456d103e523e6fbfd9",
+    "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/C0/red-http.log": "218e40001deb562503feaab7daf5aff1c2c859e5b7529e1781e2bc584a56ee46",
+    "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/C0/oauth-without-guards-red.log": "5c6380a182c80119918a607109584a72f5ace53096e31864e10bec5d8604d4c4",
+    "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/C0/repair-R4/revert-to-frozen-red.log": "5998acfee98cb777c3803e882186531fff1256763b39c0c025989e01391b2217",
+    "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/I1/final-guard-removal-isolated-red-with-fixture.log": "b81dc9416a20596df4f5bc7fa2849b3137ef093ad01c17f972a6110b3df3c50a",
+    "/Users/qc/.local/share/codex-workflows/developercards/web-authoring-safety-20261115/evidence/I1/repair-R5/red.log": "bbc099176329f7aa680621165dcf51c001099fb71d367be458c044dcb03336ef"
+  },
+  "pull_request_snapshot": {
+    "baseRefName": "main",
+    "headRefOid": "7267253d913fd4362f3af74d064efee3192b2337",
+    "isDraft": true,
+    "state": "OPEN",
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-11-15T09:41:21Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/ChuanQiao1128/DeveloperCards/actions/runs/43700222473/job/132769521203",
+        "name": "mobile (typecheck + vitest + expo export)",
+        "startedAt": "2026-11-15T09:38:37Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-11-15T09:41:10Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/ChuanQiao1128/DeveloperCards/actions/runs/43700122831/job/132769210075",
+        "name": "mobile (typecheck + vitest + expo export)",
+        "startedAt": "2026-11-15T09:37:17Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-11-15T09:39:27Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/ChuanQiao1128/DeveloperCards/actions/runs/43700220251/job/132769517057",
+        "name": "Analyze (actions)",
+        "startedAt": "2026-11-15T09:38:36Z",
+        "status": "COMPLETED",
+        "workflowName": "CodeQL"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-11-15T09:41:23Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/ChuanQiao1128/DeveloperCards/actions/runs/43700220251/job/132769517043",
+        "name": "Analyze (csharp)",
+        "startedAt": "2026-11-15T09:38:35Z",
+        "status": "COMPLETED",
+        "workflowName": "CodeQL"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-11-15T09:40:16Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/ChuanQiao1128/DeveloperCards/actions/runs/43700220251/job/132769516873",
+        "name": "Analyze (javascript-typescript)",
+        "startedAt": "2026-11-15T09:38:36Z",
+        "status": "COMPLETED",
+        "workflowName": "CodeQL"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-11-15T09:39:29Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/ChuanQiao1128/DeveloperCards/actions/runs/43700220251/job/132769516957",
+        "name": "Analyze (python)",
+        "startedAt": "2026-11-15T09:38:35Z",
+        "status": "COMPLETED",
+        "workflowName": "CodeQL"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-11-15T09:41:31Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/ChuanQiao1128/DeveloperCards/actions/runs/43700222473/job/132769521153",
+        "name": "frontend (vitest + build)",
+        "startedAt": "2026-11-15T09:38:37Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-11-15T09:40:22Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/ChuanQiao1128/DeveloperCards/actions/runs/43700122831/job/132769210065",
+        "name": "frontend (vitest + build)",
+        "startedAt": "2026-11-15T09:37:17Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-11-15T09:41:11Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/ChuanQiao1128/DeveloperCards/actions/runs/43700222473/job/132769521116",
+        "name": "frontend (playwright smoke)",
+        "startedAt": "2026-11-15T09:38:37Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-11-15T09:39:50Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/ChuanQiao1128/DeveloperCards/actions/runs/43700122831/job/132769210083",
+        "name": "frontend (playwright smoke)",
+        "startedAt": "2026-11-15T09:37:17Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-11-15T09:41:46Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/ChuanQiao1128/DeveloperCards/actions/runs/43700222473/job/132769521137",
+        "name": "backend (dotnet test)",
+        "startedAt": "2026-11-15T09:38:37Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-11-15T09:39:36Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/ChuanQiao1128/DeveloperCards/actions/runs/43700122831/job/132769210152",
+        "name": "backend (dotnet test)",
+        "startedAt": "2026-11-15T09:37:17Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-11-15T09:39:54Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/ChuanQiao1128/DeveloperCards/actions/runs/43700222473/job/132769520939",
+        "name": "python (uv lock + pytest)",
+        "startedAt": "2026-11-15T09:38:36Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-11-15T09:38:39Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/ChuanQiao1128/DeveloperCards/actions/runs/43700122831/job/132769210103",
+        "name": "python (uv lock + pytest)",
+        "startedAt": "2026-11-15T09:37:17Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-11-15T09:40:05Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/ChuanQiao1128/DeveloperCards/actions/runs/43700222473/job/132769521126",
+        "name": "infra (terraform fmt/validate + agent routes + deploy scripts)",
+        "startedAt": "2026-11-15T09:38:37Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-11-15T09:38:37Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/ChuanQiao1128/DeveloperCards/actions/runs/43700122831/job/132769209934",
+        "name": "infra (terraform fmt/validate + agent routes + deploy scripts)",
+        "startedAt": "2026-11-15T09:37:17Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-11-15T09:38:56Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/ChuanQiao1128/DeveloperCards/actions/runs/43700222473/job/132769521167",
+        "name": "tools/mcp-server (build + vitest)",
+        "startedAt": "2026-11-15T09:38:37Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-11-15T09:37:35Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/ChuanQiao1128/DeveloperCards/actions/runs/43700122831/job/132769210176",
+        "name": "tools/mcp-server (build + vitest)",
+        "startedAt": "2026-11-15T09:37:17Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-11-15T09:38:44Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/ChuanQiao1128/DeveloperCards/actions/runs/43700222473/job/132769521145",
+        "name": "integrations/n8n (signature verifier + recipe logic)",
+        "startedAt": "2026-11-15T09:38:36Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-11-15T09:37:27Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/ChuanQiao1128/DeveloperCards/actions/runs/43700122831/job/132769210020",
+        "name": "integrations/n8n (signature verifier + recipe logic)",
+        "startedAt": "2026-11-15T09:37:17Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-11-15T09:39:08Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/ChuanQiao1128/DeveloperCards/actions/runs/43700222473/job/132769521132",
+        "name": "tools/author-runner (build + vitest)",
+        "startedAt": "2026-11-15T09:38:37Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-11-15T09:37:47Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/ChuanQiao1128/DeveloperCards/actions/runs/43700122831/job/132769210099",
+        "name": "tools/author-runner (build + vitest)",
+        "startedAt": "2026-11-15T09:37:17Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-11-15T09:39:20Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/ChuanQiao1128/DeveloperCards/runs/132769688216",
+        "name": "CodeQL",
+        "startedAt": "2026-11-15T09:39:17Z",
+        "status": "COMPLETED",
+        "workflowName": ""
+      }
+    ],
+    "url": "https://github.com/ChuanQiao1128/DeveloperCards/pull/840"
+  },
+  "source_ci_summary": {
+    "head": "7267253d913fd4362f3af74d064efee3192b2337",
+    "entries": 23,
+    "success": 23,
+    "pending": 0,
+    "failure": 0,
+    "note": "Rollup contains separate CI runs with repeated job names; these are 23 successful check entries, not 23 unique test suites."
+  },
+  "documentation_state": {
+    "changed": [
+      "docs/delivery/web-authoring-safety-20261115/README.md"
+    ],
+    "untracked": [
+      "docs/delivery/web-authoring-safety-20261115/browser-final-states.json",
+      "docs/delivery/web-authoring-safety-20261115/review-initial.json",
+      "docs/delivery/web-authoring-safety-20261115/review-repaired.json",
+      "docs/delivery/web-authoring-safety-20261115/validation.json"
+    ],
+    "committed": false,
+    "next_steps_owned_by_root": [
+      "Set manifest independentReview status to PASS and link this receipt without rewriting historical review verdicts.",
+      "Refresh checkedAtUtc: the reviewed draft timestamp 09:40:21 predates its later browser-artifacts completion at 09:42:08.",
+      "Commit only delivery documentation, confirm no product-file drift against the frozen source, then check the actual final PR head remote CI."
+    ],
+    "approved_metadata_update": "Changing only completion status, receipt reference and checkedAtUtc in validation.json after this readback is expected; the reviewed hash intentionally records the pre-update input."
+  },
+  "limitations": [
+    "Local browser host injects synthetic identities and does not validate Cognito/API Gateway JWT verification.",
+    "No production migration, deploy, merge, OTA, native device validation or real-user acceptance is implied.",
+    "Current review validates all source and raw-evidence claims; docs-only final-head CI must be checked after that head exists."
+  ]
+}
