@@ -1,4 +1,5 @@
 using System.IO;
+using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -91,7 +92,7 @@ public class S3DeckUploader : IS3DeckUploader
         ? ImmutableCacheControl
         : DefaultCacheControl;
 
-      await S3().PutObjectAsync(putRequest);
+      await PutBuildAsync(putRequest, result);
 
       return result;
     }
@@ -119,13 +120,46 @@ public class S3DeckUploader : IS3DeckUploader
     };
     putRequest.Headers.CacheControl = cacheControl;
 
-    await S3().PutObjectAsync(putRequest);
-
-    return new S3UploadResult
+    var result = new S3UploadResult
     {
       Sha256 = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant(),
       Bytes = bytes.LongLength,
     };
+    await PutBuildAsync(putRequest, result);
+    return result;
+  }
+
+  private static async Task PutBuildAsync(PutObjectRequest request, S3UploadResult expected)
+  {
+    // All build artifacts (including previews/chunks/patches) use the same immutable cache contract.
+    var immutable = request.Key.Contains("/builds/", StringComparison.Ordinal)
+      || request.Headers.CacheControl == ImmutableCacheControl;
+    if (immutable) request.IfNoneMatch = "*";
+    try
+    {
+      await S3().PutObjectAsync(request);
+    }
+    catch (AmazonS3Exception ex) when (immutable && ex.StatusCode == HttpStatusCode.PreconditionFailed)
+    {
+      // A retry may reuse exactly the uploaded bytes. Never replace a conflicting committed key.
+      using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+      using var existing = await S3().GetObjectAsync(new GetObjectRequest
+      { BucketName = request.BucketName, Key = request.Key }, deadline.Token);
+      if (existing.ContentLength != expected.Bytes)
+        throw new InvalidOperationException("Immutable build object has different bytes");
+      using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+      var buffer = new byte[64 * 1024];
+      long bytesRead = 0;
+      int read;
+      while ((read = await existing.ResponseStream.ReadAsync(buffer, deadline.Token)) > 0)
+      {
+        bytesRead += read;
+        if (bytesRead > expected.Bytes) throw new InvalidOperationException("Immutable build object exceeds expected size");
+        hash.AppendData(buffer, 0, read);
+      }
+      if (bytesRead != expected.Bytes || Convert.ToHexString(hash.GetHashAndReset()).ToLowerInvariant() != expected.Sha256)
+        throw new InvalidOperationException("Immutable build object has different SHA-256");
+    }
   }
 
   public async Task<string> DownloadJsonAsync(string s3Key)

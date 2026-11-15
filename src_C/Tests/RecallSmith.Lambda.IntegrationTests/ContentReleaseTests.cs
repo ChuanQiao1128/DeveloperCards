@@ -279,6 +279,51 @@ public sealed class ContentReleaseTests(PostgresFixture db)
   }
 
 
+  [Fact]
+  public async Task Rollback_Records_Authorized_Action_And_Recovers_Manifest_After_S3_Failure()
+  {
+    try
+    {
+      var id=await Deck();var initial=await Snapshot(id);Data(await Import(id,initial.GetProperty("editingSnapshot").GetString()!));
+      var snap=await Snapshot(id);var receipt=await Review(id,snap);var repo=new JobRepository();await using var c=await Open();
+      async Task<JsonElement> Build(string action,string? live)
+      {
+        var job=await Publish(id,snap,receipt,action,live);var jid=job.GetProperty("jobId").GetString()!;
+        Assert.True(await repo.TryAcquireJobAsync(jid));
+        await DbUtil.ExecuteAsync(c,null,"update deck_publishes set content_sha256=$2,content_bytes=100 where job_id=$1",[jid,new string('a',64)]);
+        await repo.CompleteJobAsync(jid,1);return job;
+      }
+      var old=await Build("old",null);var target=old.GetProperty("buildId").GetString()!;
+      var failed=await Build("failed",target);var source=failed.GetProperty("buildId").GetString()!;
+      var jobId=old.GetProperty("jobId").GetString()!;
+      await PublishDelivery.DeliverManifest(c,jobId,()=>Task.CompletedTask);
+      var generation=Convert.ToInt64(await DbUtil.ExecuteScalarAsync(c,null,"select release_generation from decks where id=$1",[id]));
+      var body=JsonSerializer.SerializeToElement(new{releaseId="release-test",actionId="restore-1",reason="Restore tested content",buildId=target,expectedCurrent=source,expectedRestoreHash=new string('a',64)});
+      var first=await ContentRelease.Rollback(c,id,body,Admin,new Res("test"),_=>throw new IOException("S3 unavailable after DB commit"));
+      Data(first);
+      Assert.Equal(target,await DbUtil.ExecuteScalarAsync(c,null,"select live_build_id from decks where id=$1",[id]));
+      Assert.Equal(generation+1,await DbUtil.ExecuteScalarAsync(c,null,"select release_generation from decks where id=$1",[id]));
+      var row=Assert.Single(await DbUtil.QueryAsync(c,null,"select actor_sub,reason,release_generation,request from content_rollback_actions where deck_id=$1 and action_id='restore-1'",[id]));
+      Assert.Equal(Admin.UserSub,row["actor_sub"]);Assert.Equal("Restore tested content",row["reason"]);
+      Assert.Equal(generation+1,row["release_generation"]);
+      using(var request=JsonDocument.Parse((string)row["request"]!))
+      {Assert.Equal(source,request.RootElement.GetProperty("expected").GetString());Assert.Equal(target,request.RootElement.GetProperty("target").GetString());}
+      Assert.Equal("pending",await DbUtil.ExecuteScalarAsync(c,null,"select state from publish_manifest_delivery where job_id=$1",[jobId]));
+      await DbUtil.ExecuteAsync(c,null,"update publish_manifest_delivery set next_attempt_at=now()-interval '1 second' where job_id=$1",[jobId]);
+      using var s3=new PublishManifestFencingTests.ConditionalS3();
+      var replay=await ContentRelease.Rollback(c,id,body,Admin,new Res("different-trace"),conn=>ManifestBuilder.RebuildAsync(conn,s3,"bucket","content","premium"));
+      Assert.Equal(first.Body,replay.Body);
+      Assert.Equal("delivered",await DbUtil.ExecuteScalarAsync(c,null,"select state from publish_manifest_delivery where job_id=$1",[jobId]));
+      using(var manifest=JsonDocument.Parse(s3.Body!))
+      {var deck=manifest.RootElement.GetProperty("decks").EnumerateArray().Single(d=>d.GetProperty("slug").GetString()==ContentRelease.DeckSlug);Assert.Equal(target,deck.GetProperty("buildId").GetString());Assert.Equal(new string('a',64),deck.GetProperty("sha256").GetString());}
+      Assert.Equal(2L,await DbUtil.ExecuteScalarAsync(c,null,"select count(*) from deck_publishes where deck_id=$1",[id]));
+      var immutable=await Assert.ThrowsAsync<PostgresException>(()=>DbUtil.ExecuteAsync(c,null,"update content_rollback_actions set reason='changed' where deck_id=$1",[id]));
+      Assert.Contains("IMMUTABLE",immutable.MessageText);
+      Assert.False(await DbUtil.ExecuteScalarAsync(c,null,"select exists(select 1 from pg_proc p,aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) a where p.oid='public.content_release_rollback(bigint,text,text,text,text,text,text)'::regprocedure and a.grantee=0 and a.privilege_type='EXECUTE')",[]) is true);
+    }
+    finally{Vpc.Authoring.Publish.TestEnqueueSeam=null;await Restore();}
+  }
+
   private static async Task AwaitDatabaseLock(NpgsqlConnection observer)
   {
     // Observe the server's lock wait as a barrier; no delay guesses or sleeps manufacture the race.

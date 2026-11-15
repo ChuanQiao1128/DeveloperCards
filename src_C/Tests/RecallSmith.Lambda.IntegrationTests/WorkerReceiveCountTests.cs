@@ -11,7 +11,7 @@ namespace RecallSmith.Lambda.IntegrationTests;
 /// Pure tests (no database, no fixture) for the worker's SQS partial-batch contract and its
 /// redelivery take-over rule. The handler must never rethrow: every failure becomes a
 /// BatchItemFailure (ReportBatchItemFailures) except a BusinessException, which is acked after
-/// FailAsync. ManifestCoversJob is the debounce proof, tested as a table.
+/// FailAsync. Timestamp metadata is not a version proof, tested as a table.
 /// </summary>
 public class WorkerReceiveCountTests
 {
@@ -212,8 +212,8 @@ public class WorkerReceiveCountTests
 
     // null head → false
     yield return new object[] { null!, Stamp(completed + 1000), completed, now, false };
-    // fresh + stamp >= completed + 1000 → true
-    yield return new object[] { now.AddSeconds(-2), Stamp(completed + 1000), completed, now, true };
+    // Fresh timestamps (including a skewed future stamp) cannot prove which build is present.
+    yield return new object[] { now.AddSeconds(-2), Stamp(completed + 1000), completed, now, false };
     // fresh + no stamp → false
     yield return new object[] { now.AddSeconds(-2), null!, completed, now, false };
     // fresh + stamp = completed + 999 → false
