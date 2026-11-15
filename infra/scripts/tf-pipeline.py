@@ -942,8 +942,8 @@ def run_console_mfa_check(plan_path):
         if has_unknown(change.get("after_unknown")):
             problems.append("Console pool values must be known before apply")
         if (after.get("mfa_configuration") != "OFF"
-                or after.get("software_token_mfa_configuration") != [{"enabled": False}]):
-            problems.append("Console pool must end with MFA off and TOTP disabled")
+                or after.get("software_token_mfa_configuration") != []):
+            problems.append("Console pool must end with MFA off and no TOTP configuration block")
     for entry in entries:
         change = entry.get("change") or {}
         if entry.get("previous_address") or change.get("importing") is not None or change.get("replace_paths"):

@@ -559,7 +559,7 @@ class ConsoleMfaCheckTest(unittest.TestCase):
     def pool(self, actions=None):
         before = {"id": "ap-southeast-2_example", "mfa_configuration": "ON",
                   "software_token_mfa_configuration": [{"enabled": True}], "name": "console"}
-        after = dict(before, mfa_configuration="OFF", software_token_mfa_configuration=[{"enabled": False}])
+        after = dict(before, mfa_configuration="OFF", software_token_mfa_configuration=[])
         return resource("module.identity.aws_cognito_user_pool.console[0]", actions or ["update"],
                         before=before, after=after)
 
@@ -569,6 +569,13 @@ class ConsoleMfaCheckTest(unittest.TestCase):
             with open(path, "w") as handle:
                 json.dump(p, handle)
             return capture(tfp.run_console_mfa_check, path)
+
+    def test_console_uses_the_provider_mfa_off_contract(self):
+        # AWS provider 6.66.0 requires removal of this entire block when disabling TOTP without SMS.
+        source = (REPO_ROOT / "infra/modules/identity/cognito.tf").read_text()
+        console = source.split('resource "aws_cognito_user_pool_client" "spa"', 1)[0]
+        self.assertRegex(console, r'mfa_configuration\s*=\s*"OFF"')
+        self.assertNotRegex(console, r'(?m)^\s*software_token_mfa_configuration\s*\{')
 
     def test_existing_pool_off_or_already_off(self):
         for actions in (["update"], ["no-op"]):
@@ -584,7 +591,7 @@ class ConsoleMfaCheckTest(unittest.TestCase):
         variants = [
             ("after", "mfa_configuration", "OPTIONAL"),
             ("after", "software_token_mfa_configuration", [{"enabled": True}]),
-            ("after", "software_token_mfa_configuration", []),
+            ("after", "software_token_mfa_configuration", [{"enabled": False}]),
             ("after", "id", "different-pool"),
             ("before", "id", None),
             ("after_unknown", "mfa_configuration", True),

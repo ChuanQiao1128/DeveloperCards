@@ -1,3 +1,4 @@
+# OFF without SMS requires omitting the entire software token block (AWS provider contract).
 resource "aws_cognito_user_pool" "console" {
   count                    = var.manage_cognito ? 1 : 0
   auto_verified_attributes = ["email"]
@@ -6,9 +7,6 @@ resource "aws_cognito_user_pool" "console" {
   name                     = "User pool - Console for DeveloperCards"
   user_pool_tier           = "ESSENTIALS"
   username_attributes      = ["email"]
-  software_token_mfa_configuration {
-    enabled = false
-  }
   account_recovery_setting {
     recovery_mechanism {
       name     = "verified_email"

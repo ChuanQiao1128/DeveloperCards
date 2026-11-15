@@ -26,3 +26,6 @@ Local checks:
 
 Production result and the actual Cognito provider plan remain unverified until the approved recovery run completes.
 Operator IAM changes require their separate break-glass process; this recovery does not apply them.
+
+Follow-up: this version passed the plan gates but its apply returned Cognito HTTP 400. The explicit TOTP false
+block and its value-check expectation are superseded by [the provider-contract correction](../console-mfa-provider-fix-20261116/README.md).
