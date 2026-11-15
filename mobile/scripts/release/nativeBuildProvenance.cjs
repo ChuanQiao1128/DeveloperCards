@@ -83,7 +83,7 @@ function buildEnvironment(runDir, team, inherited = process.env) {
   // into Xcode. NODE_OPTIONS, dotenv, Metro overrides and caller caches do not.
   const env = { PATH: `${path.dirname(process.execPath)}:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin`,
     HOME: path.join(runDir, 'home'), TMPDIR: path.join(runDir, 'tmp'),
-    CI: '1', EXPO_NO_DOTENV: '1', EXPO_NO_TELEMETRY: '1', NODE_ENV: 'production',
+    CI: '1', LANG: 'en_US.UTF-8', EXPO_NO_DOTENV: '1', EXPO_NO_TELEMETRY: '1', NODE_ENV: 'production',
     EXPO_PUBLIC_ENV: 'production', RCT_NO_LAUNCH_PACKAGER: '1',
     npm_config_cache: path.join(runDir, 'npm-cache'), npm_config_update_notifier: 'false',
     OWNERSHIP_APPLE_TEAM_ID: team };

@@ -298,7 +298,8 @@ describe('Xcode final-bundle observer and config preservation', () => {
     write(path.join(root, '.ownership-build.json'), JSON.stringify(c));
     const built = resolve({ config });
     expect(built.updates).toEqual({ ...config.updates, requestHeaders: { ...config.updates.requestHeaders, 'expo-channel-name': 'production' } });
-    expect(built.extra).toEqual(config.extra); expect(built.plugins.slice(0, -1)).toEqual(config.plugins);
+    expect(built.extra).toEqual(config.extra); expect(built.plugins[0]).toBe('./plugins/withBuildProvenance');
+    expect(built.plugins.slice(1)).toEqual(config.plugins);
     expect(built.ios.infoPlist).toEqual({ ...config.ios.infoPlist, RecallSmithBuildProvenance: producer.signedContext(c) });
     expect({ ...built, plugins: config.plugins, ios: config.ios, updates: config.updates }).toEqual(config);
     config.updates.requestHeaders['expo-channel-name'] = 'preview';
@@ -323,5 +324,14 @@ describe('Xcode final-bundle observer and config preservation', () => {
     const env = producer.buildEnvironment('/STUB/private', 'STUBTEAM01', { ...inherited, NODE_OPTIONS: '--require malicious', EAS_BUILD_PROFILE: 'evil', SKIP_BUNDLING: '1' });
     expect(env.NODE_OPTIONS).toBeUndefined(); expect(env.EAS_BUILD_PROFILE).toBeUndefined(); expect(env.SKIP_BUNDLING).toBeUndefined();
     expect(env.EXPO_NO_DOTENV).toBe('1');
+  });
+  it('pins CocoaPods UTF-8 encoding without inheriting caller locale overrides', () => {
+    const inherited = Object.fromEntries(['EXPO_PUBLIC_API_BASE', 'EXPO_PUBLIC_AWS_REGION', 'EXPO_PUBLIC_COGNITO_USER_POOL_ID',
+      'EXPO_PUBLIC_COGNITO_USER_POOL_CLIENT_ID', 'EXPO_PUBLIC_RC_IOS_API_KEY', 'EXPO_PUBLIC_SENTRY_DSN', 'SENTRY_AUTH_TOKEN'].map(k => [k, `STUB_${k}`]));
+    const env = producer.buildEnvironment('/STUB/private', 'STUBTEAM01', {
+      ...inherited, LANG: 'C', LC_ALL: 'C', LC_CTYPE: 'C', RUBYOPT: '-EUS-ASCII',
+    });
+    expect(env.LANG).toBe('en_US.UTF-8');
+    expect(env.LC_ALL).toBeUndefined(); expect(env.LC_CTYPE).toBeUndefined(); expect(env.RUBYOPT).toBeUndefined();
   });
 });

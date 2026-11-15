@@ -48,6 +48,10 @@ public sealed class RuntimePrivilegeIsolationTests(PostgresFixture db)
         create role developercards_outsider login password 'local-outsider-password' nosuperuser nocreatedb nocreaterole;
         """,[]);
       await DbUtil.ExecuteAsync(owner,null,await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory,"Db","isolate-runtime.sql")),[]);
+      // The owner repair must never restore INSERT/TRIGGER to the isolated runtime login.
+      await DbUtil.ExecuteAsync(owner,null,"set role developercards_schema",[]);
+      await DbUtil.ExecuteAsync(owner,null,await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory,"Db","Migrations","060_rollback_owner_permissions.sql")),[]);
+      await DbUtil.ExecuteAsync(owner,null,"reset role",[]);
       await DbUtil.ExecuteAsync(owner,null,"grant usage on schema public to developercards_outsider",[]);
       await using(var outsider=new NpgsqlConnection(new NpgsqlConnectionStringBuilder(cs){Username="developercards_outsider",Password="local-outsider-password",Pooling=false}.ConnectionString))
       {
@@ -58,6 +62,8 @@ public sealed class RuntimePrivilegeIsolationTests(PostgresFixture db)
       Configure(runtime,"isolated");
       await using var c=await Pg.OpenConnectionOrNullAsync();Assert.NotNull(c);
       Assert.Equal("developercards_app",await DbUtil.ExecuteScalarAsync(c!,null,"select session_user",[]));
+      Assert.False((bool)(await DbUtil.ExecuteScalarAsync(c!,null,"select has_table_privilege(current_user,'public.content_rollback_actions','INSERT') or has_table_privilege(current_user,'public.content_rollback_actions','TRIGGER')",[]))!);
+      await Denied(c!,"insert into content_rollback_actions(deck_id,release_id,action_id,payload_hash,request,result) values(1,'r','a','h','{}','{}')");
       foreach(var sql in new[]{"create table public.runtime_ddl(id int)","create schema runtime_schema","alter table cards disable trigger all","drop function public.enforce_account_deletion_barrier() cascade","set role developercards_schema","set role developercards_migrator","truncate account_deletions","delete from account_deletions","update account_deletions set identity_status='pending_owner_confirmation'","delete from content_review_receipts","update content_review_revocations set reason='tampered'","delete from content_release_actions","delete from content_rollback_actions","update content_rollback_actions set payload_hash=repeat('a',64)","delete from admin_audit","insert into schema_migrations(version,name) values(999,'fake')","set session_replication_role=replica"})
         await Denied(c!,sql);
       var user="isolation-user";
@@ -188,7 +194,12 @@ public sealed class RuntimePrivilegeIsolationTests(PostgresFixture db)
     try
     {
       Configure(new NpgsqlConnectionStringBuilder(cs),"isolated");
-      Assert.Equal(200,(await Migrate.HandleDbMigrationsList(Request(),new Res("read-only"),Admin)).StatusCode);
+      var response=await Migrate.HandleDbMigrationsList(Request(),new Res("read-only"),Admin);
+      Assert.Equal(200,response.StatusCode);
+      var diagnostics=JsonDocument.Parse(response.Body).RootElement.GetProperty("data").GetProperty("diagnostics");
+      Assert.False(diagnostics.GetProperty("session").GetProperty("vectorTableExists").GetBoolean());
+      Assert.Equal(JsonValueKind.Null,diagnostics.GetProperty("rollback").GetProperty("functionOwner").ValueKind);
+      Assert.All(diagnostics.GetProperty("tables").EnumerateArray(),t=>Assert.False(t.GetProperty("exists").GetBoolean()));
       await using var c=new NpgsqlConnection(cs);await c.OpenAsync();
       Assert.False((bool)(await DbUtil.ExecuteScalarAsync(c,null,"select to_regclass('schema_migrations') is not null",[]))!);
     }
