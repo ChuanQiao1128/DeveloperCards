@@ -1,6 +1,7 @@
 // Trusted local process evidence, not a reproducible-build attestation.
 const fs = require('node:fs');
 const path = require('node:path');
+const os = require('node:os');
 const crypto = require('node:crypto');
 const { execFileSync } = require('node:child_process');
 const guard = require('./queueOwnershipRollout.cjs');
@@ -156,12 +157,15 @@ function localBuild(c, tooling, internal = {}) {
   exclusive(path.join(c.runDir, 'native-input.json'), nativeBefore);
   const exportOptions = path.join(c.runDir, 'ExportOptions.plist');
   exclusive(exportOptions, `<?xml version="1.0"?><plist version="1.0"><dict><key>method</key><string>app-store-connect</string><key>teamID</key><string>${c.team}</string><key>signingStyle</key><string>automatic</string></dict></plist>`);
+  // Apple signing discovery needs the OS user's HOME; Xcode scripts inherit it too.
+  // Keep the sanitized environment and explicit run-local caches/output paths.
+  const xcodeOpts = { ...opts, env: { ...env, HOME: os.userInfo().homedir } };
   run('/usr/bin/xcodebuild', ['-workspace', `ios/${workspaces[0]}`, '-scheme', 'DeveloperCards', '-configuration', 'Release',
     '-sdk', 'iphoneos', '-destination', 'generic/platform=iOS', '-derivedDataPath', path.join(c.runDir, 'derived-data'),
-    '-archivePath', path.join(c.runDir, 'native.xcarchive'), `DEVELOPMENT_TEAM=${c.team}`, 'archive'], opts);
+    '-archivePath', path.join(c.runDir, 'native.xcarchive'), `DEVELOPMENT_TEAM=${c.team}`, 'archive'], xcodeOpts);
   fail(encode(manifest(path.join(mobile, 'ios'), false, c.buildTree)) === nativeBefore, 'native source mutated during Xcode build');
   run('/usr/bin/xcodebuild', ['-exportArchive', '-archivePath', path.join(c.runDir, 'native.xcarchive'),
-    '-exportOptionsPlist', exportOptions, '-exportPath', path.join(c.runDir, 'export')], opts);
+    '-exportOptionsPlist', exportOptions, '-exportPath', path.join(c.runDir, 'export')], xcodeOpts);
   const ipas = fs.readdirSync(path.join(c.runDir, 'export')).filter(n => n.endsWith('.ipa'));
   fail(ipas.length === 1, 'expected one newly exported IPA');
   exclusive(c.output, regular(path.join(c.runDir, 'export', ipas[0])));
