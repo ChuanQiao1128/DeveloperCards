@@ -1041,7 +1041,7 @@ public class AutomationLedgerTests
 
   private static async Task<APIGatewayProxyResponse> ImportAsync(long deckId, object[] cards)
   {
-    var body = JsonSerializer.Serialize(new { deckId, cards });
+    var body = await GenericImportTestKit.JsonAsync(deckId, cards);
     var req = new LambdaRequest(Event("POST", "/api/v1/authoring/cards/import", NewSub(), ["super_admin"], null, body));
     return await CardsImport.HandleCardsImport(req, new Res(req.TraceId), await Auth.GetAuthContextAsync(req));
   }

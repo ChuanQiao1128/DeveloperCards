@@ -19,8 +19,8 @@ public class FrontHelpFieldTests(PostgresFixture db)
   private static AuthContext Admin() => AutomationTestKit.Ctx($"it-help-{Guid.NewGuid():N}", agent: false);
   private static Task<APIGatewayProxyResponse> Call(string method, object? body, IDictionary<string, string>? query = null) =>
     AutomationTestKit.CallAsync(Cards.HandleAuthoringCards, method, "/api/v1/authoring/cards", body, Admin(), query);
-  private static Task<APIGatewayProxyResponse> Import(long deckId, params object[] cards) =>
-    AutomationTestKit.CallAsync(CardsImport.HandleCardsImport, "POST", "/api/v1/authoring/cards/import", new { deckId, cards }, Admin());
+  private static async Task<APIGatewayProxyResponse> Import(long deckId, params object[] cards) =>
+    await AutomationTestKit.CallAsync(CardsImport.HandleCardsImport, "POST", "/api/v1/authoring/cards/import", await GenericImportTestKit.JsonAsync(deckId, cards), Admin());
   private static JsonElement Data(APIGatewayProxyResponse response)
   {
     Assert.True(response.StatusCode == 200, response.Body);
@@ -142,7 +142,9 @@ public class FrontHelpFieldTests(PostgresFixture db)
       var id = created.GetProperty("id").GetInt64();
       Assert.False(created.TryGetProperty("frontHelp", out _));
       Assert.Null(Assert.Single(await PublishJobProcessor.LoadCardsAsync(conn, (int)deckId)).FrontHelp);
-      Data(await Import(deckId, Card(deckId, help: false, translations: false)));
+      var legacyImport = await Import(deckId, Card(deckId, help: false, translations: false));
+      Assert.Equal(503, legacyImport.StatusCode);
+      Assert.Equal("MIGRATION_REQUIRED", Code(legacyImport));
       var rejected = await Call("PUT", new { id, expectedVersion = 1, frontHelp = Help });
       Assert.Equal(503, rejected.StatusCode);
       Assert.Equal("MIGRATION_REQUIRED", Code(rejected));

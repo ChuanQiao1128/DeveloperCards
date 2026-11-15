@@ -16,7 +16,8 @@ namespace RecallSmith.Lambda.Vpc.Authoring;
 /// `set constraints uq_cards_deck_order deferred` so it can renumber freely (mid-deck inserts,
 /// swaps) without each intermediate step colliding; the constraint is re-checked with
 /// `set constraints uq_cards_deck_order immediate` right before commit. Re-sending the same
-/// payload changes nothing and bumps no version.
+/// operationId and exact payload replays the committed result without another write. Ordinary imports
+/// require each card's expectedVersion (0 for UID absence, positive for an exact live version).
 ///
 /// On a database that has not run 022 the deferral fails with SQLSTATE 42809, which this handler
 /// maps to 503 MIGRATION_REQUIRED on this route alone. Deploy order is migrate, then code.
@@ -46,7 +47,7 @@ public static class CardsImport
     string? Translations,
     string? TranslationBasis,
     bool TranslationsSent, string? FrontHelp, bool FrontHelpSent,
-    string? Teaching, bool TeachingSent, string? Tags, bool TagsSent);
+    string? Teaching, bool TeachingSent, string? Tags, bool TagsSent, long? ExpectedVersion);
 
   /// <summary>What the core learned about the import, for the after-response side effects.</summary>
   private sealed class ImportOutcome
@@ -241,7 +242,8 @@ public static class CardsImport
           // Validate translations after locking the row: an older client may omit the stored English help.
           cards.Add(new ImportCard(i, uid, question, explanation, codeSnippet, codeLanguage, realWorldUsage, difficulty, orderInDeck, topic, mcq, source,
             translationsSent ? trEl.GetRawText() : null, null, translationsSent, frontHelp, frontHelpSent,
-            teaching, teachingSent, tags, tagsSent));
+            teaching, teachingSent, tags, tagsSent,
+            cardEl.TryGetProperty("expectedVersion", out var versionEl) ? Helpers.RequireInteger(versionEl, "expectedVersion") : null));
         }
         catch (McqValidationError ex)
         {
@@ -288,6 +290,7 @@ public static class CardsImport
     var parked = 0;
     string? releaseId = null, actionId = null, payloadHash = null;
     APIGatewayProxyResponse? releaseResult = null;
+    var genericImport = false;
 
     try
     {
@@ -306,25 +309,54 @@ public static class CardsImport
       if (!teachingReady && cards.Any(c => c.TeachingSent || c.TagsSent)) return Helpers.TeachingNotMigrated(res);
       var extended = translationsReady && frontHelpReady && teachingReady;
 
+      // Serialize imports without blocking foreign-key checks from concurrent ordinary card creates.
       var deckRows = await DbUtil.QueryAsync(conn, tx,
-        "select id from decks where id = $1 and is_deleted = 0 for update", [deckId]);
+        "select id from decks where id = $1 and is_deleted = 0 for no key update", [deckId]);
       if (deckRows.Count == 0) return Helpers.ErrorEnvelope(res, 404, "DECK_NOT_FOUND", $"Deck {deckId} not found");
+
+      // Check permissions again after waiting for the deck lock, and hold them through commit/replay.
+      if (!auth.IsSuperAdmin)
+      {
+        var permission = await DbUtil.QueryAsync(conn, tx,
+          "select deck_id from admin_deck_permissions where admin_sub=$1 and deck_id=$2 and can_write=1 for share",
+          [auth.UserSub, deckId]);
+        if (permission.Count == 0) return res.Forbidden("No permission for this deck (write)");
+      }
 
       if (await ContentRelease.Applies(conn, deckId, tx))
       {
+        await ContentRelease.Lock(conn, tx, deckId);
         using var releaseDoc = Validation.ParseJsonBody(req)!;
         var body = releaseDoc.RootElement;
         releaseId = ContentRelease.Required(body, "releaseId");
         actionId = ContentRelease.Required(body, "idempotencyKey");
         payloadHash = ContentRelease.PayloadHash(body);
         var replay = await ContentRelease.Replay(conn, tx, deckId, releaseId, actionId, payloadHash);
-        if (replay is not null) return replay;
-        await ContentRelease.Lock(conn, tx, deckId);
+        if (replay is not null) { outcome.DeckId = null; return replay; }
         if (ContentRelease.Required(body, "expectedEditingSnapshot") != await ContentRelease.EditingSnapshot(conn, tx, deckId))
           return Helpers.ErrorEnvelope(res, 409, "EDITING_SNAPSHOT_CONFLICT", "Deck or cards changed since the editing backup; nothing was written");
         var liveUids = await DbUtil.QueryAsync(conn, tx, "select stable_uid from cards where deck_id=$1 and is_deleted=0", [deckId]);
         if (liveUids.Any(r => !uids.Contains((string)r["stable_uid"]!, StringComparer.Ordinal)))
           return Helpers.ErrorEnvelope(res, 409, "RELEASE_COVERAGE", "Release import must retain every existing live UID");
+      }
+      else
+      {
+        genericImport = true;
+        using var importDoc = Validation.ParseJsonBody(req)!;
+        var body = importDoc.RootElement;
+        var operationId = ContentRelease.Required(body, "operationId");
+        if (!Guid.TryParse(operationId, out var operation) || operation == Guid.Empty)
+          return res.BadRequest("VALIDATION_ERROR", "operationId must be a nonempty UUID");
+        if (string.IsNullOrWhiteSpace(auth.UserSub)) return res.Forbidden("Requires authenticated admin user");
+        if (cards.Any(c => c.ExpectedVersion is null or < 0))
+          return res.BadRequest("VALIDATION_ERROR", "Every card requires expectedVersion: 0 for create, or the current positive version for update");
+        if (await DbUtil.ExecuteScalarAsync(conn, tx, "select to_regclass('public.content_release_actions') is not null", []) is not true)
+          return Helpers.ErrorEnvelope(res, 503, "MIGRATION_REQUIRED", "content_release_actions does not exist yet; run migration 050 first");
+        releaseId = "console-import-v1:" + ContentRelease.Hash(auth.UserSub);
+        actionId = operation.ToString("D");
+        payloadHash = ContentRelease.PayloadHash(body);
+        var replay = await ContentRelease.Replay(conn, tx, deckId, releaseId, actionId, payloadHash);
+        if (replay is not null) { outcome.DeckId = null; return replay; }
       }
 
       // A soft-deleted card in this deck whose stable_uid is in the payload cannot be revived by an
@@ -339,46 +371,27 @@ public static class CardsImport
         return Helpers.ErrorEnvelope(res, 409, "SOFT_DELETED_UID", $"stableUid belongs to a deleted card in this deck: {list}");
       }
 
-      // Park soft-deleted cards outside the payload that sit on an order the payload needs: move them
-      // past the highest order so the live payload can take those slots. This is the only row outside
-      // the payload the import ever touches.
-      const string parkSql = """
-        with blockers as (
-          select id, row_number() over (order by order_in_deck, id) as rn
-          from cards
-          where deck_id = $1 and is_deleted = 1 and order_in_deck = any($2) and not (stable_uid = any($3))
-        ), base as (
-          select greatest(coalesce(max(order_in_deck), 0), $4::int) as b from cards where deck_id = $1
-        )
-        update cards c
-        set order_in_deck = base.b + blockers.rn, updated_at = now()
-        from blockers, base
-        where c.id = blockers.id
-        """;
-      parked = await DbUtil.ExecuteAsync(conn, tx, parkSql, [deckId, orders, uids, maxOrder]);
-
-      // A live card outside the payload holding an order the payload needs is a real conflict: nothing
-      // is written and the caller resolves it.
-      var holderRows = await DbUtil.QueryAsync(conn, tx,
-        """select stable_uid as "stableUid", order_in_deck as "orderInDeck" from cards where deck_id = $1 and order_in_deck = any($2) and not (stable_uid = any($3))""",
-        [deckId, orders, uids]);
-      if (holderRows.Count > 0)
-      {
-        var pairs = string.Join("; ", holderRows.Take(10).Select(r =>
-          $"orderInDeck {Convert.ToInt32(r["orderInDeck"], CultureInfo.InvariantCulture)} is held by card {(string)r["stableUid"]!}"));
-        return Helpers.ErrorEnvelope(res, 409, "ORDER_CONFLICT",
-          $"{pairs}, which is not in this import; nothing was written. Retry after resolving the conflict.");
-      }
-
       // Lock every existing payload row, so omitted help/translations are validated and preserved atomically.
       var storedRows = await DbUtil.QueryAsync(conn, tx,
         """
-        select stable_uid as "stableUid",
+        select stable_uid as "stableUid", version,
           nullif(to_jsonb(cards) -> 'translations', 'null'::jsonb) as translations,
           nullif(to_jsonb(cards) -> 'front_help', 'null'::jsonb) as "frontHelp"
-        from cards where deck_id = $1 and is_deleted = 0 and stable_uid = any($2) for update
+        from cards where deck_id = $1 and is_deleted = 0 and stable_uid = any($2) order by id for update
         """, [deckId, uids]);
       var storedByUid = storedRows.ToDictionary(r => (string)r["stableUid"]!, StringComparer.Ordinal);
+      // Validate the whole batch before parking or upserting any row. Row locks prevent external
+      // card edits between this check and the CAS upsert; zero still requires atomic UID absence.
+      if (genericImport)
+      {
+        foreach (var c in cards)
+        {
+          storedByUid.TryGetValue(c.StableUid, out var stored);
+          if (c.ExpectedVersion == 0 ? stored is not null
+              : stored is null || Convert.ToInt64(stored["version"], CultureInfo.InvariantCulture) != c.ExpectedVersion)
+            return Helpers.ErrorEnvelope(res, 409, "VERSION_CONFLICT", $"Card {c.StableUid} changed since preview; nothing was written");
+        }
+      }
       for (var index = 0; index < cards.Count; index++)
       {
         var c = cards[index];
@@ -406,6 +419,39 @@ public static class CardsImport
         }
       }
 
+      // A live card outside the payload holding an order the payload needs is a real conflict: nothing
+      // is written and the caller resolves it.
+      var holderRows = await DbUtil.QueryAsync(conn, tx,
+        """select stable_uid as "stableUid", order_in_deck as "orderInDeck" from cards where deck_id = $1 and is_deleted = 0 and order_in_deck = any($2) and not (stable_uid = any($3)) order by id for update""",
+        [deckId, orders, uids]);
+      if (holderRows.Count > 0)
+      {
+        var pairs = string.Join("; ", holderRows.Take(10).Select(r =>
+          $"orderInDeck {Convert.ToInt32(r["orderInDeck"], CultureInfo.InvariantCulture)} is held by card {(string)r["stableUid"]!}"));
+        return Helpers.ErrorEnvelope(res, 409, "ORDER_CONFLICT",
+          $"{pairs}, which is not in this import; nothing was written. Retry after resolving the conflict.");
+      }
+
+      // Park soft-deleted cards outside the payload that sit on an order the payload needs: move them
+      // past the highest order so the live payload can take those slots. This is the only row outside
+      // the payload the import ever touches.
+      const string parkSql = """
+        with blockers as (
+          select id, row_number() over (order by order_in_deck, id) as rn
+          from cards
+          where deck_id = $1 and is_deleted = 1 and order_in_deck = any($2) and not (stable_uid = any($3))
+        ), base as (
+          select greatest(coalesce(max(order_in_deck), 0), $4::int) as b from cards where deck_id = $1
+        )
+        update cards c
+        set order_in_deck = base.b + blockers.rn, updated_at = now()
+        from blockers, base
+        where c.id = blockers.id
+        """;
+      parked = await DbUtil.ExecuteAsync(conn, tx, parkSql, [deckId, orders, uids, maxOrder]);
+
+      var versionParameter = extended ? 22 : translationsReady && frontHelpReady ? 18 : translationsReady ? 16 : 13;
+      var casWhere = genericImport ? $"cards.is_deleted = 0 and ${versionParameter}::bigint > 0 and cards.version = ${versionParameter}::bigint and " : "";
       var upsertSql = $"""
         insert into cards (
           deck_id, stable_uid, question, explanation, code_snippet, code_language,
@@ -429,7 +475,7 @@ public static class CardsImport
           {(extended ? "teaching = case when $20::boolean then excluded.teaching else cards.teaching end, tags = case when $21::boolean then excluded.tags else cards.tags end," : "")}
           version = cards.version + 1,
           updated_at = now()
-        where (cards.question, cards.explanation, cards.code_snippet, cards.code_language, cards.real_world_usage,
+        where {casWhere}(cards.question, cards.explanation, cards.code_snippet, cards.code_language, cards.real_world_usage,
                cards.difficulty, cards.order_in_deck, cards.topic, cards.mcq, cards.source, cards.translations, cards.translation_basis{(frontHelpReady ? ", cards.front_help" : "")}{(extended ? ", cards.teaching, cards.tags" : "")})
           is distinct from
               (excluded.question, excluded.explanation, excluded.code_snippet, excluded.code_language, excluded.real_world_usage,
@@ -438,7 +484,7 @@ public static class CardsImport
                case when $15::boolean then excluded.translation_basis else cards.translation_basis end{(frontHelpReady ? ", case when $17::boolean then excluded.front_help else cards.front_help end" : "")}{(extended ? ", case when $20::boolean then excluded.teaching else cards.teaching end, case when $21::boolean then excluded.tags else cards.tags end" : "")})
         returning id, (xmax = 0) as inserted
         """;
-      const string upsertSqlPre047 = """
+      var upsertSqlPre047 = $"""
         insert into cards (
           deck_id, stable_uid, question, explanation, code_snippet, code_language,
           real_world_usage, difficulty, order_in_deck, topic, mcq, source
@@ -457,7 +503,7 @@ public static class CardsImport
           source = excluded.source,
           version = cards.version + 1,
           updated_at = now()
-        where (cards.question, cards.explanation, cards.code_snippet, cards.code_language, cards.real_world_usage,
+        where {casWhere}(cards.question, cards.explanation, cards.code_snippet, cards.code_language, cards.real_world_usage,
                cards.difficulty, cards.order_in_deck, cards.topic, cards.mcq, cards.source)
           is distinct from
               (excluded.question, excluded.explanation, excluded.code_snippet, excluded.code_language, excluded.real_world_usage,
@@ -475,12 +521,15 @@ public static class CardsImport
         if (translationsReady) parameters.AddRange([c.Translations, c.TranslationBasis, c.TranslationsSent]);
         if (translationsReady && frontHelpReady) parameters.AddRange([c.FrontHelp, c.FrontHelpSent]);
         if (extended) parameters.AddRange([c.Teaching, c.Tags, c.TeachingSent, c.TagsSent]);
+        if (genericImport) parameters.Add(c.ExpectedVersion);
         var rows = translationsReady
           ? await DbUtil.QueryAsync(conn, tx, upsertSql, parameters)
           : await DbUtil.QueryAsync(conn, tx, upsertSqlPre047, parameters);
 
         if (rows.Count == 0)
         {
+          if (genericImport && c.ExpectedVersion == 0)
+            return Helpers.ErrorEnvelope(res, 409, "VERSION_CONFLICT", $"Card {c.StableUid} was created since preview; nothing was written");
           actions[c.StableUid] = "unchanged";
           unchangedUids.Add(c.StableUid);
           continue;
@@ -512,7 +561,13 @@ public static class CardsImport
       }
 
       await DbUtil.ExecuteAsync(conn, tx, "set constraints uq_cards_deck_order immediate", []);
-      if (releaseId is not null)
+      if (genericImport)
+      {
+        releaseResult = res.Ok(new { deckId, created, updated, unchanged = unchangedUids.Count,
+          cards = cards.Select(c => new { stableUid = c.StableUid, id = ids[c.StableUid], action = actions[c.StableUid] }).ToArray() });
+        await ContentRelease.Save(conn, tx, deckId, releaseId!, actionId!, "cards/import", payloadHash!, releaseResult);
+      }
+      else if (releaseId is not null)
       {
         releaseResult = res.Ok(new { deckId, releaseId, created, updated, unchanged = unchangedUids.Count,
           editingSnapshot = await ContentRelease.EditingSnapshot(conn, tx, deckId),
@@ -530,13 +585,19 @@ public static class CardsImport
       return Helpers.ErrorEnvelope(res, 409, "ORDER_CONFLICT",
         "Another write changed card order in this deck during the import; nothing was written. Retry.");
     }
+    catch (PostgresException pg) when (genericImport && pg.SqlState == "40P01")
+    {
+      return Helpers.ErrorEnvelope(res, 409, "VERSION_CONFLICT",
+        "A concurrent write conflicted with this import; the whole batch was rolled back. Preview the current cards before retrying.");
+    }
     catch (McqValidationError ex)
     {
       return res.BadRequest(ex.Code, ex.Message);
     }
     catch (Exception ex) when (ex is ValidationError)
     {
-      return Helpers.ErrorEnvelope(res, ex.Message.StartsWith("IDEMPOTENCY_CONFLICT") ? 409 : 400, "VALIDATION_ERROR", ex.Message);
+      return Helpers.ErrorEnvelope(res, ex.Message.StartsWith("IDEMPOTENCY_CONFLICT") ? 409 : 400,
+        ex.Message.StartsWith("IDEMPOTENCY_CONFLICT") ? "IDEMPOTENCY_CONFLICT" : "VALIDATION_ERROR", ex.Message);
     }
     catch (Exception ex)
     {

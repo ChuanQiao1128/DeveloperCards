@@ -16,6 +16,7 @@ import { CONSOLE_NAME } from '../lib/brand';
 import { FORM_TRANSLATION_MIRROR_CODES, formTranslationConflict, USAGE_NEEDS_MARKDOWN } from '../lib/translationView';
 import { ConsoleShell } from '../components/console/ConsoleShell';
 import { consoleNav } from '../components/console/consoleNav';
+import { getSessionGeneration } from '../auth/tokenStore';
 
 /**
  * The label on the recovery button, and the sentence that explains it.
@@ -27,8 +28,8 @@ import { consoleNav } from '../components/console/consoleNav';
 const RETRY_WITH_LATEST = 'Retry with latest version';
 
 const CONFLICT_HINT =
-  `Your edits are still here. Press "${RETRY_WITH_LATEST}" to apply them to the ` +
-  'copy that is on the server now.';
+  `Your edits are still here. Compare the current server copy above before pressing "${RETRY_WITH_LATEST}". ` +
+  'Your form will replace those fields. Another change will require confirmation again.';
 
 /**
  * What is said when the conflict cannot be recovered from, because the reread
@@ -110,6 +111,9 @@ export function EditCardPage() {
    * again, and it was the only one whose UI implied it could.
    */
   const [conflictRecoverable, setConflictRecoverable] = useState(false);
+  const [conflictCard, setConflictCard] = useState<Card | null>(null);
+  const [conflictDraft, setConflictDraft] = useState<CardFormValues | null>(null);
+  const [editingBase, setEditingBase] = useState<{ id: number; version: number } | null>(null);
 
   // The unsaved-changes guard. Declared above every early return, as the rules
   // of hooks require; the save below clears it explicitly before navigating.
@@ -155,6 +159,8 @@ export function EditCardPage() {
     );
   }
 
+  if (editingBase?.id !== numericCardId) setEditingBase({ id: numericCardId, version: card.version });
+
   const initialValues: CardFormValues = {
     question: card.question,
     stableUid: card.stableUid,
@@ -186,9 +192,10 @@ export function EditCardPage() {
    * next save — carries the version the server is actually holding.
    */
   async function readCurrentCard(): Promise<Card | null> {
+    const session = getSessionGeneration();
     try {
       const cardResult = await fetchCardById(numericCardId);
-      if (!cardResult.success || !cardResult.data) return null;
+      if (session !== getSessionGeneration() || !cardResult.success || !cardResult.data) return null;
       const latest = cardResult.data;
       queryClient.setQueryData(QueryKeys.card(numericCardId), latest);
       return latest;
@@ -200,6 +207,7 @@ export function EditCardPage() {
   async function handleSubmit(
     values: CardFormValues,
   ): Promise<{ ok: boolean; error?: string }> {
+    const session = getSessionGeneration();
     // buildCardBody trims every optional text field, so a cleared explanation,
     // usage note or snippet is sent as '' rather than dropped — the api layer
     // omits undefined keys, and an absent key leaves the old value in the row.
@@ -227,8 +235,9 @@ export function EditCardPage() {
       id: Number(card.id),
       deckId: Number(card.deckId),
       stableUid: card.stableUid,
-      expectedVersion: card.version,
+      expectedVersion: editingBase?.version ?? card.version,
     });
+    if (session !== getSessionGeneration()) return { ok: false, error: 'The signed in account changed. Reopen the editor.' };
 
     if (!result.success) {
       const message =
@@ -245,6 +254,7 @@ export function EditCardPage() {
         // recovery path, and pretending otherwise by silently merging would be
         // the worst of the three.
         const latest = await readCurrentCard();
+        if (session !== getSessionGeneration()) return { ok: false, error: 'The signed in account changed. Reopen the editor.' };
 
         if (latest === null) {
           setConflictRecoverable(false);
@@ -252,6 +262,9 @@ export function EditCardPage() {
         }
 
         setConflictRecoverable(true);
+        setConflictCard(latest);
+        setConflictDraft(values);
+        setEditingBase({ id: numericCardId, version: latest.version });
         return { ok: false, error: `${message} ${CONFLICT_HINT}` };
       }
 
@@ -297,6 +310,32 @@ export function EditCardPage() {
       </div>
 
       <div className="max-w-3xl mx-auto px-4 py-6">
+        {conflictCard && conflictDraft ? (
+          <section aria-label="Current server copy" className="mb-6 rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+            <h2 className="font-semibold">Current server copy</h2>
+            <p className="mt-2">Saved values that differ from your last save attempt. Your draft is still in the form below.</p>
+            <dl className="mt-4 space-y-3">
+              {[
+                ['Question', conflictCard.question, conflictDraft.question],
+                ['Explanation', conflictCard.explanation, conflictDraft.explanation],
+                ['Code', conflictCard.codeSnippet, conflictDraft.codeSnippet],
+                ['Code language', conflictCard.codeLanguage, conflictDraft.codeLanguage],
+                ['Usage', conflictCard.realWorldUsage, conflictDraft.realWorldUsage],
+                ['Topic', conflictCard.topic, conflictDraft.topic],
+                ['Source URL', conflictCard.source?.url, conflictDraft.sourceUrl],
+                ['Source quote', conflictCard.source?.quote, conflictDraft.sourceQuote],
+                ['Difficulty', String(conflictCard.difficulty), String(conflictDraft.difficulty)],
+                ['Order', String(conflictCard.orderInDeck), String(conflictDraft.orderInDeck)],
+                ['Revision', String(conflictCard.revision ?? ''), String(conflictDraft.revision ?? '')],
+              ].filter(([, saved, draft]) => (saved ?? '') !== (draft ?? '')).map(([label, saved]) => (
+                <div key={label}>
+                  <dt className="font-semibold">{label}</dt>
+                  <dd className="mt-1 whitespace-pre-wrap break-words">{saved || 'Empty'}</dd>
+                </div>
+              ))}
+            </dl>
+          </section>
+        ) : null}
         <CardForm
           mode="edit"
           deck={deck}

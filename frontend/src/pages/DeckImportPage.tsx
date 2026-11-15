@@ -13,6 +13,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 
 import { fetchCardsByDeck, fetchDeckById, importCardsBatch } from '../api/authoring';
+import { getSessionGeneration } from '../auth/tokenStore';
 import { QueryKeys, useAppQueryClient } from '../api/queryClient';
 import { RarityDistribution } from '../components/RarityDistribution';
 import {
@@ -304,6 +305,8 @@ export function DeckImportPage() {
 
   async function execute(toRun: readonly ImportAction[]) {
     if (!deck || toRun.length === 0) return;
+    const session = getSessionGeneration();
+    const isCurrent = () => session === getSessionGeneration();
 
     const controller = new AbortController();
     abortRef.current = controller;
@@ -320,19 +323,22 @@ export function DeckImportPage() {
         { importCards: importCardsBatch },
         {
           signal: controller.signal,
+          isCurrent,
           onProgress: (p) => setProgress({ done: p.done, total: p.total }),
         },
       );
-      setRunResult(result);
+      if (isCurrent()) setRunResult(result);
     } finally {
-      abortRef.current = null;
-      setRunning(false);
-      setCancelling(false);
+      if (isCurrent()) {
+        abortRef.current = null;
+        setRunning(false);
+        setCancelling(false);
       // The run wrote cards and moved the deck's totals, so both cached views are
       // now behind the server. Without this the card list would keep showing the
       // pre-import rows for up to the staleTime window.
-      void queryClient.invalidateQueries({ queryKey: QueryKeys.cards(deck.id) });
-      void queryClient.invalidateQueries({ queryKey: QueryKeys.deck(deck.id) });
+        void queryClient.invalidateQueries({ queryKey: QueryKeys.cards(deck.id) });
+        void queryClient.invalidateQueries({ queryKey: QueryKeys.deck(deck.id) });
+      }
     }
   }
 
@@ -437,6 +443,7 @@ export function DeckImportPage() {
               ) : null}
 
               <textarea
+                aria-label="Deck Markdown"
                 className="w-full h-80 font-mono text-xs border border-slate-300 rounded-md px-3 py-2
                            focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 spellCheck={false}
@@ -704,7 +711,8 @@ export function DeckImportPage() {
                   <div className="flex flex-wrap gap-2">
                     <Badge label="created" count={runResult.created} tone={ACTION_CLASSES.create} />
                     <Badge label="updated" count={runResult.updated} tone={ACTION_CLASSES.update} />
-                    <Badge label="failed" count={runResult.failures.length} tone={ACTION_CLASSES.conflict} />
+                    <Badge label="failed" count={runResult.failures.filter(f => f.code !== 'IMPORT_UNCONFIRMED' && f.code !== 'IMPORT_CANCELLED').length} tone={ACTION_CLASSES.conflict} />
+                    <Badge label="unconfirmed" count={runResult.batches.filter(b => b.state === 'unknown').reduce((n, b) => n + b.cards, 0)} tone={ACTION_CLASSES.conflict} />
                     <span className="text-xs text-slate-500 self-center">
                       counts describe the most recent run
                     </span>
@@ -722,7 +730,7 @@ export function DeckImportPage() {
                     <div className="bg-red-50 border border-red-200 rounded px-3 py-2">
                       <div className="font-semibold text-sm text-red-800 mb-1">
                         {runResult.failures.length} card
-                        {runResult.failures.length === 1 ? '' : 's'} failed
+                        {runResult.failures.length === 1 ? '' : 's'} {runResult.batches.some(b => b.state === 'unknown') ? 'need attention' : 'failed'}
                       </div>
                       <ul className="text-xs text-red-800 space-y-1 max-h-64 overflow-y-auto">
                         {runResult.failures.map((failure) => (
@@ -733,11 +741,23 @@ export function DeckImportPage() {
                         ))}
                       </ul>
                     </div>
+                  ) : runResult.cancelled || runResult.notRun > 0 ? (
+                    <p className="text-sm text-amber-900">Import stopped before all planned writes were confirmed.</p>
                   ) : (
                     <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 px-3 py-2 rounded text-sm">
                       All planned writes succeeded.
                     </div>
                   )}
+
+                  <ul className="mt-4 space-y-2 text-sm" aria-label="Import batch results">
+                    {runResult.batches.map(batch => (
+                      <li key={batch.operationId} className="break-words">
+                        {batch.cards} cards: {batch.state === 'unknown' ? 'Result unconfirmed' : batch.state === 'committed' ? 'Committed' : 'Rejected'}.
+                        {' '}Operation <code>{batch.operationId}</code>
+                      </li>
+                    ))}
+                    {runResult.notRun > 0 ? <li>{runResult.notRun} cards were not attempted.</li> : null}
+                  </ul>
 
                   <div className="flex items-center gap-3">
                     {runResult.failures.length > 0 || runResult.cancelled ? (

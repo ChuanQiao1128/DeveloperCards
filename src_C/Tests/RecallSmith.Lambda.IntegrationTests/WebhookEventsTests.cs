@@ -110,7 +110,7 @@ public class WebhookEventsTests
 
   private static async Task<APIGatewayProxyResponse> ImportAsync(long deckId, object[] cards)
   {
-    var body = JsonSerializer.Serialize(new { deckId, cards });
+    var body = await GenericImportTestKit.JsonAsync(deckId, cards);
     var req = new LambdaRequest(Event("POST", ImportPath, $"it-j03-{Guid.NewGuid():N}", ["super_admin"], body));
     var res = new Res(req.TraceId);
     return await CardsImport.HandleCardsImport(req, res, await Auth.GetAuthContextAsync(req));

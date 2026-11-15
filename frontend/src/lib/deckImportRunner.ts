@@ -1,37 +1,5 @@
-// src/lib/deckImportRunner.ts
-//
-// Applies an ImportPlan through F01's transactional batch endpoint, in batches.
-//
-// This lives next to deckImport.ts rather than inside DeckImportPage because the
-// risky part of an import is not the markup, it is the write path: how the plan
-// is split into batches, what is retried, what a cancel leaves behind, and what
-// exactly is sent for a field the author cleared. Keeping it here means those
-// rules are covered by node level tests and the page stays wiring.
-//
-// The write path is now one call per batch instead of one call per card:
-//
-// 1. F01 writes a whole batch in a single transaction and upserts by
-//    (deckId, stableUid), so a re-sent batch is a no-op and a batch that fails
-//    rolls back entirely — no card in it lands. That is what makes a retry safe.
-// 2. Transient failures (timeout, network, 429, 5xx) are retried with 1/2/4s
-//    backoff. A timed-out batch that actually landed comes back as `unchanged`
-//    on the retry, so a retry can never double-write.
-// 3. A batch that fails for a non-transient reason does not stop the run: its
-//    cards are recorded as failures and the next batch is attempted, so the
-//    operator gets every failure at once.
-// 4. Cleared optional fields are sent as "" instead of being omitted, and mcq is
-//    always sent as an explicit value (null on a Q/A card), and so is source
-//    (null on a card without SOURCE:, so a removed SOURCE: clears the column),
-//    and so are translations (null on a card without _ZH sections).
-//    F01 upserts every column from the payload, and the planner compares the
-//    same normalized strings, so a re-import of the same file is a no-op — idempotence has to
-//    survive deletions too.
-// 5. Because a null translations clears the column, an update that would
-//    delete a stored translation is only sent when the plan marked it
-//    clearsTranslations (the operator opted in). planImport already turns the
-//    rest into TRANSLATIONS_WOULD_BE_CLEARED conflicts; the runner re-checks
-//    rather than trusting its caller, and records any such action as a failure
-//    without sending it.
+// Preview-bound, transactional batches. Retries reuse the operation identity.
+// Transport failures may follow a commit, so unconfirmed batches stop the run.
 
 import { VERSION_CONFLICT } from '../api/errors';
 import type { ImportCardInput, ImportCardsBatchResult } from '../api/authoring';
@@ -74,6 +42,7 @@ const CANCELLED_MESSAGE =
 export interface ImportBatchWriter {
   importCards(params: {
     deckId: number;
+    operationId: string;
     cards: ImportCardInput[];
     signal?: AbortSignal;
   }): Promise<ApiResult<ImportCardsBatchResult>>;
@@ -84,6 +53,8 @@ export interface RunImportOptions {
   signal?: AbortSignal;
   /** Overridable so tests can run without real timers. Defaults to a setTimeout that resolves early on abort. */
   sleep?: (ms: number, signal?: AbortSignal) => Promise<void>;
+  /** Captured by the page so an old run cannot continue under a new account. */
+  isCurrent?: () => boolean;
 }
 
 export interface ImportFailure {
@@ -101,6 +72,7 @@ export interface ImportRunResult {
   cancelled: boolean;
   /** Actions never attempted, because a cancel stopped the run before their batch. */
   notRun: number;
+  batches: { operationId: string; state: 'committed' | 'failed' | 'unknown'; cards: number }[];
 }
 
 export interface ImportProgress {
@@ -131,12 +103,12 @@ function optionalText(value: string | null): string {
  * Builds the F01 card body for one action. Mirrors the create/update field rules
  * the per-card path used: cleared optional text becomes "", mcq is always an
  * explicit value (null on a Q/A card), source is explicit too (null without
- * SOURCE:), and there is no expectedVersion because
- * F01 ignores it.
+ * SOURCE:), and expectedVersion binds the write to the preview.
  */
 function cardInputFor(action: ImportAction): ImportCardInput {
   const card = action.card;
   return {
+    expectedVersion: action.kind === 'update' ? action.expectedVersion : 0,
     stableUid: card.stableUid,
     question: card.question,
     explanation: card.explanation,
@@ -282,13 +254,14 @@ export async function runImport(
   writer: ImportBatchWriter,
   options: RunImportOptions = {},
 ): Promise<ImportRunResult> {
-  const { onProgress, signal, sleep = defaultSleep } = options;
+  const { onProgress, signal, sleep = defaultSleep, isCurrent = () => true } = options;
   const result: ImportRunResult = {
     created: 0,
     updated: 0,
     failures: [],
     cancelled: false,
     notRun: 0,
+    batches: [],
   };
   const total = actions.length;
   const refused = actions.filter(wouldClearTranslations);
@@ -310,18 +283,26 @@ export async function runImport(
   for (const chunk of chunks) {
     // Cancelled before this batch even started: none of it, or anything after
     // it, was attempted.
-    if (signal?.aborted) {
+    if (signal?.aborted || !isCurrent()) {
       result.cancelled = true;
       result.notRun = total - done;
       return result;
     }
 
     const cards = chunk.map(cardInputFor);
+    const operationId = crypto.randomUUID();
+    const batch = { operationId, state: 'unknown' as 'committed' | 'failed' | 'unknown', cards: chunk.length };
+    result.batches.push(batch);
 
+    let unconfirmedAttempt = false;
     for (let attempt = 0; ; attempt++) {
       let outcome: ApiResult<ImportCardsBatchResult>;
       try {
-        outcome = await writer.importCards({ deckId, cards, signal });
+        if (!isCurrent()) {
+          result.notRun = total - done;
+          return result;
+        }
+        outcome = await writer.importCards({ deckId, operationId, cards, signal });
       } catch (err: unknown) {
         // The api layer converts axios errors into ApiResult, so a throw here is
         // a bug or a browser-level failure. Record the batch and move on rather
@@ -329,13 +310,20 @@ export async function runImport(
         pushChunkFailures(
           result,
           chunk,
-          'UNEXPECTED_ERROR',
-          err instanceof Error ? err.message : 'Unexpected error.',
+          'IMPORT_UNCONFIRMED',
+          `The result is unconfirmed. Operation ${operationId}. ${err instanceof Error ? err.message : ''}`,
         );
-        break;
+        result.notRun = total - (done + chunk.length);
+        return result;
+      }
+
+      if (!isCurrent() || outcome.error?.code === 'SESSION_CHANGED') {
+        result.notRun = total - (done + chunk.length);
+        return result;
       }
 
       if (outcome.success) {
+        batch.state = 'committed';
         result.created += outcome.data?.created ?? 0;
         result.updated += outcome.data?.updated ?? 0;
         break;
@@ -343,8 +331,7 @@ export async function runImport(
 
       const error = outcome.error;
 
-      // A cancel during the request: the transaction rolled back, but the
-      // operator cannot know that from here, so say so and stop.
+      // A cancel can follow a commit. Keep the batch unconfirmed and stop.
       if (error?.code === 'CANCELLED' || signal?.aborted) {
         pushChunkFailures(result, chunk, IMPORT_CANCELLED, CANCELLED_MESSAGE);
         result.cancelled = true;
@@ -352,10 +339,11 @@ export async function runImport(
         return result;
       }
 
+      if (isRetryableImportFailure(error) && error?.httpStatus !== 429) unconfirmedAttempt = true;
       if (isRetryableImportFailure(error) && attempt < IMPORT_RETRY_DELAYS_MS.length) {
         await sleep(IMPORT_RETRY_DELAYS_MS[attempt], signal);
         // A cancel during the backoff wait ends the run the same way.
-        if (signal?.aborted) {
+        if (signal?.aborted || !isCurrent()) {
           pushChunkFailures(result, chunk, IMPORT_CANCELLED, CANCELLED_MESSAGE);
           result.cancelled = true;
           result.notRun = total - (done + chunk.length);
@@ -364,14 +352,19 @@ export async function runImport(
         continue;
       }
 
-      // Non-retryable, or the retries are spent. The transaction rolled back, so
-      // no card in the batch landed.
+      // A lost response never proves rollback. Stop rather than submit more work.
+      const unknown = unconfirmedAttempt;
+      batch.state = unknown ? 'unknown' : 'failed';
       pushChunkFailures(
         result,
         chunk,
-        error?.code ?? 'UNKNOWN_ERROR',
-        error?.message ?? 'Write failed.',
+        unknown ? 'IMPORT_UNCONFIRMED' : error?.code ?? 'UNKNOWN_ERROR',
+        unknown ? `The result is unconfirmed. Operation ${operationId}. Check this operation before importing again.` : error?.message ?? 'Write failed.',
       );
+      if (unknown) {
+        result.notRun = total - (done + chunk.length);
+        return result;
+      }
       break;
     }
 

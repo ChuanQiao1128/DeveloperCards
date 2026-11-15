@@ -1,5 +1,7 @@
 // src/api/queryClient.ts
 import { useContext } from 'react';
+import { subscribeSessionChanges } from '../auth/tokenStore';
+import { clearDedupe } from './dedupe';
 import { QueryClient, QueryClientContext } from '@tanstack/react-query';
 
 /**
@@ -74,6 +76,12 @@ export const queryClient = new QueryClient({
       networkMode: 'always',
     },
   },
+});
+
+// Clear synchronously before the next account can read or reuse a pending call.
+subscribeSessionChanges(() => {
+  queryClient.clear();
+  clearDedupe();
 });
 
 /**

@@ -638,10 +638,9 @@ export async function deleteCard(cardId: number): Promise<ApiResult<null>> {
 // asks for just under that. The per-request `timeout` overrides the global one.
 export const IMPORT_REQUEST_TIMEOUT_MS = 29_000;
 
-// One card as F01 reads it. There is deliberately no `expectedVersion`: the
-// import endpoint upserts by (deckId, stableUid) and ignores it, so sending one
-// would be dead weight the reader might mistake for a CAS token.
+// Version 0 means the UID must not exist; updates use the version from preview.
 export interface ImportCardInput {
+  expectedVersion?: number;
   stableUid: string;
   question: string;
   explanation: string;
@@ -680,13 +679,14 @@ export interface ImportCardsBatchResult {
  */
 export async function importCardsBatch(params: {
   deckId: number;
+  operationId: string;
   cards: ImportCardInput[];
   signal?: AbortSignal;
 }): Promise<ApiResult<ImportCardsBatchResult>> {
   try {
     const resp = await http.post<ApiResult<Partial<ImportCardsBatchResult>>>(
       '/api/v1/authoring/cards/import',
-      { deckId: params.deckId, cards: params.cards },
+      { deckId: params.deckId, operationId: params.operationId, cards: params.cards },
       { timeout: IMPORT_REQUEST_TIMEOUT_MS, signal: params.signal },
     );
     const raw = resp.data;

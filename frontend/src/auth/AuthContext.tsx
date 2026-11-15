@@ -1,14 +1,18 @@
 /* eslint-disable react-refresh/only-export-components */
 // src/auth/AuthContext.tsx
-import { createContext, useContext, useMemo, useState } from 'react';
+import { createContext, Fragment, useCallback, useContext, useMemo, useState, useSyncExternalStore } from 'react';
+import { queryClient, useAppQueryClient } from '../api/queryClient';
 import type { ReactNode } from 'react';
 import { AUTH_CONFIGURED } from './authConfig';
 import { buildLogoutUrl, startLogin, type OAuthTokenResponse } from './cognito';
 import {
+  assertSessionGeneration,
   clearTokens,
+  getSessionGeneration,
   getSessionUser,
   getTokens,
   saveTokens,
+  subscribeSessionChanges,
   type SessionUser,
   type StoredTokens,
 } from './tokenStore';
@@ -29,8 +33,20 @@ export type AuthContextValue = {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [tokens, setTokens] = useState<StoredTokens | null>(() => getTokens());
-  const user = useMemo(() => getSessionUser(tokens), [tokens]);
+  const client = useAppQueryClient();
+  const subscribe = useCallback((notify: () => void) => subscribeSessionChanges(() => {
+    if (client !== queryClient) client.clear();
+    notify();
+  }), [client]);
+  const generation = useSyncExternalStore(subscribe, getSessionGeneration);
+  const tokens = useMemo(() => getTokens(), [generation]);
+  const user = useMemo(() => tokens ? getSessionUser(tokens) : null, [tokens]);
+  const [scope, setScope] = useState({ generation, key: generation, hadSession: !!tokens });
+  if (scope.generation !== generation) {
+    // Initial sign-in keeps the OAuth callback mounted until it navigates.
+    // Departing or replacing an existing session always drops account state.
+    setScope({ generation, key: scope.hadSession ? generation : scope.key, hadSession: !!tokens });
+  }
 
   // With no Cognito configured, treat the session as signed in locally rather
   // than blocking every page behind an auth stack that does not exist.
@@ -43,19 +59,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   function completeSignIn(tokenResponse: OAuthTokenResponse) {
-    const stored = saveTokens({
+    assertSessionGeneration(generation);
+    saveTokens({
       accessToken: tokenResponse.access_token,
       idToken: tokenResponse.id_token,
       refreshToken: tokenResponse.refresh_token,
       tokenType: tokenResponse.token_type,
       expiresIn: tokenResponse.expires_in,
     });
-    setTokens(stored);
   }
 
   function signOut() {
+    if (generation !== getSessionGeneration()) return;
     clearTokens();
-    setTokens(null);
     if (AUTH_CONFIGURED) window.location.assign(buildLogoutUrl());
   }
 
@@ -71,7 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signOut,
       }}
     >
-      {children}
+      <Fragment key={scope.key}>{children}</Fragment>
     </AuthContext.Provider>
   );
 }

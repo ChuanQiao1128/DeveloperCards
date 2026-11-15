@@ -97,7 +97,7 @@ describe('runImport', () => {
 
     const result = await runImport(DECK_ID, actionsFor(DOC), rec.writer, { sleep: async () => {} });
 
-    expect(result).toEqual({ created: 2, updated: 0, failures: [], cancelled: false, notRun: 0 });
+    expect(result).toMatchObject({ created: 2, updated: 0, failures: [], cancelled: false, notRun: 0 });
     expect(rec.batches).toHaveLength(1);
     expect(rec.batches[0].map((c) => c.stableUid)).toEqual(['cs-async-001', 'cs-span-002']);
     expect(rec.batches[0][0]).toMatchObject({
@@ -108,7 +108,7 @@ describe('runImport', () => {
     });
   });
 
-  it('builds an update body from the plan action, without an expectedVersion field', async () => {
+  it('builds an update body from the plan action, with the preview expectedVersion', async () => {
     const existing = [
       existingCard({
         id: 41,
@@ -128,8 +128,8 @@ describe('runImport', () => {
     expect(result.updated).toBe(1);
     const updated = rec.batches[0].find((c) => c.stableUid === 'cs-span-002');
     if (!updated) throw new Error('cs-span-002 was not sent');
-    // F01 ignores expectedVersion, so the runner does not send it.
-    expect(Object.hasOwn(updated, 'expectedVersion')).toBe(false);
+    // An update must carry the version captured by the preview.
+    expect(updated.expectedVersion).toBe(9);
   });
 
   it('reports every card in a refused batch and keeps the run going', async () => {
@@ -151,7 +151,7 @@ describe('runImport', () => {
 
     const result = await runImport(DECK_ID, actionsFor(DOC), writer, { sleep: async () => {} });
 
-    expect(result.failures[0]).toMatchObject({ code: 'UNEXPECTED_ERROR', message: 'socket hang up' });
+    expect(result.failures[0]).toMatchObject({ code: 'IMPORT_UNCONFIRMED', message: expect.stringContaining('socket hang up') });
     expect(result.failures).toHaveLength(2);
   });
 
@@ -174,7 +174,7 @@ describe('runImport', () => {
 
     const result = await runImport(DECK_ID, [], rec.writer, { sleep: async () => {} });
 
-    expect(result).toEqual({ created: 0, updated: 0, failures: [], cancelled: false, notRun: 0 });
+    expect(result).toMatchObject({ created: 0, updated: 0, failures: [], cancelled: false, notRun: 0 });
     expect(rec.batches).toEqual([]);
   });
 });

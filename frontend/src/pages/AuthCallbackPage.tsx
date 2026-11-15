@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { consumePostLoginRedirect, exchangeCodeForTokens } from '../auth/cognito';
 import { useAuth } from '../auth/AuthContext';
+import { getSessionGeneration } from '../auth/tokenStore';
 
 export function AuthCallbackPage() {
   const [searchParams] = useSearchParams();
@@ -12,6 +13,7 @@ export function AuthCallbackPage() {
   useEffect(() => {
     if (ran.current) return;
     ran.current = true;
+    const session = getSessionGeneration();
 
     const err = searchParams.get('error');
     const errDesc = searchParams.get('error_description');
@@ -35,9 +37,11 @@ export function AuthCallbackPage() {
     (async () => {
       try {
         const tokenResp = await exchangeCodeForTokens(code, state);
+        if (session !== getSessionGeneration()) return;
         auth.completeSignIn(tokenResp);
         navigate(consumePostLoginRedirect(), { replace: true });
       } catch (e: unknown) {
+        if (session !== getSessionGeneration()) return;
         // The real reason goes to the console; the URL carries a stable code.
         // An exception message here can quote the server or the network layer,
         // and whatever rides the URL ends up on the login screen.

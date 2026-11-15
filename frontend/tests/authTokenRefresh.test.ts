@@ -316,10 +316,12 @@ describe('a refresh the provider refuses', () => {
     // Every caller hears about it — none is left hanging on a promise the
     // refresh failure resolved for somebody else.
     expect(outcomes.map(o => o.status)).toEqual(['rejected', 'rejected', 'rejected']);
-    for (const outcome of outcomes) {
-      expect((outcome as PromiseRejectedResult).reason).toMatchObject({
-        message: 'Your session expired. Please sign in again.',
-      });
+    // The first refusal ends the session; its peers are now stale work.
+    expect((outcomes[0] as PromiseRejectedResult).reason).toMatchObject({
+      message: 'Your session expired. Please sign in again.',
+    });
+    for (const outcome of outcomes.slice(1)) {
+      expect((outcome as PromiseRejectedResult).reason).toMatchObject({ code: 'SESSION_CHANGED' });
     }
 
     expect(cognito.refreshTokens).toHaveBeenCalledTimes(1);

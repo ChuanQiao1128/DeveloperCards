@@ -102,7 +102,9 @@ const FIRST_LOAD_BUDGET_BYTES = 377_000;
 // main 298b154: 485,598 B; current: 487,429 B (+1,831 B). This includes the
 // shared frontHelp parser (995 B), entry (+347 B), CSS (+252 B), authoring (+205 B)
 // and deck-list chunk (+32 B). Keep the existing next-1,000-B rounding rule.
-const EAGER_BUDGET_BYTES = 488_000;
+// Session generation checks and account-scope cache teardown add about 1.6 kB raw.
+// Keep the existing lazy boundary; allow only 2 kB for those correctness guards.
+const EAGER_BUDGET_BYTES = 490_000;
 
 /**
  * Floor, so a parser that degenerates to an empty or near-empty set cannot make

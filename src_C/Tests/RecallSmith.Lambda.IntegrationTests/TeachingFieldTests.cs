@@ -21,8 +21,8 @@ public class TeachingFieldTests(PostgresFixture db)
   private static AuthContext Admin() => AutomationTestKit.Ctx($"it-teaching-{Guid.NewGuid():N}", agent: false);
   private static Task<APIGatewayProxyResponse> Call(string method, object? body, IDictionary<string, string>? query = null) =>
     AutomationTestKit.CallAsync(Cards.HandleAuthoringCards, method, "/api/v1/authoring/cards", body, Admin(), query);
-  private static Task<APIGatewayProxyResponse> Import(long deckId, params object[] cards) =>
-    AutomationTestKit.CallAsync(CardsImport.HandleCardsImport, "POST", "/api/v1/authoring/cards/import", new { deckId, cards }, Admin());
+  private static async Task<APIGatewayProxyResponse> Import(long deckId, params object[] cards) =>
+    await AutomationTestKit.CallAsync(CardsImport.HandleCardsImport, "POST", "/api/v1/authoring/cards/import", await GenericImportTestKit.JsonAsync(deckId, cards), Admin());
   private static JsonElement Data(APIGatewayProxyResponse response)
   {
     Assert.True(response.StatusCode == 200, response.Body);

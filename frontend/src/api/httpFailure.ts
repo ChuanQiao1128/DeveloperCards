@@ -31,6 +31,9 @@ export function isApiEnvelope(value: unknown): value is ApiResult<unknown> {
 }
 
 export function apiResultFromError<T>(err: unknown): ApiResult<T> {
+  if (err instanceof Error && 'code' in err && err.code === 'SESSION_CHANGED') {
+    return failResult<T>(err.message, 'SESSION_CHANGED');
+  }
   if (axios.isAxiosError(err) && err.response) {
     const status = err.response.status;
     const data: unknown = err.response.data;

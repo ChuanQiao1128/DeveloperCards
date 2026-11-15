@@ -53,7 +53,7 @@ public sealed class ContentReferencePublishTests(PostgresFixture db)
   public async Task PartialDraftsImport_ThenCompleteCandidatePublishes_AndWorkerRejectsLaterInvalidGraph()
   {
     var deck = await Deck();
-    var imported = await AutomationTestKit.CallAsync(CardsImport.HandleCardsImport, "POST", "/api/v1/authoring/cards/import", new { deckId = deck, cards = new[] { new { stableUid = "a", orderInDeck = 1, question = "Q", explanation = "A", teaching = new { answer = "A", keyPoint = "K", mustAnswer = new[] { "A" }, prerequisites = new[] { "b" } } } } }, Admin);
+    var imported = await AutomationTestKit.CallAsync(CardsImport.HandleCardsImport, "POST", "/api/v1/authoring/cards/import", new { deckId = deck, operationId = Guid.NewGuid().ToString("D"), cards = new[] { new { stableUid = "a", expectedVersion = 0, orderInDeck = 1, question = "Q", explanation = "A", teaching = new { answer = "A", keyPoint = "K", mustAnswer = new[] { "A" }, prerequisites = new[] { "b" } } } } }, Admin);
     Assert.True(imported.StatusCode == 200, imported.Body);
     await Card(deck, "b");
     Publish.TestEnqueueSeam = new("queue", "bucket", _ => Task.CompletedTask);
