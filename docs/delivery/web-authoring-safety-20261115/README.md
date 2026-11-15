@@ -52,6 +52,10 @@ The local suite binds only `127.0.0.1:5187`, refuses to reuse a server, and stop
 
 ## Costs and remaining work
 
+### Console login policy follow-up, 15 November 2026
+
+The owner requested Console MFA removal before merging PR #840. The existing Console Cognito pool is configured with MFA `OFF` and software-token MFA disabled. Password login, PKCE, administrator-created accounts, token revocation, API permissions, the mobile pool and operator IAM MFA retain their existing configuration. The accompanying `CONSOLE-MFA.plan-allow.json` permits only those two settings on the existing Console pool. This follow-up changes the desired Terraform configuration; the live login policy changes only after the approved infrastructure apply succeeds. No live MFA change is claimed by the source merge.
+
 The session checks add client code, and operation receipts consume existing database storage. The raw eager-bundle budget increase is recorded alongside its measured result; it is a deliberate trade for correctness. The extra local suite adds bounded work to the existing CI job. Current production bills, storage headroom, and CI quota were not queried, so no zero-increment invoice claim is made.
 
 Not executed: production migration/deployment, OTA or store release, production fault injection, real-user trials, and changes to offline ratings, balances, publishing recovery, or report delivery status. Those remain the next milestones. Personal and AI contributions should be stated according to the owner's actual review/acceptance decisions; the implementation and independent source review here were Codex-assisted.
