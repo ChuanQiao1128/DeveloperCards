@@ -1348,9 +1348,30 @@ counts. After a Terraform error, `tf-pipeline.py diagnose` prints one line per e
 | <AWS operation> | <HTTP status> | <error code>`, never the message (an AWS message can quote values). For the full
 text, reproduce the plan locally (§2, `devcards-admin`).
 
-`workflow_dispatch` (Actions → Terraform → Run workflow, from `main`) runs **plan only (infra-prod)**: the same plan,
+`workflow_dispatch` (Actions → Terraform → Run workflow, from `main`), with the default `console_mfa_only=false`, runs **plan only (infra-prod)**: the same plan,
 checked as an empty plan, as a drift report (addresses only). It needs an approval too: the role trusts nothing but
 `infra-prod`.
+
+#### Console MFA recovery (2026-11-16)
+
+Run [43707294567](https://github.com/ChuanQiao1128/DeveloperCards/actions/runs/43707294567) stopped at the guard:
+its full plan included four unrelated `module.operators` IAM changes. The apply step never ran. Do not add those
+changes to the Console allow-list or weaken the guard; operator changes still require the break-glass path below.
+
+To finish the owner's Console MFA OFF request, run **Terraform → Run workflow → main → console_mfa_only=true**
+(CLI: `gh workflow run terraform.yml --ref main -f console_mfa_only=true`). This explicit recovery mode reuses
+**select → infra-prod approval → apply**, with the literal
+`docs/delivery/web-authoring-safety-20261115/CONSOLE-MFA.plan-allow.json` and the fixed target
+`module.identity.aws_cognito_user_pool.console[0]` on **both** plans. There is no arbitrary target input. The
+on-main/stale/preflight checks, OIDC role, state locks, break-glass guard, allow-list gate, saved-plan apply, state
+recovery and private-log cleanup are unchanged. Dependencies pulled into the target plan must also pass the guard
+and allow-list gate; targeting alone is not a permission boundary.
+
+`tf-pipeline.py console-mfa-check` additionally requires the same existing pool identity, update or no-op actions,
+known MFA OFF / TOTP disabled values, and no imports, moves or replacements. An already OFF pool passes only with
+an empty plan after this value check; it performs no apply. The second plan repeats the value check and must be
+empty. Logs and summaries label this **Console user pool targeted scope only**: success does not resolve or verify
+the unrelated operator drift. Use default dispatch for a later full drift check; handle operator changes separately.
 
 ### When a run stops
 
@@ -1373,13 +1394,22 @@ checked as an empty plan, as a drift report (addresses only). It needs an approv
 
 GitHub re-runs a run with its original commit. If a later commit on `main` already changed AWS, re-running an older
 run would put its older configuration back, sometimes within its own allow-list. `tf-pipeline.py stale` therefore
-refuses a commit when a later push run of `terraform.yml` on `main` changed AWS: its `apply (infra-prod)` job
-succeeded (an empty plan confirms main and AWS agree), or its step `apply the saved plan` ran at all, whatever the
+refuses a commit when a later push **or dispatch** run of `terraform.yml` on `main` changed AWS: its `apply (infra-prod)` job
+succeeded (an empty plan confirms the checked scope), or its step `apply the saved plan` ran at all, whatever the
 run's colour (a red second plan, an apply that failed part-way or was cancelled), in any attempt. It reads the newest
-100 runs and their jobs from the Actions API (which a token cannot forge), in **select** and again in **apply**
-before any credential. A re-run of the latest run goes ahead past this check; it still applies only when its plan
+1000 runs, in pages of 100, and their jobs from the Actions API (which a token cannot forge), in **select** and again in **apply**
+before any credential. A plan-only dispatch has no apply job and does not count. A re-run of the latest run goes ahead past this check; it still applies only when its plan
 matches its allow-list, so it helps after a transient error, a lock or an approval that timed out, not after an
 apply that stopped part-way (When a run stops, above).
+
+If 1000 runs are read without exhausting the history or finding a later apply, the check refuses: truncated history
+cannot prove that the commit is current. Investigate the history before retrying; do not turn this error into a pass.
+
+**Transition restriction:** a re-run checks out its original commit, including its old stale-check script. Runs
+created before the Console recovery fix only recognize push applies, not later dispatch applies. Do not approve
+such historical runs, including failed run 43707294567. Recover by dispatching the updated workflow from current
+`main`. The existing required owner approval is the control for this restriction; the new script cannot
+retroactively protect an old immutable checkout. Confirm there are no historical pending approvals before recovery.
 
 ### Queueing
 
