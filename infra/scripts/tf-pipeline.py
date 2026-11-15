@@ -30,7 +30,7 @@ Stdlib only, so the workflow and the unit tests (infra/scripts/tests/test_tf_pip
       Repeats select's checks, so the apply job never trusts the select job's output alone.
   stale --sha SHA --repo OWNER/REPO [--run-id ID]
       Refuses SHA when a later commit on main already changed AWS (or was confirmed in sync) through the pipeline:
-      a later push run of terraform.yml whose "apply (infra-prod)" job succeeded, or whose step "apply the saved
+      a later push or dispatch run of terraform.yml whose "apply (infra-prod)" job succeeded, or whose step "apply the saved
       plan" ran at all (succeeded, failed part-way or was cancelled) in any attempt. Re-running an old run would
       otherwise put old configuration back. Read from the Actions API through `gh api` (runs and jobs, which a
       token cannot forge).
@@ -46,6 +46,9 @@ Stdlib only, so the workflow and the unit tests (infra/scripts/tests/test_tf_pip
   diagnose --log FILE [FILE ...]
       Terraform's errors without their text: for each `Error:` its leading phrase, the resource address, the
       AWS operation, HTTP status and error code. Never the message itself, which can quote values.
+  console-mfa-check --plan PLAN_JSON
+      Fixed-scope recovery: an existing Console user pool, update or no-op, with known OFF/disabled MFA values.
+      No identity change, import or move. Used in addition to guard and check-plan.py, never instead of them.
 
 Nothing here prints a plan, a value or state: only paths, addresses, actions, key names and counts.
 Exit codes: 0 pass, 1 refused or violation, 2 usage or unreadable input.
@@ -617,7 +620,7 @@ def gh_api(path):
 
 def changed_aws(jobs):
     """True when an apply job among JOBS (every attempt of one run) applied or confirmed the plan: the job
-    succeeded (an empty plan confirms main and AWS agree), or its step "apply the saved plan" ran at all. A step that
+    succeeded (an empty plan confirms its checked scope), or its step "apply the saved plan" ran at all. A step that
     failed part-way or was cancelled may have changed AWS too, and a red second plan follows a real apply."""
     for job in jobs:
         if job.get("name") != APPLY_JOB:
@@ -631,15 +634,15 @@ def changed_aws(jobs):
 
 
 def newer_applied(sha, repo, run_id=None, api=gh_api):
-    """The newest terraform.yml push run on main, other than RUN_ID, whose commit descends from SHA and which
+    """The newest terraform.yml push/dispatch run on main, other than RUN_ID, whose commit descends from SHA and which
     changed AWS (changed_aws, in any of its attempts), or None. Any conclusion: a run that went red after its apply
     step counts. The newest 100 runs are read; the runs that matter are the ones after SHA's own."""
-    runs = api("repos/%s/actions/workflows/terraform.yml/runs?branch=main&event=push&per_page=100"
+    runs = api("repos/%s/actions/workflows/terraform.yml/runs?branch=main&per_page=100"
                % repo).get("workflow_runs") or []
     for run in runs:
         if run_id is not None and str(run.get("id")) == str(run_id):
             continue
-        if (run.get("path") != WORKFLOW_PATH or run.get("event") != "push" or run.get("head_branch") != "main"
+        if (run.get("path") != WORKFLOW_PATH or run.get("event") not in ("push", "workflow_dispatch") or run.get("head_branch") != "main"
                 or (run.get("head_repository") or {}).get("full_name") != repo):
             continue
         head = run.get("head_sha") or ""
@@ -897,6 +900,58 @@ def run_guard(plan_path, output=None):
     return rc
 
 
+# ── Console MFA recovery ──────────────────────────────────────────────────────────────────────────────
+
+def has_unknown(value):
+    if isinstance(value, dict):
+        return any(has_unknown(v) for v in value.values())
+    if isinstance(value, list):
+        return any(has_unknown(v) for v in value)
+    return bool(value)
+
+
+def run_console_mfa_check(plan_path):
+    try:
+        with open(plan_path) as handle:
+            plan = json.load(handle)
+    except (OSError, ValueError) as exc:
+        raise UsageError("cannot read " + plan_path + ": " + str(exc))
+    if not isinstance(plan, dict):
+        raise UsageError("plan is not a JSON object")
+    address = "module.identity.aws_cognito_user_pool.console[0]"
+    entries = plan.get("resource_changes") or []
+    pools = [e for e in entries if e.get("address") == address]
+    problems = []
+    if len(pools) != 1:
+        problems.append("expected exactly one existing Console pool")
+    else:
+        entry = pools[0]
+        change = entry.get("change") or {}
+        before = change.get("before") or {}
+        after = change.get("after") or {}
+        if (entry.get("mode") != "managed" or entry.get("type") != "aws_cognito_user_pool"
+                or change.get("actions") not in (["update"], ["no-op"])):
+            problems.append("Console pool must be a managed update or no-op")
+        if (not isinstance(before.get("id"), str) or not before.get("id")
+                or before.get("id") != after.get("id")):
+            problems.append("existing Console pool identity must be preserved")
+        if has_unknown(change.get("after_unknown")):
+            problems.append("Console pool values must be known before apply")
+        if (after.get("mfa_configuration") != "OFF"
+                or after.get("software_token_mfa_configuration") != [{"enabled": False}]):
+            problems.append("Console pool must end with MFA off and TOTP disabled")
+    for entry in entries:
+        change = entry.get("change") or {}
+        if entry.get("previous_address") or change.get("importing") is not None or change.get("replace_paths"):
+            problems.append("recovery cannot move, import or replace resources")
+    for problem in sorted(set(problems)):
+        error("CONSOLE MFA REFUSED: " + problem)
+    if problems:
+        return 1
+    log("CONSOLE MFA CHECK OK: existing pool identity and known MFA settings verified")
+    return 0
+
+
 # ── diagnose ───────────────────────────────────────────────────────────────────────────────────────────
 
 SAFE_PHRASE = re.compile(r"[^A-Za-z0-9 ._/-]")
@@ -981,6 +1036,8 @@ def main(argv=None):
     p.add_argument("--output", help="append apply_needed= here (GITHUB_OUTPUT)")
     p = sub.add_parser("diagnose")
     p.add_argument("--log", nargs="+", required=True)
+    p = sub.add_parser("console-mfa-check")
+    p.add_argument("--plan", required=True)
     args = parser.parse_args(argv)
     try:
         if args.cmd == "pr-check":
@@ -1002,6 +1059,8 @@ def main(argv=None):
             return run_guard(args.plan, args.output)
         if args.cmd == "diagnose":
             return run_diagnose(args.log)
+        if args.cmd == "console-mfa-check":
+            return run_console_mfa_check(args.plan)
         parser.print_usage(sys.stderr)
         return 2
     except UsageError as exc:

@@ -466,7 +466,9 @@ class StaleTest(InRepo):
             ([self.run_entry(7, self.new, conclusion="failure")], {"7": [{"name": tfp.APPLY_JOB, "conclusion": "failure"}]}),
             ([self.run_entry(7, self.new, conclusion=None, status="in_progress")],
              {"7": self.applied(None, None)}),                                              # still running
-            ([self.run_entry(7, self.new, event="workflow_dispatch")], {"7": self.applied()}),
+            ([self.run_entry(7, self.new, event="workflow_dispatch")],
+             {"7": [{"name": "plan only (infra-prod)", "conclusion": "success"}]}),
+            ([self.run_entry(7, self.new, event="pull_request")], {"7": self.applied()}),
             ([self.run_entry(7, self.new, path=".github/workflows/evil.yml")], {"7": self.applied()}),
             ([self.run_entry(7, self.new, head_repository={"full_name": "fork/recallsmith"})], {"7": self.applied()}),
             ([self.run_entry(9, self.new)], {"9": self.applied()}),                       # this run itself
@@ -475,6 +477,15 @@ class StaleTest(InRepo):
         for runs, jobs in cases:
             rc, out = capture(tfp.stale, self.old, REPO, "9", self.api(runs, jobs))
             self.assertEqual(rc, 0, json.dumps(runs) + out)
+
+    def test_dispatch_apply_also_makes_older_commits_stale(self):
+        for conclusion, step in (("success", "success"), ("failure", "failure"),
+                                 ("cancelled", "cancelled"), ("failure", "success")):
+            api = self.api([self.run_entry(7, self.new, event="workflow_dispatch")],
+                           {"7": self.applied(conclusion, step)})
+            rc, out = capture(tfp.stale, self.old, REPO, "9", api)
+            self.assertEqual(rc, 1, out)
+            self.assertNotIn("event=push", api.calls[0])
 
     def test_gh_api_without_the_workflow_on_record(self):
         # The first push of terraform.yml: GitHub may not list the workflow yet (404) -> no run, nothing applied.
@@ -512,6 +523,96 @@ def resource(address, actions, rtype=None, before=None, after=None, importing=Fa
 
 def plan(*entries, outputs=None):
     return {"resource_changes": list(entries), "output_changes": outputs or {}}
+
+
+class ConsoleMfaCheckTest(unittest.TestCase):
+    def pool(self, actions=None):
+        before = {"id": "ap-southeast-2_example", "mfa_configuration": "ON",
+                  "software_token_mfa_configuration": [{"enabled": True}], "name": "console"}
+        after = dict(before, mfa_configuration="OFF", software_token_mfa_configuration=[{"enabled": False}])
+        return resource("module.identity.aws_cognito_user_pool.console[0]", actions or ["update"],
+                        before=before, after=after)
+
+    def check(self, p):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "plan.json")
+            with open(path, "w") as handle:
+                json.dump(p, handle)
+            return capture(tfp.run_console_mfa_check, path)
+
+    def test_existing_pool_off_or_already_off(self):
+        for actions in (["update"], ["no-op"]):
+            entry = self.pool(actions)
+            if actions == ["no-op"]:
+                entry["change"]["before"] = entry["change"]["after"].copy()
+            rc, out = self.check(plan(entry))
+            self.assertEqual(rc, 0, out)
+            self.assertIn("CONSOLE MFA CHECK OK", out)
+            self.assertNotIn("ap-southeast-2_example", out)
+
+    def test_rejects_wrong_or_unknown_values(self):
+        variants = [
+            ("after", "mfa_configuration", "OPTIONAL"),
+            ("after", "software_token_mfa_configuration", [{"enabled": True}]),
+            ("after", "software_token_mfa_configuration", []),
+            ("after", "id", "different-pool"),
+            ("before", "id", None),
+            ("after_unknown", "mfa_configuration", True),
+            ("after_unknown", "software_token_mfa_configuration", [{"enabled": True}]),
+            ("after_unknown", "id", True),
+        ]
+        for part, key, value in variants:
+            entry = self.pool()
+            entry["change"][part][key] = value
+            rc, out = self.check(plan(entry))
+            self.assertEqual(rc, 1, (part, key, out))
+            self.assertNotIn("different-pool", out)
+            self.assertNotIn("ap-southeast-2_example", out)
+
+    def test_no_create_replace_import_move_or_missing_pool(self):
+        for actions in (["create"], ["delete"], ["delete", "create"], ["create", "delete"], ["forget"]):
+            rc, out = self.check(plan(self.pool(actions)))
+            self.assertEqual(rc, 1, out)
+        for modify in (
+            lambda e: e.update(previous_address="module.identity.aws_cognito_user_pool.old[0]"),
+            lambda e: e["change"].update(importing={"id": "secret-import-id"}),
+            lambda e: e.update(mode="data"),
+            lambda e: e.update(type="aws_s3_bucket"),
+        ):
+            entry = self.pool()
+            modify(entry)
+            rc, out = self.check(plan(entry))
+            self.assertEqual(rc, 1, out)
+            self.assertNotIn("secret-import-id", out)
+        rc, out = self.check(plan())
+        self.assertEqual(rc, 1, out)
+
+    def test_nested_false_unknown_flags_are_known(self):
+        entry = self.pool()
+        entry["change"]["after_unknown"] = {"software_token_mfa_configuration": [{"enabled": False}]}
+        rc, out = self.check(plan(entry))
+        self.assertEqual(rc, 0, out)
+
+    def test_non_mfa_changes_fail_the_existing_gates(self):
+        allow = REPO_ROOT / "docs/delivery/web-authoring-safety-20261115/CONSOLE-MFA.plan-allow.json"
+        cases = []
+        entry = self.pool()
+        entry["change"]["after"]["name"] = "other-name"
+        cases.append(plan(entry))
+        cases.append(plan(self.pool(), resource("aws_sqs_queue.q", ["create"], after={"name": "q"})))
+        cases.append(plan(self.pool(), outputs={"console": {"actions": ["update"]}}))
+        for p in cases:
+            with tempfile.TemporaryDirectory() as tmp:
+                path = os.path.join(tmp, "plan.json")
+                with open(path, "w") as handle:
+                    json.dump(p, handle)
+                proc = subprocess.run([sys.executable, str(CHECK_PLAN), "--plan", path, "--allow", str(allow)],
+                                      capture_output=True, text=True)
+                self.assertEqual(proc.returncode, 1, proc.stdout + proc.stderr)
+        entry = resource("aws_sqs_queue.q", ["no-op"], before={"name": "q"}, after={"name": "q"})
+        entry["previous_address"] = "aws_sqs_queue.old"
+        rc, out = self.check(plan(self.pool(), entry))
+        self.assertEqual(rc, 1, out)
 
 
 def trust(principal):
@@ -748,7 +849,17 @@ class WorkflowFactsTest(unittest.TestCase):
             self.assertIn("TF_VAR_alert_email: ${{ secrets.TF_VAR_ALERT_EMAIL }}", self.jobs[name])
         self.assertNotIn("developercards-gha-prod", self.text)
         self.assertNotIn("configure-aws-credentials", self.jobs["select"])
-        self.assertIn("if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'", self.jobs["plan"])
+        self.assertIn("if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && !inputs.console_mfa_only", self.jobs["plan"])
+
+    def test_console_recovery_is_explicit_and_main_only(self):
+        self.assertIn("console_mfa_only:\n        description:", self.text)
+        self.assertIn("        type: boolean\n        default: false", self.text)
+        self.assertIn("if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || inputs.console_mfa_only)",
+                      self.jobs["select"])
+        self.assertIn("CONSOLE_MFA_ONLY: ${{ github.event_name == 'workflow_dispatch' && inputs.console_mfa_only }}",
+                      self.jobs["apply"])
+        self.assertIn("console-mfa-check --plan", self.jobs["apply"])
+        self.assertTrue(before(self.jobs["apply"], "console-mfa-check --plan", " apply -input=false"))
 
     def test_concurrency_never_cancels(self):
         self.assertIn("\nconcurrency:\n", self.text)
@@ -1349,7 +1460,8 @@ class StepBodyTest(unittest.TestCase):
             handle.write(step_body(self.jobs[job], name))
         full = {"PATH": self.bin + os.pathsep + os.environ["PATH"], "RUNNER_TEMP": self.runner_temp,
                 "GITHUB_STEP_SUMMARY": self.summary, "GITHUB_SHA": "a" * 40, "GITHUB_RUN_ID": "11",
-                "GITHUB_RUN_ATTEMPT": "2", "STUB_LOG": self.log, "ALLOW": "", "TF_VAR_alert_email": "x@example.invalid"}
+                "GITHUB_RUN_ATTEMPT": "2", "STUB_LOG": self.log, "ALLOW": "", "CONSOLE_MFA_ONLY": "false", "NEEDED": "true",
+                "GITHUB_OUTPUT": os.path.join(self.tmp, "outputs"), "TF_VAR_alert_email": "x@example.invalid"}
         full.update(env)
         proc = subprocess.run(["bash", "--noprofile", "--norc", "-eo", "pipefail", script], cwd=self.work, env=full,
                               stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
@@ -1383,6 +1495,55 @@ class StepBodyTest(unittest.TestCase):
         rc, out = self.run_step("apply", "the second plan must be empty", STUB_PYTHON="empty")
         self.assertEqual(rc, 0, out)
         self.assertIn("PLAN EMPTY", out)
+
+    def test_both_recovery_plans_use_only_the_fixed_target(self):
+        for recovery in ("false", "true"):
+            open(self.log, "w").close()
+            for name in ("plan to a saved file (never printed)", "the second plan must be empty"):
+                rc, out = self.run_step("apply", name, CONSOLE_MFA_ONLY=recovery, STUB_PYTHON="empty")
+                self.assertEqual(rc, 0, out)
+            plans = [line for line in self.read(self.log).splitlines() if " plan " in line]
+            self.assertEqual(len(plans), 2)
+            for line in plans:
+                self.assertEqual("-target=module.identity.aws_cognito_user_pool.console[0]" in line, recovery == "true")
+                self.assertIn("-lock-timeout=10m", line)
+            if recovery == "true":
+                self.assertIn("Console user pool targeted scope only", out)
+                self.assertIn("full production drift is not checked", out)
+                self.assertIn("console-mfa-check --plan", self.read(self.log))
+
+    def test_recovery_selection_emits_the_literal_allow_file(self):
+        rc, out = self.run_step("select", "pick this push's allow files", CONSOLE_MFA_ONLY="true")
+        self.assertEqual(rc, 0, out)
+        outputs = self.read(os.path.join(self.tmp, "outputs"))
+        self.assertEqual(outputs, "apply=true\nallow=docs/delivery/web-authoring-safety-20261115/CONSOLE-MFA.plan-allow.json\n")
+        self.assertIn("targeted scope only", self.read(self.summary))
+        self.assertNotIn("tf-pipeline.py select", self.read(self.log))
+
+    def test_recovery_gate_checks_values_and_accepts_an_already_off_pool(self):
+        for needed in ("true", "false"):
+            open(self.log, "w").close()
+            rc, out = self.run_step("apply", "the plan must match the allow-list (check-plan.py)",
+                                    CONSOLE_MFA_ONLY="true", NEEDED=needed, STUB_PYTHON="empty",
+                                    ALLOW="docs/delivery/web-authoring-safety-20261115/CONSOLE-MFA.plan-allow.json")
+            self.assertEqual(rc, 0, out)
+            calls = self.read(self.log)
+            self.assertIn("console-mfa-check --plan", calls)
+            self.assertEqual(" --allow " in calls, needed == "true")
+        rc, out = self.run_step("apply", "the plan must match the allow-list (check-plan.py)",
+                                CONSOLE_MFA_ONLY="true", STUB_PYTHON="fail")
+        self.assertEqual(rc, 1, out)
+        self.assertIn("PLAN VIOLATION", out)
+
+    def test_recovery_summary_labels_targeted_success(self):
+        with open(self.tf("second.txt"), "w") as handle:
+            handle.write("PLAN EMPTY\n")
+        rc, out = self.run_step("apply", "job summary", CONSOLE_MFA_ONLY="true", GUARD="success", GATE="success",
+                                APPLY="success", SECOND="success", NEEDED="true")
+        self.assertEqual(rc, 0, out)
+        summary = self.read(self.summary)
+        self.assertIn("Console user pool targeted scope only", summary)
+        self.assertIn("full production drift is not checked", summary)
 
     def test_plan_only_writes_the_drift_report_and_fails(self):
         rc, out = self.run_step("plan", "main and AWS must agree (check-plan.py, no allow file)", STUB_PYTHON="fail")
