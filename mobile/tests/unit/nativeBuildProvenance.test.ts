@@ -325,4 +325,13 @@ describe('Xcode final-bundle observer and config preservation', () => {
     expect(env.NODE_OPTIONS).toBeUndefined(); expect(env.EAS_BUILD_PROFILE).toBeUndefined(); expect(env.SKIP_BUNDLING).toBeUndefined();
     expect(env.EXPO_NO_DOTENV).toBe('1');
   });
+  it('pins CocoaPods UTF-8 encoding without inheriting caller locale overrides', () => {
+    const inherited = Object.fromEntries(['EXPO_PUBLIC_API_BASE', 'EXPO_PUBLIC_AWS_REGION', 'EXPO_PUBLIC_COGNITO_USER_POOL_ID',
+      'EXPO_PUBLIC_COGNITO_USER_POOL_CLIENT_ID', 'EXPO_PUBLIC_RC_IOS_API_KEY', 'EXPO_PUBLIC_SENTRY_DSN', 'SENTRY_AUTH_TOKEN'].map(k => [k, `STUB_${k}`]));
+    const env = producer.buildEnvironment('/STUB/private', 'STUBTEAM01', {
+      ...inherited, LANG: 'C', LC_ALL: 'C', LC_CTYPE: 'C', RUBYOPT: '-EUS-ASCII',
+    });
+    expect(env.LANG).toBe('en_US.UTF-8');
+    expect(env.LC_ALL).toBeUndefined(); expect(env.LC_CTYPE).toBeUndefined(); expect(env.RUBYOPT).toBeUndefined();
+  });
 });
