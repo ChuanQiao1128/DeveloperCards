@@ -8,7 +8,7 @@ function patchPhase(script) {
   return script.replace(token, '"$PROJECT_DIR/../scripts/release/observeNativeBundle.cjs"');
 }
 module.exports = config => withXcodeProject(config, cfg => {
-  const phases = cfg.modResults.pbxShellScriptBuildPhaseSection();
+  const phases = cfg.modResults.hash.project.objects.PBXShellScriptBuildPhase || {};
   const candidates = Object.values(phases).filter(p => typeof p === 'object' && p.name === '"Bundle React Native code and images"');
   if (candidates.length !== 1) throw new Error('expected one Xcode RN bundling phase');
   const phase = candidates[0];

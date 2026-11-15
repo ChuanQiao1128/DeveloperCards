@@ -11,5 +11,6 @@ module.exports = ({ config }) => {
   return { ...config, ios: { ...config.ios, infoPlist: { ...config.ios?.infoPlist,
     RecallSmithBuildProvenance: signedContext(context) } },
     updates: { ...config.updates, requestHeaders: { ...config.updates?.requestHeaders, 'expo-channel-name': 'production' } },
-    plugins: [...(config.plugins ?? []), './plugins/withBuildProvenance'] };
+    // Xcode mods execute in reverse registration order; preserve Sentry's wrapper first.
+    plugins: ['./plugins/withBuildProvenance', ...(config.plugins ?? [])] };
 };

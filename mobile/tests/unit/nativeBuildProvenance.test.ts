@@ -298,7 +298,8 @@ describe('Xcode final-bundle observer and config preservation', () => {
     write(path.join(root, '.ownership-build.json'), JSON.stringify(c));
     const built = resolve({ config });
     expect(built.updates).toEqual({ ...config.updates, requestHeaders: { ...config.updates.requestHeaders, 'expo-channel-name': 'production' } });
-    expect(built.extra).toEqual(config.extra); expect(built.plugins.slice(0, -1)).toEqual(config.plugins);
+    expect(built.extra).toEqual(config.extra); expect(built.plugins[0]).toBe('./plugins/withBuildProvenance');
+    expect(built.plugins.slice(1)).toEqual(config.plugins);
     expect(built.ios.infoPlist).toEqual({ ...config.ios.infoPlist, RecallSmithBuildProvenance: producer.signedContext(c) });
     expect({ ...built, plugins: config.plugins, ios: config.ios, updates: config.updates }).toEqual(config);
     config.updates.requestHeaders['expo-channel-name'] = 'preview';
