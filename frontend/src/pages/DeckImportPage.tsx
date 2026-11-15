@@ -818,7 +818,7 @@ export function DeckImportPage() {
                     {runResult.failures.length > 0 || runResult.cancelled ? (
                       <button
                         type="button"
-                        disabled={running}
+                        disabled={running || !!recovery}
                         className="inline-flex items-center px-3 py-1.5 rounded-md text-sm font-medium
                                    bg-indigo-600 text-white hover:bg-indigo-700
                                    disabled:bg-slate-300 disabled:cursor-not-allowed"
@@ -829,7 +829,8 @@ export function DeckImportPage() {
                     ) : (
                       <button
                         type="button"
-                        className="text-sm px-3 py-1.5 rounded-md border border-slate-300 text-slate-700 hover:bg-slate-50"
+                        disabled={!!recovery}
+                        className="text-sm px-3 py-1.5 rounded-md border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
                         onClick={() => void buildPreview()}
                       >
                         Re-run the preview
@@ -838,7 +839,8 @@ export function DeckImportPage() {
 
                     <button
                       type="button"
-                      className="text-sm px-3 py-1.5 rounded-md border border-slate-300 text-slate-700 hover:bg-slate-50"
+                      disabled={!!recovery}
+                      className="text-sm px-3 py-1.5 rounded-md border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
                       onClick={restart}
                     >
                       Start over

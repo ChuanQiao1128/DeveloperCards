@@ -38,6 +38,11 @@ it('recovers after a lost response and reload using the saved identity without a
   expect(screen.getByText('failed', { exact: true }).parentElement?.textContent).toBe('0failed');
   expect(screen.getByText('unconfirmed', { exact: true }).parentElement?.textContent).toBe('1unconfirmed');
   expect(screen.getByText('1 card needs confirmation')).not.toBeNull();
+  expect((screen.getByRole('button', { name: 'Re-run the preview' }) as HTMLButtonElement).disabled).toBe(true);
+  expect((screen.getByRole('button', { name: 'Start over' }) as HTMLButtonElement).disabled).toBe(true);
+  expect((screen.getByRole('button', { name: 'Recover saved import' }) as HTMLButtonElement).disabled).toBe(false);
+  expect(screen.getByRole('link', { name: 'Back to cards →' }).getAttribute('href')).toBe('/decks/cards?deckId=7');
+
   expect(screen.getByRole('list', { name: 'Import batch results' }).textContent).toContain(api.importCardsBatch.mock.calls[0][0].operationId);
 
   expect(api.lookupImportReceipt).toHaveBeenCalledTimes(1);
@@ -47,6 +52,9 @@ it('recovers after a lost response and reload using the saved identity without a
   mount();
   await user.click(await screen.findByRole('button', { name: 'Recover saved import' }));
   await screen.findByText('All planned writes succeeded.');
+  expect((screen.getByRole('button', { name: 'Re-run the preview' }) as HTMLButtonElement).disabled).toBe(false);
+  expect((screen.getByRole('button', { name: 'Start over' }) as HTMLButtonElement).disabled).toBe(false);
+
   expect(api.importCardsBatch).toHaveBeenCalledTimes(1);
   expect(api.lookupImportReceipt.mock.calls[1][0].serializedBody).toBe(sent.serializedBody);
   expect(screen.queryByRole('button', { name: 'Recover saved import' })).toBeNull();
