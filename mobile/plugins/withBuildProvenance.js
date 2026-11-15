@@ -1,11 +1,15 @@
 const { withXcodeProject } = require('expo/config-plugins');
 function patchPhase(script) {
-  // Expo/Sentry may wrap the RN script. Replace exactly the resolved RN
-  // invocation, so the observer surrounds Metro AND its final Hermes compile.
-  const token = /`"\$NODE_BINARY" --print "require\('path'\)\.dirname\(require\.resolve\('react-native\/package\.json'\)\) \+ '\/scripts\/react-native-xcode\.sh'"`/g;
-  const matches = script.match(token);
-  if (matches?.length !== 1) throw new Error('unsupported Xcode bundling invocation; provenance stays closed');
-  return script.replace(token, '"$PROJECT_DIR/../scripts/release/observeNativeBundle.cjs"');
+  // Surround Sentry's tool injection, not its RN subprocess: that subprocess
+  // must keep Sentry's Node/Hermes wrappers for source-map discovery.
+  const resolved = (pkg, name) => '`"$NODE_BINARY" --print "require(\'path\').dirname(require.resolve(\'' + pkg + '/package.json\')) + \'/scripts/' + name + '\'"`';
+  const command = '/bin/sh ' + resolved('@sentry/react-native', 'sentry-xcode.sh') + ' ' + resolved('react-native', 'react-native-xcode.sh');
+  const lines = script.split('\n');
+  if (lines.filter(line => line === command).length !== 1 ||
+    script.split('/scripts/react-native-xcode.sh').length !== 2 || script.split('/scripts/sentry-xcode.sh').length !== 2) {
+    throw new Error('unsupported Xcode bundling invocation; provenance stays closed');
+  }
+  return lines.map(line => line === command ? '"$PROJECT_DIR/../scripts/release/observeNativeBundle.cjs"' : line).join('\n');
 }
 module.exports = config => withXcodeProject(config, cfg => {
   const phases = cfg.modResults.hash.project.objects.PBXShellScriptBuildPhase || {};

@@ -103,8 +103,15 @@ production it merges reserved signed native provenance, the observer plugin and 
 `expo-channel-name: production` update request header, preserving other update settings.
 The signed IPA inspector rejects a missing or different production channel; a locally built binary
 therefore cannot pass only on runtime/URL while silently losing production OTA delivery. The Xcode plugin
-accepts only its known RN bundling invocation. The observer runs Metro and Hermes in that same native
-build, refuses a pre-existing/skipped bundle, and retains the final Hermes bytes before signing.
+accepts only the exact locked Expo/Sentry outer bundling command and replaces that whole command
+with the observer; bare RN, legacy nested-observer and unknown wrapper forms fail closed.
+The observer invokes the locked Sentry 7.2.0 shell with the RN 0.81.5 script from the generated
+`ios` directory, preserving Sentry CLI 2.55.0 discovery, source-map reporting and enabled uploads.
+It supplies the real Node/Hermes tools before Sentry installs its own wrappers; caller-supplied
+wrapper markers, tool/report paths and bundling overrides are refused (diagnostics name keys only).
+Existing `SENTRY_ALLOW_FAILURE` production behavior is preserved. The observer waits for the complete
+Sentry → RN → Hermes → source-map/module-collection chain, refuses a pre-existing/skipped bundle,
+and retains the final Hermes bytes before signing. A nonzero chain result creates no observation.
 The producer requires their digest to match `main.jsbundle` in the newly signed IPA, and requires the
 signed source commit/archive/nonce to match its in-memory expectations. Unsupported hooks/toolchains,
 missing observations, stale IPA replay, source/overlay/receipt mutations and mismatched JS fail closed.
@@ -131,6 +138,9 @@ even with `LOCAL_BUILD=1`, before any external call and points to the producer.
 This is trusted local producer process provenance. It does not prove reproducible compilation or defend
 against a privileged dishonest builder. Local tests use explicitly labelled fake build/signature tools
 through internal dependency injection; no production flag or environment variable selects them.
+Shell integration tests execute the actual installed Expo template/plugin and Sentry/RN shell scripts
+with explicitly fake Sentry CLI/Metro/Hermes tools reproducing the locked injection protocol; their
+simulated reporting/upload attempt is not an actual Sentry upload or release acceptance.
 A real authorized signed build must still demonstrate the hook timing, metadata signature coverage,
 bundle equality and checker acceptance. Store/TestFlight availability, distribution, device fallback
 and queue behavior remain separate unverified obligations. Until that evidence exists, do not claim
