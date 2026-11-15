@@ -1,4 +1,5 @@
 using Npgsql;
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Globalization;
 using System.Text.Json;
@@ -36,6 +37,25 @@ public static class ProgressEvents
     int? SrsStage,
     string? SchedulerVersion,
     string? SchedulerState);
+
+  private static readonly ConcurrentDictionary<string, byte> WinnerOrderReadyDatabases = new(StringComparer.Ordinal);
+
+  private static async Task<bool> IsWinnerOrderReadyAsync(NpgsqlConnection conn)
+  {
+    var database = $"{conn.Host}:{conn.Port}/{conn.Database}";
+    if (WinnerOrderReadyDatabases.ContainsKey(database)) return true;
+
+    var ready = await DbUtil.ExecuteScalarAsync(conn, null, """
+      select exists (
+        select 1 from pg_attribute
+        where attrelid = to_regclass('public.user_progress')
+          and attname = 'last_review_event_id' and not attisdropped
+      )
+      """, []) is true;
+    // Cache only true so a warm process observes additive migration 057 on its next request.
+    if (ready) WinnerOrderReadyDatabases.TryAdd(database, 0);
+    return ready;
+  }
 
   // The ladder in mobile/src/review/model.ts has 7 buckets (INTERVALS_DAYS),
   // so a valid stage is 0..6. The client clamps with clampStage() before it
@@ -320,11 +340,27 @@ public static class ProgressEvents
           "SCHEDULER_STATE_NOT_READY", "Progress sync is temporarily unavailable. Please try again.");
       }
 
+      var winnerOrderReady = await IsWinnerOrderReadyAsync(conn);
+      // shortcut: pre-057 schemas keep historical timestamp-only ties; migrate 057 before
+      // activating the deterministic writer. This fallback cannot guarantee cross-batch convergence.
+      var winnerPredicate = winnerOrderReady
+        ? "(excluded.last_reviewed_at, excluded.last_review_event_id) > (coalesce(user_progress.last_reviewed_at, 'epoch'::timestamptz), coalesce(user_progress.last_review_event_id, '00000000-0000-0000-0000-000000000000'::uuid))"
+        : "excluded.last_reviewed_at >= coalesce(user_progress.last_reviewed_at, 'epoch'::timestamptz)";
+      var winnerColumn = winnerOrderReady ? ", last_review_event_id" : "";
+      var winnerUpdate = winnerOrderReady ? $"""
+            -- Legacy NULL winner ids sort below every real event at the same time.
+            last_review_event_id = case
+              when {winnerPredicate}
+                then excluded.last_review_event_id
+              else user_progress.last_review_event_id
+            end,
+        """ : "";
+
       var schedulerStateColumn = schedulerStateReady ? ", scheduler_state" : "";
       var schedulerStateValue = schedulerStateReady ? ", scheduler_state" : "";
-      var schedulerStateUpdate = schedulerStateReady ? """
+      var schedulerStateUpdate = schedulerStateReady ? $"""
             scheduler_state = case
-              when (excluded.last_reviewed_at, excluded.last_review_event_id) > (coalesce(user_progress.last_reviewed_at, 'epoch'::timestamptz), coalesce(user_progress.last_review_event_id, '00000000-0000-0000-0000-000000000000'::uuid))
+              when {winnerPredicate}
                 then excluded.scheduler_state
               else user_progress.scheduler_state
             end,
@@ -543,7 +579,7 @@ public static class ProgressEvents
         upsert as (
           insert into user_progress (
             user_sub, deck_slug, stable_uid,
-            status, last_rating, last_reviewed_at, last_review_event_id,
+            status, last_rating, last_reviewed_at{winnerColumn},
             review_count, due_at,
             last_seen_revision,
             srs_stage, last_scheduler_version{schedulerStateColumn},
@@ -553,8 +589,7 @@ public static class ProgressEvents
             user_sub, deck_slug, stable_uid,
             1 as status,
             last_rating,
-            last_reviewed_at,
-            last_review_event_id,
+            last_reviewed_at{winnerColumn},
             inc as review_count,
             next_review_at as due_at,
             last_seen_revision,
@@ -572,21 +607,16 @@ public static class ProgressEvents
               excluded.last_reviewed_at
             ),
 
-            -- Legacy NULL winner ids sort below every real event at the same time.
-            last_review_event_id = case
-              when (excluded.last_reviewed_at, excluded.last_review_event_id) > (coalesce(user_progress.last_reviewed_at, 'epoch'::timestamptz), coalesce(user_progress.last_review_event_id, '00000000-0000-0000-0000-000000000000'::uuid))
-                then excluded.last_review_event_id
-              else user_progress.last_review_event_id
-            end,
+        {winnerUpdate}
 
             last_rating = case
-              when (excluded.last_reviewed_at, excluded.last_review_event_id) > (coalesce(user_progress.last_reviewed_at, 'epoch'::timestamptz), coalesce(user_progress.last_review_event_id, '00000000-0000-0000-0000-000000000000'::uuid))
+              when {winnerPredicate}
                 then excluded.last_rating
               else user_progress.last_rating
             end,
 
             due_at = case
-              when (excluded.last_reviewed_at, excluded.last_review_event_id) > (coalesce(user_progress.last_reviewed_at, 'epoch'::timestamptz), coalesce(user_progress.last_review_event_id, '00000000-0000-0000-0000-000000000000'::uuid))
+              when {winnerPredicate}
                 then excluded.due_at
               else user_progress.due_at
             end,
@@ -608,13 +638,13 @@ public static class ProgressEvents
             -- which is honest, while keeping the previous stage next to a new
             -- due_at is exactly the stitched state above.
             srs_stage = case
-              when (excluded.last_reviewed_at, excluded.last_review_event_id) > (coalesce(user_progress.last_reviewed_at, 'epoch'::timestamptz), coalesce(user_progress.last_review_event_id, '00000000-0000-0000-0000-000000000000'::uuid))
+              when {winnerPredicate}
                 then excluded.srs_stage
               else user_progress.srs_stage
             end,
 
             last_scheduler_version = case
-              when (excluded.last_reviewed_at, excluded.last_review_event_id) > (coalesce(user_progress.last_reviewed_at, 'epoch'::timestamptz), coalesce(user_progress.last_review_event_id, '00000000-0000-0000-0000-000000000000'::uuid))
+              when {winnerPredicate}
                 then excluded.last_scheduler_version
               else user_progress.last_scheduler_version
             end,
