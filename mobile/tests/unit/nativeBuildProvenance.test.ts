@@ -1,6 +1,6 @@
 // Explicit local fake Xcode/Metro/Hermes/signature tools. These tests establish
 // orchestration only; none of these fixtures is actual signed release evidence.
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -15,7 +15,7 @@ const observer = require(path.join(mobile, 'scripts/release/observeNativeBundle.
 const { sha } = guard;
 const dirs: string[] = [];
 const temp = () => { const p = fs.mkdtempSync(path.join(os.tmpdir(), 'native-provenance-STUB-')); dirs.push(p); return p; };
-afterEach(() => dirs.splice(0).forEach(dir => fs.rmSync(dir, { force: true, recursive: true })));
+afterEach(() => { vi.unstubAllEnvs(); dirs.splice(0).forEach(dir => fs.rmSync(dir, { force: true, recursive: true })); });
 const write = (file: string, data: string | Buffer) => { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, data); };
 const hbc = Buffer.concat([Buffer.from('c61fbc03c103191f', 'hex'), Buffer.from(' STUB devcards:sync:pendingOwners:v1 PROGRESS_QUEUE_FULL')]);
 function fixture() {
@@ -149,6 +149,9 @@ describe('producer-owned local provenance orchestration (fake build/signature to
   });
   it('executes the actual fixed local npm/prebuild/pod/Xcode producer with only external tools stubbed', () => {
     const f = fixture(); const calls: string[][] = [];
+    const callerHome = path.join(f.dir, 'untrusted-caller-home');
+    vi.stubEnv('HOME', callerHome);
+    let prebuildEnvironment: Record<string, string> | undefined;
     const publicEnvironment = Object.fromEntries(['EXPO_PUBLIC_API_BASE', 'EXPO_PUBLIC_AWS_REGION', 'EXPO_PUBLIC_COGNITO_USER_POOL_ID',
       'EXPO_PUBLIC_COGNITO_USER_POOL_CLIENT_ID', 'EXPO_PUBLIC_RC_IOS_API_KEY', 'EXPO_PUBLIC_SENTRY_DSN', 'SENTRY_AUTH_TOKEN'].map(k => [k, `STUB_${k}`]));
     producer.produce(f.root, f.commit, f.output, { inspect, build: (c: any) => {
@@ -156,7 +159,14 @@ describe('producer-owned local provenance orchestration (fake build/signature to
       const tool = (command: string, args: string[], opts: any) => {
         calls.push([command, ...args]);
         expect(opts.cwd).toBe(root); expect(opts.env.EXPO_NO_DOTENV).toBe('1');
-        expect(opts.env.HOME).toBe(path.join(c.runDir, 'home'));
+        const signingXcode = command === '/usr/bin/xcodebuild' && (args.includes('archive') || args[0] === '-exportArchive');
+        expect(opts.env.HOME).toBe(signingXcode ? os.userInfo().homedir : path.join(c.runDir, 'home'));
+        expect(opts.env.HOME).not.toBe(callerHome);
+        expect(opts.env.TMPDIR).toBe(path.join(c.runDir, 'tmp'));
+        expect(opts.env.npm_config_cache).toBe(path.join(c.runDir, 'npm-cache'));
+        expect(opts.env.LANG).toBe('en_US.UTF-8');
+        for (const key of ['LC_ALL', 'LC_CTYPE', 'RUBYOPT', 'NODE_OPTIONS', 'BUNDLE_CONFIG', 'EAS_BUILD_PROFILE']) expect(opts.env[key]).toBeUndefined();
+        if (signingXcode) expect(opts.env).toEqual({ ...prebuildEnvironment, HOME: os.userInfo().homedir });
         if (args.includes('--version') || args[0] === '-version') return 'STUB tool version';
         if (command === 'npm') {
           expect(args).toEqual(['ci', '--offline', '--ignore-scripts', '--no-audit', '--no-fund', '--include=dev']);
@@ -165,13 +175,17 @@ describe('producer-owned local provenance orchestration (fake build/signature to
           write(path.join(root, 'node_modules/@expo/cli/package.json'), '{"main":"cli.js"}');
           write(path.join(root, 'node_modules/@expo/cli/cli.js'), '// STUB Metro');
         } else if (args.includes('prebuild')) {
+          prebuildEnvironment = { ...opts.env };
           expect(args).toEqual(['node_modules/expo/bin/cli', 'prebuild', '--platform', 'ios', '--no-install']);
           fs.mkdirSync(path.join(root, 'ios/DeveloperCards.xcworkspace'), { recursive: true });
         } else if (command === 'pod') {
           expect(args).toEqual(['install', '--deployment', '--project-directory=ios']);
+          expect(opts.env.CP_HOME_DIR).toBe(path.join(c.runDir, 'pod-cache'));
           write(path.join(root, 'ios/Pods/hermes-engine/destroot/bin/hermesc'), 'STUB Hermes compiler');
         } else if (args.includes('archive')) {
           expect(args).toContain('Release'); expect(args).toContain(`DEVELOPMENT_TEAM=${c.team}`);
+          expect(args[args.indexOf('-derivedDataPath') + 1]).toBe(path.join(c.runDir, 'derived-data'));
+          expect(args[args.indexOf('-archivePath') + 1]).toBe(path.join(c.runDir, 'native.xcarchive'));
           const staged = path.join(c.runDir, 'derived-data/Build/Products/Release-iphoneos');
           fs.mkdirSync(staged, { recursive: true });
           observer.observe(root, { CONFIGURATION: 'Release', PLATFORM_NAME: 'iphoneos', CONFIGURATION_BUILD_DIR: staged,
@@ -179,12 +193,17 @@ describe('producer-owned local provenance orchestration (fake build/signature to
             write(path.join(staged, 'STUB.app/main.jsbundle'), hbc);
           });
         } else if (args[0] === '-exportArchive') {
+          expect(args[args.indexOf('-archivePath') + 1]).toBe(path.join(c.runDir, 'native.xcarchive'));
+          expect(args[args.indexOf('-exportOptionsPlist') + 1]).toBe(path.join(c.runDir, 'ExportOptions.plist'));
+          expect(args[args.indexOf('-exportPath') + 1]).toBe(path.join(c.runDir, 'export'));
           const exported = path.join(c.runDir, 'export/STUB.ipa'); fs.mkdirSync(path.dirname(exported));
           writeIpa(exported, f.app, producer.signedContext(c));
         } else throw new Error(`unexpected tool ${command}`);
         return Buffer.from('STUB local tool success');
       };
-      return producer.localBuild(c, tool, { platform: 'darwin', environment: publicEnvironment, cache: null });
+      return producer.localBuild(c, tool, { platform: 'darwin', environment: { ...publicEnvironment, HOME: callerHome,
+        LANG: 'C', LC_ALL: 'C', LC_CTYPE: 'C', RUBYOPT: '-EUS-ASCII', NODE_OPTIONS: '--require malicious',
+        BUNDLE_CONFIG: '/untrusted/metro.config.js', EAS_BUILD_PROFILE: 'evil' }, cache: null });
     } });
     expect(check(f).embeddedBundleSha256).toBe(sha(hbc));
     expect(calls.some(call => call.includes('-exportArchive'))).toBe(true);
