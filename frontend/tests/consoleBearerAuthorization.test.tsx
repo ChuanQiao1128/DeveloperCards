@@ -9,7 +9,6 @@ import { readSessionUser } from '../src/auth/sessionUser';
 import { ConsoleShell } from '../src/components/console/ConsoleShell';
 import { consoleNav } from '../src/components/console/consoleNav';
 import { LearnersPage } from '../src/pages/LearnersPage';
-import { LearnerDetailPage } from '../src/pages/LearnerDetailPage';
 import { OperationsPage } from '../src/pages/OperationsPage';
 import { OverviewPage } from '../src/pages/OverviewPage';
 import { detail, envelope, learners, operations } from './support/consoleOperationsFixture';
@@ -40,7 +39,7 @@ for (const path of ['/overview', '/operations', '/learners', '/learners/observed
   it.each(cases)(`immediately denies ${path} after refreshed $name despite unchanged super-admin ID token`, async scenario => {
     render(<QueryClientProvider client={client}><AuthProvider><MemoryRouter initialEntries={[path]}><AuthProbe /><Routes>
       <Route path="/overview" element={<OverviewPage />} /><Route path="/operations" element={<OperationsPage />} />
-      <Route path="/learners" element={<LearnersPage />} /><Route path="/learners/:sub" element={<LearnerDetailPage />} />
+      <Route path="/learners/*" element={<LearnersPage />} />
     </Routes></MemoryRouter></AuthProvider></QueryClientProvider>);
     await waitFor(() => expect(get).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(client.isFetching()).toBe(0));

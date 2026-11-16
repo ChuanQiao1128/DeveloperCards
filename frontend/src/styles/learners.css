@@ -1,0 +1,15 @@
+/* Loaded with user management so its table styles do not enlarge the sign-in page. */
+.learner-user-id { user-select: all; }
+.learner-copy { line-height: 1.5rem; }
+.learner-actions { text-align: right; }
+.learner-tab-selected { border-bottom: 2px solid #4f46e5; }
+@media (min-width: 640px) {
+  .learner-panel-padding { padding: 24px; }
+  .learner-cell-padding { padding-inline: 24px; }
+}
+@media (min-width: 768px) {
+  .learner-last-connected { display: table-cell; }
+  .learner-last-mobile { display: none; }
+}
+@media (min-width: 1024px) { .learner-app { display: table-cell; } }
+@media (min-width: 1280px) { .learner-first-connected { display: table-cell; } }

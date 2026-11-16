@@ -58,7 +58,6 @@ const ReportsPage = lazy(() => import('./pages/ReportsPage').then(m => ({ defaul
 const OverviewPage = lazy(() => import('./pages/OverviewPage').then(m => ({ default: m.OverviewPage })));
 const OperationsPage = lazy(() => import('./pages/OperationsPage').then(m => ({ default: m.OperationsPage })));
 const LearnersPage = lazy(() => import('./pages/LearnersPage').then(m => ({ default: m.LearnersPage })));
-const LearnerDetailPage = lazy(() => import('./pages/LearnerDetailPage').then(m => ({ default: m.LearnerDetailPage })));
 const UsagePage = lazy(() => import('./pages/UsagePage').then(m => ({ default: m.UsagePage })));
 
 if (typeof window !== 'undefined') {
@@ -124,8 +123,7 @@ function App() {
                 <Route path="/" element={<DeckListPage />} />
                 <Route path="/overview" element={<OverviewPage />} />
                 <Route path="/operations" element={<OperationsPage />} />
-                <Route path="/learners" element={<LearnersPage />} />
-                <Route path="/learners/:sub" element={<LearnerDetailPage />} />
+                <Route path="/learners/*" element={<LearnersPage />} />
                 <Route path="/decks/new" element={<NewDeckPage />} />
 
                 {/* ✅ Query-param routes */}
