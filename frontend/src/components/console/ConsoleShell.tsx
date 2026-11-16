@@ -1,6 +1,6 @@
 // src/components/console/ConsoleShell.tsx
 
-import { useSyncExternalStore } from 'react';
+import { useEffect, useId, useRef, useState, useSyncExternalStore } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 
 import { getSessionGeneration, subscribeSessionChanges } from '../../auth/tokenStore';
@@ -8,6 +8,8 @@ import { useSignOut } from '../../auth/AuthContext';
 import { isSuperAdmin, readSessionUser } from '../../auth/sessionUser';
 import { consoleSectionFor } from './consoleNav';
 import type { ConsoleSection } from './consoleNav';
+import { ConsoleIcon } from './ConsoleIcon';
+import { Button } from '../ui/Button';
 
 type Props = {
   title: string;
@@ -68,9 +70,9 @@ type Props = {
  * (frontend-console-27).
  */
 const NAV_LINK_BASE =
-  'text-xs px-2 py-1 rounded border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500';
-const NAV_LINK_CLASS = `${NAV_LINK_BASE} border-slate-300 text-slate-700 hover:bg-slate-50`;
-const NAV_LINK_ACTIVE_CLASS = `${NAV_LINK_BASE} bg-indigo-50 border-indigo-300 text-indigo-700`;
+  'console-nav-link flex min-h-11 items-center gap-3 rounded-md px-3 py-2 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500';
+const NAV_LINK_CLASS = `${NAV_LINK_BASE} text-slate-600 hover:bg-slate-200/60 hover:text-slate-950`;
+const NAV_LINK_ACTIVE_CLASS = `${NAV_LINK_BASE} bg-indigo-50 text-indigo-800`;
 
 export function ConsoleShell({
   title,
@@ -111,7 +113,27 @@ export function ConsoleShell({
   // A caller may suppress navigation, but a stale prop cannot grant permission.
   const resolvedSuperAdmin = isSuperAdmin(derivedUser) && superAdmin !== false;
 
-  const current = consoleSectionFor(useLocation().pathname);
+  const location = useLocation();
+  const current = consoleSectionFor(location.pathname);
+  const drawerRef = useRef<HTMLDialogElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const drawerId = useId();
+  const [navigationOpen, setNavigationOpen] = useState(false);
+
+  // Close after browser history navigation as well as clicks inside the drawer.
+  useEffect(() => { if (drawerRef.current?.open) drawerRef.current.close(); }, [location.key]);
+  useEffect(() => {
+    const desktop = window.matchMedia?.('(min-width: 1024px)');
+    const closeOnDesktop = () => { if (desktop?.matches && drawerRef.current?.open) drawerRef.current.close(); };
+    desktop?.addEventListener('change', closeOnDesktop);
+    return () => desktop?.removeEventListener('change', closeOnDesktop);
+  }, []);
+
+  const closeNavigation = () => { if (drawerRef.current?.open) drawerRef.current.close(); };
+  const openNavigation = () => {
+    drawerRef.current?.showModal();
+    setNavigationOpen(true);
+  };
   /** aria-current and the active look for the link of the section on screen. */
   const navProps = (section: ConsoleSection) =>
     section === current
@@ -119,67 +141,103 @@ export function ConsoleShell({
       : { className: NAV_LINK_CLASS };
 
   const navGroups: [string, [ConsoleSection, string, string | undefined, string?][]][] = [
-    ['Operations and learners', resolvedSuperAdmin ? [
-      ['overview', 'Overview', overviewHref], ['operations', 'Operations', operationsHref], ['learners', 'Learners', learnersHref],
-    ] : []],
-    ['Content and automation', [
-      ['decks', 'Decks', decksHref], ['review', 'Review queue', reviewHref], ['qa', 'AI QA', qaHref],
-      ['reports', 'Reports', reportsHref], ['usage', 'Usage', usageHref], ['ledger', 'Automation ledger', ledgerHref],
-      ['automation', 'Automation', automationHref],
+    ['Workbench', resolvedSuperAdmin ? [['overview', 'Overview', overviewHref]] : []],
+    ['Content', [
+      ['decks', 'Decks', decksHref], ['review', 'Review queue', reviewHref],
+      ['qa', 'AI QA', qaHref], ['reports', 'Reports', reportsHref],
     ]],
-    ['Administration', resolvedSuperAdmin ? [
-      ['webhooks', 'Webhooks', webhooksHref], ['adminUsers', 'Admin Management', adminUsersHref, 'Manage users and permissions (super_admin only)'],
+    ['Learners', resolvedSuperAdmin ? [['learners', 'Learners', learnersHref]] : []],
+    ['Automation', [
+      ['automation', 'Automation', automationHref], ['ledger', 'Automation ledger', ledgerHref],
+    ]],
+    ['Analytics', [['usage', 'Usage', usageHref]]],
+    ['System', resolvedSuperAdmin ? [
+      ['operations', 'Operations', operationsHref], ['webhooks', 'Webhooks', webhooksHref],
+      ['adminUsers', 'Admin Management', adminUsersHref, 'Manage users and permissions (super_admin only)'],
     ] : []],
   ];
+  const currentGroup = navGroups.find(([, entries]) => entries.some(([section]) => section === current));
+  const currentLabel = currentGroup?.[1].find(([section]) => section === current)?.[1];
 
-  return (
-    <div className="min-h-screen bg-slate-100">
-      {/* Top bar */}
-      <header className="bg-white border-b border-slate-200">
-        <div className="max-w-[1600px] w-full mx-auto px-4 py-4 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div className="text-lg font-semibold text-slate-900">{title}</div>
-            {subtitle ? <div className="text-xs text-slate-500 mt-0.5">{subtitle}</div> : null}
-          </div>
-
-          <div className="flex items-center gap-2 flex-wrap justify-end">
-            {/* A landmark, so "skip to the console's sections" is answerable by
-                assistive technology without reading the header out. It needs the
-                three links to be adjacent, which is why the user pill now sits
-                after them rather than between the section links and Admin
-                Management — that position was incidental, and identity beside
-                Sign out is where a shell usually puts it. */}
-            <nav aria-label="Console sections" className="flex items-center gap-2 flex-wrap">
-              {navGroups.map(([label, entries]) => entries.some(([, , href]) => href) && (
-                <div key={label} role="group" aria-label={label} className="flex flex-wrap items-center gap-2">
-                  {entries.map(([section, label, href, title]) => href && (
-                    <Link key={section} to={href} title={title} {...navProps(section)}>{label}</Link>
-                  ))}
-                </div>
-              ))}
-            </nav>
-
-            <span className="text-xs px-2 py-1 rounded-full bg-slate-100 border border-slate-200 text-slate-700">
-              {resolvedUserLabel}
-            </span>
-
-            {/* Stays a button, and must: signing out is an action with a side
-                effect, not a destination. */}
-            <button
-              type="button"
-              className="text-xs px-2 py-1 rounded border border-slate-300 text-slate-700 hover:bg-slate-50"
-              onClick={signOut}
-            >
-              Sign out
-            </button>
+  const navigation = (
+    <nav aria-label="Console sections" className="console-navigation">
+      {navGroups.map(([group, entries]) => entries.some(([, , href]) => href) && (
+        <div key={group} role="group" aria-label={`${group} navigation`} className="console-nav-group">
+          <div className="mb-2 px-3 text-xs font-semibold text-slate-500">{group}</div>
+          <div className="space-y-1">
+            {entries.map(([section, label, href, description]) => href && (
+              <Link key={section} to={href} title={description} {...navProps(section)} onClick={closeNavigation}>
+                <ConsoleIcon name={section} />
+                <span className="min-w-0 flex-1">{label}</span>
+                {section === current && <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-600" />}
+              </Link>
+            ))}
           </div>
         </div>
-      </header>
+      ))}
+    </nav>
+  );
+  const brand = (
+    <div className="console-brand">
+      <div aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-indigo-600 text-white">
+        <ConsoleIcon name="decks" className="h-6 w-6" />
+      </div>
+      <div className="min-w-0">
+        <div className="text-sm font-semibold text-slate-950">DeveloperCards</div>
+        <div className="text-xs text-slate-500">Console</div>
+      </div>
+    </div>
+  );
 
-      {/* Body */}
-      <div className="max-w-[1600px] w-full mx-auto px-4 py-6">
-        {/* Main */}
-        <main className="space-y-4">{children}</main>
+  return (
+    <div className="console-shell min-h-screen bg-slate-50 text-slate-900">
+      <a className="console-skip-link" href="#console-main">Skip to content</a>
+      <aside className="console-sidebar" aria-label={title} aria-hidden={navigationOpen || undefined}>
+        {brand}
+        {navigation}
+      </aside>
+
+      <dialog
+        id={drawerId}
+        ref={drawerRef}
+        className="console-drawer"
+        aria-label="Console navigation"
+        onCancel={event => { event.preventDefault(); closeNavigation(); }}
+        onClose={() => { setNavigationOpen(false); triggerRef.current?.focus(); }}
+        onClick={event => { if (event.target === event.currentTarget) closeNavigation(); }}
+      >
+        <div className="flex h-full flex-col bg-slate-50">
+          <div className="flex items-center justify-between pr-4">
+            {brand}
+            <Button variant="ghost" className="min-h-11 min-w-11 p-2" aria-label="Close navigation" onClick={closeNavigation}>
+              <ConsoleIcon name="close" />
+            </Button>
+          </div>
+          {navigation}
+        </div>
+      </dialog>
+
+      <div className="console-workspace">
+        <header className="console-topbar">
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <Button ref={triggerRef} variant="ghost" className="console-menu-button min-h-11 min-w-11 p-2" aria-label="Open navigation" aria-expanded={navigationOpen} aria-controls={drawerId} onClick={openNavigation}>
+              <ConsoleIcon name="menu" />
+            </Button>
+            <div className="min-w-0">
+              <div className="flex min-w-0 items-center gap-2 text-sm">
+                {currentGroup && <><div className="hidden shrink-0 text-slate-500 sm:block">{currentGroup[0]}</div><ConsoleIcon name="chevron" className="hidden h-3 w-3 shrink-0 text-slate-400 sm:block" /></>}
+                <div className="truncate font-semibold text-slate-900">{subtitle ?? currentLabel ?? title}</div>
+              </div>
+            </div>
+          </div>
+          <div className="console-account">
+            <span className="console-account-label text-xs text-slate-600" title={resolvedUserLabel}>{resolvedUserLabel}</span>
+            <Button variant="outline" size="sm" className="min-h-11 shrink-0 gap-2" onClick={signOut}>
+              <ConsoleIcon name="signOut" className="h-4 w-4" />Sign out
+            </Button>
+          </div>
+        </header>
+        <main id="console-main" tabIndex={-1} className="console-main space-y-4">{children}</main>
       </div>
     </div>
   );

@@ -569,7 +569,7 @@ describe('LedgerPage', () => {
 
     function shell(href?: string) {
       return render(
-        <MemoryRouter>
+        <MemoryRouter initialEntries={[href ?? '/']}>
           <ConsoleShell title="t" ledgerHref={href}>
             body
           </ConsoleShell>
@@ -580,7 +580,9 @@ describe('LedgerPage', () => {
     shell('/ledger');
     const link = screen.getByRole('link', { name: 'Automation ledger' });
     expect(link.getAttribute('href')).toBe('/ledger');
-    expect(link.querySelector('span')).toBeNull();
+    expect(link.tagName).toBe('A');
+    expect(link.getAttribute('aria-current')).toBe('page');
+    expect(link.getAttribute('class')).toContain('focus-visible:ring-2');
     cleanup();
 
     shell(undefined);
