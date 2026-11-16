@@ -8,10 +8,34 @@ locals {
   snapshot  = "ops/console-monitor/v1/current.json"
   issuer    = "https://cognito-idp.${local.region}.amazonaws.com/${aws_cognito_user_pool.test.id}"
   functions = {
-    core      = { runtime = "dotnet10", handler = "RecallSmith.Lambda::RecallSmith.Lambda.VpcFunction::Handler", memory = 512, timeout = 90, concurrency = 2 }
-    worker    = { runtime = "dotnet10", handler = "RecallSmith.Lambda.Worker::RecallSmith.Lambda.Worker.WorkerFunction::FunctionHandler", memory = 512, timeout = 615, concurrency = 2 }
-    observer  = { runtime = "dotnet10", handler = "RecallSmith.Lambda.OperationsObserver::RecallSmith.Lambda.OperationsObserver.Function::Handler", memory = 256, timeout = 8, concurrency = 1 }
-    collector = { runtime = "python3.12", handler = "synthetic_check.handler.lambda_handler", memory = 256, timeout = 60, concurrency = 1 }
+    core = {
+      runtime     = "dotnet10"
+      handler     = "RecallSmith.Lambda::RecallSmith.Lambda.VpcFunction::Handler"
+      memory      = 512
+      timeout     = 90
+      concurrency = 2
+    }
+    worker = {
+      runtime     = "dotnet10"
+      handler     = "RecallSmith.Lambda.Worker::RecallSmith.Lambda.Worker.WorkerFunction::FunctionHandler"
+      memory      = 512
+      timeout     = 615
+      concurrency = 2
+    }
+    observer = {
+      runtime     = "dotnet10"
+      handler     = "RecallSmith.Lambda.OperationsObserver::RecallSmith.Lambda.OperationsObserver.Function::Handler"
+      memory      = 256
+      timeout     = 8
+      concurrency = 1
+    }
+    collector = {
+      runtime     = "python3.12"
+      handler     = "synthetic_check.handler.lambda_handler"
+      memory      = 256
+      timeout     = 60
+      concurrency = 1
+    }
   }
   aliases = { for key in keys(local.functions) : key => "arn:aws:lambda:${local.region}:${local.account}:function:${local.name}-${key}:test" }
   db_environment = {
@@ -259,18 +283,18 @@ output "resolved" {
 }
 
 output "sdk_deployment_contract" {
-  value = { for key, spec in local.functions : key => {
+  value = { for key, spec in local.functions : key => merge({ "runtime" = spec.runtime }, {
     function_name      = "${local.name}-${key}"
     alias_arn          = local.aliases[key]
     role_arn           = aws_iam_role.test[key].arn
     public_environment = local.environments[key]
-    runtime            = spec.runtime, handler = spec.handler
+    handler            = spec.handler
     memory_size        = spec.memory, timeout = spec.timeout, concurrency = spec.concurrency
     artifact           = var.artifacts[key]
     private_subnet_ids = key == "collector" ? [] : var.subnet_ids
     security_group_ids = key == "collector" ? [] : [aws_security_group.test.id]
     log_group          = aws_cloudwatch_log_group.test[key].name
-  } }
+  }) }
 }
 
 output "runtime_ready" {

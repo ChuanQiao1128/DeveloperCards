@@ -1,0 +1,15 @@
+{
+  "tags_only_updates": false,
+  "changes": {
+    "module.identity.aws_iam_role_policy.console_operations_snapshot": {
+      "action": "update",
+      "keys": [
+        "policy"
+      ]
+    }
+  },
+  "outputs": [
+    "console_s2_observer_deployment_contract"
+  ],
+  "_note": "Default production input keeps observer deployment null. Only extend existing synthetic DescribeAlarms policy from5to8 exact metricalarmARNs. No automatic observer/SG/role/schedule/data changes. Observer/clones use a separately reviewed owner SDK plan, not this allowlist. Existing full-plan trust drift guard stays active."
+}
