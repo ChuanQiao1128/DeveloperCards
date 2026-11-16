@@ -107,3 +107,17 @@ it('drops previously loaded sensitive data when the API authoritatively denies a
   expect(screen.queryByText('learner@example.invalid')).toBeNull();
   expect(client.getQueryCache().getAll().some(q => JSON.stringify(q.state.data ?? null).includes('learner@example.invalid'))).toBe(false);
 });
+
+it('keeps non-null server activity and receipt times distinct from unknown complete device sync', async () => {
+  const observed = { ...learners.items[0], lastServerActivityAt: '2026-11-14T12:34:56Z' };
+  const evidence = { ...detail, learner: observed, progress: { ...detail.progress, latestEventAt: '2026-11-14T11:00:00Z', latestReceivedAt: '2026-11-14T13:00:00Z' } };
+  get.mockImplementation((path: string) => Promise.resolve(envelope(path.endsWith('/observed-1') ? evidence : { ...learners, items: [observed] })));
+  mount();
+  await screen.findByText('Last server activity: 2026-11-14 12:34:56 UTC');
+  fireEvent.click(screen.getByRole('link', { name: 'learner@example.invalid' }));
+  await screen.findByRole('heading', { name: 'Observed identity' });
+  expect(screen.getByText('Last server activity').nextSibling?.textContent).toBe('2026-11-14 12:34:56 UTC');
+  expect(screen.getByText('Latest client event time').nextSibling?.textContent).toBe('2026-11-14 11:00:00 UTC');
+  expect(screen.getByText('Latest server receipt').nextSibling?.textContent).toBe('2026-11-14 13:00:00 UTC');
+  expect(screen.getByText('Last complete sync').nextSibling?.textContent).toBe('Unknown');
+});

@@ -11,6 +11,7 @@ export type StoredTokens = {
 };
 
 export type SessionUser = {
+  sub?: string;
   email?: string;
   username?: string;
   groups: string[];
@@ -225,23 +226,28 @@ export function setStoredTokens(input: StoredTokens | {
   return saveTokens(input);
 }
 
-/** Watch out: groups may live on the access token, not necessarily the id token. */
+/** Permissions come only from the bearer used by http.ts; ID claims are display data. */
 export function getUserGroups(tokens?: StoredTokens | null): string[] {
   const t = tokens ?? getTokens();
   if (!t) return [];
-
-  const fromId = readGroupsFromPayload(decodeJwtPayload(t.idToken));
-  if (fromId.length > 0) return fromId;
-
-  return readGroupsFromPayload(decodeJwtPayload(t.accessToken));
+  const access = decodeJwtPayload(t.accessToken);
+  const id = decodeJwtPayload(t.idToken);
+  if (typeof access?.sub !== 'string' || !access.sub ||
+      (typeof id?.sub === 'string' && id.sub !== access.sub)) return [];
+  return readGroupsFromPayload(access);
 }
 
 export function getSessionUser(tokens?: StoredTokens | null): SessionUser | null {
   const t = tokens ?? getTokens();
   if (!t) return null;
 
-  const payload = decodeJwtPayload(t.idToken) ?? decodeJwtPayload(t.accessToken);
+  const id = decodeJwtPayload(t.idToken);
+  const access = decodeJwtPayload(t.accessToken);
+  if (typeof id?.sub === 'string' && typeof access?.sub === 'string' && id.sub !== access.sub) return null;
+  const payload = id ?? access;
   if (!payload) return null;
+  const subject = access?.sub ?? id?.sub;
+  const sub = typeof subject === 'string' ? subject : undefined;
 
   const email = typeof payload.email === 'string' ? payload.email : undefined;
   const username =
@@ -251,5 +257,5 @@ export function getSessionUser(tokens?: StoredTokens | null): SessionUser | null
         ? (payload.username as string)
         : undefined;
 
-  return { email, username, groups: getUserGroups(t) };
+  return { sub, email, username, groups: getUserGroups(t) };
 }

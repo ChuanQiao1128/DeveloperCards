@@ -108,7 +108,8 @@ export function ConsoleShell({
           isSuperAdmin(derivedUser) ? 'super_admin' : 'editor'
         }`
       : '—');
-  const resolvedSuperAdmin = superAdmin ?? isSuperAdmin(derivedUser);
+  // A caller may suppress navigation, but a stale prop cannot grant permission.
+  const resolvedSuperAdmin = isSuperAdmin(derivedUser) && superAdmin !== false;
 
   const current = consoleSectionFor(useLocation().pathname);
   /** aria-current and the active look for the link of the section on screen. */

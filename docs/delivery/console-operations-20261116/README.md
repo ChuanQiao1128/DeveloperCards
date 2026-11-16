@@ -55,6 +55,14 @@ activation. There is no new bucket, public policy, VPC egress or schedule.
 2. Generate and check a saved Terraform plan permitting only the new synthetic
    role inline policy in `OPS.plan-allow.json`. Verify its exact object and five
    existing metric-alarm ARNs. Never apply unrelated IAM drift.
+   Before first activation, initialize the absent snapshot once with the reviewed
+   producer and actual production probes under the owner's existing MFA session.
+   Confirm `NoSuchKey` using that existing owner access, then use conditional
+   creation; never seed fixture data or overwrite an existing/corrupt object.
+   This is one bounded deployment probe. The collector has no `ListBucket`, so
+   S3 can return 403 for a missing key; it must keep treating denied reads as
+   failures rather than guessing that the object is absent. Subsequent scheduled
+   runs use the existing object's ETag without any broader permission.
 3. Apply migration 061 before serving the new APIs. It adds the index matching
    the directory's C-collated cursor and rejects a conflicting existing definition.
    Read back the index and migration receipt, then confirm an idempotent repeat.
