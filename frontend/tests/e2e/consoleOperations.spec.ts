@@ -37,24 +37,25 @@ test('mock sources render with safe semantics and a keyboard-operable learner dr
   await expect(page.getByRole('heading', { name: 'Synthetic checks', level: 2 })).toBeVisible();
   expect(fixture.reads.filter(path => path.endsWith('/operations/overview'))).toHaveLength(1);
   await expect(page.getByText(/OK means the alarm is not firing/)).toBeVisible();
-  await page.getByRole('link', { name: 'Learners', exact: true }).click();
-  const search = page.getByLabel('Search email or subject');
+  await page.getByRole('link', { name: '用户管理', exact: true }).click();
+  const search = page.getByLabel('搜索用户');
   await search.focus();
   await page.keyboard.type('literal%_@example.invalid');
   await page.keyboard.press('Tab');
-  await expect(page.getByRole('button', { name: 'Search', exact: true })).toBeFocused();
+  await expect(page.getByRole('button', { name: '搜索', exact: true })).toBeFocused();
   await page.keyboard.press('Enter');
-  await expect(page.getByText('No observed learners match this search.')).toBeVisible();
+  await expect(page.getByText('未找到匹配的用户')).toBeVisible();
   expect(new URL(page.url()).search).toBe('');
   const stored = await page.evaluate(() => ({ local: { ...localStorage }, session: { ...sessionStorage } }));
   expect(JSON.stringify(stored)).not.toContain('literal%_');
   await search.fill('');
-  await page.getByRole('button', { name: 'Search', exact: true }).click();
+  await page.getByRole('button', { name: '搜索', exact: true }).click();
   await page.getByRole('link', { name: 'learner@example.invalid', exact: true }).focus();
   await page.keyboard.press('Enter');
   await expect(page).toHaveURL(/\/learners\/observed-1$/);
-  await expect(page.getByRole('heading', { name: 'Evaluated access' })).toBeVisible();
-  await expect(page.getByText('sandbox disallowed')).toBeVisible();
+  await expect(page.getByRole('heading', { name: '账号资料' })).toBeVisible();
+  await page.getByRole('tab', { name: '会员权益' }).click();
+  await expect(page.getByText('测试环境权益不允许下载付费卡组')).toBeVisible();
   const axe = await new AxeBuilder({ page }).analyze();
   expect(axe.violations).toEqual([]);
   expect(errors).toEqual([]);
@@ -65,7 +66,7 @@ test('mock learner evidence fits a narrow screen and direct editor routes stay g
   const fixture = await setup(page);
   await page.setViewportSize({ width: 375, height: 812 });
   await page.goto('/learners/observed-1');
-  await expect(page.getByRole('heading', { name: 'Device state' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '账号资料' })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   const axe = await new AxeBuilder({ page }).analyze();
   expect(axe.violations).toEqual([]);
@@ -78,7 +79,7 @@ test('mock editor cannot read the new direct routes or see their navigation', as
   for (const path of ['/overview', '/operations', '/learners', '/learners/observed-1']) {
     await page.goto(path);
     await expect(page.getByText('Super administrator access required')).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Learners', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: '用户管理', exact: true })).toHaveCount(0);
   }
   expect(fixture.reads).toEqual([]);
 });

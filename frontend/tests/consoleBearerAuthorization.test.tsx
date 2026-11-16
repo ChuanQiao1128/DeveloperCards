@@ -8,6 +8,7 @@ import { clearTokens, getSessionGeneration, getUserGroups, saveTokens } from '..
 import { readSessionUser } from '../src/auth/sessionUser';
 import { ConsoleShell } from '../src/components/console/ConsoleShell';
 import { consoleNav } from '../src/components/console/consoleNav';
+import { LearnerWorkspace } from '../src/pages/LearnerWorkspace';
 import { LearnersPage } from '../src/pages/LearnersPage';
 import { LearnerDetailPage } from '../src/pages/LearnerDetailPage';
 import { OperationsPage } from '../src/pages/OperationsPage';
@@ -40,16 +41,16 @@ for (const path of ['/overview', '/operations', '/learners', '/learners/observed
   it.each(cases)(`immediately denies ${path} after refreshed $name despite unchanged super-admin ID token`, async scenario => {
     render(<QueryClientProvider client={client}><AuthProvider><MemoryRouter initialEntries={[path]}><AuthProbe /><Routes>
       <Route path="/overview" element={<OverviewPage />} /><Route path="/operations" element={<OperationsPage />} />
-      <Route path="/learners" element={<LearnersPage />} /><Route path="/learners/:sub" element={<LearnerDetailPage />} />
+      <Route path="/learners" element={<LearnerWorkspace />}><Route index element={<LearnersPage />} /><Route path=":sub" element={<LearnerDetailPage />} /></Route>
     </Routes></MemoryRouter></AuthProvider></QueryClientProvider>);
     await waitFor(() => expect(get).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(client.isFetching()).toBe(0));
-    expect(screen.getByRole('link', { name: 'Learners' })).toBeTruthy();
+    expect(screen.getByRole('link', { name: '用户管理' })).toBeTruthy();
     client.setQueryData(['private-A-marker'], 'A cached PII');
     get.mockImplementation(() => new Promise(() => {}));
     act(() => { saveTokens({ ...original, accessToken: jwt(scenario.sub, scenario.groups) }, getSessionGeneration()); });
     expect(screen.getByText('Super administrator access required')).toBeTruthy();
-    for (const name of ['Overview', 'Operations', 'Learners', 'Admin Management', 'Webhooks']) expect(screen.queryByRole('link', { name })).toBeNull();
+    for (const name of ['Overview', 'Operations', '用户管理', 'Admin Management', 'Webhooks']) expect(screen.queryByRole('link', { name })).toBeNull();
     expect(get).toHaveBeenCalledTimes(1);
     expect(client.getQueryData(['private-A-marker'])).toBeUndefined();
     expect(JSON.stringify(client.getQueryCache().getAll().map(q => q.state.data))).not.toContain('learner@example.invalid');
@@ -62,7 +63,7 @@ for (const path of ['/overview', '/operations', '/learners', '/learners/observed
 }
 it.each(cases)('a stale explicit superAdmin prop cannot retain privileged navigation with $name', scenario => {
   render(<MemoryRouter><ConsoleShell title="Console" superAdmin={true} {...consoleNav()}>Body</ConsoleShell></MemoryRouter>);
-  expect(screen.getByRole('link', { name: 'Learners' })).toBeTruthy();
+  expect(screen.getByRole('link', { name: '用户管理' })).toBeTruthy();
   act(() => { saveTokens({ ...original, accessToken: jwt(scenario.sub, scenario.groups) }, getSessionGeneration()); });
-  for (const name of ['Overview', 'Operations', 'Learners', 'Admin Management', 'Webhooks']) expect(screen.queryByRole('link', { name })).toBeNull();
+  for (const name of ['Overview', 'Operations', '用户管理', 'Admin Management', 'Webhooks']) expect(screen.queryByRole('link', { name })).toBeNull();
 });

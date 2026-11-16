@@ -7,3 +7,5 @@ The console is an Operate surface. Show the page title, scope and source context
 Use text for fresh, stale, unknown, failure and empty states. Absolute timestamps include UTC. Errors retain only safe support references; prior successful operational results become explicitly historical after refresh failure. Learner deletion or authorization loss removes sensitive results. Search has a visible label, inline validation and keyboard submission. External configured HTTPS tools identify their new-tab behavior.
 
 Source: the approved read-only W1 brief and incumbent implementation; no redesign or new font, color system, dependency or animation system is introduced.
+
+User management uses a responsive directory table with labeled email or user ID search. Narrow screens retain identity, last server activity and the detail action. Profiles show identity first and use keyboard-operable tabs for account, membership and learning; raw subscription and device evidence lives in expandable troubleshooting sections. The module uses Chinese task labels and retains explicit UTC times, unknown states and historical-read warnings.

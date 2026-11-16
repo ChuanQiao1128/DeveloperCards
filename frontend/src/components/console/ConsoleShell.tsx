@@ -146,7 +146,7 @@ export function ConsoleShell({
       ['decks', 'Decks', decksHref], ['review', 'Review queue', reviewHref],
       ['qa', 'AI QA', qaHref], ['reports', 'Reports', reportsHref],
     ]],
-    ['Learners', resolvedSuperAdmin ? [['learners', 'Learners', learnersHref]] : []],
+    ['Learners', resolvedSuperAdmin ? [['learners', '用户管理', learnersHref]] : []],
     ['Automation', [
       ['automation', 'Automation', automationHref], ['ledger', 'Automation ledger', ledgerHref],
     ]],

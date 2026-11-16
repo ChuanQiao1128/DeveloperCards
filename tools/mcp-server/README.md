@@ -57,7 +57,8 @@ node tools/mcp-server/dist/index.js login
 Opens the console's Cognito sign-in page in the browser (authorization code + PKCE S256, client
 `console-dev`, scopes `openid email profile`) and waits for the redirect on
 `http://localhost:8976/callback`; the listener binds to `127.0.0.1` only and accepts one callback.
-Sign in with MFA as usual; the tab then shows "Login complete. You can close this tab."
+Sign in with your Console account and password; the Console pool has MFA disabled. The tab then
+shows "Login complete. You can close this tab."
 
 Tokens are stored in `~/.config/developercards/mcp-tokens.json` (`DC_TOKEN_FILE`), file mode `0600`
 in a `0700` directory, as `{ accessToken, idToken, refreshToken, expiresAt }`. The server refreshes

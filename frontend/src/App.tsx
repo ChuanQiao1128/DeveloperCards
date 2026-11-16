@@ -48,6 +48,7 @@ const DeckImportPage = lazy(() => import('./pages/DeckImportPage').then(m => ({ 
 const ContentReleasePage = lazy(() => import('./pages/ContentReleasePage').then(m => ({ default: m.ContentReleasePage })));
 const DeckPreviewPage = lazy(() => import('./pages/DeckPreviewPage').then(m => ({ default: m.DeckPreviewPage })));
 const AdminUsersPage = lazy(() => import('./pages/AdminUsersPage').then(m => ({ default: m.AdminUsersPage })));
+const LearnerWorkspace = lazy(() => import('./pages/LearnerWorkspace').then(m => ({ default: m.LearnerWorkspace })));
 const DeckEditPage = lazy(() => import('./pages/DeckEditPage').then(m => ({ default: m.DeckEditPage })));
 const WebhooksPage = lazy(() => import('./pages/WebhooksPage').then(m => ({ default: m.WebhooksPage })));
 const LedgerPage = lazy(() => import('./pages/LedgerPage').then(m => ({ default: m.LedgerPage })));
@@ -124,8 +125,10 @@ function App() {
                 <Route path="/" element={<DeckListPage />} />
                 <Route path="/overview" element={<OverviewPage />} />
                 <Route path="/operations" element={<OperationsPage />} />
-                <Route path="/learners" element={<LearnersPage />} />
-                <Route path="/learners/:sub" element={<LearnerDetailPage />} />
+                <Route path="/learners" element={<LearnerWorkspace />}>
+                  <Route index element={<LearnersPage />} />
+                  <Route path=":sub" element={<LearnerDetailPage />} />
+                </Route>
                 <Route path="/decks/new" element={<NewDeckPage />} />
 
                 {/* ✅ Query-param routes */}
