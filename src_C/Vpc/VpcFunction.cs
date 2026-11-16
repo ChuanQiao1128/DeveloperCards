@@ -61,7 +61,11 @@ public sealed class VpcFunction
     // function can produce -- including the OPTIONS preflight and the 500 from the catch
     // below -- has to carry the same CORS answer, or the browser reports the wrong failure.
     var res = new Res(req.TraceId, req.Origin);
-    if (Vpc.Db.DbSafety.MaintenanceOnly) return res.NotFound("Route not found");
+    if (Vpc.Db.DbSafety.MaintenanceOnly)
+    {
+      var unavailableRoute = res.NotFound("Route not found");
+      return Vpc.Operations.ConsoleOperations.IsRoute(req.Path) ? Vpc.Operations.ConsoleOperations.Private(unavailableRoute) : unavailableRoute;
+    }
 
     // The whole dispatch, wrapped once. Deliberately the only statement in this method that
     // can produce a response: there is no early return above it and no route below it, so a
@@ -69,7 +73,11 @@ public sealed class VpcFunction
     // entire difference between this and a Stopwatch inside each handler, and it is why the
     // 404 branch and the unhandled-exception branch -- the two that matter most and get
     // instrumented last -- are covered here for free.
-    return await RouteMetrics.MeasureAsync(ServiceName, req, () => DispatchAsync(req, res));
+    return await RouteMetrics.MeasureAsync(ServiceName, req, async () =>
+    {
+      var response = await DispatchAsync(req, res);
+      return Vpc.Operations.ConsoleOperations.IsRoute(req.Path) ? Vpc.Operations.ConsoleOperations.Private(response) : response;
+    });
   }
 
   private static AuthContext Anonymous() => new(
@@ -88,10 +96,11 @@ public sealed class VpcFunction
     var publicEvents = RouteMatcher.Match("/api/v1/public/events", req.Path.TrimEnd('/')) is not null;
     // R28 ANONREPORT: the anonymous card report route, the same rule (no bearer is ever read for it).
     var publicCardReports = RouteMatcher.Match("/api/v1/public/card-reports", req.Path.TrimEnd('/')) is not null;
+    var operationsRoute = Vpc.Operations.ConsoleOperations.IsRoute(req.Path);
     AuthContext auth;
     try
     {
-      auth = publicEvents || publicCardReports ? Anonymous() : await Auth.GetAuthContextAsync(req);
+      auth = publicEvents || publicCardReports ? Anonymous() : await Auth.GetAuthContextAsync(operationsRoute ? Vpc.Operations.ConsoleOperations.AuthRequest(req) : req);
     }
     catch
     {
@@ -103,7 +112,8 @@ public sealed class VpcFunction
       return res.Raw(200, new { ok = true });
     }
 
-    Log.Event("info", new
+    if (operationsRoute) Log.Event("info", new { traceId = req.TraceId, lambda = ServiceName, method = req.Method, path = RouteMetrics.RouteFor(req.Path) });
+    else Log.Event("info", new
     {
       traceId = req.TraceId,
       lambda = ServiceName,
@@ -121,6 +131,14 @@ public sealed class VpcFunction
       if ((req.RawBody?.Length ?? 0) > 1_048_576) return res.PayloadTooLarge();
       // 💡 彻底清除路径匹配的干扰因素：去掉尾部斜杠
       var p = req.Path.TrimEnd('/');
+
+      if (operationsRoute)
+      {
+        if (RouteMatcher.Match("/api/v1/admin/operations/overview", p) is not null) return await Vpc.Operations.ConsoleOperations.HandleOverview(req, res, auth);
+        if (RouteMatcher.Match("/api/v1/admin/learners", p) is not null) return await Vpc.Operations.ConsoleOperations.HandleLearners(req, res, auth);
+        if (RouteMatcher.Match("/api/v1/admin/learners/:sub", p) is not null) return await Vpc.Operations.ConsoleOperations.HandleLearner(req, res, auth);
+        return await Vpc.Operations.ConsoleOperations.HandleLearner(req, res, auth);
+      }
 
       var agentDeny = Vpc.AgentClientPolicy.Deny(auth, req, p, res);
       if (agentDeny is not null) return agentDeny;

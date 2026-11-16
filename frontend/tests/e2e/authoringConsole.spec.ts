@@ -706,6 +706,10 @@ test('an unsaved deck edit survives refresh 503 and saves once after manual retr
   });
   await stubApi(page);
   const session = JSON.parse(editorSession());
+  // Renew the credential without changing the authorization scope.
+  const initialAccessClaims = JSON.parse(Buffer.from(session.accessToken.split('.')[1], 'base64url').toString('utf8'));
+  const recoveredAccessToken = fakeJwt({ ...initialAccessClaims, nonce: 'recovered' });
+  expect(recoveredAccessToken).not.toBe(session.accessToken);
   session.refreshToken = 'e2e-refresh';
   await page.addInitScript(([key, value]) => sessionStorage.setItem(key, value), [TOKEN_KEY, JSON.stringify(session)]);
   let available = false;
@@ -728,7 +732,7 @@ test('an unsaved deck edit survives refresh 503 and saves once after manual retr
       status: available ? 200 : 503,
       contentType: 'application/json',
       body: JSON.stringify(available ? {
-        access_token: 'e2e-recovered-access', id_token: session.idToken, expires_in: 3600, token_type: 'Bearer',
+        access_token: recoveredAccessToken, id_token: session.idToken, expires_in: 3600, token_type: 'Bearer',
       } : { error: 'temporarily_unavailable' }),
     });
   });
@@ -756,7 +760,7 @@ test('an unsaved deck edit survives refresh 503 and saves once after manual retr
   expect(refreshes).toBe(2);
   expect(writes).toHaveLength(1);
   expect(writes[0]).toMatchObject({
-    body: { title: 'Unsaved edit through a Cognito outage' }, authorization: 'Bearer e2e-recovered-access',
+    body: { title: 'Unsaved edit through a Cognito outage' }, authorization: `Bearer ${recoveredAccessToken}`,
   });
   await expect(title).toHaveValue('Unsaved edit through a Cognito outage');
 });

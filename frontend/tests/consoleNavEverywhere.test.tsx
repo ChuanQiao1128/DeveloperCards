@@ -83,6 +83,9 @@ describe('the console sections on the landing page', () => {
     signInAsSuperAdmin();
     await mountHome();
     expect(navLinks()).toEqual({
+      Overview: '/overview',
+      Operations: '/operations',
+      Learners: '/learners',
       Reports: '/reports',
       Usage: '/usage',
       Webhooks: '/admin/webhooks',
@@ -122,6 +125,9 @@ describe('the current section in the header (frontend-console-27)', () => {
   it('marks the link of the page on screen with aria-current and an active look, and no other', () => {
     signInAsSuperAdmin();
     for (const [path, name] of [
+      ['/overview', 'Overview'],
+      ['/operations', 'Operations'],
+      ['/learners/subject', 'Learners'],
       ['/review?deckId=7', 'Review queue'],
       ['/decks/qa', 'AI QA'],
       ['/ledger', 'Automation ledger'],
@@ -151,11 +157,14 @@ describe('the current section in the header (frontend-console-27)', () => {
     expect(consoleSectionFor('/content-intelligence')).toBeNull();
   });
 
-  it('orders the links authoring first, then the ledger and Automation, then the super_admin sections', () => {
+  it('groups operations first, preserving content, automation and administration link order', () => {
     signInAsSuperAdmin();
     shellAt('/ledger');
     const nav = screen.getByRole('navigation', { name: 'Console sections' });
     expect(within(nav).getAllByRole('link').map(a => a.textContent)).toEqual([
+      'Overview',
+      'Operations',
+      'Learners',
       'Decks',
       'Review queue',
       'AI QA',
@@ -177,7 +186,10 @@ describe('consoleNav', () => {
         'adminUsersHref',
         'automationHref',
         'decksHref',
+        'learnersHref',
         'ledgerHref',
+        'operationsHref',
+        'overviewHref',
         'qaHref',
         'reportsHref',
         'reviewHref',

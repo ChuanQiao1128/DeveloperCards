@@ -103,7 +103,13 @@ describe('the console shell is everywhere and owns sign-out', () => {
 
     for (const name of protectedPages) {
       const source = readPage(name);
-      expect(source, `${name} does not render inside ConsoleShell`).toContain('ConsoleShell');
+      if (source.includes('<ConsolePage')) {
+        expect(source).toContain("from '../components/console/OperationsViews'");
+        const sharedPage = readFileSync(join(process.cwd(), 'src/components/console/OperationsViews.tsx'), 'utf8');
+        expect(sharedPage, `${name} shared page must render the existing shell`).toContain('return <ConsoleShell');
+      } else {
+        expect(source, `${name} does not render inside ConsoleShell`).toContain('ConsoleShell');
+      }
       expect(source, `${name} still builds its own <header>`).not.toContain('<header');
     }
   });

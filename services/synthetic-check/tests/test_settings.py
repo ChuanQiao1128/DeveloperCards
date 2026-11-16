@@ -24,13 +24,18 @@ CONTRACT = {
     "METRICS_NAMESPACE": "DeveloperCards",
     "LOG_LEVEL": "info",
 }
+OPS_CONTRACT = {
+    "OPS_SNAPSHOT_BUCKET": "core-vpc-premium",
+    "OPS_SNAPSHOT_KEY": "ops/console-monitor/v1/current.json",
+    "OPS_ALARM_NAMES": '["developercards-prod-core-vpc-errors","developercards-prod-worker-errors","developercards-prod-synthetic-check-failing","developercards-prod-sqs-oldest-age","developercards-prod-dlq-nonempty"]',
+}
 
 
 def test_prod_env_file_matches_contract() -> None:
     text = ENV_FILE.read_text()
     assert text.count("\n") == 1 and text.endswith("\n")
     doc = json.loads(text)
-    assert list(doc.items()) == list(CONTRACT.items())
+    assert list(doc.items()) == list(CONTRACT.items()) + list(OPS_CONTRACT.items())
     assert DEFAULTS == CONTRACT
     assert load_settings({}) == load_settings(doc) == Settings(
         api_base="https://api.developercards.app",

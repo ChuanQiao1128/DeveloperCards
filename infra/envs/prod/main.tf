@@ -239,6 +239,15 @@ module "worker" {
   synthetic_check_function_name = "developercards-synthetic-check"
   synthetic_check_role_arn      = module.identity.synthetic_check_role_arn
   synthetic_check_environment = {
+    OPS_SNAPSHOT_BUCKET = "core-vpc-premium"
+    OPS_SNAPSHOT_KEY    = "ops/console-monitor/v1/current.json"
+    OPS_ALARM_NAMES = jsonencode([
+      "developercards-prod-core-vpc-errors",
+      "developercards-prod-worker-errors",
+      "developercards-prod-synthetic-check-failing",
+      "developercards-prod-sqs-oldest-age",
+      "developercards-prod-dlq-nonempty",
+    ])
     API_BASE               = "https://api.developercards.app"
     CDN_BASE               = "https://cdn.developercards.app"
     CONSOLE_BASE           = "https://console.developercards.app"

@@ -11,11 +11,13 @@ deploy back); `advisoryFailed` names the advisory checks that failed.
 from __future__ import annotations
 
 import time
+from datetime import datetime, timezone
 from typing import Any
 
 from . import emf
 from .checks import ADVISORY_CHECKS, CHECK_NAMES, ERROR, CheckResult, run_checks
 from .logs import log
+from .operations_snapshot import publish_observation
 from .settings import DEFAULTS, load_settings
 
 JOB = "synthetic-check"
@@ -26,6 +28,7 @@ def lambda_handler(event: Any, context: Any) -> dict[str, Any]:
         log("info", "synthetic-skip")
         return {"skipped": "unknown-event"}
     started = time.monotonic()
+    observed_at = datetime.now(timezone.utc)
     namespace = DEFAULTS["METRICS_NAMESPACE"]
     try:
         settings = load_settings()
@@ -39,4 +42,5 @@ def lambda_handler(event: Any, context: Any) -> dict[str, Any]:
     advisory_failed = [r.name for r in results if not r.ok and r.name in ADVISORY_CHECKS]
     emf.run_line(namespace, results, latency_ms)
     log("info" if ok and not advisory_failed else "warn", "synthetic-run", ok=ok, failedChecks=failed, advisoryFailed=advisory_failed)
+    publish_observation(results, observed_at, context)
     return {"ok": ok, "failed": failed, "advisoryFailed": advisory_failed}

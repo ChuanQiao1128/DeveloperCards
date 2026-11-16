@@ -247,28 +247,35 @@ interface Baseline {
 // scenario that renders the shell moved by -246 B, editorLegacy included (the
 // link was not role-gated). initialLoading and fatalErrorRetry are unchanged to
 // the character. The values were stable across two separate vitest processes.
+// RE-MEASURED, 2026-11-16, console W1. Before updating any value, captured
+// all eleven old/new scenarios and verified old hashes against these baselines.
+// Content outside <header> is identical in every scenario. Existing navigation
+// anchors (attributes, order and labels) are identical; only three super-admin
+// links, accessible group wrappers and the header's wrapping class were added.
+// Eight super-admin shell scenarios move +979 B, editorLegacy +112 B, and both
+// early returns are unchanged. Exact sizes/hashes and B2/B3 remain load-bearing.
 const B1: Record<string, Baseline> = {
   // The three reachable role/mode cells.
-  superAdminPaginated: { hash: 'abe413c46c3214aa3b1a6c4bc4d5e8860dfc75641a4a70388de8cd2908f4a4e7', bytes: 12956 },
-  superAdminLegacyFallback: { hash: '37053f23fb4d9ded92192f7ab4beba101dc09721a8e609177b47ab406bbfbe09', bytes: 13202 },
-  editorLegacy: { hash: '1e6c228c5ca3757c7377a25740e09dc51cc1ddc5858b921fc82bb681af1aae10', bytes: 9959 },
+  superAdminPaginated: { hash: '3d1b220e0254662697ceb5bd9ed1c01f249b03a2283be526c806251c56a178c4', bytes: 13935 },
+  superAdminLegacyFallback: { hash: '6fb7d89cba70905e00dc3a376f79e7a1b26ade671b1c5f6c052fe9c89124e4f7', bytes: 14181 },
+  editorLegacy: { hash: 'ccdb63d8104cc8114329342f058485f308d5948bf15c3b276b03c4464dce4e46', bytes: 10071 },
   // The two early returns, which never reach the main tree at all.
   initialLoading: { hash: 'da5e91db42c7895c31e1fba36b34c6aaeb456d4ef2efde3a425f5b5066a52974', bytes: 147 },
   fatalErrorRetry: { hash: '22809bb57f98a29737e080c405194d891a62ee389911aae33891f12b55c1c396', bytes: 421 },
   // Both halves of the empty-state ternary. These two differ by ONE WORD, and
   // the split turns that ternary into an `emptyMessage` prop — which is exactly
   // the kind of change that keeps one branch and loses the other.
-  emptySearchResult: { hash: '213e03a1254b2816c2052fcbe58ec419483bcf15fc586574f79a3e470b0aaa24', bytes: 6940 },
-  emptyWithNoQuery: { hash: '2a1957dc5993e2e3014651c4a3138fad99f117a34cdb143e68165bcfa91eae00', bytes: 6930 },
+  emptySearchResult: { hash: '0ef2a4ae1984fa89d68b58dfae7c00271528fbe00c7f0b5ce8fd467cdc001650', bytes: 7919 },
+  emptyWithNoQuery: { hash: 'e8c3c6b35a2456d477d1705d56c5f9f397253f708351c02352b96c6a316ca103', bytes: 7909 },
   // The three banners/panels that only appear in one state each.
-  manifestErrorBanner: { hash: 'a8f53072bb0acd882432a50de0fd3eb01ad6d23503c6e1e9055da20621f8c233', bytes: 13454 },
+  manifestErrorBanner: { hash: 'a1edf5f79e06f24ac2954c323546ad6b71e8073b60fa0b6836bdfde31db995ad', bytes: 14433 },
   // F24 (2026-09-26): the Publish Jobs table gained an Error column after Status
   // (CFE-09) and a title on the Job ID cell, so this scenario's markup grew by
   // 99 B. No other scenario renders that table, so only this hash moved.
-  publishJobsTab: { hash: '67a9a430f19466280658d38c33606bdb8c29f8b753d6cefd618b61ead9631297', bytes: 5912 },
-  pollFailureBanner: { hash: '07ebe68a47e077eb7c60d908aa7c5b38f9565f849d5cd416ba15d86ea29bbd35', bytes: 13841 },
+  publishJobsTab: { hash: '109f5876ff8ca02797cab0902dbb522ee8a7046ae162e336df20ce397e76b024', bytes: 6891 },
+  pollFailureBanner: { hash: '257be86e99e296c25ab8c20c2a2c9053a3826159beb3a30357a778e1e3ad07f5', bytes: 14820 },
   // A row mid-publish, so the pending markup is inside a hash too.
-  publishingRow: { hash: '0b6ba04b5c8c0ede2d7542c158a8d937dee998a2aee45295d1fa2259c4dfcc9d', bytes: 12972 },
+  publishingRow: { hash: 'f1841eee0dc89b4abba49bf0486e707fe1b001ddf5d69f6ee66b112f31966403', bytes: 13951 },
 };
 
 // B2: one Profiler onRender entry per commit of the profiled subtree.

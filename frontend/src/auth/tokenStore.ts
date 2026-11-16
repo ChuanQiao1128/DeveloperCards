@@ -11,6 +11,7 @@ export type StoredTokens = {
 };
 
 export type SessionUser = {
+  sub?: string;
   email?: string;
   username?: string;
   groups: string[];
@@ -166,6 +167,14 @@ export function getIdToken(): string | null {
   return tokens.idToken;
 }
 
+function authorizationScope(tokens: StoredTokens): string {
+  const id = decodeJwtPayload(tokens.idToken);
+  const access = decodeJwtPayload(tokens.accessToken);
+  return JSON.stringify([id?.sub ?? null, access?.sub ?? null, id?.iss ?? null, access?.iss ?? null,
+    id?.aud ?? null, access?.client_id ?? null,
+    readGroupsFromPayload(id).sort(), readGroupsFromPayload(access).sort()]);
+}
+
 export function saveTokens(input: {
   accessToken: string;
   idToken: string;
@@ -190,8 +199,14 @@ export function saveTokens(input: {
     expiresAt,
   };
 
+  // A refreshed credential can also change the account or its authorization.
+  // Keep ordinary refreshes in the same generation, but drop all prior reads
+  // when the subject, identity domain, or role claims change.
+  const previous = refreshSession === undefined ? null : readStoredTokens();
+  if (refreshSession !== undefined) assertSessionGeneration(refreshSession);
+  const authorizationChanged = previous !== null && authorizationScope(previous) !== authorizationScope(stored);
   sessionStorage.setItem(TOKEN_KEY, JSON.stringify(stored));
-  if (refreshSession === undefined) sessionChanged();
+  if (refreshSession === undefined || authorizationChanged) sessionChanged();
   return stored;
 }
 
@@ -211,23 +226,28 @@ export function setStoredTokens(input: StoredTokens | {
   return saveTokens(input);
 }
 
-/** Watch out: groups may live on the access token, not necessarily the id token. */
+/** Permissions come only from the bearer used by http.ts; ID claims are display data. */
 export function getUserGroups(tokens?: StoredTokens | null): string[] {
   const t = tokens ?? getTokens();
   if (!t) return [];
-
-  const fromId = readGroupsFromPayload(decodeJwtPayload(t.idToken));
-  if (fromId.length > 0) return fromId;
-
-  return readGroupsFromPayload(decodeJwtPayload(t.accessToken));
+  const access = decodeJwtPayload(t.accessToken);
+  const id = decodeJwtPayload(t.idToken);
+  if (typeof access?.sub !== 'string' || !access.sub ||
+      (typeof id?.sub === 'string' && id.sub !== access.sub)) return [];
+  return readGroupsFromPayload(access);
 }
 
 export function getSessionUser(tokens?: StoredTokens | null): SessionUser | null {
   const t = tokens ?? getTokens();
   if (!t) return null;
 
-  const payload = decodeJwtPayload(t.idToken) ?? decodeJwtPayload(t.accessToken);
+  const id = decodeJwtPayload(t.idToken);
+  const access = decodeJwtPayload(t.accessToken);
+  if (typeof id?.sub === 'string' && typeof access?.sub === 'string' && id.sub !== access.sub) return null;
+  const payload = id ?? access;
   if (!payload) return null;
+  const subject = access?.sub ?? id?.sub;
+  const sub = typeof subject === 'string' ? subject : undefined;
 
   const email = typeof payload.email === 'string' ? payload.email : undefined;
   const username =
@@ -237,5 +257,5 @@ export function getSessionUser(tokens?: StoredTokens | null): SessionUser | null
         ? (payload.username as string)
         : undefined;
 
-  return { email, username, groups: getUserGroups(t) };
+  return { sub, email, username, groups: getUserGroups(t) };
 }
