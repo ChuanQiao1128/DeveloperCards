@@ -63,4 +63,42 @@ public class ConsoleOperationsSnapshotTests(PostgresFixture db)
     }
     finally{foreach(var pair in old)Environment.SetEnvironmentVariable(pair.Key,pair.Value);}
   }
+  private static string SourceFile(string relative)
+  {
+    var directory=new DirectoryInfo(AppContext.BaseDirectory);
+    while(directory is not null && !File.Exists(Path.Combine(directory.FullName,relative)))directory=directory.Parent;
+    Assert.NotNull(directory);return Path.Combine(directory.FullName,relative);
+  }
+  [Fact] public async Task Committed_production_CloudWatch_dashboard_survives_link_validation()
+  {
+    using var production=JsonDocument.Parse(await File.ReadAllTextAsync(SourceFile("src_C/env/prod.env.json")));
+    var dashboard=production.RootElement.GetProperty("OPS_CLOUDWATCH_URL").GetString()!;
+    var names=new[]{"OPS_SNAPSHOT_BUCKET","OPS_CLOUDWATCH_URL","OPS_SENTRY_URL"};var old=names.ToDictionary(n=>n,Environment.GetEnvironmentVariable);
+    try
+    {
+      Environment.SetEnvironmentVariable("OPS_SNAPSHOT_BUCKET",null);Environment.SetEnvironmentVariable("OPS_CLOUDWATCH_URL",dashboard);
+      Environment.SetEnvironmentVariable("OPS_SENTRY_URL",production.RootElement.GetProperty("OPS_SENTRY_URL").GetString());
+      var response=await ConsoleOperations.HandleOverview(Request(ConsoleOperations.OverviewPath),new Res("prod-link"),Admin);
+      Assert.Equal(200,response.StatusCode);Assert.Equal(dashboard,Data(response).GetProperty("links").GetProperty("cloudWatch").GetString());
+      Assert.Equal(production.RootElement.GetProperty("OPS_SENTRY_URL").GetString(),Data(response).GetProperty("links").GetProperty("sentry").GetString());
+    }
+    finally {foreach(var pair in old)Environment.SetEnvironmentVariable(pair.Key,pair.Value);}
+  }
+  [Fact] public async Task Dashboard_fragment_exception_is_limited_to_expected_console_location_and_shape()
+  {
+    const string cloud="https://ap-southeast-2.console.aws.amazon.com/cloudwatch/home";
+    var names=new[]{"OPS_SNAPSHOT_BUCKET","OPS_CLOUDWATCH_URL","OPS_SENTRY_URL"};var old=names.ToDictionary(n=>n,Environment.GetEnvironmentVariable);
+    try
+    {
+      Environment.SetEnvironmentVariable("OPS_SNAPSHOT_BUCKET",null);
+      foreach(var url in new[]{cloud+"#alarmsV2:alarm/test",cloud+"#dashboards:name=developercards-prod&secret=value",cloud+"?secret=value#dashboards:name=developercards-prod","https://user:secret@ap-southeast-2.console.aws.amazon.com/cloudwatch/home#dashboards:name=developercards-prod","https://example.test/cloudwatch/home#dashboards:name=developercards-prod","https://ap-southeast-2.console.aws.amazon.com.example.test/cloudwatch/home#dashboards:name=developercards-prod","https://ap-southeast-2.console.aws.amazon.com/other#dashboards:name=developercards-prod","http://ap-southeast-2.console.aws.amazon.com/cloudwatch/home#dashboards:name=developercards-prod","https://ap-southeast-2.console.aws.amazon.com:444/cloudwatch/home#dashboards:name=developercards-prod"})
+      {
+        Environment.SetEnvironmentVariable("OPS_CLOUDWATCH_URL",url);Environment.SetEnvironmentVariable("OPS_SENTRY_URL",url);
+        var response=await ConsoleOperations.HandleOverview(Request(ConsoleOperations.OverviewPath),new Res("invalid-link"),Admin);
+        Assert.Equal(200,response.StatusCode);Assert.Equal(JsonValueKind.Null,Data(response).GetProperty("links").GetProperty("cloudWatch").ValueKind);Assert.Equal(JsonValueKind.Null,Data(response).GetProperty("links").GetProperty("sentry").ValueKind);
+      }
+    }
+    finally {foreach(var pair in old)Environment.SetEnvironmentVariable(pair.Key,pair.Value);}
+  }
+
 }

@@ -116,6 +116,20 @@ def test_corrupt_existing_snapshot_is_never_overwritten(broken):
     assert not s3.puts
 
 
+_INVALID_WIRE = json.loads((Path(__file__).parent / "fixtures" / "operations-snapshot-invalid-wire-v1.json").read_text())["cases"]
+
+
+@pytest.mark.parametrize("case", _INVALID_WIRE, ids=lambda case: case["id"])
+def test_consumer_rejected_existing_wire_is_never_overwritten(case):
+    import base64
+
+    s3 = S3()
+    s3.body = base64.b64decode(case["bodyBase64"])
+    with pytest.raises(ops.SnapshotError, match="invalid_existing"):
+        ops.publish_snapshot(s3, BUCKET, snapshot(NOW + timedelta(seconds=5)), NOW + timedelta(seconds=10))
+    assert s3.gets == 1 and not s3.puts
+
+
 @pytest.mark.parametrize("change", [
     lambda d: d.update(schemaVersion=True),
     lambda d: d.update(observedAt=ops.timestamp(NOW + timedelta(minutes=3))),

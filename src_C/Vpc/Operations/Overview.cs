@@ -39,7 +39,12 @@ public static partial class ConsoleOperations
   private static string? SafeLink(string name)
   {
     var raw = Environment.GetEnvironmentVariable(name);
-    return raw?.Length <= 2048 && Uri.TryCreate(raw, UriKind.Absolute, out var url) && url.Scheme == "https" && string.IsNullOrEmpty(url.UserInfo) && string.IsNullOrEmpty(url.Query) && string.IsNullOrEmpty(url.Fragment) ? url.AbsoluteUri : null;
+    if (raw?.Length > 2048 || !Uri.TryCreate(raw, UriKind.Absolute, out var url) || url.Scheme != "https" || !string.IsNullOrEmpty(url.UserInfo) || !string.IsNullOrEmpty(url.Query)) return null;
+    if (name == "OPS_CLOUDWATCH_URL")
+      return url.Host.Equals("ap-southeast-2.console.aws.amazon.com", StringComparison.OrdinalIgnoreCase)
+        && url.IsDefaultPort && url.AbsolutePath == "/cloudwatch/home"
+        && System.Text.RegularExpressions.Regex.IsMatch(url.Fragment, "^#dashboards:name=[A-Za-z0-9_-]{1,255}$") ? url.AbsoluteUri : null;
+    return string.IsNullOrEmpty(url.Fragment) ? url.AbsoluteUri : null;
   }
   private static Dictionary<string,object?> State(string state, string status, string source, DateTimeOffset? observed, DateTimeOffset fetched, DateTimeOffset? expires, string? reason) => new()
   {

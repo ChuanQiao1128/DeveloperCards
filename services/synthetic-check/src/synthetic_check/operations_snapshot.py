@@ -23,6 +23,7 @@ _NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9:_./# -]{0,254}\Z")
 _BUCKET = re.compile(r"[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]\Z")
 _RUN = re.compile(r"[A-Za-z0-9_-]{1,128}\Z")
 _CODE = re.compile(r"[A-Z][A-Z0-9_]{0,47}\Z")
+_TIME = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]{1,6})?(?:Z|\+00:00)\Z")
 
 
 class SnapshotError(Exception):
@@ -34,7 +35,7 @@ def timestamp(value: datetime) -> str:
 
 
 def parse_time(value: Any) -> datetime:
-    if not isinstance(value, str) or len(value) > 40:
+    if not isinstance(value, str) or not _TIME.fullmatch(value):
         raise SnapshotError("invalid_time")
     try:
         parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
@@ -150,6 +151,8 @@ def _validate(document: Any, now: datetime) -> datetime:
     rows = alarms["items"]
     if not isinstance(rows, list) or len(rows) > 20 or alarms["reason"] not in (None, "not_configured", "source_unavailable"):
         raise SnapshotError("invalid_snapshot")
+    if alarms["state"] == "unknown" and rows:
+        raise SnapshotError("invalid_snapshot")
     seen: set[str] = set()
     for row in rows:
         if not isinstance(row, dict) or set(row) != {"name", "state", "stateUpdatedAt"}:
@@ -160,6 +163,15 @@ def _validate(document: Any, now: datetime) -> datetime:
         if row["stateUpdatedAt"] is not None and parse_time(row["stateUpdatedAt"]) > now + timedelta(seconds=60):
             raise SnapshotError("invalid_snapshot")
     return started
+
+
+def _unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    obj: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in obj:
+            raise SnapshotError("invalid_snapshot")
+        obj[key] = value
+    return obj
 
 
 def publish_snapshot(client: Any, bucket: str, document: dict[str, Any], now: datetime, context: Any = None) -> str:
@@ -184,7 +196,7 @@ def publish_snapshot(client: Any, bucket: str, document: dict[str, Any], now: da
             if len(raw) > MAX_BYTES:
                 raise SnapshotError("invalid_existing")
             try:
-                existing = json.loads(raw)
+                existing = json.loads(raw.decode("utf-8"), object_pairs_hook=_unique_object)
                 prior = _validate(existing, now)
             except (ValueError, TypeError, SnapshotError):
                 raise SnapshotError("invalid_existing") from None
