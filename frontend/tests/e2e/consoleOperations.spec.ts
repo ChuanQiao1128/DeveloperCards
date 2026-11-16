@@ -2,7 +2,7 @@
 // This does not establish real Cognito, deployed API, provider, or device behavior.
 import AxeBuilder from '@axe-core/playwright';
 import { test, expect } from './cspGuard';
-import { detail, envelope, learners, operations } from '../support/consoleOperationsFixture';
+import { detail, envelope, learners, membership, operations } from '../support/consoleOperationsFixture';
 import type { Page } from '@playwright/test';
 
 async function setup(page: Page, groups = ['super_admin']) {
@@ -17,7 +17,16 @@ async function setup(page: Page, groups = ['super_admin']) {
     const url = new URL(route.request().url());
     reads.push(url.pathname);
     if (url.pathname === '/api/v1/admin/operations/overview') return route.fulfill({ json: envelope({ ...operations, synthetic: { ...operations.synthetic, state: 'stale' } }).data });
-    if (url.pathname === '/api/v1/admin/learners') return route.fulfill({ json: envelope(url.searchParams.has('query') ? { ...learners, items: [], nextCursor: null } : { ...learners, items: [...learners.items, ...['maya.patel', 'daniel.chen', 'ava.wilson'].map((name, index) => ({ ...learners.items[0], sub: `fixture-${index}`, email: `${name}@example.invalid`, lastReportedPlatform: index % 2 ? 'Android' : 'iOS', lastReportedVersion: '2.1.0' }))] }).data });
+    if (url.pathname === '/api/v1/admin/learners') {
+      const rows = [...learners.items,
+        { ...learners.items[0], sub: 'sandbox-fixture', email: 'maya.patel@example.invalid', membership: { ...membership, environment: 'sandbox', premiumDownloadEligible: false } },
+        { ...learners.items[0], sub: 'expired-fixture', email: 'daniel.chen@example.invalid', membership: { ...membership, tier: 'free' as const, status: 'expired' as const, expiresAt: '2026-11-15T04:00:00Z' } },
+        { ...learners.items[0], sub: 'grant-fixture', email: 'ava.wilson@example.invalid', membership: { ...membership, source: 'legacy' as const, scope: 'selected_decks' as const, environment: null, expiresAt: null, premiumDownloadEligible: false } },
+        { ...learners.items[0], sub: 'unknown-fixture', email: 'unknown@example.invalid', membership: null },
+      ];
+      const items = url.searchParams.has('query') ? [] : url.searchParams.get('source') === 'sandbox' ? [rows[1]] : rows;
+      return route.fulfill({ json: envelope({ ...learners, items }).data });
+    }
     if (url.pathname === '/api/v1/admin/learners/observed-1') return route.fulfill({ json: envelope(detail).data });
     unexpected.push(url.pathname);
     return route.fulfill({ status: 500, json: { success: false, data: null, error: { code: 'UNEXPECTED_MOCK_ROUTE' }, traceId: null } });
@@ -84,6 +93,33 @@ test('mock learner evidence fits a narrow screen and direct editor routes stay g
   await expect(page.getByRole('table')).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await page.screenshot({ path: testInfo.outputPath('user-directory-narrow.png'), fullPage: true });
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  expect(fixture.unexpected).toEqual([]);
+});
+
+test('membership directory filters reach the server and remain usable at narrow widths', async ({ page }, testInfo) => {
+  const fixture = await setup(page);
+  await page.goto('/learners');
+  await expect(page.getByRole('table')).toBeVisible();
+  await expect(page.getByText('Expired', { exact: true }).filter({ visible: true })).toHaveCount(1);
+  await expect(page.getByText('Selected decks', { exact: true }).filter({ visible: true })).toHaveCount(1);
+  await expect(page.getByText('Access unknown', { exact: true }).filter({ visible: true })).toHaveCount(1);
+  const request = page.waitForRequest(req => new URL(req.url()).searchParams.get('source') === 'sandbox');
+  await page.getByLabel('Membership source').selectOption('sandbox');
+  await request;
+  await expect(page.getByText('1 users on this page · Filters applied')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'maya.patel@example.invalid', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'learner@example.invalid', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Reset filters' }).click();
+  await expect(page.getByRole('link', { name: 'learner@example.invalid', exact: true })).toBeVisible();
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  await page.screenshot({ path: testInfo.outputPath('membership-directory-desktop.png'), fullPage: true });
+  for (const width of [768, 375, 320]) {
+    await page.setViewportSize({ width, height: 900 });
+    await expect(page.getByLabel('Membership filter')).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    await page.screenshot({ path: testInfo.outputPath(`membership-directory-${width}.png`), fullPage: true });
+  }
   expect(fixture.unexpected).toEqual([]);
 });
 

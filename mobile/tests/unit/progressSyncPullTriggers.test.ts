@@ -50,11 +50,13 @@ vi.mock('react-native', () => ({
 
 const pushedEventIds: string[] = [];
 const pullPaths: string[] = [];
+const bootstrapBodies: unknown[] = [];
 
 vi.mock('../../src/api/apiClient', () => ({
   apiJson: vi.fn(async (path: string, opts: any) => {
     const ok = (data: any) => ({ success: true, data, error: null, traceId: 't', version: '1' });
     if (path.startsWith('/api/v1/user/bootstrap')) {
+      bootstrapBodies.push(opts?.body);
       return ok({ created: false, userSub: USER, serverTimeMs: 1 });
     }
     if (path.startsWith('/api/v1/sync/push')) {
@@ -106,6 +108,7 @@ beforeEach(async () => {
   await resetProgressSyncState();
   pushedEventIds.length = 0;
   pullPaths.length = 0;
+  bootstrapBodies.length = 0;
 });
 
 /** Leaves one review event in the outbox so the next sync has work to push. */
@@ -115,6 +118,13 @@ async function queueLocalWork(uid: string) {
 }
 
 describe('syncProgressOnce pull whitelist', () => {
+  it('reports device, platform and app version even when there are no events to push', async () => {
+    await forceProgressSync('manual');
+    expect(pushedEventIds).toEqual([]);
+    expect(bootstrapBodies).toEqual([{ deviceId: expect.any(String), clientPlatform: 'ios', clientVersion: 'test' }]);
+    expect((bootstrapBodies[0] as { deviceId: string }).deviceId.length).toBeGreaterThan(0);
+  });
+
   it('pulls on app_foreground even when this device has work of its own to send', async () => {
     await queueLocalWork('u1');
 

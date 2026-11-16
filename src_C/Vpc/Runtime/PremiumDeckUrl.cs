@@ -203,6 +203,7 @@ public static class PremiumDeckUrl
           expiresAtMs = premiumInfo.ExpiresAtMs,
         }));
 
+        if (!premiumInfo.Ok) return res.ServiceUnavailable("ENTITLEMENTS_UNAVAILABLE", "Membership access is temporarily unavailable", 30);
         if (!premiumInfo.Premium) return res.Forbidden("Requires premium entitlement");
 
         if (ToBool(Environment.GetEnvironmentVariable("DISALLOW_SANDBOX_PREMIUM")))

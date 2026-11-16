@@ -56,7 +56,7 @@ public static partial class ConsoleOperations
   }
   private static object Row(Dictionary<string, object?> row) => new
   {
-    sub = row["user_sub"], email = row["email"], firstObservedAt = row["created_at"], lastServerActivityAt = row["last_seen_at"], lastReportedPlatform = row["last_platform"], lastReportedVersion = row["last_version"],
+    sub = row["user_sub"], email = row["email"], firstObservedAt = row["created_at"], lastServerActivityAt = row["last_seen_at"], lastReportedPlatform = row["last_platform"], lastReportedVersion = row["last_version"], membership = MembershipRow(row),
   };
   private static async Task Audit(NpgsqlConnection conn, NpgsqlTransaction tx, AuthContext auth, Res res, string action, string target)
   {
@@ -66,7 +66,13 @@ public static partial class ConsoleOperations
   {
     var deny = Deny(auth, res); if (deny is not null) return deny;
     if (req.Method != "GET") return Private(res.MethodNotAllowed());
-    if (req.Query.Keys.Any(k => k is not ("query" or "limit" or "cursor")) || !Limit(req, "limit", out var limit)) return Invalid(res);
+    if (req.Query.Keys.Any(k => k is not ("query" or "limit" or "cursor" or "membership" or "source" or "expiry")) || !Limit(req, "limit", out var limit)) return Invalid(res);
+    var membership = req.Query.GetValueOrDefault("membership", "all");
+    var source = req.Query.GetValueOrDefault("source", "all");
+    var expiry = req.Query.GetValueOrDefault("expiry", "all");
+    if (!new[] { "all", "premium", "free", "unknown" }.Contains(membership)
+      || !new[] { "all", "production", "sandbox", "legacy", "none", "unknown" }.Contains(source)
+      || !new[] { "all", "next7", "next30", "expired" }.Contains(expiry)) return Invalid(res);
     var rawQuery = req.Query.GetValueOrDefault("query", "");
     if (rawQuery.Any(char.IsControl)) return Invalid(res);
     var query = rawQuery.Trim();
@@ -76,7 +82,17 @@ public static partial class ConsoleOperations
     {
       try
       {
-        var c = Decode(raw, "v", "query", "limit", "afterSub", "asOf");
+        JsonElement c;
+        try
+        {
+          c = Decode(raw, "v", "query", "limit", "afterSub", "asOf", "membership", "source", "expiry");
+          if (c.GetProperty("membership").GetString() != membership || c.GetProperty("source").GetString() != source || c.GetProperty("expiry").GetString() != expiry) return Invalid(res);
+        }
+        catch (FormatException)
+        {
+          if (membership != "all" || source != "all" || expiry != "all") return Invalid(res);
+          c = Decode(raw, "v", "query", "limit", "afterSub", "asOf");
+        }
         after = c.GetProperty("afterSub").GetString()!;
         if (c.GetProperty("query").GetString() != query || c.GetProperty("limit").GetInt32() != limit || !Text(after) || after.Contains('/')) return Invalid(res);
         var stamp = Stamp(c.GetProperty("asOf"));
@@ -91,9 +107,9 @@ public static partial class ConsoleOperations
       await using var tx = await conn.BeginTransactionAsync(RequestBudget.Token);
       asOf ??= (DateTime)(await DbUtil.ExecuteScalarAsync(conn, tx, "select now()", []))!;
       var pattern = "%" + query.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_") + "%";
-      var rows = await DbUtil.QueryAsync(conn, tx, $"select {UserColumns} from users where created_at <= $1 and user_sub COLLATE \"C\" > $2 COLLATE \"C\" and (user_sub ilike $3 escape '\\' or email ilike $3 escape '\\') order by user_sub COLLATE \"C\" limit $4", [asOf, after, pattern, limit + 1]);
+      var rows = await DbUtil.QueryAsync(conn, tx, LearnerDirectorySql, [asOf, after, pattern, limit + 1, membership, source, expiry]);
       var more = rows.Count > limit; if (more) rows.RemoveAt(limit);
-      var cursor = more ? Encode(new { v = 1, query, limit, afterSub = rows[^1]["user_sub"], asOf }) : null;
+      var cursor = more ? Encode(new { v = 1, query, limit, afterSub = rows[^1]["user_sub"], asOf, membership, source, expiry }) : null;
       await Audit(conn, tx, auth, res, "console.learners.list", "learners");
       await tx.CommitAsync(RequestBudget.Token);
       return Private(res.Ok(new { scope = "backend_observed_users", fetchedAt = DateTimeOffset.UtcNow, asOf, items = rows.Select(Row), nextCursor = cursor }));

@@ -203,6 +203,17 @@ describe('resolveDeckBySlug · entitlements are not on the free path', () => {
 });
 
 describe('resolveDeckBySlug · a failed entitlements lookup is not a "no"', () => {
+  it('preserves installed premium content when the entitlement source returns 503', async () => {
+    seedInstalledDeck('premium');
+    respond = (call) => call.url === ENTITLEMENTS_URL
+      ? { ok: false, status: 503, json: async () => ({ success: false, data: null, error: { code: 'ENTITLEMENTS_UNAVAILABLE' } }), headers: { get: () => '30' } }
+      : { ok: false, status: 404, json: async () => null, headers: { get: () => null } };
+    const { resolveDeckBySlug } = await loadRepo();
+    expect((await resolveDeckBySlug('algo'))?.Slug).toBe('algo');
+    expect(deletedFiles).toEqual([]);
+    expect(store.has('devcards:content:deckmeta:v2:user1:algo')).toBe(true);
+  });
+
   it('keeps the installed premium deck when the lookup cannot be completed', async () => {
     seedInstalledDeck('premium');
     respond = (call) => {

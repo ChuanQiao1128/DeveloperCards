@@ -13,3 +13,6 @@
 }
 @media (min-width: 1024px) { .learner-app { display: table-cell; } }
 @media (min-width: 1280px) { .learner-first-connected { display: table-cell; } }
+
+.learner-filters { display: flex; flex-wrap: wrap; gap: 16px; }
+.learner-filter { flex: 1 1 160px; min-width: 0; }

@@ -210,3 +210,49 @@ it('clears saved directory state after leaving and re-entering the learner works
   expect((screen.getByLabelText('Search users') as HTMLInputElement).value).toBe('');
   expect(screen.queryByDisplayValue('private-search@example.invalid')).toBeNull();
 });
+
+it('applies membership filters on the server, resets paging, and preserves filters across a profile visit', async () => {
+  get.mockImplementation((path: string, config: { params: { cursor?: string } }) => Promise.resolve(envelope(path.endsWith('/observed-1') ? detail : { ...learners, nextCursor: config.params.cursor ? null : 'member-page-2' })));
+  mount();
+  await screen.findByText('learner@example.invalid');
+  fireEvent.change(screen.getByLabelText('Membership filter'), { target: { value: 'premium' } });
+  await waitFor(() => expect(get.mock.calls.at(-1)?.[1].params.membership).toBe('premium'));
+  await waitFor(() => expect((screen.getByRole('button', { name: 'Next page' }) as HTMLButtonElement).disabled).toBe(false));
+  fireEvent.click(screen.getByRole('button', { name: 'Next page' }));
+  await screen.findByText('Page 2');
+  fireEvent.click(screen.getByRole('link', { name: 'learner@example.invalid' }));
+  await screen.findByRole('heading', { name: 'Account details' });
+  fireEvent.click(screen.getByRole('link', { name: 'Back to users' }));
+  await screen.findByText('Page 2');
+  expect((screen.getByLabelText('Membership filter') as HTMLSelectElement).value).toBe('premium');
+  await waitFor(() => expect((screen.getByLabelText('Access expiry') as HTMLSelectElement).disabled).toBe(false));
+  fireEvent.change(screen.getByLabelText('Access expiry'), { target: { value: 'next7' } });
+  await waitFor(() => expect(get.mock.calls.at(-1)?.[1].params).toMatchObject({ membership: 'premium', expiry: 'next7', cursor: undefined }));
+  await screen.findByText('Page 1');
+  fireEvent.click(screen.getByRole('button', { name: 'Reset filters' }));
+  await waitFor(() => expect(get.mock.calls.at(-1)?.[1].params.membership).toBeUndefined());
+});
+
+it('shows expired, scoped grant, free and unknown directory access without inventing a lifetime expiry', async () => {
+  const current = learners.items[0];
+  get.mockResolvedValue(envelope({ ...learners, items: [
+    { ...current, sub: 'expired', membership: { ...current.membership, tier: 'free', status: 'expired' } },
+    { ...current, sub: 'grant', membership: { ...current.membership, source: 'legacy', scope: 'selected_decks', expiresAt: null } },
+    { ...current, sub: 'free', membership: { ...current.membership, tier: 'free', status: 'free', source: 'none', scope: 'none', expiresAt: null } },
+    { ...current, sub: 'unknown', membership: null },
+  ] }));
+  mount();
+  await screen.findAllByText('Expired');
+  for (const label of ['Selected decks', 'Free', 'Access unknown', 'Not provided']) expect(screen.getAllByText(label).length).toBeGreaterThan(0);
+  expect(screen.queryByText(/lifetime/i)).toBeNull();
+});
+
+it('clears membership filter state when the signed-in identity changes', async () => {
+  get.mockResolvedValue(envelope(learners)); mount();
+  await screen.findByText('learner@example.invalid');
+  fireEvent.change(screen.getByLabelText('Membership source'), { target: { value: 'sandbox' } });
+  await waitFor(() => expect(get.mock.calls.at(-1)?.[1].params.source).toBe('sandbox'));
+  await act(async () => { login('B'); });
+  await waitFor(() => expect((screen.getByLabelText('Membership source') as HTMLSelectElement).value).toBe('all'));
+  await waitFor(() => expect(get.mock.calls.at(-1)?.[1].params.source).toBeUndefined());
+});

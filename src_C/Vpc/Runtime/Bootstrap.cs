@@ -8,7 +8,9 @@ namespace RecallSmith.Lambda.Vpc.Runtime;
 
 public static class Bootstrap
 {
-  public static async Task<APIGatewayProxyResponse> HandleBootstrap(LambdaRequest req, Res res, AuthContext auth)
+  public static Task<APIGatewayProxyResponse> HandleBootstrap(LambdaRequest req, Res res, AuthContext auth) => HandleBootstrap(req, res, auth, null);
+
+  internal static async Task<APIGatewayProxyResponse> HandleBootstrap(LambdaRequest req, Res res, AuthContext auth, HttpClient? profileClient)
   {
     var deny = Auth.RequireUser(auth, res);
     if (deny is not null) return deny;
@@ -30,16 +32,15 @@ public static class Bootstrap
       if (clientPlatform is not null && clientPlatform.Length > 50) throw new ValidationError("clientPlatform too long", "clientPlatform");
       if (clientVersion is not null && clientVersion.Length > 50) throw new ValidationError("clientVersion too long", "clientVersion");
 
+      var userSub = auth.UserSub!;
+      var email = GetClaimString(auth.Claims, "email") ?? GetClaimString(auth.Claims, "cognito:email")
+        ?? await CognitoUserProfile.ReadEmail(req, auth, profileClient);
+
       await using var conn = await Pg.OpenConnectionOrNullAsync();
       if (conn is null)
       {
         return res.BadRequest("CONFIG_ERROR", "Missing PG env vars (PGHOST/PGDATABASE/PGUSER/PGPASSWORD)");
       }
-
-      var userSub = auth.UserSub!;
-      var email =
-        GetClaimString(auth.Claims, "email") ??
-        GetClaimString(auth.Claims, "cognito:email");
 
       const string sql = """
         insert into users (user_sub, email, last_seen_at, last_platform, last_version, last_device_id)

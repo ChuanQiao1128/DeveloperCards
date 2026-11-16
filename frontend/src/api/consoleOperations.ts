@@ -1,7 +1,10 @@
 import { http } from './http';
 import { assertSessionGeneration, clearTokens, getSessionGeneration } from '../auth/tokenStore';
 
-export type LearnerRow = { sub: string; email: string | null; firstObservedAt: string; lastServerActivityAt: string | null; lastReportedPlatform: string | null; lastReportedVersion: string | null };
+export type MembershipSummary = { state: 'known' | 'unknown'; tier: 'premium' | 'free' | 'unknown'; status: 'active' | 'expired' | 'inactive' | 'free' | 'unknown'; source: 'revenuecat' | 'legacy' | 'none' | 'unknown'; scope: 'all' | 'selected_decks' | 'none' | 'unknown'; expiresAt: string | null; environment: string | null; premiumDownloadEligible: boolean | null };
+export type MembershipFilters = { membership: 'all' | 'premium' | 'free' | 'unknown'; source: 'all' | 'production' | 'sandbox' | 'legacy' | 'none' | 'unknown'; expiry: 'all' | 'next7' | 'next30' | 'expired' };
+export const DEFAULT_MEMBERSHIP_FILTERS: MembershipFilters = { membership: 'all', source: 'all', expiry: 'all' };
+export type LearnerRow = { membership?: MembershipSummary | null; sub: string; email: string | null; firstObservedAt: string; lastServerActivityAt: string | null; lastReportedPlatform: string | null; lastReportedVersion: string | null };
 export type Learners = { scope: 'backend_observed_users'; fetchedAt: string; asOf: string; items: LearnerRow[]; nextCursor: string | null };
 export type SourceState = { state: 'fresh' | 'stale' | 'unknown'; status: 'healthy' | 'degraded' | 'failed' | 'unknown'; source: string; observedAt: string | null; fetchedAt: string; expiresAt: string | null; reason: string | null };
 export type Operations = {
@@ -35,7 +38,8 @@ const nullable = (check: Check): Check => v => v === null || check(v);
 const oneOf = (...values: unknown[]): Check => v => values.includes(v);
 const array = (check: Check, max: number): Check => v => Array.isArray(v) && v.length <= max && v.every(check);
 const object = (fields: Record<string, Check>): Check => v => !!v && typeof v === 'object' && !Array.isArray(v) && Object.entries(fields).every(([key, check]) => check((v as Record<string, unknown>)[key]));
-const row = object({ sub: string, email: nullable(string), firstObservedAt: timestamp, lastServerActivityAt: nullable(timestamp), lastReportedPlatform: nullable(string), lastReportedVersion: nullable(string) });
+const membership = object({ state: oneOf('known', 'unknown'), tier: oneOf('premium', 'free', 'unknown'), status: oneOf('active', 'expired', 'inactive', 'free', 'unknown'), source: oneOf('revenuecat', 'legacy', 'none', 'unknown'), scope: oneOf('all', 'selected_decks', 'none', 'unknown'), expiresAt: nullable(timestamp), environment: nullable(string), premiumDownloadEligible: nullable(bool) });
+const row = object({ membership: value => value === undefined || value === null || membership(value), sub: string, email: nullable(string), firstObservedAt: timestamp, lastServerActivityAt: nullable(timestamp), lastReportedPlatform: nullable(string), lastReportedVersion: nullable(string) });
 const source = { state: oneOf('fresh', 'stale', 'unknown'), status: oneOf('healthy', 'degraded', 'failed', 'unknown'), source: string, observedAt: nullable(timestamp), fetchedAt: timestamp, expiresAt: nullable(timestamp), reason: nullable(string) };
 const deck = object({ deckSlug: string, projectedCardCount: count, projectedReviewCount: count, uniqueReceivedEventCount: count, latestEventAt: nullable(timestamp), latestReceivedAt: nullable(timestamp) });
 const validators: Record<'learners' | 'detail' | 'operations', Check> = {
@@ -96,6 +100,9 @@ async function read<T>(kind: keyof typeof validators, path: string, params: Reco
   }
 }
 export const fetchOperations = (signal?: AbortSignal) => read<Operations>('operations', '/api/v1/admin/operations/overview', {}, signal);
-export const fetchLearners = (query: string, cursor?: string, signal?: AbortSignal) => read<Learners>('learners', '/api/v1/admin/learners', { query: query.trim() || undefined, cursor, limit: 25 }, signal);
+export const fetchLearners = (query: string, cursor?: string, signal?: AbortSignal, filters?: MembershipFilters) => read<Learners>('learners', '/api/v1/admin/learners', {
+  query: query.trim() || undefined, cursor, limit: 25,
+  ...Object.fromEntries(Object.entries(filters ?? {}).filter(([, value]) => value !== 'all')),
+}, signal);
 export const fetchLearner = (sub: string, deckCursor?: string, signal?: AbortSignal) => read<LearnerDetail>('detail', `/api/v1/admin/learners/${encodeURIComponent(sub)}`, { deckCursor, deckLimit: 25 }, signal);
 

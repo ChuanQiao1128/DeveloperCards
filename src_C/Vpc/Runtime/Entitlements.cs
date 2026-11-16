@@ -15,7 +15,7 @@ public static class Entitlements
     if (deny is not null) return deny;
 
     await using var conn = await Pg.OpenConnectionOrNullAsync();
-    if (conn is null) return res.BadRequest("CONFIG_ERROR", "Missing PG env vars (PGHOST/PGDATABASE/PGUSER/PGPASSWORD)");
+    if (conn is null) return res.ServiceUnavailable("ENTITLEMENTS_UNAVAILABLE", "Membership access is temporarily unavailable", 30);
 
     var userSub = (auth.UserSub ?? string.Empty).Trim();
     if (string.IsNullOrEmpty(userSub)) return res.Unauthorized("Missing user");
@@ -23,7 +23,6 @@ public static class Entitlements
     var nowMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
     Dictionary<string, object?>? rcRow = null;
-    string? rcErr = null;
 
     try
     {
@@ -39,8 +38,8 @@ public static class Entitlements
     }
     catch (Exception ex)
     {
-      rcErr = ex.Message;
-      Log.Warn("[entitlements] rc_state query failed:", new { impl = EntitlementsImpl, userSub, err = rcErr });
+      Log.Warn("[entitlements] subscription source unavailable", new { impl = EntitlementsImpl, code = ex.GetType().Name });
+      return res.ServiceUnavailable("ENTITLEMENTS_UNAVAILABLE", "Membership access is temporarily unavailable", 30);
     }
 
     if (rcRow is not null)
@@ -137,7 +136,7 @@ public static class Entitlements
       serverTimeMs = nowMs,
 
       impl = EntitlementsImpl,
-      rcCheckError = rcErr,
+      rcCheckError = (string?)null,
       rcRowSeen = rcRow is not null,
     });
   }

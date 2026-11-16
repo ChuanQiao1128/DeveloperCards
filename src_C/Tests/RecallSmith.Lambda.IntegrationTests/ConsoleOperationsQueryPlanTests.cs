@@ -1,5 +1,6 @@
 using Npgsql;
 using RecallSmith.Lambda.Db;
+using RecallSmith.Lambda.Vpc.Operations;
 namespace RecallSmith.Lambda.IntegrationTests;
 [Collection(PostgresCollection.Name)]
 public class ConsoleOperationsQueryPlanTests(PostgresFixture db, Xunit.Abstractions.ITestOutputHelper output)
@@ -31,11 +32,8 @@ public class ConsoleOperationsQueryPlanTests(PostgresFixture db, Xunit.Abstracti
           foreach(var (label,after,pattern) in new[]{("empty-first","","%%"),("common-prefix","","%learner009%"),("empty-after-5000","00000000-0000-0000-0000-000000005000","%%")})
           {
             output.WriteLine($"INDEX={indexed}; CASE={label}");
-            var plan=await DbUtil.QueryAsync(conn,null,"""
-              explain(analyze,buffers) select user_sub,email,created_at,last_seen_at,last_platform,last_version from users
-              where created_at<=$1 and user_sub COLLATE "C">$2 COLLATE "C" and(user_sub ilike $3 escape '\' or email ilike $3 escape '\')
-              order by user_sub COLLATE "C" limit $4
-              """,[new DateTime(2026,11,16,0,0,0,DateTimeKind.Utc),after,pattern,26]);
+            var plan=await DbUtil.QueryAsync(conn,null,"explain(analyze,buffers) " + ConsoleOperations.LearnerDirectorySql,
+              [new DateTime(2026,11,16,0,0,0,DateTimeKind.Utc),after,pattern,26,"all","all","all"]);
             foreach(var row in plan)output.WriteLine(Convert.ToString(row["QUERY PLAN"]));Assert.NotEmpty(plan);
           }
         }
