@@ -8,4 +8,4 @@ Use text for fresh, stale, unknown, failure and empty states. Absolute timestamp
 
 Source: the approved read-only W1 brief and incumbent implementation; no redesign or new font, color system, dependency or animation system is introduced.
 
-User management uses a responsive directory table with labeled email or user ID search. Narrow screens retain identity, last server activity and the detail action. Profiles show identity first and use keyboard-operable tabs for account, membership and learning; raw subscription and device evidence lives in expandable troubleshooting sections. The module uses Chinese task labels and retains explicit UTC times, unknown states and historical-read warnings.
+User management uses a responsive directory table with labeled email or user ID search. Narrow screens retain identity, last server activity and the detail action. Profiles show identity first and use keyboard-operable tabs for account, membership and learning; raw subscription and device evidence lives in expandable troubleshooting sections. The module uses plain English task labels and retains explicit UTC times, unknown states and historical-read warnings.

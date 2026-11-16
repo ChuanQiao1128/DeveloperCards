@@ -73,7 +73,7 @@ describe('responsive console navigation', () => {
     const { drawer } = openDrawer();
     expect(within(drawer).getByRole('link', { name: 'Admin Management' })).toBeTruthy();
     act(() => { signInAsEditor(); });
-    for (const name of ['Overview', 'Operations', '用户管理', 'Webhooks', 'Admin Management']) {
+    for (const name of ['Overview', 'Operations', 'Learners', 'Webhooks', 'Admin Management']) {
       expect(within(drawer).queryByRole('link', { name })).toBeNull();
     }
     expect(within(drawer).getByRole('link', { name: 'Review queue' })).toBeTruthy();

@@ -38,7 +38,7 @@ const ROUTE_TITLES: Record<string, string> = {
   '/usage': 'Usage',
   '/overview': 'Overview',
   '/operations': 'Operations',
-  '/learners': '用户管理',
+  '/learners': 'User management',
 };
 
 /**
@@ -49,6 +49,6 @@ const ROUTE_TITLES: Record<string, string> = {
  */
 export function documentTitleFor(pathname: string): string {
   const path = pathname !== '/' && pathname.endsWith('/') ? pathname.slice(0, -1) : pathname;
-  const label = path.startsWith('/learners/') ? '用户详情' : ROUTE_TITLES[path];
+  const label = path.startsWith('/learners/') ? 'User profile' : ROUTE_TITLES[path];
   return label ? `${label} · ${CONSOLE_NAME}` : CONSOLE_NAME;
 }
