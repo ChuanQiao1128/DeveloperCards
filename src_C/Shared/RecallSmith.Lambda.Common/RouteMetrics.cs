@@ -151,6 +151,8 @@ public static class RouteMetrics
     "/api/v1/sync/progress",
     "/api/v1/sync/pull",
     "/api/v1/draw-state/sync",
+    "/api/v1/admin/operations/overview",
+    "/api/v1/admin/learners",
     "/api/v1/admin/users",
     "/api/v1/admin/webhooks/subscriptions",
     "/api/v1/admin/webhooks/deliveries",
@@ -199,6 +201,7 @@ public static class RouteMetrics
   [
     "/api/v1/admin/users/:userSub/entitlements",
     "/api/v1/admin/users/:userSub",
+    "/api/v1/admin/learners/:sub",
     "/api/v1/admin/webhooks/subscriptions/:subscriptionId",
     "/api/v1/admin/webhooks/subscriptions/:subscriptionId/test",
     "/api/v1/admin/webhooks/deliveries/:deliveryId/redeliver",

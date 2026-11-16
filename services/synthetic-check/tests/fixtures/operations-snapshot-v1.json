@@ -1,0 +1,87 @@
+{
+  "schemaVersion": 1,
+  "runId": "test-run",
+  "observedAt": "2026-11-16T00:00:00.000Z",
+  "completedAt": "2026-11-16T00:00:01.000Z",
+  "expiresAt": "2026-11-16T00:30:00.000Z",
+  "checks": [
+    {
+      "name": "api-health",
+      "status": "failed",
+      "advisory": false,
+      "httpStatus": 503,
+      "latencyMs": 12,
+      "code": "STATUS"
+    },
+    {
+      "name": "cdn-manifest",
+      "status": "failed",
+      "advisory": false,
+      "httpStatus": 503,
+      "latencyMs": 12,
+      "code": "STATUS"
+    },
+    {
+      "name": "cdn-deck",
+      "status": "failed",
+      "advisory": false,
+      "httpStatus": 503,
+      "latencyMs": 12,
+      "code": "STATUS"
+    },
+    {
+      "name": "console-index",
+      "status": "failed",
+      "advisory": false,
+      "httpStatus": 503,
+      "latencyMs": 12,
+      "code": "STATUS"
+    },
+    {
+      "name": "api-auth-guard",
+      "status": "failed",
+      "advisory": false,
+      "httpStatus": 503,
+      "latencyMs": 12,
+      "code": "STATUS"
+    },
+    {
+      "name": "api-sync-guard",
+      "status": "failed",
+      "advisory": false,
+      "httpStatus": 503,
+      "latencyMs": 12,
+      "code": "STATUS"
+    },
+    {
+      "name": "remote-config",
+      "status": "failed",
+      "advisory": true,
+      "httpStatus": 503,
+      "latencyMs": 12,
+      "code": "STATUS"
+    },
+    {
+      "name": "cognito-console",
+      "status": "failed",
+      "advisory": false,
+      "httpStatus": 503,
+      "latencyMs": 12,
+      "code": "STATUS"
+    },
+    {
+      "name": "cognito-mobile",
+      "status": "failed",
+      "advisory": false,
+      "httpStatus": 503,
+      "latencyMs": 12,
+      "code": "STATUS"
+    }
+  ],
+  "alarms": {
+    "state": "unknown",
+    "observedAt": "2026-11-16T00:00:00.000Z",
+    "items": [],
+    "reason": "not_configured"
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "tags_only_updates": false,
+  "changes": {
+    "module.identity.aws_iam_role_policy.console_operations_snapshot": "create"
+  },
+  "outputs": [],
+  "_note": "Only a new exact snapshot-object/metric-alarm read policy on existing synthetic role. No other identity, bucket, schedule, network, or dashboard mutation. Actual saved plan and policy resources must be checked before apply."
+}
