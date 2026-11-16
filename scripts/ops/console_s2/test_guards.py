@@ -4,9 +4,10 @@ from datetime import datetime, timedelta, timezone
 import json
 from pathlib import Path
 import tempfile
+from types import SimpleNamespace
 import unittest
 
-from guards import Blocked, Ledger, LIMITS, validate_manifest
+from guards import Blocked, Ledger, LIMITS, sdk_client, validate_manifest
 
 
 def manifest():
@@ -213,6 +214,56 @@ class GuardTests(unittest.TestCase):
             self.ledger.consume("cleanupSDK")
         with self.assertRaises(Blocked):
             self.ledger.consume("cleanupSDK")
+
+    def test_v4_sdk_cap_is_durable_and_v3_stays_400(self):
+        self.assertEqual(LIMITS["sdkControl"], 400)
+        for version, cap in (("s2-execution-budget-v3", 400), ("s2-execution-budget-v4", 500)):
+            m = deepcopy(self.m)
+            m["executionBudgetVersion"] = version
+            path = self.path.with_name(version + ".json")
+            ledger = Ledger(path, m, now=lambda: self.now)
+            with ledger.state() as data:
+                data["counts"]["sdkControl"] = cap - 1
+            ledger.consume("sdkControl")
+            with self.assertRaisesRegex(Blocked, "BUDGET_SDKCONTROL"):
+                Ledger(path, m, now=lambda: self.now).consume("sdkControl")
+            ledger.consume("cleanupSDK")
+            state = json.loads(path.read_text())
+            self.assertEqual(state["counts"], {"sdkControl": cap, "cleanupSDK": 1})
+
+    def test_actual_sdk_factory_accepts_reviewed_versions_and_counts_hooks(self):
+        try:
+            import botocore.config
+        except ImportError:
+            self.skipTest("botocore unavailable")
+        class Session:
+            def __init__(self):
+                self.hooks = {}
+                self.calls = 0
+            def client(self, service, **kwargs):
+                self.calls += 1
+                self.config = kwargs["config"]
+                return SimpleNamespace(meta=SimpleNamespace(events=SimpleNamespace(register=self.hooks.__setitem__)))
+        for version in ("s2-execution-budget-v3", "s2-execution-budget-v4"):
+            m = deepcopy(self.m)
+            m["executionBudgetVersion"] = version
+            ledger = Ledger(self.path.with_name(version + "-sdk.json"), m, now=lambda: self.now)
+            session = Session()
+            sdk_client(session, "sts", ledger)
+            self.assertEqual(session.config.retries["total_max_attempts"], 1)
+            session.hooks["before-send.*.*"]()
+            sdk_client(session, "lambda", ledger, cleanup=True)
+            session.hooks["before-send.*.*"]()
+            session.hooks["before-send.lambda.Invoke"]()
+            self.assertEqual(json.loads(ledger.path.read_text())["counts"],
+                             {"sdkControl": 1, "cleanupSDK": 1, "handlerInvocations": 1})
+        m["executionBudgetVersion"] = "s2-execution-budget-v5"
+        ledger = Ledger(self.path.with_name("unknown-sdk.json"), m, now=lambda: self.now)
+        session = Session()
+        for cleanup in (False, True):
+            with self.assertRaisesRegex(Blocked, "AMENDED_EXECUTION_BUDGET_REVIEW_REQUIRED"):
+                sdk_client(session, "sts", ledger, cleanup=cleanup)
+        self.assertEqual(session.calls, 0)
 
     def test_manifest_change_does_not_reset_clock(self):
         self.create()
