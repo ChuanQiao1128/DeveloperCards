@@ -23,6 +23,12 @@ LIMITS = {"businessHTTP": 100, "browserHTTP": 500, "handlerInvocations": 150,
           "observerInvocations": 12, "cleanupSDK": 250}
 RUN_ID = re.compile(r"\d{8}t\d{6}z-[a-f0-9]{8}\Z")
 SHA = re.compile(r"[a-f0-9]{64}\Z")
+
+
+def sdk_limit(manifest):
+    return 500 if manifest.get("executionBudgetVersion") == "s2-execution-budget-v4" else LIMITS["sdkControl"]
+
+
 FOUNDATION_PREREQUISITES = ("independentReview", "ownerChannel", "network", "artifactBinding", "cleanupDriver")
 PREREQUISITES = ("independentReview", "ownerChannel", "productionAcl", "isolatedAcl",
                  "schema61", "explain", "network", "artifactBinding", "cleanupDriver")
@@ -186,7 +192,8 @@ class Ledger:
                 require(data["activeStartAt"] is not None, "ACTIVE_WINDOW_NOT_STARTED")
                 require(self.now() < min(self.deadline(data) - timedelta(minutes=5), stamp(data["activeStartAt"]) + timedelta(minutes=30)), "INJECTION_DEADLINE")
             count = data["counts"].get(category, 0)
-            require(count < LIMITS[category], "BUDGET_" + category.upper())
+            limit = sdk_limit(self.manifest) if category == "sdkControl" else LIMITS[category]
+            require(count < limit, "BUDGET_" + category.upper())
             data["counts"][category] = count + 1
 
     def _advance(self, manifest, phase):
@@ -286,7 +293,7 @@ def sdk_client(session, service, ledger, *, cleanup=False, deadline_monotonic=No
     Callers count business/observer/collector invokes separately. SDK retries are
     disabled using total_max_attempts (max_attempts=1 would permit a retry).
     """
-    require(ledger.manifest.get("executionBudgetVersion") == "s2-execution-budget-v3", "AMENDED_EXECUTION_BUDGET_REVIEW_REQUIRED")
+    require(ledger.manifest.get("executionBudgetVersion") in ("s2-execution-budget-v3", "s2-execution-budget-v4"), "AMENDED_EXECUTION_BUDGET_REVIEW_REQUIRED")
     from botocore.config import Config
     client = session.client(service, region_name=REGION, config=Config(
         connect_timeout=1, read_timeout=9, retries={"total_max_attempts": 1, "mode": "standard"}))

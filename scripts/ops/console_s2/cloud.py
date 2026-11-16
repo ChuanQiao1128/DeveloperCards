@@ -15,7 +15,7 @@ from pathlib import Path
 import time
 
 from guards import (ACCOUNT, REGION, Blocked, LIMITS, PREREQUISITES, require,
-                    sdk_client, stamp, validate_manifest, digest)
+                    sdk_client, sdk_limit, stamp, validate_manifest, digest)
 
 KINDS = ("core", "worker", "observer", "collector")
 # Ownership parentage is not deletion parentage. Only these native containment
@@ -285,7 +285,7 @@ def _ensure(c,key,kind,name,create,*,parent=None,local_name=None,after=None):
 def estimate(manifest):
     """Conservative healthy-path provisioning estimate; actual sends remain capped.
 
-    No promise that propagation/reconciliation fits. Work stops at400; cleanup250
+    No promise that propagation/reconciliation fits. Work stops at the reviewed cap; cleanup250
     remains separately available. Root can reserve more for actual incident polls.
     """
     reserve=manifest.get("cloud",{}).get("incidentControlReserve",50)
@@ -296,7 +296,7 @@ def estimate(manifest):
 
 
 def context(session,ledger,manifest,*,cleanup=False,deadline_monotonic=None):
-    require(manifest.get("executionBudgetVersion")=="s2-execution-budget-v3","AMENDED_EXECUTION_BUDGET_REVIEW_REQUIRED")
+    require(manifest.get("executionBudgetVersion") in ("s2-execution-budget-v3", "s2-execution-budget-v4"),"AMENDED_EXECUTION_BUDGET_REVIEW_REQUIRED")
     validate_manifest(manifest,phase=ledger.phase)
     require(manifest==ledger.manifest,"DRIVER_LEDGER_MANIFEST_MISMATCH")
     source=Path(manifest.get("sourceManifestPath",""));plan=Path(manifest.get("savedPlanPath",""))
@@ -458,7 +458,7 @@ def foundation(session,ledger,manifest,watchdog):
     estimate_=estimate(manifest)
     with ledger.state() as state:
         used=state["counts"].get("sdkControl",0)
-    require(LIMITS["sdkControl"]-used>=estimate_["requiredAvailableWorkCalls"],"SDK_BUDGET_INSUFFICIENT_BEFORE_CREATE")
+    require(sdk_limit(manifest)-used>=estimate_["requiredAvailableWorkCalls"],"SDK_BUDGET_INSUFFICIENT_BEFORE_CREATE")
     require(callable(watchdog),"INDEPENDENT_WATCHDOG_REQUIRED")
     # Root registers an independent process/thread that can call cleanup even
     # if this stack fails; callback must return before any create API.
