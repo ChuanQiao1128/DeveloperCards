@@ -22,10 +22,10 @@ public sealed record Observation(
   [property: JsonPropertyName("schemaVersion")] int SchemaVersion,
   [property: JsonPropertyName("observedAt")] DateTime ObservedAt,
   [property: JsonPropertyName("status")] string Status,
-  [property: JsonPropertyName("stalled")] bool? Stalled,
+  [property: JsonPropertyName("stalled"), JsonIgnore(Condition = JsonIgnoreCondition.Never)] bool? Stalled,
   [property: JsonPropertyName("truncated")] bool Truncated,
   [property: JsonPropertyName("items")] IReadOnlyList<StalledItem> Items,
-  [property: JsonPropertyName("reason")] string? Reason);
+  [property: JsonPropertyName("reason"), JsonIgnore(Condition = JsonIgnoreCondition.Never)] string? Reason);
 
 public sealed class Function
 {
