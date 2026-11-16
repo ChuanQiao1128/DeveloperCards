@@ -5,7 +5,7 @@
 // wherever the user is — including the review queue, the human gate of the
 // authoring agent, from the landing page. A page passes only its deck-scoped
 // overrides (e.g. reviewHref: `/review?deckId=7`), or `undefined` to leave a
-// section out (the deck list omits Decks: it is that page).
+// section out. The deck list keeps its own Decks destination visible as well.
 //
 // Webhooks and Admin Management are listed for everyone; ConsoleShell renders
 // them only for a super_admin session.

@@ -1,0 +1,332 @@
+{
+  "baseCommit": "98b013",
+  "dom": [
+    {
+      "scenario": "editorLegacy",
+      "oldBytes": 10071,
+      "newBytes": 21558,
+      "oldHash": "ccdb63d8104cc8114329342f058485f308d5948bf15c3b276b03c4464dce4e46",
+      "newHash": "271b17f2cc2685f62f1e179c0f5b07eb611e1ae72b398b9c1bebb3f70470f118",
+      "pageContentEqual": true
+    },
+    {
+      "scenario": "emptySearchResult",
+      "oldBytes": 7919,
+      "newBytes": 25209,
+      "oldHash": "0ef2a4ae1984fa89d68b58dfae7c00271528fbe00c7f0b5ce8fd467cdc001650",
+      "newHash": "218e4eeefea7a2e925a77623743b05a09e577aac83add68bb1507015e2776a34",
+      "pageContentEqual": true
+    },
+    {
+      "scenario": "emptyWithNoQuery",
+      "oldBytes": 7909,
+      "newBytes": 25199,
+      "oldHash": "e8c3c6b35a2456d477d1705d56c5f9f397253f708351c02352b96c6a316ca103",
+      "newHash": "c6b848afb8ac03acf1cbc1da919c8b5f87a7fe48b9d9aa8eaa3481cfded36cc6",
+      "pageContentEqual": true
+    },
+    {
+      "scenario": "fatalErrorRetry",
+      "oldBytes": 421,
+      "newBytes": 421,
+      "oldHash": "22809bb57f98a29737e080c405194d891a62ee389911aae33891f12b55c1c396",
+      "newHash": "22809bb57f98a29737e080c405194d891a62ee389911aae33891f12b55c1c396",
+      "pageContentEqual": true
+    },
+    {
+      "scenario": "initialLoading",
+      "oldBytes": 147,
+      "newBytes": 147,
+      "oldHash": "da5e91db42c7895c31e1fba36b34c6aaeb456d4ef2efde3a425f5b5066a52974",
+      "newHash": "da5e91db42c7895c31e1fba36b34c6aaeb456d4ef2efde3a425f5b5066a52974",
+      "pageContentEqual": true
+    },
+    {
+      "scenario": "manifestErrorBanner",
+      "oldBytes": 14433,
+      "newBytes": 31723,
+      "oldHash": "a1edf5f79e06f24ac2954c323546ad6b71e8073b60fa0b6836bdfde31db995ad",
+      "newHash": "714d2638b9db196f225d7a562e6906dbae4bf7f6d7f836c1eeaa2e1de4076bc4",
+      "pageContentEqual": true
+    },
+    {
+      "scenario": "pollFailureBanner",
+      "oldBytes": 14820,
+      "newBytes": 32110,
+      "oldHash": "257be86e99e296c25ab8c20c2a2c9053a3826159beb3a30357a778e1e3ad07f5",
+      "newHash": "c40ac8f0525b98270f5f74a7931793466fc1d87b32a2e9a4e1044826b7ba94ab",
+      "pageContentEqual": true
+    },
+    {
+      "scenario": "publishJobsTab",
+      "oldBytes": 6891,
+      "newBytes": 24181,
+      "oldHash": "109f5876ff8ca02797cab0902dbb522ee8a7046ae162e336df20ce397e76b024",
+      "newHash": "48abad293c46616c6cd3a6f59265bb393926bd9316d94975d3409b13db3fdcac",
+      "pageContentEqual": true
+    },
+    {
+      "scenario": "publishingRow",
+      "oldBytes": 13951,
+      "newBytes": 31241,
+      "oldHash": "f1841eee0dc89b4abba49bf0486e707fe1b001ddf5d69f6ee66b112f31966403",
+      "newHash": "1a13aa66902ec88a2cf518428ee02ba4dc63fd37c3535acbc1e543f1e85bcf92",
+      "pageContentEqual": true
+    },
+    {
+      "scenario": "superAdminLegacyFallback",
+      "oldBytes": 14181,
+      "newBytes": 31471,
+      "oldHash": "6fb7d89cba70905e00dc3a376f79e7a1b26ade671b1c5f6c052fe9c89124e4f7",
+      "newHash": "b18768e6768e2acf7df0a05db18b3164b60764417d45ceec4d678abc10f25cff",
+      "pageContentEqual": true
+    },
+    {
+      "scenario": "superAdminPaginated",
+      "oldBytes": 13935,
+      "newBytes": 31225,
+      "oldHash": "3d1b220e0254662697ceb5bd9ed1c01f249b03a2283be526c806251c56a178c4",
+      "newHash": "a3f15fed6116391ba894aa8d98dce4c0216138b64d7bff3d13a5b600f5b4d37a",
+      "pageContentEqual": true
+    }
+  ],
+  "sourceBindings": [
+    "ConsoleShell.tsx sidebar/dialog/topbar/main wrapper",
+    "ConsoleIcon.tsx decorative outline icons",
+    "index.css scoped shell CSS",
+    "DeckListPage.tsx only consoleNav override removed"
+  ],
+  "unchangedGates": [
+    "all page main children",
+    "initialLoading/fatalErrorRetry markup",
+    "B2 Profiler timeline",
+    "B3 buildViewRows counters"
+  ],
+  "bundle": {
+    "old": {
+      "first": {
+        "raw": 375712,
+        "gzip": 116670,
+        "files": [
+          {
+            "name": "assets/index-ClYCaQeH.js",
+            "raw": 346011,
+            "gzip": 110881
+          },
+          {
+            "name": "assets/index-BehtEcqQ.css",
+            "raw": 29701,
+            "gzip": 5789
+          }
+        ]
+      },
+      "eager": {
+        "raw": 492057,
+        "gzip": 157965,
+        "files": [
+          {
+            "name": "assets/index-ClYCaQeH.js",
+            "raw": 346011,
+            "gzip": 110881
+          },
+          {
+            "name": "assets/index-BehtEcqQ.css",
+            "raw": 29701,
+            "gzip": 5789
+          },
+          {
+            "name": "assets/DeckListPage-B_ZOAUOY.js",
+            "raw": 30457,
+            "gzip": 9154
+          },
+          {
+            "name": "assets/authoring-BvhisF-M.js",
+            "raw": 10491,
+            "gzip": 2825
+          },
+          {
+            "name": "assets/useDecks-CNMzoVba.js",
+            "raw": 3426,
+            "gzip": 1292
+          },
+          {
+            "name": "assets/ErrorBanner-CVld1Nlt.js",
+            "raw": 3208,
+            "gzip": 1483
+          },
+          {
+            "name": "assets/qaGate-DqQzT5Nc.js",
+            "raw": 580,
+            "gzip": 399
+          },
+          {
+            "name": "assets/ConsoleShell-COa3LdL3.js",
+            "raw": 56576,
+            "gzip": 21485
+          },
+          {
+            "name": "assets/frontHelp-Dfb-GHHT.js",
+            "raw": 995,
+            "gzip": 554
+          },
+          {
+            "name": "assets/httpFailure-D9sKsAZv.js",
+            "raw": 1524,
+            "gzip": 664
+          },
+          {
+            "name": "assets/useQuery-Cj2uE3V6.js",
+            "raw": 8794,
+            "gzip": 3205
+          },
+          {
+            "name": "assets/errors-Bkr8gkTf.js",
+            "raw": 294,
+            "gzip": 234
+          }
+        ]
+      }
+    },
+    "candidate": {
+      "first": {
+        "raw": 378952,
+        "gzip": 117475,
+        "files": [
+          {
+            "name": "assets/index-DEnkuEab.js",
+            "raw": 346011,
+            "gzip": 110872
+          },
+          {
+            "name": "assets/index-q_wGuFfg.css",
+            "raw": 32941,
+            "gzip": 6603
+          }
+        ]
+      },
+      "eager": {
+        "raw": 498867,
+        "gzip": 160150,
+        "files": [
+          {
+            "name": "assets/index-DEnkuEab.js",
+            "raw": 346011,
+            "gzip": 110872
+          },
+          {
+            "name": "assets/index-q_wGuFfg.css",
+            "raw": 32941,
+            "gzip": 6603
+          },
+          {
+            "name": "assets/DeckListPage-QAt1RRYw.js",
+            "raw": 30439,
+            "gzip": 9148
+          },
+          {
+            "name": "assets/authoring-VFoHNc9N.js",
+            "raw": 10491,
+            "gzip": 2824
+          },
+          {
+            "name": "assets/useDecks-y24_jT18.js",
+            "raw": 3426,
+            "gzip": 1290
+          },
+          {
+            "name": "assets/ErrorBanner-B7CFVEIq.js",
+            "raw": 3208,
+            "gzip": 1480
+          },
+          {
+            "name": "assets/qaGate-DqQzT5Nc.js",
+            "raw": 580,
+            "gzip": 399
+          },
+          {
+            "name": "assets/ConsoleShell-Db9RTwhP.js",
+            "raw": 60164,
+            "gzip": 22878
+          },
+          {
+            "name": "assets/frontHelp-Dfb-GHHT.js",
+            "raw": 995,
+            "gzip": 554
+          },
+          {
+            "name": "assets/httpFailure-CSpZ2ifs.js",
+            "raw": 1524,
+            "gzip": 664
+          },
+          {
+            "name": "assets/useQuery-BMOGMKbw.js",
+            "raw": 8794,
+            "gzip": 3204
+          },
+          {
+            "name": "assets/errors-Bkr8gkTf.js",
+            "raw": 294,
+            "gzip": 234
+          }
+        ]
+      }
+    },
+    "sameInstalledDependencies": true,
+    "sameTrackedProductionEnvironment": true,
+    "roundingPolicy": "next 1,000 B from measured closure; no extra allowance",
+    "delta": {
+      "first": {
+        "raw": 3240,
+        "gzip": 805
+      },
+      "eager": {
+        "raw": 6810,
+        "gzip": 2185
+      }
+    }
+  },
+  "checks": {
+    "targetedFreshProcesses": [
+      {
+        "log": "/tmp/console-ui-repair-targeted1.log",
+        "files": 9,
+        "tests": 113,
+        "exit": 0
+      },
+      {
+        "log": "/tmp/console-ui-repair-targeted2.log",
+        "files": 9,
+        "tests": 113,
+        "exit": 0
+      }
+    ],
+    "fullSuite": {
+      "report": "/tmp/console-ui-repair-full-results.json",
+      "tests": 1914,
+      "passed": 1914,
+      "failed": 0,
+      "exit": 0
+    },
+    "lint": {
+      "log": "/tmp/console-ui-repair-lint.log",
+      "exit": 0,
+      "existingWarnings": [
+        "AuthContext.tsx:42",
+        "DeckListPage.tsx:620"
+      ]
+    },
+    "build": {
+      "log": "/tmp/console-ui-repair-build.log",
+      "exit": 0
+    },
+    "detector": {
+      "report": "/tmp/console-commercial-ui-detector.json",
+      "exit": 0,
+      "findings": []
+    },
+    "diffCheck": {
+      "exit": 0
+    }
+  },
+  "domLengthUnits": "The legacy oldBytes/newBytes names in DOM captures store JavaScript html.length (UTF-16 code units), not UTF-8 byte counts. SHA-256 hashes are over the recorded normalized HTML."
+}

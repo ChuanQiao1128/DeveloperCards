@@ -703,7 +703,7 @@ export function DeckListPage() {
           : '—'
       }
       superAdmin={superAdmin}
-      {...consoleNav({ decksHref: undefined })}
+      {...consoleNav()}
     >
       <div className="w-full mx-auto space-y-6">
         {/* Header Section */}

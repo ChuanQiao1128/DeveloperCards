@@ -427,7 +427,7 @@ describe('WebhooksPage', () => {
   it('shows the Webhooks nav link to a super_admin only', () => {
     function shell(href?: string) {
       return render(
-        <MemoryRouter>
+        <MemoryRouter initialEntries={[href ?? '/']}>
           <ConsoleShell title="t" webhooksHref={href}>
             body
           </ConsoleShell>
@@ -438,7 +438,9 @@ describe('WebhooksPage', () => {
     shell('/admin/webhooks');
     const link = screen.getByRole('link', { name: 'Webhooks' });
     expect(link.getAttribute('href')).toBe('/admin/webhooks');
-    expect(link.querySelector('span')).toBeNull();
+    expect(link.tagName).toBe('A');
+    expect(link.getAttribute('aria-current')).toBe('page');
+    expect(link.getAttribute('class')).toContain('focus-visible:ring-2');
     cleanup();
 
     shell(undefined);

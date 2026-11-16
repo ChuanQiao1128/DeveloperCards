@@ -83,6 +83,7 @@ describe('the console sections on the landing page', () => {
     signInAsSuperAdmin();
     await mountHome();
     expect(navLinks()).toEqual({
+      Decks: '/',
       Overview: '/overview',
       Operations: '/operations',
       Learners: '/learners',
@@ -101,6 +102,7 @@ describe('the console sections on the landing page', () => {
     signInAsEditor();
     await mountHome();
     expect(navLinks()).toEqual({
+      Decks: '/',
       Reports: '/reports',
       Usage: '/usage',
       'Automation ledger': '/ledger',
@@ -157,24 +159,25 @@ describe('the current section in the header (frontend-console-27)', () => {
     expect(consoleSectionFor('/content-intelligence')).toBeNull();
   });
 
-  it('groups operations first, preserving content, automation and administration link order', () => {
+  it('organizes the sidebar into management categories with system tools last', () => {
     signInAsSuperAdmin();
     shellAt('/ledger');
     const nav = screen.getByRole('navigation', { name: 'Console sections' });
     expect(within(nav).getAllByRole('link').map(a => a.textContent)).toEqual([
       'Overview',
-      'Operations',
-      'Learners',
       'Decks',
       'Review queue',
       'AI QA',
       'Reports',
-      'Usage',
-      'Automation ledger',
+      'Learners',
       'Automation',
+      'Automation ledger',
+      'Usage',
+      'Operations',
       'Webhooks',
       'Admin Management',
     ]);
+    expect(within(nav).getAllByRole('group').map(group => group.getAttribute('aria-label'))).toEqual(['Workbench navigation', 'Content navigation', 'Learners navigation', 'Automation navigation', 'Analytics navigation', 'System navigation']);
   });
 });
 

@@ -828,7 +828,7 @@ export function WebhooksPage() {
         <p className="mt-2 text-slate-600 text-sm">
           The console never shows the secret value. Read it with your own AWS credentials:
         </p>
-        <pre className="mt-2 overflow-x-auto border border-slate-200 rounded p-4 font-mono text-xs text-slate-800">
+        <pre tabIndex={0} role="region" aria-label="Signing secret command" className="mt-2 overflow-x-auto border border-slate-200 rounded p-4 font-mono text-xs text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">
           <code>{`aws ssm get-parameter --name ${ssmName} --with-decryption --query Parameter.Value --output text`}</code>
         </pre>
       </section>
@@ -853,7 +853,7 @@ export function WebhooksPage() {
           body&apos;s <code className="font-mono text-xs text-slate-800">eventId</code>, since a delivery can arrive more
           than once.
         </p>
-        <pre className="mt-3 overflow-x-auto border border-slate-200 rounded p-4 font-mono text-xs text-slate-800">
+        <pre tabIndex={0} role="region" aria-label="Delivery verification code" className="mt-3 overflow-x-auto border border-slate-200 rounded p-4 font-mono text-xs text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">
           <code>{WEBHOOK_VERIFY_SNIPPET}</code>
         </pre>
         <div className="mt-3" data-testid="webhooks-test-vector">

@@ -141,29 +141,49 @@ function inventory(): string[] {
 // Re-measured again (R26 C01, 2026-10-02): the Content Intelligence page was
 // retired with Snowflake, so both roles lost `a:Content Intelligence`. Nothing
 // else in either list moved.
-// Console W1 adds only these three administrator navigation destinations.
+// Console W1 added three administrator destinations. Commercial shell (2026-11-17)
+// remeasurement adds the full closed mobile navigation copy, persistent Decks in
+// both copies, skip link, Open navigation and Close navigation. This census
+// intentionally includes hidden DOM controls; role-based tests separately check
+// accessible links and current-session gating. No page action changed.
 const SUPER_ADMIN_CONTROLS = [
   'a:AI QA',
+  'a:AI QA',
+  'a:Admin Management',
   'a:Admin Management',
   'a:Automation',
+  'a:Automation',
   'a:Automation ledger',
+  'a:Automation ledger',
+  'a:Decks',
+  'a:Decks',
+  'a:Learners',
   'a:Learners',
   'a:Operations',
+  'a:Operations',
+  'a:Overview',
   'a:Overview',
   'a:Reports',
+  'a:Reports',
   'a:Review queue',
+  'a:Review queue',
+  'a:Skip to content',
   'a:Usage',
+  'a:Usage',
+  'a:Webhooks',
   'a:Webhooks',
   'button:4',
   'button:4',
   'button:Cards',
   'button:Cards',
+  'button:Close navigation',
   'button:Decks',
   'button:Delete',
   'button:Delete',
   'button:Edit',
   'button:Edit',
   'button:New Deck',
+  'button:Open navigation',
   'button:Preview',
   'button:Preview',
   'button:Publish',
@@ -176,23 +196,35 @@ const SUPER_ADMIN_CONTROLS = [
   'select:All TypesStarterPaid|Filter by type',
 ];
 
-// The difference is exactly twelve controls: the two tab-switcher buttons
+// The difference is exactly seventeen DOM controls (privileged links have a
+// desktop and closed mobile copy): the two tab-switcher buttons
 // (Decks / Publish Jobs), New Deck, two Publish, two Delete, and ConsoleShell's
-// Admin Management, Webhooks, Overview, Operations and Learners. Nothing else
+// Admin Management, Webhooks, Overview, Operations and Learners, each twice. Nothing else
 // changes between the roles.
 const EDITOR_CONTROLS = [
   'a:AI QA',
+  'a:AI QA',
+  'a:Automation',
   'a:Automation',
   'a:Automation ledger',
+  'a:Automation ledger',
+  'a:Decks',
+  'a:Decks',
+  'a:Reports',
   'a:Reports',
   'a:Review queue',
+  'a:Review queue',
+  'a:Skip to content',
+  'a:Usage',
   'a:Usage',
   'button:4',
   'button:4',
   'button:Cards',
   'button:Cards',
+  'button:Close navigation',
   'button:Edit',
   'button:Edit',
+  'button:Open navigation',
   'button:Preview',
   'button:Preview',
   'button:Refresh',

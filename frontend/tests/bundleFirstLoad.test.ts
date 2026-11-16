@@ -53,7 +53,12 @@ const FRONTEND = fileURLToPath(new URL('..', import.meta.url));
  * unsaved-changes guard; measured 310,441 -> 366,033. Raised to measured+10k,
  * rounded up to the next 1,000.
  */
-const FIRST_LOAD_BUDGET_BYTES = 377_000;
+// Commercial console (2026-11-17), clean 98b013 and candidate, same machine,
+// installed dependencies and tracked production environment: first load
+// 375,712 -> 378,952 B. The scoped responsive shell CSS is eagerly loaded;
+// JS entry remains 346,011 B. Apply the existing next-1,000-B measurement rule.
+// Full raw/gzip closure evidence: docs/delivery/console-commercial-ui/verification.json.
+const FIRST_LOAD_BUDGET_BYTES = 379_000;
 
 /**
  * The login page's real download, static closure plus the module-scope prefetch.
@@ -108,7 +113,11 @@ const FIRST_LOAD_BUDGET_BYTES = 377_000;
 // grouped navigation, new lazy route registry, permission-aware session teardown
 // and shared UI styles total 492,565 B. Root approved the existing next-1,000-B
 // policy for this measured feature increment; static/lazy boundaries stay fixed.
-const EAGER_BUDGET_BYTES = 493_000;
+// Commercial console (2026-11-17): clean 98b013 492,057 -> 498,867 B
+// (gzip 157,965 -> 160,150 B summed per asset). The increment is scoped CSS,
+// sidebar/drawer/icon JS and the persistent home Decks link; no new dependency,
+// eager page import or weakened lazy boundary. Same next-1,000-B policy.
+const EAGER_BUDGET_BYTES = 499_000;
 
 /**
  * Floor, so a parser that degenerates to an empty or near-empty set cannot make
