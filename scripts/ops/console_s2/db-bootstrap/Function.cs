@@ -237,7 +237,7 @@ public sealed class Function
     {
       // CREATE DATABASE is nontransactional. A matching role/database owner is recorded before the call.
       await Execute(admin, $"create database {Quote(db)} owner {Quote(role)}", ct);
-      
+
     }
     await Execute(admin, "select set_config('s2.db_marker',$1,false)", ct, marker);
     await Execute(admin, "do $$ begin execute format('comment on database %I is %L','" + db + "',current_setting('s2.db_marker')); end $$", ct);
