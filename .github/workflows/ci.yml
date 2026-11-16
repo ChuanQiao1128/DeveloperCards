@@ -229,6 +229,8 @@ jobs:
       # RecallSmith.Lambda.csproj, so a bare `dotnet test` here depends on
       # which of the two MSBuild picks.
       - run: dotnet test Tests/RecallSmith.Lambda.IntegrationTests
+      - name: Check isolated Console database privileges
+        run: python3 ../scripts/ops/console_s2/db-bootstrap/tests/run.py --dotnet dotnet
 
   # Every Python package (services/*, tools/ingest, evals) with a pyproject.toml:
   # the committed uv.lock must be current and its pytest suite must pass.
@@ -260,6 +262,8 @@ jobs:
             echo "::endgroup::"
           done
           [ "$found" = 1 ] || { echo "no Python package found" >&2; exit 1; }
+      - name: Check isolated Console SDK lifecycle
+        run: uv run --frozen --project services/synthetic-check python -m unittest discover -s scripts/ops/console_s2 -p 'test_*.py' -v
       # The same packages, audited for known vulnerabilities in what they ship: the
       # locked runtime dependencies (`--no-dev`; evals' optional `embeddings` extra is
       # a local-only tool and stays out). `--no-emit-local` drops evals' path

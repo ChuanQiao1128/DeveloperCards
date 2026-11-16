@@ -8,6 +8,9 @@ locals {
     "developercards-prod-synthetic-check-failing",
     "developercards-prod-sqs-oldest-age",
     "developercards-prod-dlq-nonempty",
+    "developercards-prod-sync-http-errors",
+    "developercards-prod-publish-stalled",
+    "developercards-prod-operations-observer-unavailable",
   ]
 }
 

@@ -18,7 +18,8 @@ from . import emf
 from .checks import ADVISORY_CHECKS, CHECK_NAMES, ERROR, CheckResult, run_checks
 from .logs import log
 from .operations_snapshot import publish_observation
-from .settings import DEFAULTS, load_settings
+from .operations_observer import isolated_targets_configured, metric_namespace, observe
+from .settings import load_settings
 
 JOB = "synthetic-check"
 
@@ -29,18 +30,21 @@ def lambda_handler(event: Any, context: Any) -> dict[str, Any]:
         return {"skipped": "unknown-event"}
     started = time.monotonic()
     observed_at = datetime.now(timezone.utc)
-    namespace = DEFAULTS["METRICS_NAMESPACE"]
+    namespace = metric_namespace()
+    config_valid = False
     try:
         settings = load_settings()
-        namespace = settings.metrics_namespace
-        results = run_checks(settings)
+        config_valid = namespace is not None and isolated_targets_configured(namespace) and not settings.config_error
+        results = run_checks(settings) if config_valid else [CheckResult(name, False, None, 0, ERROR) for name in CHECK_NAMES]
     except Exception:
         results = [CheckResult(name, False, None, 0, ERROR) for name in CHECK_NAMES]
     latency_ms = max(0, int((time.monotonic() - started) * 1000))
     ok = len(results) == len(CHECK_NAMES) and emf.core_ok(results)
     failed = [r.name for r in results if not r.ok and r.name not in ADVISORY_CHECKS]
     advisory_failed = [r.name for r in results if not r.ok and r.name in ADVISORY_CHECKS]
-    emf.run_line(namespace, results, latency_ms)
+    if namespace is not None:
+        emf.run_line(namespace, results, latency_ms)
     log("info" if ok and not advisory_failed else "warn", "synthetic-run", ok=ok, failedChecks=failed, advisoryFailed=advisory_failed)
+    observe(namespace, context, started, config_valid=config_valid)
     publish_observation(results, observed_at, context)
     return {"ok": ok, "failed": failed, "advisoryFailed": advisory_failed}

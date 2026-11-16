@@ -90,6 +90,12 @@ module "identity" {
 
   # R18H H05: the synthetic check (H00 §5.4).
   synthetic_check_function_name = "developercards-synthetic-check"
+  console_s2_observer = var.console_s2_observer_deployment == null ? null : {
+    function_name      = "developercards-operations-observer"
+    subnet_arns        = [for id in var.subnet_ids : "arn:aws:ec2:${var.region}:${var.account_id}:subnet/${id}"]
+    security_group_arn = "arn:aws:ec2:${var.region}:${var.account_id}:security-group/${aws_security_group.console_s2_observer[0].id}"
+    vpc_arn            = "arn:aws:ec2:${var.region}:${var.account_id}:vpc/${var.vpc_id}"
+  }
 }
 
 module "data" {
@@ -247,22 +253,42 @@ module "worker" {
       "developercards-prod-synthetic-check-failing",
       "developercards-prod-sqs-oldest-age",
       "developercards-prod-dlq-nonempty",
+      "developercards-prod-sync-http-errors",
+      "developercards-prod-publish-stalled",
+      "developercards-prod-operations-observer-unavailable",
     ])
-    API_BASE               = "https://api.developercards.app"
-    CDN_BASE               = "https://cdn.developercards.app"
-    CONSOLE_BASE           = "https://console.developercards.app"
-    REMOTE_CONFIG_URL      = "https://raw.githubusercontent.com/ChuanQiao1128/recallsmith-mobile-config/refs/heads/main/recallsmith-config.json"
-    COGNITO_CONSOLE_ISSUER = "https://cognito-idp.ap-southeast-2.amazonaws.com/ap-southeast-2_4Vf8uCXKt"
-    COGNITO_MOBILE_ISSUER  = "https://cognito-idp.ap-southeast-2.amazonaws.com/ap-southeast-2_04hd6iisb"
-    CHECK_TIMEOUT_SECONDS  = "10"
-    CHECK_USER_AGENT       = "DeveloperCards-Synthetic/1.0 (+https://developercards.app)"
-    METRICS_NAMESPACE      = "DeveloperCards"
-    LOG_LEVEL              = "info"
+    OPS_OBSERVER_FUNCTION_ARN = "arn:aws:lambda:${var.region}:${var.account_id}:function:developercards-operations-observer:prod"
+    API_BASE                  = "https://api.developercards.app"
+    CDN_BASE                  = "https://cdn.developercards.app"
+    CONSOLE_BASE              = "https://console.developercards.app"
+    REMOTE_CONFIG_URL         = "https://raw.githubusercontent.com/ChuanQiao1128/recallsmith-mobile-config/refs/heads/main/recallsmith-config.json"
+    COGNITO_CONSOLE_ISSUER    = "https://cognito-idp.ap-southeast-2.amazonaws.com/ap-southeast-2_4Vf8uCXKt"
+    COGNITO_MOBILE_ISSUER     = "https://cognito-idp.ap-southeast-2.amazonaws.com/ap-southeast-2_04hd6iisb"
+    CHECK_TIMEOUT_SECONDS     = "10"
+    CHECK_USER_AGENT          = "DeveloperCards-Synthetic/1.0 (+https://developercards.app)"
+    METRICS_NAMESPACE         = "DeveloperCards"
+    LOG_LEVEL                 = "info"
   }
+  console_s2_observer = var.console_s2_observer_deployment == null ? null : {
+    role_arn            = module.identity.console_s2_observer_role_arn
+    artifact_path       = var.console_s2_observer_deployment.artifact_path
+    artifact_sha256_b64 = var.console_s2_observer_deployment.artifact_sha256_b64
+    subnet_ids          = var.subnet_ids
+    security_group_ids  = [aws_security_group.console_s2_observer[0].id]
+  }
+  console_s2_observer_environment = var.console_s2_observer_deployment == null ? {} : {
+    PGHOST     = module.data.db_address, PGPORT = "5432"
+    PGDATABASE = var.console_s2_observer_deployment.database
+    PGUSER     = "developercards_operations_observer"
+    PGSSLMODE  = "verify-full", PGSSLROOTCERT = "Certificates/ap-southeast-2-bundle.pem"
+    API_ENV    = "production", METRICS_NAMESPACE = "DeveloperCards"
+  }
+
 }
 
 module "observability" {
-  source = "../../modules/observability"
+  source             = "../../modules/observability"
+  console_s2_enabled = var.console_s2_observer_deployment != null
 
   env          = "prod"
   account_id   = var.account_id
@@ -323,4 +349,43 @@ module "operators" {
   # Kept out of reach of the pipeline role developercards-gha-infra (RUNBOOK §15).
   audit_bucket_name = "developercards-cloudtrail-${var.account_id}"
   state_bucket_name = "recallsmith-tfstate-${var.account_id}"
+}
+
+
+# Optional owner rollout contract. Passwords never enter this input or Terraform state.
+variable "console_s2_observer_deployment" {
+  type    = object({ artifact_path = string, artifact_sha256_b64 = string, database = string })
+  default = null
+  validation {
+    condition = var.console_s2_observer_deployment == null ? true : (
+      can(regex("^[A-Za-z0-9+/]{43}=$", var.console_s2_observer_deployment.artifact_sha256_b64)) &&
+      can(regex("^[a-z][a-z0-9_]{1,62}$", var.console_s2_observer_deployment.database))
+    )
+    error_message = "Bind the reviewed artifact and actual production database before the owner rollout."
+  }
+}
+resource "aws_security_group" "console_s2_observer" {
+  count       = var.console_s2_observer_deployment == null ? 0 : 1
+  name        = "developercards-operations-observer"
+  description = "Read-only operations observer: RDS only"
+  vpc_id      = var.vpc_id
+}
+resource "aws_vpc_security_group_egress_rule" "console_s2_observer_database" {
+  for_each                     = var.console_s2_observer_deployment == null ? toset([]) : toset(var.rds_security_group_ids)
+  security_group_id            = aws_security_group.console_s2_observer[0].id
+  referenced_security_group_id = each.value
+  ip_protocol                  = "tcp"
+  from_port                    = 5432
+  to_port                      = 5432
+}
+resource "aws_vpc_security_group_ingress_rule" "console_s2_observer_database" {
+  for_each                     = var.console_s2_observer_deployment == null ? toset([]) : toset(var.rds_security_group_ids)
+  security_group_id            = each.value
+  referenced_security_group_id = aws_security_group.console_s2_observer[0].id
+  ip_protocol                  = "tcp"
+  from_port                    = 5432
+  to_port                      = 5432
+}
+output "console_s2_observer_deployment_contract" {
+  value = module.worker.console_s2_observer_deployment_contract
 }

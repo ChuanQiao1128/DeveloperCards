@@ -28,6 +28,7 @@
     <ProjectReference Include="..\..\Shared\RecallSmith.Lambda.Db\RecallSmith.Lambda.Db.csproj" />
     <ProjectReference Include="..\..\Vpc\RecallSmith.Lambda.Vpc.csproj" />
     <ProjectReference Include="..\..\Worker\RecallSmith.Lambda.Worker.csproj" />
+    <ProjectReference Include="..\..\OperationsObserver\RecallSmith.Lambda.OperationsObserver.csproj" />
   </ItemGroup>
 
   <ItemGroup>

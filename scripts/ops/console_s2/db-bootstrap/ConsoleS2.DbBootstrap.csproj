@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>ConsoleS2.DbBootstrap</AssemblyName><GenerateRuntimeConfigurationFiles>true</GenerateRuntimeConfigurationFiles>
+  </PropertyGroup>
+  <ItemGroup><Compile Remove="tests/**/*.cs" /></ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Amazon.Lambda.Core" Version="2.5.0" />
+    <PackageReference Include="Amazon.Lambda.Serialization.SystemTextJson" Version="2.4.0" />
+    <PackageReference Include="Npgsql" Version="10.0.0" />
+    <Compile Include="../../../../src_C/Shared/RecallSmith.Lambda.Db/PgConnectionSecurity.cs" Link="PgConnectionSecurity.cs" />
+    <None Include="../../../../src_C/Shared/RecallSmith.Lambda.Db/Certificates/ap-southeast-2-bundle.pem" Link="Certificates/ap-southeast-2-bundle.pem" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <EmbeddedResource Include="../../../../src_C/Vpc/Db/Migrations/*.sql" LogicalName="Migrations.%(Filename)%(Extension)" />
+    <EmbeddedResource Include="../../../../src_C/OperationsObserver/Backlog.sql" LogicalName="Backlog.sql" />
+  </ItemGroup>
+</Project>
