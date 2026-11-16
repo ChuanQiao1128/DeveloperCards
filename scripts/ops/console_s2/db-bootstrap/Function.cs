@@ -43,7 +43,7 @@ public sealed class Function
       var marker = "console-s2:" + run + ":" + manifest;
       await using var admin = await Open("postgres", "postgres", pw.GetString()!, timeout.Token);
       if (await Scalar(admin, "select current_user='postgres' and rolcreaterole and rolcreatedb from pg_roles where rolname=current_user", timeout.Token) is not true) return Rejected();
-      if (operation == "drop-isolated") return await Drop(admin, database, marker, timeout.Token);
+      if (operation == "drop-isolated") return await Drop(admin, database, marker, pw.GetString()!, timeout.Token);
       await using var production = await Open(productionDb, "postgres", pw.GetString()!, timeout.Token);
       var audit = await Audit(production, timeout.Token);
       if (operation == "audit") return new { schemaVersion = 1, ok = true, audit };
@@ -53,7 +53,9 @@ public sealed class Function
         if (!await OwnedDatabase(admin, database, marker, timeout.Token)) return Rejected();
         var user = fields.TryGetValue("userSub", out var sub) && sub.ValueKind == JsonValueKind.String ? sub.GetString() : null;
         if (operation == "lock-sync-fixture" && !Guid.TryParse(user, out _)) return Rejected();
+        return await WithRuntimeOwner(admin, database, marker, pw.GetString()!, async () => {
         await using var isolated = await Open(database, "postgres", pw.GetString()!, timeout.Token);
+        await Execute(isolated, $"set role {Quote(database + "_runtime")}", timeout.Token);
         var seconds = operation == "lock-sync-fixture" ? 45 : 10;
         if (context.RemainingTime.TotalSeconds < seconds + 5) return Rejected();
         await using var tx = await isolated.BeginTransactionAsync(timeout.Token);
@@ -68,6 +70,7 @@ public sealed class Function
         await sleep.ExecuteNonQueryAsync(timeout.Token);
         await tx.RollbackAsync(timeout.Token);
         return new { schemaVersion = 1, ok = true, isolatedLockReleased = true, seconds };
+        }, timeout.Token);
       }
       var password = fields.TryGetValue("newPassword", out var next) && next.ValueKind == JsonValueKind.String ? next.GetString() : null;
       if (password is null || !Regex.IsMatch(password, "^[A-Za-z0-9]{40,64}$")) return Rejected();
@@ -92,11 +95,15 @@ public sealed class Function
       if (operation == "configure-isolated-observer")
       {
         if (!await OwnedDatabase(admin, database, marker, timeout.Token)) return Rejected();
-        await using var isolated = await Open(database, "postgres", pw.GetString()!, timeout.Token);
-        if (!(await Audit(isolated, timeout.Token)).Safe) return Rejected();
-        return await ProvisionObserver(isolated, database, database + "_observer", password, marker, timeout.Token);
+        return await WithRuntimeOwner(admin, database, marker, pw.GetString()!, async () => {
+          await using var isolated = await Open(database, "postgres", pw.GetString()!, timeout.Token);
+          await Execute(isolated, $"set role {Quote(database + "_runtime")}", timeout.Token);
+          if (!(await Audit(isolated, timeout.Token)).Safe) return Rejected();
+          await Execute(isolated, "reset role", timeout.Token);
+          return await ProvisionObserver(isolated, database, database + "_observer", password, marker, timeout.Token, database + "_runtime");
+        }, timeout.Token);
       }
-      return await ProvisionIsolated(admin, production, database, password, marker, timeout.Token);
+      return await ProvisionIsolated(admin, production, database, password, marker, pw.GetString()!, timeout.Token);
     }
     catch (Exception) { return new { schemaVersion = 1, ok = false, reason = SafeError }; }
   }
@@ -181,6 +188,38 @@ public sealed class Function
     await Execute(c, "select set_config('s2.role_password',$1,false),set_config('s2.role_marker',$2,false)", ct, password, marker);
     await Execute(c, "do $$ begin execute format('create role %I login noinherit nosuperuser nocreatedb nocreaterole noreplication nobypassrls connection limit " + (role.EndsWith("_observer", StringComparison.Ordinal) ? "2" : "6") + " password %L', '" + role + "',current_setting('s2.role_password')); execute format('comment on role %I is %L','" + role + "',current_setting('s2.role_marker')); end $$", ct);
   }
+  // PG17 grants a non-superuser creator ADMIN only. Keep that grant and revoke only our temporary self-grant.
+  private static async Task<object> WithRuntimeOwner(NpgsqlConnection admin, string db, string marker, string masterPassword, Func<Task<object>> work, CancellationToken ct)
+  {
+    var role = db + "_runtime";
+    if (!await OwnedRole(admin, role, marker, ct)) throw new InvalidOperationException();
+    try
+    {
+      // The server may commit GRANT even when its response is lost or the request is cancelled.
+      await Execute(admin, $"grant {Quote(role)} to postgres with admin false, inherit false, set true", ct);
+      return await work();
+    }
+    finally
+    {
+      var cleanupFailed = false;
+      try
+      {
+        using var reset = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        await Execute(admin, "reset role", reset.Token);
+      }
+      catch { cleanupFailed = true; }
+      try
+      {
+        // A fresh admin session can revoke even if the original session is broken or still SET ROLE.
+        using var revoke = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        await using var cleaner = await Open("postgres", "postgres", masterPassword, revoke.Token);
+        if (!await OwnedRole(cleaner, role, marker, revoke.Token)) throw new InvalidOperationException();
+        await Execute(cleaner, $"revoke {Quote(role)} from postgres granted by postgres", revoke.Token);
+      }
+      catch { cleanupFailed = true; }
+      if (cleanupFailed) throw new InvalidOperationException();
+    }
+  }
   private static async Task<bool> RoleHasNoMembership(NpgsqlConnection c, string role, CancellationToken ct)
     => await Scalar(c, "select not rolsuper and not rolcreatedb and not rolcreaterole and not rolreplication and not rolbypassrls and not rolinherit and not exists(select 1 from pg_auth_members m where m.member=r.oid) from pg_roles r where rolname=$1", ct, role) is true;
   private static async Task<bool> ProtectedDatabaseAccessSafe(NpgsqlConnection conn, string role, bool observer, CancellationToken ct)
@@ -208,17 +247,20 @@ public sealed class Function
       """;
     return await Scalar(conn, sql, ct, role, observer) is true;
   }
-  private static async Task<object> ProvisionObserver(NpgsqlConnection production, string db, string role, string password, string marker, CancellationToken ct)
+  private static async Task<object> ProvisionObserver(NpgsqlConnection production, string db, string role, string password, string marker, CancellationToken ct, string? owner = null)
   {
     await using var tx = await production.BeginTransactionAsync(ct);
     await CreateRole(production, role, password, marker, ct);
-    await Execute(production, $"grant connect on database {Quote(db)} to {Quote(role)}; grant usage on schema public to {Quote(role)}; grant select on public.deck_publishes,public.publish_dispatch,public.publish_manifest_delivery to {Quote(role)}; alter role {Quote(role)} set default_transaction_read_only=on", ct);
+    if (owner is not null) await Execute(production, $"set local role {Quote(owner)}", ct);
+    await Execute(production, $"grant connect on database {Quote(db)} to {Quote(role)}; grant usage on schema public to {Quote(role)}; grant select on public.deck_publishes,public.publish_dispatch,public.publish_manifest_delivery to {Quote(role)}", ct);
+    if (owner is not null) await Execute(production, "reset role", ct);
+    await Execute(production, $"alter role {Quote(role)} set default_transaction_read_only=on", ct);
     if (!await RoleHasNoMembership(production, role, ct)) throw new InvalidOperationException();
     if (!await ProtectedDatabaseAccessSafe(production, role, true, ct)) throw new InvalidOperationException();
     await tx.CommitAsync(ct);
     return new { schemaVersion = 1, ok = true, role, protectedDatabaseAccessSafe = true, connectionLimit = 2 };
   }
-  private static async Task<object> ProvisionIsolated(NpgsqlConnection admin, NpgsqlConnection production, string db, string password, string marker, CancellationToken ct)
+  private static async Task<object> ProvisionIsolated(NpgsqlConnection admin, NpgsqlConnection production, string db, string password, string marker, string masterPassword, CancellationToken ct)
   {
     var role = db + "_runtime";
     await using (var tx = await admin.BeginTransactionAsync(ct))
@@ -228,21 +270,26 @@ public sealed class Function
       await tx.CommitAsync(ct);
     }
     if (!await ProtectedDatabaseAccessSafe(production, role, false, ct)) throw new InvalidOperationException();
-    var exists = await Scalar(admin, "select exists(select 1 from pg_database where datname=$1)", ct, db) is true;
-    if (exists)
+    if (await Scalar(admin, "select exists(select 1 from pg_database where datname=$1)", ct, db) is true
+        && !await OwnedDatabase(admin, db, marker, ct)) throw new InvalidOperationException();
+    return await WithRuntimeOwner(admin, db, marker, masterPassword, async () =>
     {
-      if (!await OwnedDatabase(admin, db, marker, ct)) throw new InvalidOperationException();
-    }
-    else
-    {
-      // CREATE DATABASE is nontransactional. A matching role/database owner is recorded before the call.
-      await Execute(admin, $"create database {Quote(db)} owner {Quote(role)}", ct);
-
-    }
-    await Execute(admin, "select set_config('s2.db_marker',$1,false)", ct, marker);
-    await Execute(admin, "do $$ begin execute format('comment on database %I is %L','" + db + "',current_setting('s2.db_marker')); end $$", ct);
-    await Execute(admin, $"revoke all on database {Quote(db)} from public; grant connect on database {Quote(db)} to {Quote(role)}", ct);
-    return new { schemaVersion = 1, ok = true, database = db, role, productionPrivilegesAbsent = true, migrationsApplied = false };
+      var exists = await Scalar(admin, "select exists(select 1 from pg_database where datname=$1)", ct, db) is true;
+      if (exists)
+      {
+        if (!await OwnedDatabase(admin, db, marker, ct)) throw new InvalidOperationException();
+      }
+      else
+      {
+        // Nontransactional create; ownership/marker reconciliation accepts a lost response before COMMENT.
+        await Execute(admin, $"create database {Quote(db)} owner {Quote(role)}", ct);
+      }
+      await Execute(admin, $"set role {Quote(role)}", ct);
+      await Execute(admin, "select set_config('s2.db_marker',$1,false)", ct, marker);
+      await Execute(admin, "do $$ begin execute format('comment on database %I is %L','" + db + "',current_setting('s2.db_marker')); end $$", ct);
+      await Execute(admin, $"revoke all on database {Quote(db)} from public; grant connect on database {Quote(db)} to {Quote(role)},postgres", ct);
+      return new { schemaVersion = 1, ok = true, database = db, role, productionPrivilegesAbsent = true, migrationsApplied = false };
+    }, ct);
   }
   private static async Task<bool> OwnedDatabase(NpgsqlConnection admin, string db, string marker, CancellationToken ct)
     => await OwnedRole(admin, db + "_runtime", marker, ct) && await Scalar(admin,
@@ -286,7 +333,7 @@ public sealed class Function
     }
     finally { await Execute(conn, "select pg_advisory_unlock(77889911)", ct); }
   }
-  private static async Task<object> Drop(NpgsqlConnection admin, string db, string marker, CancellationToken ct)
+  private static async Task<object> Drop(NpgsqlConnection admin, string db, string marker, string masterPassword, CancellationToken ct)
   {
     var role = db + "_runtime";
     var observer = db + "_observer";
@@ -300,7 +347,11 @@ public sealed class Function
     if (databaseExists)
     {
       if (!roleExists || !await OwnedDatabase(admin, db, marker, ct)) throw new InvalidOperationException();
-      await Execute(admin, $"drop database {Quote(db)} with(force)", ct);
+      await WithRuntimeOwner(admin, db, marker, masterPassword, async () => {
+        await Execute(admin, $"set role {Quote(role)}", ct);
+        await Execute(admin, $"drop database {Quote(db)} with(force)", ct);
+        return new { dropped = true };
+      }, ct);
     }
     if (observerExists) await Execute(admin, $"drop role {Quote(observer)}", ct);
     if (roleExists) await Execute(admin, $"drop role {Quote(role)}", ct);
