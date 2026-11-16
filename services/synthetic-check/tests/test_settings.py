@@ -27,7 +27,8 @@ CONTRACT = {
 OPS_CONTRACT = {
     "OPS_SNAPSHOT_BUCKET": "core-vpc-premium",
     "OPS_SNAPSHOT_KEY": "ops/console-monitor/v1/current.json",
-    "OPS_ALARM_NAMES": '["developercards-prod-core-vpc-errors","developercards-prod-worker-errors","developercards-prod-synthetic-check-failing","developercards-prod-sqs-oldest-age","developercards-prod-dlq-nonempty"]',
+    "OPS_ALARM_NAMES": '["developercards-prod-core-vpc-errors","developercards-prod-worker-errors","developercards-prod-synthetic-check-failing","developercards-prod-sqs-oldest-age","developercards-prod-dlq-nonempty","developercards-prod-sync-http-errors","developercards-prod-publish-stalled","developercards-prod-operations-observer-unavailable"]',
+    "OPS_OBSERVER_FUNCTION_ARN": "arn:aws:lambda:ap-southeast-2:622994489535:function:developercards-operations-observer:prod",
 }
 
 
