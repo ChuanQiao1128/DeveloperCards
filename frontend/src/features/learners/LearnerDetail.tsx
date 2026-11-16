@@ -1,14 +1,14 @@
 import { useId, useState, type KeyboardEvent } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ConsoleReadError } from '../api/consoleOperations';
-import { useConsoleIdentity } from '../hooks/useConsoleIdentity';
-import { useLearner } from '../hooks/useConsoleOperations';
-import { ConsolePage, Fields } from '../components/console/OperationsViews';
-import { CopyUserId, LearnerLoading, LearnerReadError, MembershipBadge } from '../components/console/LearnerViews';
-import { downloadDecision, entitlementSource, learnerNumber as number, learnerTime as time } from '../lib/learnerView';
-import { HEADING, LINK, PANEL } from '../lib/consoleOperationsView';
-import { Button } from '../components/ui/Button';
-import { Callout } from '../components/ui/Callout';
+import { ConsoleReadError } from '../../api/consoleOperations';
+import { useConsoleIdentity } from '../../hooks/useConsoleIdentity';
+import { useLearner } from '../../hooks/useConsoleOperations';
+import { ConsolePage, Fields } from '../../components/console/OperationsViews';
+import { CopyUserId, LearnerLoading, LearnerReadError, MembershipBadge } from '../../components/console/LearnerViews';
+import { downloadDecision, entitlementSource, learnerNumber as number, learnerTime as time } from '../../lib/learnerView';
+import { HEADING, LINK, PANEL } from '../../lib/consoleOperationsView';
+import { Button } from '../../components/ui/Button';
+import { Callout } from '../../components/ui/Callout';
 
 const TABS = ['Account', 'Membership', 'Learning'] as const;
 

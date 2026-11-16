@@ -1,6 +1,6 @@
 import { useState, type Dispatch, type SetStateAction } from 'react';
 import { Outlet } from 'react-router-dom';
-import { useConsoleIdentity } from '../hooks/useConsoleIdentity';
+import { useConsoleIdentity } from '../../hooks/useConsoleIdentity';
 
 type Directory = { draft: string; query: string; cursors: (string | undefined)[] };
 export type DirectoryContext = { directory: Directory; setDirectory: Dispatch<SetStateAction<Directory>> };

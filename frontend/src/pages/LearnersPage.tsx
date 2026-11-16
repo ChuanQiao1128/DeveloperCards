@@ -6,10 +6,10 @@ import { LearnerLoading, LearnerReadError } from '../components/console/LearnerV
 import { learnerTime as time } from '../lib/learnerView';
 import { INPUT, LINK } from '../lib/consoleOperationsView';
 import { Button } from '../components/ui/Button';
-import { LearnerWorkspace, type DirectoryContext } from './LearnerWorkspace';
+import { LearnerWorkspace, type DirectoryContext } from '../features/learners/LearnerWorkspace';
 import '../styles/learners.css';
 
-const LearnerDetailPage = lazy(() => import('./LearnerDetailPage').then(module => ({ default: module.LearnerDetailPage })));
+const LearnerDetailPage = lazy(() => import('../features/learners/LearnerDetail').then(module => ({ default: module.LearnerDetailPage })));
 
 export function LearnersPage() {
   return <Routes><Route element={<LearnerWorkspace />}><Route index element={<LearnerDirectory />} /><Route path=":sub" element={<LearnerDetailPage />} /></Route></Routes>;

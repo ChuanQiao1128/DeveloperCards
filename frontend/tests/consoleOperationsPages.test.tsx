@@ -203,9 +203,9 @@ it('clears saved directory state after leaving and re-entering the learner works
   mount();
   await screen.findByText('learner@example.invalid');
   fireEvent.change(screen.getByLabelText('Search users'), { target: { value: 'private-search@example.invalid' } });
-  fireEvent.click(screen.getByRole('link', { name: 'Operations', exact: true }));
+  fireEvent.click(screen.getByRole('link', { name: 'Operations' }));
   await screen.findByRole('heading', { name: 'Synthetic checks', level: 2 });
-  fireEvent.click(screen.getByRole('link', { name: 'Learners', exact: true }));
+  fireEvent.click(screen.getByRole('link', { name: 'Learners' }));
   await screen.findByText('learner@example.invalid');
   expect((screen.getByLabelText('Search users') as HTMLInputElement).value).toBe('');
   expect(screen.queryByDisplayValue('private-search@example.invalid')).toBeNull();
