@@ -333,9 +333,9 @@ def _role_policy(m,sg,kind,*,bootstrap=False):
     if kind!="collector":
         statements += [
             {"Sid":"VpcDescribe","Effect":"Allow","Action":["ec2:DescribeNetworkInterfaces","ec2:DescribeSubnets"],"Resource":["*"],"Condition":{"StringEquals":{"aws:RequestedRegion":REGION}}},
-            # EC2 authorizes the new ENI, subnet and SG separately; condition keys differ per resource.
-            {"Sid":"CreateInExactNetwork","Effect":"Allow","Action":["ec2:CreateNetworkInterface"],"Resource":[_arn("ec2","network-interface/*"),_arn("ec2","security-group/"+sg),*[_arn("ec2","subnet/"+x) for x in m["cloud"]["subnetIds"]]]},
-            {"Sid":"ManageVpcInterfaces","Effect":"Allow","Action":["ec2:DeleteNetworkInterface","ec2:AssignPrivateIpAddresses","ec2:UnassignPrivateIpAddresses"],"Resource":[_arn("ec2","network-interface/*")],"Condition":{"ArnEquals":{"ec2:Vpc":_arn("ec2","vpc/"+m["cloud"]["vpcId"])}}},
+            # Lambda requires ENI actions on all resources; exact network selection stays in VpcConfig.
+            {"Sid":"CreateVpcInterfaces","Effect":"Allow","Action":["ec2:CreateNetworkInterface"],"Resource":["*"],"Condition":{"StringEquals":{"aws:RequestedRegion":REGION}}},
+            {"Sid":"ManageVpcInterfaces","Effect":"Allow","Action":["ec2:DeleteNetworkInterface","ec2:AssignPrivateIpAddresses","ec2:UnassignPrivateIpAddresses"],"Resource":["*"],"Condition":{"StringEquals":{"aws:RequestedRegion":REGION}}},
             {"Sid":"NoEniCallsFromHandler","Effect":"Deny","Action":["ec2:CreateNetworkInterface","ec2:DeleteNetworkInterface","ec2:DescribeNetworkInterfaces","ec2:DescribeSubnets","ec2:AssignPrivateIpAddresses","ec2:UnassignPrivateIpAddresses"],"Resource":["*"],"Condition":{"ArnEquals":{"lambda:SourceFunctionArn":_arn("lambda","function:"+name+"-"+kind)}}},
         ]
     if not bootstrap and kind in ("core","worker"):
@@ -390,10 +390,22 @@ def _logs(c,kind):
         after=lambda _: _client(c,"logs").put_retention_policy(logGroupName=name,retentionInDays=3))
 
 
-def _wait_function(c,name):
+def _wait_function(c,name,kind):
     for attempt in range(4):
         raw=_client(c,"lambda").get_function_configuration(FunctionName=name)
-        if raw.get("State")=="Active" and raw.get("LastUpdateStatus","Successful")=="Successful": return
+        if raw.get("State")=="Active" and raw.get("LastUpdateStatus","Successful")=="Successful":
+            network=raw.get("VpcConfig",{})
+            require(isinstance(network,dict),"FUNCTION_NETWORK_MISMATCH")
+            subnets=network.get("SubnetIds",[]);groups=network.get("SecurityGroupIds",[])
+            if kind=="collector":
+                require(not network.get("VpcId") and subnets==[] and groups==[],"FUNCTION_NETWORK_MISMATCH")
+            else:
+                expected=c["manifest"]["cloud"]
+                require(network.get("VpcId")==expected["vpcId"] and
+                        isinstance(subnets,list) and all(isinstance(x,str) for x in subnets) and
+                        sorted(subnets)==sorted(set(expected["subnetIds"])) and
+                        groups==[_identity(c,"security-group")],"FUNCTION_NETWORK_MISMATCH")
+            return
         require(raw.get("State")!="Failed" and raw.get("LastUpdateStatus")!="Failed","FUNCTION_DEPLOYMENT_FAILED")
         if attempt<3: time.sleep(2)
     raise Blocked("FUNCTION_NOT_READY_WITHIN_FOUR_POLLS")
@@ -419,14 +431,14 @@ def _function(c,kind,artifact,environment,*,bootstrap=False):
         return result["FunctionName"]
     existing=_record(c,"function-"+kind)
     _ensure(c,"function-"+kind,"function",name,create)
-    _wait_function(c,name)
+    _wait_function(c,name,kind)
     if existing and not bootstrap:
         result=_client(c,"lambda").update_function_code(FunctionName=name,ZipFile=payload,Publish=False)
-        _wait_function(c,name)
+        _wait_function(c,name,kind)
         # Never persist environment or raw result. This call contains credentials
         # only in owner memory; boto3 debug logging must remain disabled.
         _client(c,"lambda").update_function_configuration(FunctionName=name,Handler=handler,Runtime=runtime,Timeout=timeout,MemorySize=memory,Environment={"Variables":environment})
-        _wait_function(c,name)
+        _wait_function(c,name,kind)
         result=_publish_version(c,kind,payload,handler)
         _mark(c,"function-"+kind,version=result["Version"],codeSha256=result["CodeSha256"])
     else:

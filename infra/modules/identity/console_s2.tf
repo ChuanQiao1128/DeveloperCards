@@ -46,15 +46,16 @@ resource "aws_iam_role_policy" "console_s2_observer" {
         Condition = { StringEquals = { "aws:RequestedRegion" = var.region } }
       },
       {
-        # EC2 authorizes the new ENI, subnet and SG separately; scope each resource ARN.
-        Sid      = "CreateInExactNetwork", Effect = "Allow", Action = ["ec2:CreateNetworkInterface"]
-        Resource = concat(["arn:aws:ec2:${var.region}:${var.account_id}:network-interface/*", var.console_s2_observer.security_group_arn], var.console_s2_observer.subnet_arns)
+        # Lambda requires ENI actions on all resources; exact network selection stays in VpcConfig.
+        Sid       = "CreateVpcInterfaces", Effect = "Allow", Action = ["ec2:CreateNetworkInterface"]
+        Resource  = "*"
+        Condition = { StringEquals = { "aws:RequestedRegion" = var.region } }
       },
       {
         Sid       = "ManageVpcInterfaces", Effect = "Allow"
         Action    = ["ec2:DeleteNetworkInterface", "ec2:AssignPrivateIpAddresses", "ec2:UnassignPrivateIpAddresses"]
-        Resource  = "arn:aws:ec2:${var.region}:${var.account_id}:network-interface/*"
-        Condition = { ArnEquals = { "ec2:Vpc" = var.console_s2_observer.vpc_arn } }
+        Resource  = "*"
+        Condition = { StringEquals = { "aws:RequestedRegion" = var.region } }
       },
       {
         # Deny ENI calls from function code; Lambda service provisioning remains allowed.

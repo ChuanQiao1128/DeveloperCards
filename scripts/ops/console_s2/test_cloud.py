@@ -2,7 +2,6 @@
 from copy import deepcopy
 from datetime import datetime,timezone,timedelta
 import base64
-from fnmatch import fnmatchcase
 import hashlib
 import json
 import zipfile
@@ -97,7 +96,9 @@ class Transport:
                 if name not in functions:self.missing()
                 return functions[name]
             if o=="create_function":
-                functions[name]={"FunctionName":name,"FunctionArn":cloud._arn("lambda","function:"+name),"Version":"1","CodeSha256":base64.b64encode(hashlib.sha256(k["Code"]["ZipFile"]).digest()).decode(),"Handler":k["Handler"],"State":"Active","LastUpdateStatus":"Successful","Tags":k["Tags"]};return functions[name]
+                d.setdefault("functionNetworks",{})[name]=deepcopy(k.get("VpcConfig"))
+                network={**deepcopy(k["VpcConfig"]),"VpcId":self.ledger.manifest["cloud"]["vpcId"]} if "VpcConfig" in k else {"VpcId":"","SubnetIds":[],"SecurityGroupIds":[]}
+                functions[name]={"FunctionName":name,"FunctionArn":cloud._arn("lambda","function:"+name),"Version":"1","CodeSha256":base64.b64encode(hashlib.sha256(k["Code"]["ZipFile"]).digest()).decode(),"Handler":k["Handler"],"State":"Active","LastUpdateStatus":"Successful","Tags":k["Tags"],"VpcConfig":network};return functions[name]
             if o=="list_tags":
                 arn=k["Resource"]
                 if ":event-source-mapping:" in arn:return {"Tags":next(x["Tags"] for x in mappings.values() if x["EventSourceMappingArn"]==arn)}
@@ -202,33 +203,26 @@ class Transport:
 
 
 class EniPolicyTests(unittest.TestCase):
-    """Offline SAR resource-authorization model, not an AWS IAM/runtime simulation."""
-    def test_create_requires_exact_subnet_and_every_security_group(self):
+    """Lambda-documented policy shape; no claim of IAM/runtime validation."""
+    def test_only_six_eni_actions_region_scoped_and_handler_denied(self):
         m=manifest()
-        m["cloud"]={"vpcId":"vpc-12345678","subnetIds":["subnet-12345678","subnet-87654321"]}
-        arn=lambda resource:cloud._arn("ec2",resource)
+        m["cloud"]={"vpcId":"vpc-12345678","subnetIds":["subnet-12345678"]}
+        expected={"ec2:CreateNetworkInterface","ec2:DescribeNetworkInterfaces","ec2:DescribeSubnets","ec2:DeleteNetworkInterface","ec2:AssignPrivateIpAddresses","ec2:UnassignPrivateIpAddresses"}
         for kind,bootstrap in (("core",True),("core",False),("worker",False),("observer",False)):
             with self.subTest(kind=kind,bootstrap=bootstrap):
                 policy=cloud._role_policy(m,"sg-owned",kind,bootstrap=bootstrap)
-                statements=[s for s in policy["Statement"] if "ec2:CreateNetworkInterface" in s["Action"]]
-                def permitted(subnet="subnet-12345678",groups=("sg-owned",),handler=False):
-                    # SAR: CreateNetworkInterface checks ENI, subnet, and each selected SG;
-                    # neither ec2:Subnet nor ec2:SecurityGroup is a supported create key.
-                    context={"lambda:SourceFunctionArn":cloud._arn("lambda","function:"+cloud._name(m)+"-"+kind)} if handler else {}
-                    resources=[arn("network-interface/eni-new"),arn("subnet/"+subnet),*[arn("security-group/"+g) for g in groups]]
-                    for resource in resources:
-                        matching=[s for s in statements if any(fnmatchcase(resource,r) for r in s["Resource"]) and all(context.get(key) in (value if isinstance(value,list) else [value]) for key,value in s.get("Condition",{}).get("ArnEquals",{}).items())]
-                        if any(s["Effect"]=="Deny" for s in matching) or not any(s["Effect"]=="Allow" for s in matching):return False
-                    return True
-                self.assertTrue(permitted())
-                self.assertTrue(permitted(subnet="subnet-87654321"))
-                self.assertFalse(permitted(subnet="subnet-other"))
-                self.assertFalse(permitted(groups=("sg-other",)))
-                self.assertFalse(permitted(groups=("sg-owned","sg-other")))
-                self.assertFalse(permitted(handler=True))
-                create=next(s for s in statements if s["Effect"]=="Allow")
-                self.assertNotIn("Condition",create)
-                self.assertNotIn("*",create["Resource"])
+                allows=[s for s in policy["Statement"] if s["Effect"]=="Allow" and any(a.startswith("ec2:") for a in s["Action"])]
+                self.assertEqual({a for s in allows for a in s["Action"]},expected)
+                for statement in allows:
+                    self.assertEqual(statement["Resource"],["*"])
+                    self.assertEqual(statement["Condition"],{"StringEquals":{"aws:RequestedRegion":cloud.REGION}})
+                deny=next(s for s in policy["Statement"] if s["Sid"]=="NoEniCallsFromHandler")
+                self.assertEqual(set(deny["Action"]),expected)
+                self.assertEqual(deny["Effect"],"Deny")
+                self.assertEqual(deny["Resource"],["*"])
+                self.assertEqual(deny["Condition"],{"ArnEquals":{"lambda:SourceFunctionArn":cloud._arn("lambda","function:"+cloud._name(m)+"-"+kind)}})
+        collector=cloud._role_policy(m,"sg-owned","collector")
+        self.assertFalse(any(a.startswith("ec2:") for s in collector["Statement"] for a in s["Action"]))
 
 
 @unittest.skipIf(botocore is None,"Run with pinned synthetic-check runtime for offline SDK model checks")
@@ -275,6 +269,10 @@ class CloudTests(unittest.TestCase):
         self.ready()
         result=cloud.runtime(None,self.ledger,self.m,lambda _: {"PGPASSWORD":"Z"*48})
         self.assertEqual(result["status"],"RUNTIME_PROVISIONED_NOT_ACCEPTED")
+        with self.ledger.state() as state:sg=state["intents"]["security-group"]["id"]
+        for kind in ("core","worker","observer"):
+            self.assertEqual(self.transport.data["functionNetworks"][cloud._name(self.m)+"-"+kind],{"SubnetIds":self.m["cloud"]["subnetIds"],"SecurityGroupIds":[sg]})
+        self.assertIsNone(self.transport.data["functionNetworks"][cloud._name(self.m)+"-collector"])
         saved=self.ledger.path.read_text();self.assertNotIn("Z"*48,saved);self.assertNotIn("PGPASSWORD",saved)
         with self.ledger.state() as state:
             self.assertLessEqual(state["counts"]["sdkControl"],240)
@@ -285,6 +283,48 @@ class CloudTests(unittest.TestCase):
         with self.ledger.state() as state:
             self.assertLessEqual(state["counts"]["cleanupSDK"],250)
             print(json.dumps({"scope":"offline modeled SDK sends only","provisionCalls":provision_calls,"cleanupCalls":state["counts"]["cleanupSDK"]}))
+
+    def test_bootstrap_network_drift_blocks_before_helper_binding(self):
+        variants=[("VpcId","vpc-other"),("SubnetIds",["subnet-other"]),("SubnetIds",["subnet-12345678","subnet-other"]),("SubnetIds",["subnet-12345678","subnet-12345678"]),("SecurityGroupIds",["sg-other"]),("SecurityGroupIds",["sg-other","sg-extra"]),("ExtraSecurityGroup","sg-extra"),("DuplicateSecurityGroup",None),("VpcConfig",{})]
+        for field,value in variants:
+            with self.subTest(field=field,value=value):
+                fixture=CloudTests();fixture.setUp()
+                try:
+                    original=fixture.transport.reply
+                    def reply(service,operation,args):
+                        result=original(service,operation,args)
+                        if service=="lambda" and operation=="get_function_configuration":
+                            result=deepcopy(result)
+                            if field=="VpcConfig":result[field]=value
+                            elif field=="ExtraSecurityGroup":result["VpcConfig"]["SecurityGroupIds"].append(value)
+                            elif field=="DuplicateSecurityGroup":result["VpcConfig"]["SecurityGroupIds"]*=2
+                            else:result["VpcConfig"][field]=value
+                        return result
+                    with patch.object(fixture.transport,"reply",side_effect=reply):
+                        with self.assertRaisesRegex(Blocked,"FUNCTION_NETWORK_MISMATCH"):
+                            cloud.foundation(None,fixture.ledger,fixture.m,lambda *_:True)
+                    self.assertFalse(any(operation in ("invoke","publish_version","put_function_concurrency") for _,operation in fixture.transport.calls))
+                    with fixture.ledger.state() as state:
+                        self.assertNotIn("bootstrapVersion",state["intents"]["function-core"])
+                finally:fixture.doCleanups()
+
+    def test_network_readback_checks_every_kind_and_rejects_vpc_collector(self):
+        self.ready();cloud.runtime(None,self.ledger,self.m,lambda _:{"PGPASSWORD":"Z"*48})
+        c=cloud.context(None,self.ledger,self.m)
+        for kind in cloud.KINDS:
+            name=cloud._name(self.m)+"-"+kind
+            raw=self.transport.data["functions"][name]
+            original=deepcopy(raw["VpcConfig"])
+            raw["VpcConfig"]["VpcId"]="vpc-other"
+            with self.assertRaisesRegex(Blocked,"FUNCTION_NETWORK_MISMATCH"):cloud._wait_function(c,name,kind)
+            raw["VpcConfig"]=original
+        collector=cloud._name(self.m)+"-collector"
+        raw=self.transport.data["functions"][collector]
+        for network in ({"SubnetIds":["subnet-12345678"]},{"SecurityGroupIds":["sg-owned"]}):
+            raw["VpcConfig"]=network
+            with self.assertRaisesRegex(Blocked,"FUNCTION_NETWORK_MISMATCH"):cloud._wait_function(c,collector,"collector")
+        raw.pop("VpcConfig")
+        cloud._wait_function(c,collector,"collector")
 
     def db_cleanup(self,binding,client):
         response=client.invoke(FunctionName=binding["functionName"],Qualifier=binding["numericVersion"],InvocationType="RequestResponse",Payload=b'{}')
@@ -465,6 +505,12 @@ class CloudTests(unittest.TestCase):
         self.sleep.assert_not_called()
         cloud._role(c,"core","sg-owned",bootstrap=False)
         self.sleep.assert_called_once_with(15)
+        for field,value in (("subnetIds",["subnet-other"]),("vpcId","vpc-other")):
+            changed=deepcopy(self.m);changed["cloud"][field]=value
+            before=len(self.transport.calls)
+            with self.assertRaisesRegex(Blocked,"DRIVER_LEDGER_MANIFEST_MISMATCH"):
+                cloud.context(None,self.ledger,changed)
+            self.assertEqual(len(self.transport.calls),before)
 
 
 if __name__=="__main__":unittest.main()
