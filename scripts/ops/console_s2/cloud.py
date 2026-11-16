@@ -333,7 +333,8 @@ def _role_policy(m,sg,kind,*,bootstrap=False):
     if kind!="collector":
         statements += [
             {"Sid":"VpcDescribe","Effect":"Allow","Action":["ec2:DescribeNetworkInterfaces","ec2:DescribeSubnets"],"Resource":["*"],"Condition":{"StringEquals":{"aws:RequestedRegion":REGION}}},
-            {"Sid":"CreateInExactSubnets","Effect":"Allow","Action":["ec2:CreateNetworkInterface"],"Resource":["*"],"Condition":{"ArnEquals":{"ec2:Subnet":[_arn("ec2","subnet/"+x) for x in m["cloud"]["subnetIds"]],"ec2:SecurityGroup":_arn("ec2","security-group/"+sg)}}},
+            # EC2 authorizes the new ENI, subnet and SG separately; condition keys differ per resource.
+            {"Sid":"CreateInExactNetwork","Effect":"Allow","Action":["ec2:CreateNetworkInterface"],"Resource":[_arn("ec2","network-interface/*"),_arn("ec2","security-group/"+sg),*[_arn("ec2","subnet/"+x) for x in m["cloud"]["subnetIds"]]]},
             {"Sid":"ManageVpcInterfaces","Effect":"Allow","Action":["ec2:DeleteNetworkInterface","ec2:AssignPrivateIpAddresses","ec2:UnassignPrivateIpAddresses"],"Resource":[_arn("ec2","network-interface/*")],"Condition":{"ArnEquals":{"ec2:Vpc":_arn("ec2","vpc/"+m["cloud"]["vpcId"])}}},
             {"Sid":"NoEniCallsFromHandler","Effect":"Deny","Action":["ec2:CreateNetworkInterface","ec2:DeleteNetworkInterface","ec2:DescribeNetworkInterfaces","ec2:DescribeSubnets","ec2:AssignPrivateIpAddresses","ec2:UnassignPrivateIpAddresses"],"Resource":["*"],"Condition":{"ArnEquals":{"lambda:SourceFunctionArn":_arn("lambda","function:"+name+"-"+kind)}}},
         ]
@@ -363,14 +364,22 @@ def _role(c,kind,sg,*,bootstrap=False):
     role=_ensure(c,"role-"+kind,"role",name,lambda:_client(c,"iam").create_role(RoleName=name,AssumeRolePolicyDocument=json.dumps(trust),Tags=_tag_list(m))["Role"]["RoleName"])
     document=_role_policy(m,sg,kind,bootstrap=bootstrap)
     key="policy-"+kind
+    policy_written=False
+    def put_policy():
+        nonlocal policy_written
+        policy_written=True
+        return _fixed(_client(c,"iam").put_role_policy(RoleName=role,PolicyName="isolated-only",PolicyDocument=json.dumps(document)),"isolated-only")
     if _record(c,key):
         _parent(c,"role-"+kind)
         # An owned bootstrap role is upgraded only after runtime gate; no broad
         # policy is ever attached to the bootstrap function before that gate.
         if not bootstrap:
-            _client(c,"iam").put_role_policy(RoleName=role,PolicyName="isolated-only",PolicyDocument=json.dumps(document))
+            put_policy()
     else:
-        _ensure(c,key,"policy",role+":isolated-only",lambda:_fixed(_client(c,"iam").put_role_policy(RoleName=role,PolicyName="isolated-only",PolicyDocument=json.dumps(document)),"isolated-only"),parent="role-"+kind,local_name="isolated-only")
+        _ensure(c,key,"policy",role+":isolated-only",put_policy,parent="role-"+kind,local_name="isolated-only")
+    if policy_written:
+        # IAM role/trust and inline policy propagation precede the single Lambda create attempt.
+        time.sleep(15)
     return role
 
 

@@ -2,6 +2,7 @@
 from copy import deepcopy
 from datetime import datetime,timezone,timedelta
 import base64
+from fnmatch import fnmatchcase
 import hashlib
 import json
 import zipfile
@@ -200,6 +201,36 @@ class Transport:
         raise AssertionError("Unhandled local fixture operation "+s+"."+o)
 
 
+class EniPolicyTests(unittest.TestCase):
+    """Offline SAR resource-authorization model, not an AWS IAM/runtime simulation."""
+    def test_create_requires_exact_subnet_and_every_security_group(self):
+        m=manifest()
+        m["cloud"]={"vpcId":"vpc-12345678","subnetIds":["subnet-12345678","subnet-87654321"]}
+        arn=lambda resource:cloud._arn("ec2",resource)
+        for kind,bootstrap in (("core",True),("core",False),("worker",False),("observer",False)):
+            with self.subTest(kind=kind,bootstrap=bootstrap):
+                policy=cloud._role_policy(m,"sg-owned",kind,bootstrap=bootstrap)
+                statements=[s for s in policy["Statement"] if "ec2:CreateNetworkInterface" in s["Action"]]
+                def permitted(subnet="subnet-12345678",groups=("sg-owned",),handler=False):
+                    # SAR: CreateNetworkInterface checks ENI, subnet, and each selected SG;
+                    # neither ec2:Subnet nor ec2:SecurityGroup is a supported create key.
+                    context={"lambda:SourceFunctionArn":cloud._arn("lambda","function:"+cloud._name(m)+"-"+kind)} if handler else {}
+                    resources=[arn("network-interface/eni-new"),arn("subnet/"+subnet),*[arn("security-group/"+g) for g in groups]]
+                    for resource in resources:
+                        matching=[s for s in statements if any(fnmatchcase(resource,r) for r in s["Resource"]) and all(context.get(key) in (value if isinstance(value,list) else [value]) for key,value in s.get("Condition",{}).get("ArnEquals",{}).items())]
+                        if any(s["Effect"]=="Deny" for s in matching) or not any(s["Effect"]=="Allow" for s in matching):return False
+                    return True
+                self.assertTrue(permitted())
+                self.assertTrue(permitted(subnet="subnet-87654321"))
+                self.assertFalse(permitted(subnet="subnet-other"))
+                self.assertFalse(permitted(groups=("sg-other",)))
+                self.assertFalse(permitted(groups=("sg-owned","sg-other")))
+                self.assertFalse(permitted(handler=True))
+                create=next(s for s in statements if s["Effect"]=="Allow")
+                self.assertNotIn("Condition",create)
+                self.assertNotIn("*",create["Resource"])
+
+
 @unittest.skipIf(botocore is None,"Run with pinned synthetic-check runtime for offline SDK model checks")
 class CloudTests(unittest.TestCase):
     def setUp(self):
@@ -219,6 +250,7 @@ class CloudTests(unittest.TestCase):
         self.ledger=Ledger(directory/"ledger.json",self.m,now=lambda:datetime(2026,11,16,1,tzinfo=timezone.utc),phase="foundation")
         self.transport=Transport(self.ledger)
         self.patch=patch.object(cloud,"sdk_client",self.transport.factory);self.patch.start();self.addCleanup(self.patch.stop)
+        self.sleep_patch=patch.object(cloud.time,"sleep");self.sleep=self.sleep_patch.start();self.addCleanup(self.sleep_patch.stop)
 
     def ready(self):
         result=cloud.foundation(None,self.ledger,self.m,lambda *_:True)
@@ -424,6 +456,15 @@ class CloudTests(unittest.TestCase):
         self.assertFalse(any(x.startswith(("s3:","sqs:","lambda:","secretsmanager:","sns:")) for x in allows))
         bootstrap=cloud._role_policy(self.m,"sg-owned","core",bootstrap=True)
         self.assertFalse(any(a.startswith(("s3:","sqs:")) for s in bootstrap["Statement"] if s["Effect"]=="Allow" for a in s["Action"]))
+        self.ledger.register_cleanup()
+        c=cloud.context(None,self.ledger,self.m)
+        cloud._role(c,"core","sg-owned",bootstrap=True)
+        self.sleep.assert_called_once_with(15)
+        self.sleep.reset_mock()
+        cloud._role(c,"core","sg-owned",bootstrap=True)
+        self.sleep.assert_not_called()
+        cloud._role(c,"core","sg-owned",bootstrap=False)
+        self.sleep.assert_called_once_with(15)
 
 
 if __name__=="__main__":unittest.main()
