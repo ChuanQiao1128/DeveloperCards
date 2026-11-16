@@ -141,11 +141,15 @@ function inventory(): string[] {
 // Re-measured again (R26 C01, 2026-10-02): the Content Intelligence page was
 // retired with Snowflake, so both roles lost `a:Content Intelligence`. Nothing
 // else in either list moved.
+// Console W1 adds only these three administrator navigation destinations.
 const SUPER_ADMIN_CONTROLS = [
   'a:AI QA',
   'a:Admin Management',
   'a:Automation',
   'a:Automation ledger',
+  'a:Learners',
+  'a:Operations',
+  'a:Overview',
   'a:Reports',
   'a:Review queue',
   'a:Usage',
@@ -172,9 +176,10 @@ const SUPER_ADMIN_CONTROLS = [
   'select:All TypesStarterPaid|Filter by type',
 ];
 
-// The difference is exactly nine controls: the two tab-switcher buttons
+// The difference is exactly twelve controls: the two tab-switcher buttons
 // (Decks / Publish Jobs), New Deck, two Publish, two Delete, and ConsoleShell's
-// Admin Management and Webhooks. Nothing else changes between the roles.
+// Admin Management, Webhooks, Overview, Operations and Learners. Nothing else
+// changes between the roles.
 const EDITOR_CONTROLS = [
   'a:AI QA',
   'a:Automation',

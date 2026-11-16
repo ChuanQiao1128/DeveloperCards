@@ -166,6 +166,14 @@ export function getIdToken(): string | null {
   return tokens.idToken;
 }
 
+function authorizationScope(tokens: StoredTokens): string {
+  const id = decodeJwtPayload(tokens.idToken);
+  const access = decodeJwtPayload(tokens.accessToken);
+  return JSON.stringify([id?.sub ?? null, access?.sub ?? null, id?.iss ?? null, access?.iss ?? null,
+    id?.aud ?? null, access?.client_id ?? null,
+    readGroupsFromPayload(id).sort(), readGroupsFromPayload(access).sort()]);
+}
+
 export function saveTokens(input: {
   accessToken: string;
   idToken: string;
@@ -190,8 +198,14 @@ export function saveTokens(input: {
     expiresAt,
   };
 
+  // A refreshed credential can also change the account or its authorization.
+  // Keep ordinary refreshes in the same generation, but drop all prior reads
+  // when the subject, identity domain, or role claims change.
+  const previous = refreshSession === undefined ? null : readStoredTokens();
+  if (refreshSession !== undefined) assertSessionGeneration(refreshSession);
+  const authorizationChanged = previous !== null && authorizationScope(previous) !== authorizationScope(stored);
   sessionStorage.setItem(TOKEN_KEY, JSON.stringify(stored));
-  if (refreshSession === undefined) sessionChanged();
+  if (refreshSession === undefined || authorizationChanged) sessionChanged();
   return stored;
 }
 

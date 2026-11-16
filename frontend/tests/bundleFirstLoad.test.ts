@@ -104,7 +104,11 @@ const FIRST_LOAD_BUDGET_BYTES = 377_000;
 // and deck-list chunk (+32 B). Keep the existing next-1,000-B rounding rule.
 // Session generation checks and account-scope cache teardown add about 1.6 kB raw.
 // Keep the existing lazy boundary; allow only 2 kB for those correctness guards.
-const EAGER_BUDGET_BYTES = 490_000;
+// Console W1 (2026-11-16), same machine/dependencies: clean HEAD 489,979 B;
+// grouped navigation, new lazy route registry, permission-aware session teardown
+// and shared UI styles total 492,565 B. Root approved the existing next-1,000-B
+// policy for this measured feature increment; static/lazy boundaries stay fixed.
+const EAGER_BUDGET_BYTES = 493_000;
 
 /**
  * Floor, so a parser that degenerates to an empty or near-empty set cannot make

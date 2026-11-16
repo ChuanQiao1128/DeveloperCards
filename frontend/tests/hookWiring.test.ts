@@ -39,7 +39,10 @@ const ALLOWLIST: Record<string, string> = {};
  * inventory and not a bundle fact.
  *
  * It was three — the read pair plus useDeleteCard — then nine, then ten, and is
- * now eleven. The newest is useUnsavedChangesGuard: the card and deck editors
+ * now fifteen. The console additions are useConsoleIdentity, useOperations,
+ * useLearners and useLearner. The identity hook is separate from API parsing
+ * and data-query code; all four are called by the new pages/shared page shell.
+ * useUnsavedChangesGuard: the card and deck editors
  * warn before a stray navigation discards an unsaved edit, and it is called from
  * all three of them. Sorted, because scanHookWiring sorts.
  *
@@ -57,11 +60,15 @@ const ALLOWLIST: Record<string, string> = {};
 const EXPECTED_BARREL_HOOKS = [
   'useCard',
   'useCards',
+  'useConsoleIdentity',
   'useCreateCard',
   'useCreateDeck',
   'useDeck',
   'useDeleteCard',
   'useDeleteDeck',
+  'useLearner',
+  'useLearners',
+  'useOperations',
   'usePublishDeck',
   'useUnsavedChangesGuard',
   'useUpdateCard',
@@ -132,7 +139,7 @@ describe('the scan itself is still looking at something', () => {
     expect(scan.scannedFileCount).toBeGreaterThanOrEqual(20);
   });
 
-  it('found the barrel it is judging, and it publishes exactly the wired eleven', () => {
+  it('found the barrel it is judging, and it publishes exactly the wired fifteen', () => {
     // Hardcoded on purpose, and re-deriving either line from ALLOWLIST breaks
     // it: `toBeGreaterThanOrEqual(ALLOWLIST.size)` is a real floor of 22 while
     // the allowlist is full and silently becomes `>= 0` — unfailable, passing

@@ -1,8 +1,9 @@
 // src/components/console/ConsoleShell.tsx
 
-import { useMemo } from 'react';
+import { useSyncExternalStore } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 
+import { getSessionGeneration, subscribeSessionChanges } from '../../auth/tokenStore';
 import { useSignOut } from '../../auth/AuthContext';
 import { isSuperAdmin, readSessionUser } from '../../auth/sessionUser';
 import { consoleSectionFor } from './consoleNav';
@@ -35,6 +36,9 @@ type Props = {
   // An undefined href means "this session has nowhere to go here", and the
   // control is not rendered at all. That is the same three-state shape the
   // callbacks had; only the payload changed.
+  overviewHref?: string;
+  operationsHref?: string;
+  learnersHref?: string;
   decksHref?: string;
   adminUsersHref?: string;
   // super_admin only, like adminUsersHref: rendered only for a super_admin session.
@@ -73,6 +77,9 @@ export function ConsoleShell({
   subtitle,
   userLabel,
   superAdmin,
+  overviewHref,
+  operationsHref,
+  learnersHref,
   decksHref,
   adminUsersHref,
   webhooksHref,
@@ -89,11 +96,10 @@ export function ConsoleShell({
   // tokens state; in a bare page test it degrades to dropping the session.
   const signOut = useSignOut();
 
-  // When a page passes neither field, derive both from the stored session. The
-  // session cannot change under a mounted shell — signing out navigates away —
-  // so it is read once, the same `useMemo(…, [])` the pages use for it. A page
-  // that passes a value keeps full control of it.
-  const derivedUser = useMemo(() => readSessionUser(), []);
+  // Session replacement and refreshed permission changes update navigation.
+  // API authorization remains authoritative.
+  useSyncExternalStore(subscribeSessionChanges, getSessionGeneration);
+  const derivedUser = readSessionUser();
 
   const resolvedUserLabel =
     userLabel ??
@@ -111,11 +117,25 @@ export function ConsoleShell({
       ? { className: NAV_LINK_ACTIVE_CLASS, 'aria-current': 'page' as const }
       : { className: NAV_LINK_CLASS };
 
+  const navGroups: [string, [ConsoleSection, string, string | undefined, string?][]][] = [
+    ['Operations and learners', resolvedSuperAdmin ? [
+      ['overview', 'Overview', overviewHref], ['operations', 'Operations', operationsHref], ['learners', 'Learners', learnersHref],
+    ] : []],
+    ['Content and automation', [
+      ['decks', 'Decks', decksHref], ['review', 'Review queue', reviewHref], ['qa', 'AI QA', qaHref],
+      ['reports', 'Reports', reportsHref], ['usage', 'Usage', usageHref], ['ledger', 'Automation ledger', ledgerHref],
+      ['automation', 'Automation', automationHref],
+    ]],
+    ['Administration', resolvedSuperAdmin ? [
+      ['webhooks', 'Webhooks', webhooksHref], ['adminUsers', 'Admin Management', adminUsersHref, 'Manage users and permissions (super_admin only)'],
+    ] : []],
+  ];
+
   return (
     <div className="min-h-screen bg-slate-100">
       {/* Top bar */}
       <header className="bg-white border-b border-slate-200">
-        <div className="max-w-[1600px] w-full mx-auto px-4 py-4 flex items-center justify-between gap-3">
+        <div className="max-w-[1600px] w-full mx-auto px-4 py-4 flex flex-wrap items-center justify-between gap-3">
           <div>
             <div className="text-lg font-semibold text-slate-900">{title}</div>
             {subtitle ? <div className="text-xs text-slate-500 mt-0.5">{subtitle}</div> : null}
@@ -129,66 +149,13 @@ export function ConsoleShell({
                 Management — that position was incidental, and identity beside
                 Sign out is where a shell usually puts it. */}
             <nav aria-label="Console sections" className="flex items-center gap-2 flex-wrap">
-              {/* Grouped: authoring (Decks, Review queue, AI QA, Reports,
-                  Usage), then the ledger and Automation, then the super_admin-only
-                  sections together at the end (frontend-console-27). */}
-              {decksHref ? (
-                <Link to={decksHref} {...navProps('decks')}>
-                  Decks
-                </Link>
-              ) : null}
-
-              {reviewHref ? (
-                <Link to={reviewHref} {...navProps('review')}>
-                  Review queue
-                </Link>
-              ) : null}
-
-              {qaHref ? (
-                <Link to={qaHref} {...navProps('qa')}>
-                  AI QA
-                </Link>
-              ) : null}
-
-              {reportsHref ? (
-                <Link to={reportsHref} {...navProps('reports')}>
-                  Reports
-                </Link>
-              ) : null}
-
-              {usageHref ? (
-                <Link to={usageHref} {...navProps('usage')}>
-                  Usage
-                </Link>
-              ) : null}
-
-              {ledgerHref ? (
-                <Link to={ledgerHref} {...navProps('ledger')}>
-                  Automation ledger
-                </Link>
-              ) : null}
-
-              {automationHref ? (
-                <Link to={automationHref} {...navProps('automation')}>
-                  Automation
-                </Link>
-              ) : null}
-
-              {resolvedSuperAdmin && webhooksHref ? (
-                <Link to={webhooksHref} {...navProps('webhooks')}>
-                  Webhooks
-                </Link>
-              ) : null}
-
-              {resolvedSuperAdmin && adminUsersHref ? (
-                <Link
-                  to={adminUsersHref}
-                  {...navProps('adminUsers')}
-                  title="Manage users and permissions (super_admin only)"
-                >
-                  Admin Management
-                </Link>
-              ) : null}
+              {navGroups.map(([label, entries]) => entries.some(([, , href]) => href) && (
+                <div key={label} role="group" aria-label={label} className="flex flex-wrap items-center gap-2">
+                  {entries.map(([section, label, href, title]) => href && (
+                    <Link key={section} to={href} title={title} {...navProps(section)}>{label}</Link>
+                  ))}
+                </div>
+              ))}
             </nav>
 
             <span className="text-xs px-2 py-1 rounded-full bg-slate-100 border border-slate-200 text-slate-700">

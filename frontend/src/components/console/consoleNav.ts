@@ -11,6 +11,9 @@
 // them only for a super_admin session.
 
 export type ConsoleNavHrefs = {
+  overviewHref?: string;
+  operationsHref?: string;
+  learnersHref?: string;
   decksHref?: string;
   reviewHref?: string;
   qaHref?: string;
@@ -26,6 +29,9 @@ export type ConsoleNavHrefs = {
 // page links the Automation console (B07 frontend-console-12); it used to be
 // passed only by the four pages of the automation area.
 export const CONSOLE_NAV: Readonly<Required<ConsoleNavHrefs>> = {
+  overviewHref: '/overview',
+  operationsHref: '/operations',
+  learnersHref: '/learners',
   decksHref: '/',
   reviewHref: '/review',
   qaHref: '/decks/qa',
@@ -44,6 +50,9 @@ export function consoleNav(overrides: ConsoleNavHrefs = {}): ConsoleNavHrefs {
 }
 
 export type ConsoleSection =
+  | 'overview'
+  | 'operations'
+  | 'learners'
   | 'decks'
   | 'review'
   | 'qa'
@@ -56,6 +65,9 @@ export type ConsoleSection =
 
 /** The console section a path belongs to; the deck list and its card/deck pages are Decks. */
 export function consoleSectionFor(pathname: string): ConsoleSection | null {
+  if (pathname === '/overview') return 'overview';
+  if (pathname === '/operations') return 'operations';
+  if (pathname === '/learners' || pathname.startsWith('/learners/')) return 'learners';
   if (pathname === '/review') return 'review';
   if (pathname === '/decks/qa') return 'qa';
   if (pathname === '/reports') return 'reports';
