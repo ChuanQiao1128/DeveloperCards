@@ -386,7 +386,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
       const msg = friendlyAuthError(err);
       set({ lastError: msg });
-      throw new Error(msg);
+      throw new AuthFlowError('FAILED', msg);
     } finally {
       set({ loading: false });
     }
