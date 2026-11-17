@@ -139,8 +139,9 @@ export function CardAnswerSections(props: { card: CardExport; testID?: string; o
       ),
     });
 
-    // 2. Self-Check Points (mustAnswer)
-    if (t.mustAnswer && t.mustAnswer.length > 0) {
+    // A one-line answer already supplies its own self-check in either language.
+    const repeatsAnswer = t.mustAnswer?.length === 1 && t.mustAnswer[0] === t.answer;
+    if (t.mustAnswer && t.mustAnswer.length > 0 && !repeatsAnswer) {
       const zhPoints = chineseAnswerChecklist(card);
       const hasChineseChecklist = zhPoints !== null;
       const needsEnglishDisclosure = isZh && !hasChineseChecklist;

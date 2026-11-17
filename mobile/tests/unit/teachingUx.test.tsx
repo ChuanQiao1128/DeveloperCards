@@ -41,6 +41,18 @@ const text = (tree: renderer.ReactTestRenderer) => tree.root.findAll((node) => (
 afterEach(async () => { await act(async () => { for (const tree of trees.splice(0)) tree.unmount(); }); });
 
 describe('teaching in the learner chosen language', () => {
+  it.each([undefined, 'zh-CN'] as const)('keeps a compact answer without a duplicate checklist in %s', async (lang) => {
+    const compact = { ...card, Teaching: { ...card.Teaching, mustAnswer: [card.Teaching.answer] } };
+    const tree = await mount(<CardTextLangContext.Provider value={lang}><CardAnswerSections card={compact} /></CardTextLangContext.Provider>);
+    expect(text(tree)).toContain(lang === 'zh-CN' ? compact.Teaching['zh-CN'].answer : compact.Teaching.answer);
+    expect(text(tree)).toContain(lang === 'zh-CN' ? compact.Teaching['zh-CN'].keyPoint : compact.Teaching.keyPoint);
+    expect(host(tree, 'teaching-self-check-list')).toBeUndefined();
+    expect(host(tree, 'teaching-english-checklist-toggle')).toBeUndefined();
+    // A distinct single requirement remains useful even when the answer is short.
+    await act(async () => tree.update(<CardTextLangContext.Provider value={lang}><CardAnswerSections card={{ ...compact, Teaching: { ...compact.Teaching, mustAnswer: ['Explain why the agent needs permissions'] } }} /></CardTextLangContext.Provider>));
+    expect(host(tree, 'teaching-self-check-list')).toBeTruthy();
+  });
+
   it('keeps unreviewed English points behind an explicit Chinese disclosure and resets on the next card', async () => {
     const view = (value: any) => <CardTextLangContext.Provider value="zh-CN"><CardAnswerSections card={value} /></CardTextLangContext.Provider>;
     const tree = await mount(view(card));
