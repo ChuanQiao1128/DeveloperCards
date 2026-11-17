@@ -1009,6 +1009,14 @@ export function HomeScreen({ navigation, route }: Props) {
                     {homeState.vm.draw.label || '\u00A0'}
                   </Text>
 
+                  {!starterSlug && isOrderedDeck(featuredDeck.slug) && featuredDeck.realRow?.deck.canStudy ? (
+                    <Pressable testID="home-card-walkthrough" accessibilityRole="button"
+                      style={({ pressed }) => [styles.walkthroughLink, pressed && styles.pressed]}
+                      onPress={() => navigation.navigate('CardWalkthrough', { slug: featuredDeck.slug })}>
+                      <Text style={styles.walkthroughLinkText}>Try a 5-card walkthrough</Text>
+                    </Pressable>
+                  ) : null}
+
                   <ProgressSyncStatus />
 
                   {/* ─── TODAY GROUP — pressure card + update notice + goal ──── */}
@@ -1201,6 +1209,8 @@ export function HomeScreen({ navigation, route }: Props) {
 }
 export default HomeScreen;
 const styles = StyleSheet.create({
+  walkthroughLink: { minHeight: 44, justifyContent: 'center', alignItems: 'center', paddingHorizontal: spacing.sm },
+  walkthroughLinkText: { color: colors.inkSecondary, fontSize: typography.bodySmall, fontWeight: '600', textDecorationLine: 'underline', textAlign: 'center' },
   safeArea: { flex: 1, backgroundColor: colors.parchmentBg },
   gradient: { flex: 1 },
   container: { paddingHorizontal: spacing.screenPadding, paddingTop: spacing.md, paddingBottom: spacing.xl },

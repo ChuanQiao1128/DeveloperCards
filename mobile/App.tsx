@@ -24,6 +24,7 @@ import PermissionPromptScreen from './src/screens/PermissionPromptScreen';
 import HomeScreen from './src/screens/HomeScreen';
 import LibraryScreen from './src/screens/LibraryScreen';
 import CardDetailScreen from './src/screens/CardDetailScreen';
+import CardWalkthroughScreen from './src/screens/CardWalkthroughScreen';
 import MistakeBookScreen from './src/screens/MistakeBookScreen';
 import DomainProgressScreen from './src/screens/DomainProgressScreen';
 import MyReportsScreen from './src/screens/MyReportsScreen';
@@ -261,6 +262,7 @@ function App() {
         <Stack.Screen name="Home" component={HomeScreen} />
         <Stack.Screen name="Library" component={LibraryScreen} />
         <Stack.Screen name="CardDetail" component={CardDetailScreen} />
+        <Stack.Screen name="CardWalkthrough" component={CardWalkthroughScreen} />
         <Stack.Screen name="MistakeBook" component={MistakeBookScreen} />
         <Stack.Screen name="DomainProgress" component={DomainProgressScreen} />
         <Stack.Screen name="MyReports" component={MyReportsScreen} />

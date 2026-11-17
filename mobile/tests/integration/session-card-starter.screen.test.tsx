@@ -329,7 +329,7 @@ describe('SessionCardScreen starter lesson', () => {
 
     // The 5th Got it opens Draw: no recall check, no summary.
     expect(navigation.replace).toHaveBeenCalledTimes(1);
-    expect(navigation.replace).toHaveBeenCalledWith('Draw', { slug: 'csharp', rewardPending: true });
+    expect(navigation.replace).toHaveBeenCalledWith('Draw', { slug: 'csharp', rewardPending: true, lessonReadCount: 5 });
     expect(navigation.replace).not.toHaveBeenCalledWith('SessionSummary', expect.anything());
     expect(hasText(tree, 'Reveal answer')).toBe(false);
     expect(store.get(STAGE_KEY)).toBe('done');
@@ -383,7 +383,7 @@ describe('SessionCardScreen starter lesson', () => {
 
     // The 5th answer completes the lesson: Draw with the bootstrap, not a summary.
     expect(navigation.replace).toHaveBeenCalledTimes(1);
-    expect(navigation.replace).toHaveBeenCalledWith('Draw', { slug: 'csharp', rewardPending: true });
+    expect(navigation.replace).toHaveBeenCalledWith('Draw', { slug: 'csharp', rewardPending: true, lessonReadCount: 5 });
     expect(store.get(STAGE_KEY)).toBe('done');
     expect(await loadDeckWallet('csharp')).toEqual({ availablePulls: DECK_BOOTSTRAP_GRANT, reservePulls: 0 });
     expect(progressState.filter((p) => (p.lastReviewedAt ?? 0) > 0).map((p) => p.stableUid)).toEqual(['m1', 'm2', 'm3', 'm4', 'm5']);
@@ -437,8 +437,18 @@ describe('SessionCardScreen starter lesson', () => {
   it('finishes straight away when every lesson card is already studied (closed before the reward)', async () => {
     progressState = CARDS.map((c) => (['c1', 'c2', 'c3', 'c4', 'c5'].includes(c.StableUid) ? learned(c.StableUid) : untouched(c.StableUid)));
     const { navigation } = await mount();
-    expect(navigation.replace).toHaveBeenCalledWith('Draw', { slug: 'csharp', rewardPending: true });
+    expect(navigation.replace).toHaveBeenCalledWith('Draw', { slug: 'csharp', rewardPending: true, lessonReadCount: 5 });
     expect(store.get(STAGE_KEY)).toBe('done');
+    expect(await loadDeckWallet('csharp')).toEqual({ availablePulls: DECK_BOOTSTRAP_GRANT, reservePulls: 0 });
+  });
+
+  it.each([0, 4])('counts only %i retained studied cards when recorded lesson cards were removed', async (count) => {
+    const studied = ['c1', 'c2', 'c3', 'c4'].slice(0, count);
+    store.set('recallsmith:starter-lesson:v1', JSON.stringify({ slug: 'csharp', uids: [...studied, 'removed'] }));
+    progressState = CARDS.map((card) => studied.includes(card.StableUid) ? learned(card.StableUid) : untouched(card.StableUid));
+    const { navigation } = await mount();
+    expect(navigation.replace).toHaveBeenCalledWith('Draw', { slug: 'csharp', rewardPending: true,
+      ...(count ? { lessonReadCount: count } : {}) });
     expect(await loadDeckWallet('csharp')).toEqual({ availablePulls: DECK_BOOTSTRAP_GRANT, reservePulls: 0 });
   });
 

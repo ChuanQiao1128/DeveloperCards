@@ -461,6 +461,22 @@ describe('HomeScreen starter lesson', () => {
     expect(recordFunnelEventMock).not.toHaveBeenCalled();
   });
 
+  it('offers existing Basics learners an optional walkthrough without restarting onboarding', async () => {
+    store.set(STAGE_KEY, 'done');
+    activeSlugFixture = 'aws-saa-fundamentals';
+    deckSummariesFixture = [deck('aws-saa-fundamentals')];
+    const tree = await renderHome();
+    expect(sessionCalls()).toHaveLength(0);
+    await act(async () => tree.root.findByProps({ testID: 'home-card-walkthrough' }).props.onPress());
+    expect(navigateMock).toHaveBeenCalledWith('CardWalkthrough', { slug: 'aws-saa-fundamentals' });
+    expect(store.get(STAGE_KEY)).toBe('done');
+    expect(recordFunnelEventMock).not.toHaveBeenCalled();
+    await act(async () => tree.unmount());
+    store.set(STAGE_KEY, 'starter');
+    const starter = await renderHome();
+    expect(starter.root.findAllByProps({ testID: 'home-card-walkthrough' })).toHaveLength(0);
+  });
+
   it('upgrades an installed starter pack on every Home focus and refreshes Home when the full deck went in', async () => {
     store.set(STAGE_KEY, 'done');
     await renderHome();

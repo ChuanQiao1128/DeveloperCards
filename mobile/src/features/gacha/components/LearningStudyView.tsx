@@ -26,9 +26,10 @@ import { CHROME_MAX_FONT_SCALE } from '../../../theme/dynamicType';
 export const LEARNING_STUDY_COPY = {
   caption: 'NEW CARD',
   hintBeforeReveal: 'Think of your answer, then show it.',
-  hintAfterReveal: 'Read it once. It comes back tomorrow.',
+  hintAfterReveal: 'Both choices bring this card back tomorrow.',
   showAnswer: 'Show answer',
   gotIt: 'Got it',
+  stillLearning: 'Still learning · continue',
 } as const;
 
 type LoadedSource = { url: string; quote: string | null; host: string };
@@ -64,6 +65,7 @@ export type LearningStudyViewProps = {
   revealed?: boolean;
   onPressPrerequisite?: (uid: string) => void;
   prerequisiteLabels?: Readonly<Record<string, string>>;
+  caption?: string;
 };
 
 export const LearningStudyView = React.memo(function LearningStudyView(props: LearningStudyViewProps) {
@@ -73,7 +75,9 @@ export const LearningStudyView = React.memo(function LearningStudyView(props: Le
   const lang = useCardTextLang();
   const orderBadge = typeof rank === 'number' && rank > 0 ? `#${formatRank(rank)}` : `#${card.OrderInDeck}`;
   const [source, setSource] = useState<LoadedSource | null>(null);
+  const [helpOpen, setHelpOpen] = useState(false);
   const uid = card.StableUid;
+  useEffect(() => setHelpOpen(false), [uid, lang]);
   // Same split as ReviewBody: the prose, then the fenced code as a code block (never raw backticks).
   const question = React.useMemo(() => splitQuestionCode(card.Question), [card.Question]);
 
@@ -94,7 +98,7 @@ export const LearningStudyView = React.memo(function LearningStudyView(props: Le
     <View style={styles.card} testID="learning-study-view">
       <View style={styles.headerRow}>
         <Text style={styles.caption} numberOfLines={1} maxFontSizeMultiplier={CHROME_MAX_FONT_SCALE}>
-          {LEARNING_STUDY_COPY.caption}
+          {props.caption ?? LEARNING_STUDY_COPY.caption}
         </Text>
         <Text style={styles.order} numberOfLines={1} testID="review-order-badge">
           {orderBadge}
@@ -107,12 +111,24 @@ export const LearningStudyView = React.memo(function LearningStudyView(props: Le
         text={question.text}
       />
       {question.code ? <QuestionCodeBlock code={question.code} /> : null}
-      <CardFrontHelp key={`${card.StableUid}:${lang ?? 'en'}`} help={card.FrontHelp} />
+      {!helpOpen ? <CardFrontHelp key={`${card.StableUid}:${lang ?? 'en'}`} help={card.FrontHelp} /> : null}
       {/* Question first: the answer and its source stay off screen until "Show answer". The source
           is still read on mount, so it is ready by the time the answer opens. */}
       {revealed ? (
         <View style={styles.answerWrap}>
           <CardAnswerSections card={card} testID="learning-study-answer" onPressPrerequisite={props.onPressPrerequisite} prerequisiteLabels={props.prerequisiteLabels} />
+          <Pressable accessibilityRole="button" accessibilityState={{ expanded: helpOpen }}
+            testID="learning-study-help-toggle" onPress={() => setHelpOpen((value) => !value)} style={styles.stillLearning}>
+            <Text style={styles.stillLearningText}>{helpOpen ? 'Hide learning help' : 'Need help understanding?'}</Text>
+          </Pressable>
+          {helpOpen ? <View testID="learning-study-help">
+            <Text style={styles.helpText}>Read the Key point for why the answer works. Compare it with the situation in the question.</Text>
+            {props.onPressPrerequisite && card.Teaching?.prerequisites?.length ? (
+              <Text style={styles.helpText}>The Foundation links above open the background cards.</Text>
+            ) : null}
+            <CardFrontHelp key={`${card.StableUid}:${lang ?? 'en'}:open`} help={card.FrontHelp} initiallyExpanded />
+            <Text style={styles.helpText}>You can continue while it is still unclear. Reading an answer is a first step; reviewing later checks what you remember.</Text>
+          </View> : null}
         </View>
       ) : null}
       {revealed && source ? (
@@ -154,6 +170,7 @@ export function LearningStudyDock(props: {
   disabled?: boolean;
   onShowAnswer: () => void;
   onGotIt: () => void;
+  onStillLearning?: () => void;
 }) {
   const { revealed, disabled = false, onShowAnswer, onGotIt } = props;
   return (
@@ -179,6 +196,13 @@ export function LearningStudyDock(props: {
           {revealed ? LEARNING_STUDY_COPY.gotIt : LEARNING_STUDY_COPY.showAnswer}
         </Text>
       </Pressable>
+      {revealed && props.onStillLearning ? (
+        <Pressable testID="learning-study-still-learning" accessibilityRole="button"
+          accessibilityState={{ disabled }} disabled={disabled} onPress={props.onStillLearning}
+          style={({ pressed }) => [styles.stillLearning, pressed && styles.pressed, disabled && styles.disabled]}>
+          <Text style={styles.stillLearningText}>{LEARNING_STUDY_COPY.stillLearning}</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -186,6 +210,9 @@ export function LearningStudyDock(props: {
 export default LearningStudyView;
 
 const styles = StyleSheet.create({
+  stillLearning: { minHeight: 44, justifyContent: 'center', alignItems: 'center', paddingHorizontal: spacing.sm },
+  stillLearningText: { color: colors.inkSecondary, fontSize: typography.bodySmall, textAlign: 'center', fontWeight: '600' },
+  helpText: { color: colors.inkSecondary, fontSize: typography.body, lineHeight: 22, marginBottom: spacing.sm },
   card: {
     borderRadius: 18,
     paddingHorizontal: spacing.md,

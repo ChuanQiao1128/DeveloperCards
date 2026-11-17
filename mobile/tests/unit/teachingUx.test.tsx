@@ -85,6 +85,17 @@ describe('teaching in the learner chosen language', () => {
     expect(buildPrerequisiteLabels(cards, 'zh-CN').one).toBe('EBS 加密');
     expect(buildPrerequisiteLabels(cards).one).toBe('EBS encryption');
   });
+
+  it('opens existing word help while reading and resets help on the next card', async () => {
+    const value = { ...card, FrontHelp: [{ term: 'Agent', definition: 'Software running on the instance.' }] };
+    const tree = await mount(<LearningStudyView card={value} deckSlug="aws" revealed />);
+    expect(text(tree)).not.toContain('Software running on the instance.');
+    await act(async () => host(tree, 'learning-study-help-toggle').props.onPress());
+    expect(text(tree)).toContain('Software running on the instance.');
+    expect(text(tree)).toContain('You can continue while it is still unclear.');
+    await act(async () => tree.update(<LearningStudyView card={{ ...value, StableUid: 'two' }} deckSlug="aws" revealed />));
+    expect(host(tree, 'learning-study-help')).toBeUndefined();
+  });
 });
 
 describe('course availability', () => {
