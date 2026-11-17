@@ -1,5 +1,6 @@
 const fs = require('node:fs');
 const path = require('node:path');
+const os = require('node:os');
 const { createHash } = require('node:crypto');
 const { spawnSync } = require('node:child_process');
 
@@ -28,17 +29,25 @@ function verifyBundle(directory, settings) {
   for (const name of AUTH_NAMES) {
     if (!bytes.includes(Buffer.from(settings[name]))) throw new Error(`OTA launch bundle is missing compiled setting: ${name}`);
   }
+  const map = JSON.parse(fs.readFileSync(file + '.map', 'utf8'));
+  if (map.version !== 3 || !Array.isArray(map.sources) || map.sources.length === 0 || !fs.existsSync(path.join(root, 'assetmap.json'))) {
+    throw new Error('OTA export is missing source maps or asset map');
+  }
   return createHash('sha256').update(bytes).digest('hex');
 }
 
 function prepare() {
   const settings = authSettings(process.env);
-  const result = spawnSync('npx', ['expo', 'export', '--platform', 'ios', '--output-dir', 'dist', '--clear'], {
-    stdio: 'inherit', env: { ...process.env, NODE_ENV: 'production', EXPO_NO_DOTENV: '1' },
-  });
-  if (result.error || result.status !== 0) throw new Error('OTA export failed; nothing published');
-  const sha256 = verifyBundle('dist', settings);
-  console.log(`OTA iOS launch bundle verified: sha256=${sha256}`);
+  // Expo 54 can retain transforms across --clear; environment changes need a fresh Metro store.
+  const cache = fs.mkdtempSync(path.join(os.tmpdir(), 'developercards-ota-'));
+  try {
+    const result = spawnSync('npx', ['expo', 'export', '--platform', 'ios', '--source-maps', '--dump-assetmap', '--output-dir', 'dist', '--clear'], {
+      stdio: 'inherit', env: { ...process.env, NODE_ENV: 'production', EXPO_NO_DOTENV: '1', TMPDIR: cache },
+    });
+    if (result.error || result.status !== 0) throw new Error('OTA export failed; nothing published');
+    const sha256 = verifyBundle('dist', settings);
+    console.log(`OTA iOS launch bundle verified: sha256=${sha256}`);
+  } finally { fs.rmSync(cache, { recursive: true, force: true }); }
 }
 
 if (require.main === module) {
