@@ -39,7 +39,7 @@ function makeFakeEasDir(): string {
       `echo "$@" >> "${path.join(dir, 'eas.argv.log')}"`,
       'case "$1" in',
       '  whoami) exit 0 ;;',
-    `  env:exec) exit ${opts.envExecExit ?? 0} ;;`,
+    '  env:exec) exit 0 ;;',
       `  env:list) for n in $FAKE_EAS_NAMES; do echo "$n=${MARKER}"; done ;;`,
       '  update)',
       '    echo "$@" >> "$FAKE_EAS_LOG"',
