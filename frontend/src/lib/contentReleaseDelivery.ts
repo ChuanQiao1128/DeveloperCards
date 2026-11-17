@@ -21,7 +21,8 @@ export async function verifyReleaseDelivery(session: ReleaseSession, query: Rele
   if (!job || job.status !== 'SUCCESS') return null;
   if (query.liveBuildId !== job.build_id) throw new Error('Another release changed the live build. Publication verification stopped.');
   if (!/^[a-zA-Z0-9_-]+$/.test(job.build_id) || !/^[0-9a-f]{64}$/.test(job.content_sha256 ?? '')) throw new Error('Published job is missing a valid build or content hash.');
-  const manifest = await fetchContentManifest({ signal });
+  // A browser-cached response can retain pre-CORS headers even after the CDN policy changes.
+  const manifest = await fetchContentManifest({ signal, bustCache: true });
   if (!manifest.ok) throw new Error(manifest.error);
   const entry = manifest.data.decks.find(item => item.slug === session.bundle.deckSlug);
   if (entry?.buildId !== job.build_id) return null; // The public index may still be cached for 60 seconds.
@@ -30,7 +31,7 @@ export async function verifyReleaseDelivery(session: ReleaseSession, query: Rele
   if (entry.path !== expectedPath) throw new Error('Public manifest has an unexpected deck path.');
   const manifestUrl = new URL(getContentManifestUrl(), location.href);
   const deckUrl = new URL(expectedPath, manifestUrl);
-  const response = await fetch(deckUrl, { signal, credentials: 'omit', redirect: 'error', headers: { accept: 'application/json' } });
+  const response = await fetch(deckUrl, { signal, credentials: 'omit', redirect: 'error', cache: 'no-store', headers: { accept: 'application/json' } });
   if (!response.ok) throw new Error(`Published deck download failed (HTTP ${response.status}).`);
   const bytes = await response.arrayBuffer();
   const sha256 = [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))].map(byte => byte.toString(16).padStart(2, '0')).join('');
