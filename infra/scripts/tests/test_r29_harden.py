@@ -124,15 +124,18 @@ class ConsoleCspTest(unittest.TestCase):
         # The console DSN's ingest origin (org timeawake-limited, US); the DSN itself lives in SSM and CI, not here.
         self.assertRegex(sentry[0], r"^https://o\d+\.ingest\.us\.sentry\.io$")
 
-    def test_public_content_cdn_uses_free_plan_managed_cors_and_read_methods(self):
+    def test_public_content_cors_is_constant_across_shared_cache_variants(self):
         headers = (REPO_ROOT / "infra/modules/edge/security_headers.tf").read_text()
-        self.assertIn('data "aws_cloudfront_response_headers_policy" "content_console_read"', headers)
-        self.assertIn('name = "Managed-SimpleCORS"', headers)
-        self.assertNotIn('resource "aws_cloudfront_response_headers_policy" "content_console_read"', headers)
+        cors = headers.split('resource "aws_s3_bucket_cors_configuration" "content_console_read" {', 1)[1].split('resource "', 1)[0]
+        self.assertIn('allowed_origins = ["https://${local.console_hostname}"]', cors)
+        self.assertIn('allowed_methods = ["GET", "HEAD"]', cors)
+        self.assertNotIn('"*"', cors)
         content = (REPO_ROOT / "infra/modules/edge/cdn.tf").read_text().split('resource "aws_cloudfront_distribution" "content" {', 1)[1].split('resource "', 1)[0]
-        self.assertIn('data.aws_cloudfront_response_headers_policy.content_console_read.id', content)
+        self.assertRegex(content, r'name\s*= "Origin"\s+value = "https://\$\{local.console_hostname\}"')
+        self.assertIn('depends_on = [aws_s3_bucket_cors_configuration.content_console_read]', content)
+        self.assertRegex(content, r'cache_policy_id\s*= "658327ea-f89d-4fab-a63d-7e88639e58f6"')
+        self.assertNotIn('response_headers_policy_id', content)
         self.assertRegex(content, r'allowed_methods\s*= \["GET", "HEAD"\]')
-        self.assertNotIn('"OPTIONS"', content)
 
     def test_the_console_index_html_has_no_inline_script(self):
         # html.parser, not a regex: it lower-cases tag and attribute names, so <SCRIPT> or STYLE= cannot slip past.

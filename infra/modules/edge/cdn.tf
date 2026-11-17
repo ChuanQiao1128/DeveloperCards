@@ -98,27 +98,30 @@ resource "aws_cloudfront_distribution" "content" {
   wait_for_deployment = true
   web_acl_id          = aws_wafv2_web_acl.content.arn
   default_cache_behavior {
-    allowed_methods            = ["GET", "HEAD"]
-    response_headers_policy_id = data.aws_cloudfront_response_headers_policy.content_console_read.id
-    cache_policy_id            = "658327ea-f89d-4fab-a63d-7e88639e58f6"
-    cached_methods             = ["GET", "HEAD"]
-    compress                   = true
-    default_ttl                = 0
-    max_ttl                    = 0
-    min_ttl                    = 0
-    smooth_streaming           = false
-    target_origin_id           = local.content_origin_id
-    trusted_key_groups         = []
-    trusted_signers            = []
-    viewer_protocol_policy     = "redirect-to-https"
+    allowed_methods        = ["GET", "HEAD"]
+    cache_policy_id        = "658327ea-f89d-4fab-a63d-7e88639e58f6"
+    cached_methods         = ["GET", "HEAD"]
+    compress               = true
+    default_ttl            = 0
+    max_ttl                = 0
+    min_ttl                = 0
+    smooth_streaming       = false
+    target_origin_id       = local.content_origin_id
+    trusted_key_groups     = []
+    trusted_signers        = []
+    viewer_protocol_policy = "redirect-to-https"
     grpc_config {
       enabled = false
     }
   }
   origin {
-    connection_attempts         = 3
-    connection_timeout          = 10
-    domain_name                 = var.content_bucket_regional_domain_name
+    connection_attempts = 3
+    connection_timeout  = 10
+    domain_name         = var.content_bucket_regional_domain_name
+    custom_header {
+      name  = "Origin"
+      value = "https://${local.console_hostname}"
+    }
     origin_access_control_id    = aws_cloudfront_origin_access_control.content.id
     origin_id                   = local.content_origin_id
     response_completion_timeout = 0
@@ -134,6 +137,8 @@ resource "aws_cloudfront_distribution" "content" {
     ssl_support_method       = "sni-only"
     minimum_protocol_version = "TLSv1.2_2021"
   }
+  # Populate CORS at the origin before updating the distribution's request header.
+  depends_on = [aws_s3_bucket_cors_configuration.content_console_read]
   lifecycle {
     ignore_changes = [tags, tags_all]
   }

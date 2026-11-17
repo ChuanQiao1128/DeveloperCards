@@ -26,8 +26,9 @@ name: Terraform
 #           bucket under recovery/, never uploaded as an artifact.
 #   plan    workflow_dispatch from main defaults to the full read-only drift report. console_mfa_only=true instead
 #           reuses select/apply with the fixed Console pool target and MFA allow-list; both plans are targeted and
-#           never claim the whole estate is in sync. content_headers_only=true uses only the three fixed
-#           CDN/Console response-header targets. Recovery modes are mutually exclusive; both retain the same
+#           never claim the whole estate is in sync. content_headers_only=true uses only the fixed
+#           CDN/Console header and content bucket CORS targets, then refreshes /content/* caches with a fixed
+#           distribution identity and idempotent caller reference. Recovery modes are mutually exclusive and retain
 #           infra-prod approval, saved-plan apply and guards.
 #
 # This repository and its Actions logs are public: no step prints a plan, a value or state. Terraform runs with
@@ -148,7 +149,7 @@ jobs:
             echo 'allow=docs/delivery/content-release-recovery-20261118/CDN-VERIFY.plan-allow.json' >> "$GITHUB_OUTPUT"
             {
               echo 'Content verification response headers targeted scope only; full production drift is not checked.'
-              echo 'Only the fixed content CORS policy/distribution attachment and Console CSP policy may change.'
+              echo 'Only fixed content bucket CORS, distribution headers and Console CSP may change.'
               echo 'Allow file: docs/delivery/content-release-recovery-20261118/CDN-VERIFY.plan-allow.json'
             } >> "$GITHUB_STEP_SUMMARY"
           else
@@ -253,7 +254,7 @@ jobs:
             targets=('-target=module.identity.aws_cognito_user_pool.console[0]')
           elif [ "$CONTENT_HEADERS_ONLY" = true ]; then
             targets=(
-              '-target=module.edge.aws_cloudfront_response_headers_policy.content_console_read'
+              '-target=module.edge.aws_s3_bucket_cors_configuration.content_console_read'
               '-target=module.edge.aws_cloudfront_distribution.content'
               '-target=module.edge.aws_cloudfront_response_headers_policy.security["console"]'
             )
@@ -305,7 +306,7 @@ jobs:
             targets=('-target=module.identity.aws_cognito_user_pool.console[0]')
           elif [ "$CONTENT_HEADERS_ONLY" = true ]; then
             targets=(
-              '-target=module.edge.aws_cloudfront_response_headers_policy.content_console_read'
+              '-target=module.edge.aws_s3_bucket_cors_configuration.content_console_read'
               '-target=module.edge.aws_cloudfront_distribution.content'
               '-target=module.edge.aws_cloudfront_response_headers_policy.security["console"]'
             )
@@ -325,6 +326,26 @@ jobs:
           python3 infra/scripts/check-plan.py --plan "$RUNNER_TEMP/tf/second.json" > "$RUNNER_TEMP/tf/second.txt" 2>&1 || rc=$?
           cat "$RUNNER_TEMP/tf/second.txt"
           exit "$rc"
+      - id: content_invalidation
+        name: refresh only public content header caches
+        if: >-
+          env.CONTENT_HEADERS_ONLY == 'true' && steps.gate.outcome == 'success' &&
+          (steps.second.outcome == 'success' || steps.guard.outputs.apply_needed == 'false')
+        run: |
+          set -euo pipefail
+          distribution="$(terraform -chdir=infra/envs/prod output -raw content_distribution_id)"
+          if [ "$distribution" != E28BKORJLV6UXG ]; then
+            echo '::error::unexpected content distribution; no cache invalidation issued'
+            exit 1
+          fi
+          cat > "$RUNNER_TEMP/tf/content-invalidation.json" <<JSON
+          {"Paths":{"Quantity":1,"Items":["/content/*"]},"CallerReference":"content-headers-$GITHUB_SHA"}
+          JSON
+          invalidation="$(aws cloudfront create-invalidation --distribution-id "$distribution" \
+            --invalidation-batch "file://$RUNNER_TEMP/tf/content-invalidation.json" \
+            --query Invalidation.Id --output text)"
+          aws cloudfront wait invalidation-completed --distribution-id "$distribution" --id "$invalidation"
+          echo 'Public content header caches refreshed; card bytes and build identities are unchanged.'
       # An apply that cannot write the state at the end (an S3 error, the session expiring) leaves what it did in
       # infra/envs/prod/errored.tfstate, and the hosted runner is discarded with it. Push it (state push refuses an
       # older serial or another lineage, never -force); failing that, keep it in the private, versioned state
@@ -374,6 +395,7 @@ jobs:
           GATE: ${{ steps.gate.outcome }}
           APPLY: ${{ steps.apply.outcome }}
           SECOND: ${{ steps.second.outcome }}
+          INVALIDATION: ${{ steps.content_invalidation.outcome }}
           NEEDED: ${{ steps.guard.outputs.apply_needed }}
         run: |
           set -uo pipefail
@@ -405,6 +427,7 @@ jobs:
             fi
             if [ "$CONTENT_HEADERS_ONLY" = true ]; then
               echo 'Content verification response headers targeted scope only; full production drift is not checked.'
+              echo "Content header cache refresh: ${INVALIDATION:-not run}"
               echo
             fi
             echo "- allow file: $allow_line"
