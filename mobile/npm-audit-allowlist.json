@@ -164,6 +164,15 @@
       "inBundle": false,
       "reason": "Not in the shipped app (inBundle false): absent from the iOS and Android Metro source maps, checked in every CI run by check-bundle-packages.py. Build-time only: @expo/cli dev-server certificates and @expo/code-signing-certificates; app.json sets no updates code signing. No fixed release: the advisory covers node-forge <=1.4.0 and 1.4.0 (2026-03-24) is the newest release; it leaves the tree when @expo/cli stops depending on node-forge (an Expo SDK major).",
       "expires": "2027-02-01"
+    },
+    {
+      "id": "GHSA-fc5q-39xc-vjpf",
+      "package": "picomatch",
+      "severity": "high",
+      "title": "picomatch vulnerable to ReDoS through single-branch repeated extglobs",
+      "inBundle": false,
+      "reason": "2026-11-18 temporary build-time exception: absent from every iOS and Android bundle source map in a local Expo export of the same mobile source tree and package-lock; check-bundle-packages.py enforces absence in every CI export, including split chunks. Locked build paths: expo@54.0.30 -> @expo/cli@54.0.20 -> picomatch@3.0.2; expo -> @expo/metro@54.2.0 -> metro-file-map@0.83.3 -> micromatch@4.0.8 -> picomatch@2.3.2; tooling via anymatch/readdirp/jest-util and tinyglobby/vite/vitest uses 2.3.2/4.0.7. CLI globs are trusted operator template paths; Metro globs derive from repository-controlled extensions and fixed watcher patterns, not application requests or user content. All published versions through latest 4.0.7 are affected and the advisory has no patched release. Re-review or remove before 2026-12-01, and immediately if a patched release appears, build configuration changes, or runtime reachability is introduced; do not extend without renewed evidence and review.",
+      "expires": "2026-12-01"
     }
   ]
 }
