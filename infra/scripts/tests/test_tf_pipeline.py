@@ -886,17 +886,29 @@ class WorkflowFactsTest(unittest.TestCase):
             self.assertIn("TF_VAR_alert_email: ${{ secrets.TF_VAR_ALERT_EMAIL }}", self.jobs[name])
         self.assertNotIn("developercards-gha-prod", self.text)
         self.assertNotIn("configure-aws-credentials", self.jobs["select"])
-        self.assertIn("if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && !inputs.console_mfa_only", self.jobs["plan"])
+        self.assertIn("if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && !inputs.console_mfa_only && !inputs.content_headers_only", self.jobs["plan"])
 
     def test_console_recovery_is_explicit_and_main_only(self):
         self.assertIn("console_mfa_only:\n        description:", self.text)
         self.assertIn("        type: boolean\n        default: false", self.text)
-        self.assertIn("if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || inputs.console_mfa_only)",
+        self.assertIn("if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || inputs.console_mfa_only || inputs.content_headers_only)",
                       self.jobs["select"])
         self.assertIn("CONSOLE_MFA_ONLY: ${{ github.event_name == 'workflow_dispatch' && inputs.console_mfa_only }}",
                       self.jobs["apply"])
         self.assertIn("console-mfa-check --plan", self.jobs["apply"])
         self.assertTrue(before(self.jobs["apply"], "console-mfa-check --plan", " apply -input=false"))
+
+    def test_content_recovery_is_explicit_and_main_only(self):
+        self.assertIn("content_headers_only:\n        description:", self.text)
+        self.assertIn("&& !inputs.content_headers_only", self.jobs["plan"])
+        for job in ("select", "apply"):
+            self.assertIn("CONTENT_HEADERS_ONLY: ${{ github.event_name == 'workflow_dispatch' && inputs.content_headers_only }}",
+                          self.jobs[job])
+        self.assertIn("environment:\n      name: infra-prod", self.jobs["apply"])
+        for name in ("plan to a saved file (never printed)", "the second plan must be empty"):
+            body = step_body(self.jobs["apply"], name)
+            self.assertIn('${targets[@]+"${targets[@]}"}', body)
+            self.assertNotIn("inputs.target", body)
 
     def test_concurrency_never_cancels(self):
         self.assertIn("\nconcurrency:\n", self.text)
@@ -1497,7 +1509,7 @@ class StepBodyTest(unittest.TestCase):
             handle.write(step_body(self.jobs[job], name))
         full = {"PATH": self.bin + os.pathsep + os.environ["PATH"], "RUNNER_TEMP": self.runner_temp,
                 "GITHUB_STEP_SUMMARY": self.summary, "GITHUB_SHA": "a" * 40, "GITHUB_RUN_ID": "11",
-                "GITHUB_RUN_ATTEMPT": "2", "STUB_LOG": self.log, "ALLOW": "", "CONSOLE_MFA_ONLY": "false", "NEEDED": "true",
+                "GITHUB_RUN_ATTEMPT": "2", "STUB_LOG": self.log, "ALLOW": "", "CONSOLE_MFA_ONLY": "false", "CONTENT_HEADERS_ONLY": "false", "NEEDED": "true",
                 "GITHUB_OUTPUT": os.path.join(self.tmp, "outputs"), "TF_VAR_alert_email": "x@example.invalid"}
         full.update(env)
         proc = subprocess.run(["bash", "--noprofile", "--norc", "-eo", "pipefail", script], cwd=self.work, env=full,
@@ -1548,6 +1560,61 @@ class StepBodyTest(unittest.TestCase):
                 self.assertIn("Console user pool targeted scope only", out)
                 self.assertIn("full production drift is not checked", out)
                 self.assertIn("console-mfa-check --plan", self.read(self.log))
+
+    def test_content_recovery_is_fixed_and_uses_the_same_targets_in_both_plans(self):
+        expected = [
+            '-target=module.edge.aws_cloudfront_response_headers_policy.content_console_read',
+            '-target=module.edge.aws_cloudfront_distribution.content',
+            '-target=module.edge.aws_cloudfront_response_headers_policy.security["console"]',
+        ]
+        for name in ("plan to a saved file (never printed)", "the second plan must be empty"):
+            open(self.log, "w").close()
+            rc, out = self.run_step("apply", name, CONTENT_HEADERS_ONLY="true", STUB_PYTHON="empty")
+            self.assertEqual(rc, 0, out)
+            plans = [line for line in self.read(self.log).splitlines() if " plan " in line]
+            self.assertEqual(len(plans), 1)
+            targets = [arg for arg in plans[0].split() if arg.startswith("-target=")]
+            self.assertEqual(targets, expected)
+            self.assertIn("-lock-timeout=10m", plans[0])
+            self.assertNotIn("console-mfa-check", self.read(self.log))
+            if "second" in name:
+                self.assertIn("full production drift is not checked", out)
+
+    def test_content_recovery_selection_and_mutual_exclusion(self):
+        rc, out = self.run_step("select", "pick this push's allow files", CONTENT_HEADERS_ONLY="true")
+        self.assertEqual(rc, 0, out)
+        self.assertEqual(self.read(os.path.join(self.tmp, "outputs")),
+                         "apply=true\nallow=docs/delivery/content-release-recovery-20261118/CDN-VERIFY.plan-allow.json\n")
+        self.assertIn("Content verification response headers targeted scope only", self.read(self.summary))
+        self.assertNotIn("tf-pipeline.py select", self.read(self.log))
+        for job, name in (("select", "pick this push's allow files"), ("apply", "preflight (no credentials yet)")):
+            open(os.path.join(self.tmp, "outputs"), "w").close()
+            open(self.log, "w").close()
+            rc, out = self.run_step(job, name, CONSOLE_MFA_ONLY="true", CONTENT_HEADERS_ONLY="true")
+            self.assertEqual(rc, 1, out)
+            self.assertIn("select only one recovery mode", out)
+            self.assertEqual(self.read(self.log), "")
+            self.assertEqual(self.read(os.path.join(self.tmp, "outputs")), "")
+
+    def test_content_recovery_gate_accepts_only_guarded_empty_retry_without_allow(self):
+        for needed in ("true", "false"):
+            open(self.log, "w").close()
+            rc, out = self.run_step("apply", "the plan must match the allow-list (check-plan.py)",
+                                    CONTENT_HEADERS_ONLY="true", NEEDED=needed, STUB_PYTHON="empty",
+                                    ALLOW="docs/delivery/content-release-recovery-20261118/CDN-VERIFY.plan-allow.json")
+            self.assertEqual(rc, 0, out)
+            self.assertEqual(" --allow " in self.read(self.log), needed == "true")
+        rc, out = self.run_step("apply", "the plan must match the allow-list (check-plan.py)",
+                                CONTENT_HEADERS_ONLY="true", NEEDED="false", STUB_PYTHON="fail")
+        self.assertEqual(rc, 1, out)
+        self.assertIn("PLAN VIOLATION", out)
+
+    def test_content_recovery_summary_labels_targeted_success(self):
+        rc, out = self.run_step("apply", "job summary", CONTENT_HEADERS_ONLY="true", GUARD="success", GATE="success",
+                                APPLY="success", SECOND="success", NEEDED="true")
+        self.assertEqual(rc, 0, out)
+        self.assertIn("Content verification response headers targeted scope only", self.read(self.summary))
+        self.assertIn("full production drift is not checked", self.read(self.summary))
 
     def test_recovery_selection_emits_the_literal_allow_file(self):
         rc, out = self.run_step("select", "pick this push's allow files", CONSOLE_MFA_ONLY="true")

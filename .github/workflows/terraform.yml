@@ -26,7 +26,9 @@ name: Terraform
 #           bucket under recovery/, never uploaded as an artifact.
 #   plan    workflow_dispatch from main defaults to the full read-only drift report. console_mfa_only=true instead
 #           reuses select/apply with the fixed Console pool target and MFA allow-list; both plans are targeted and
-#           never claim the whole estate is in sync. The same infra-prod approval and guards still apply.
+#           never claim the whole estate is in sync. content_headers_only=true uses only the three fixed
+#           CDN/Console response-header targets. Recovery modes are mutually exclusive; both retain the same
+#           infra-prod approval, saved-plan apply and guards.
 #
 # This repository and its Actions logs are public: no step prints a plan, a value or state. Terraform runs with
 # -no-color and its output goes to files under $RUNNER_TEMP/tf that are never uploaded and are deleted at the end.
@@ -60,6 +62,10 @@ on:
         description: 'Recover Console MFA OFF only (targeted apply; full drift is not checked)'
         type: boolean
         default: false
+      content_headers_only:
+        description: 'Recover content verification headers only (targeted apply; full drift is not checked)'
+        type: boolean
+        default: false
 
 # Read-only by default; only the two infra-prod jobs can mint an OIDC token.
 permissions:
@@ -81,7 +87,7 @@ env:
 jobs:
   select:
     name: select (no AWS)
-    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || inputs.console_mfa_only)
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || inputs.console_mfa_only || inputs.content_headers_only)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -118,12 +124,17 @@ jobs:
         env:
           BEFORE: ${{ github.event.before }}
           CONSOLE_MFA_ONLY: ${{ github.event_name == 'workflow_dispatch' && inputs.console_mfa_only }}
+          CONTENT_HEADERS_ONLY: ${{ github.event_name == 'workflow_dispatch' && inputs.content_headers_only }}
         run: |
           set -euo pipefail
           {
             echo "### Terraform: \`$GITHUB_SHA\`"
             echo
           } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$CONSOLE_MFA_ONLY" = true ] && [ "$CONTENT_HEADERS_ONLY" = true ]; then
+            echo '::error::select only one recovery mode'
+            exit 1
+          fi
           if [ "$CONSOLE_MFA_ONLY" = true ]; then
             echo 'apply=true' >> "$GITHUB_OUTPUT"
             echo 'allow=docs/delivery/web-authoring-safety-20261115/CONSOLE-MFA.plan-allow.json' >> "$GITHUB_OUTPUT"
@@ -131,6 +142,14 @@ jobs:
               echo 'Console user pool targeted scope only; full production drift is not checked.'
               echo 'Only MFA/TOTP may change, to OFF/disabled; the existing pool identity must be preserved.'
               echo 'Allow file: docs/delivery/web-authoring-safety-20261115/CONSOLE-MFA.plan-allow.json'
+            } >> "$GITHUB_STEP_SUMMARY"
+          elif [ "$CONTENT_HEADERS_ONLY" = true ]; then
+            echo 'apply=true' >> "$GITHUB_OUTPUT"
+            echo 'allow=docs/delivery/content-release-recovery-20261118/CDN-VERIFY.plan-allow.json' >> "$GITHUB_OUTPUT"
+            {
+              echo 'Content verification response headers targeted scope only; full production drift is not checked.'
+              echo 'Only the fixed content CORS policy/distribution attachment and Console CSP policy may change.'
+              echo 'Allow file: docs/delivery/content-release-recovery-20261118/CDN-VERIFY.plan-allow.json'
             } >> "$GITHUB_STEP_SUMMARY"
           else
             python3 infra/scripts/tf-pipeline.py select --before "$BEFORE" --after "$GITHUB_SHA" \
@@ -159,6 +178,7 @@ jobs:
     env:
       ALLOW: ${{ needs.select.outputs.allow }}
       CONSOLE_MFA_ONLY: ${{ github.event_name == 'workflow_dispatch' && inputs.console_mfa_only }}
+      CONTENT_HEADERS_ONLY: ${{ github.event_name == 'workflow_dispatch' && inputs.content_headers_only }}
       # The one root variable without a default (infra/envs/prod/variables.tf, sensitive). Environment secret.
       TF_VAR_alert_email: ${{ secrets.TF_VAR_ALERT_EMAIL }}
     steps:
@@ -184,6 +204,10 @@ jobs:
       - name: preflight (no credentials yet)
         run: |
           set -euo pipefail
+          if [ "$CONSOLE_MFA_ONLY" = true ] && [ "$CONTENT_HEADERS_ONLY" = true ]; then
+            echo '::error::select only one recovery mode'
+            exit 1
+          fi
           if [ -z "${TF_VAR_alert_email:-}" ]; then
             echo "::error::environment secret TF_VAR_ALERT_EMAIL is not set on infra-prod (infra/RUNBOOK.md §15 Bootstrap)"
             exit 1
@@ -224,12 +248,18 @@ jobs:
         name: plan to a saved file (never printed)
         run: |
           set -euo pipefail
-          target=""
+          targets=()
           if [ "$CONSOLE_MFA_ONLY" = true ]; then
-            target='-target=module.identity.aws_cognito_user_pool.console[0]'
+            targets=('-target=module.identity.aws_cognito_user_pool.console[0]')
+          elif [ "$CONTENT_HEADERS_ONLY" = true ]; then
+            targets=(
+              '-target=module.edge.aws_cloudfront_response_headers_policy.content_console_read'
+              '-target=module.edge.aws_cloudfront_distribution.content'
+              '-target=module.edge.aws_cloudfront_response_headers_policy.security["console"]'
+            )
           fi
           terraform -chdir=infra/envs/prod plan -input=false -no-color -lock-timeout=10m \
-            ${target:+"$target"} -out="$RUNNER_TEMP/tf/apply.tfplan" > "$RUNNER_TEMP/tf/plan.log" 2>&1
+            ${targets[@]+"${targets[@]}"} -out="$RUNNER_TEMP/tf/apply.tfplan" > "$RUNNER_TEMP/tf/plan.log" 2>&1
           terraform -chdir=infra/envs/prod show -no-color -json "$RUNNER_TEMP/tf/apply.tfplan" \
             > "$RUNNER_TEMP/tf/plan.json" 2>> "$RUNNER_TEMP/tf/plan.log"
           echo "plan saved"
@@ -246,8 +276,9 @@ jobs:
           if [ "$CONSOLE_MFA_ONLY" = true ]; then
             python3 infra/scripts/tf-pipeline.py console-mfa-check --plan "$RUNNER_TEMP/tf/plan.json" || exit $?
           fi
-          # A retry may find the pool already OFF; still verify its identity and values, then require an empty plan.
-          if [ -n "$ALLOW" ] && ! { [ "$CONSOLE_MFA_ONLY" = true ] && [ "$NEEDED" = false ]; }; then
+          # A recovery retry may already be applied; only a genuinely empty guarded plan skips the allow-list.
+          # MFA recovery still verifies the existing pool identity and values above.
+          if [ -n "$ALLOW" ] && ! { { [ "$CONSOLE_MFA_ONLY" = true ] || [ "$CONTENT_HEADERS_ONLY" = true ]; } && [ "$NEEDED" = false ]; }; then
             python3 infra/scripts/check-plan.py --plan "$RUNNER_TEMP/tf/plan.json" --allow "$RUNNER_TEMP/tf/allow.json" \
               --summary > "$RUNNER_TEMP/tf/gate.txt" 2>&1 || rc=$?
           else
@@ -269,17 +300,26 @@ jobs:
         if: steps.guard.outputs.apply_needed == 'true'
         run: |
           set -uo pipefail
-          target=""
+          targets=()
           if [ "$CONSOLE_MFA_ONLY" = true ]; then
-            target='-target=module.identity.aws_cognito_user_pool.console[0]'
+            targets=('-target=module.identity.aws_cognito_user_pool.console[0]')
+          elif [ "$CONTENT_HEADERS_ONLY" = true ]; then
+            targets=(
+              '-target=module.edge.aws_cloudfront_response_headers_policy.content_console_read'
+              '-target=module.edge.aws_cloudfront_distribution.content'
+              '-target=module.edge.aws_cloudfront_response_headers_policy.security["console"]'
+            )
           fi
           terraform -chdir=infra/envs/prod plan -input=false -no-color -lock-timeout=10m \
-            ${target:+"$target"} -out="$RUNNER_TEMP/tf/second.tfplan" > "$RUNNER_TEMP/tf/second.log" 2>&1 || exit 1
+            ${targets[@]+"${targets[@]}"} -out="$RUNNER_TEMP/tf/second.tfplan" > "$RUNNER_TEMP/tf/second.log" 2>&1 || exit 1
           terraform -chdir=infra/envs/prod show -no-color -json "$RUNNER_TEMP/tf/second.tfplan" \
             > "$RUNNER_TEMP/tf/second.json" 2>> "$RUNNER_TEMP/tf/second.log" || exit 1
           if [ "$CONSOLE_MFA_ONLY" = true ]; then
             echo 'Console user pool targeted scope only; full production drift is not checked.'
             python3 infra/scripts/tf-pipeline.py console-mfa-check --plan "$RUNNER_TEMP/tf/second.json" || exit $?
+          fi
+          if [ "$CONTENT_HEADERS_ONLY" = true ]; then
+            echo 'Content verification response headers targeted scope only; full production drift is not checked.'
           fi
           rc=0
           python3 infra/scripts/check-plan.py --plan "$RUNNER_TEMP/tf/second.json" > "$RUNNER_TEMP/tf/second.txt" 2>&1 || rc=$?
@@ -363,6 +403,10 @@ jobs:
               echo 'Console user pool targeted scope only; full production drift is not checked.'
               echo
             fi
+            if [ "$CONTENT_HEADERS_ONLY" = true ]; then
+              echo 'Content verification response headers targeted scope only; full production drift is not checked.'
+              echo
+            fi
             echo "- allow file: $allow_line"
             echo "- guard (break-glass refusal): ${GUARD:-not run}; plan gate (check-plan.py): ${GATE:-not run}"
             echo "- apply: $applied"
@@ -387,7 +431,7 @@ jobs:
 
   plan:
     name: plan only (infra-prod)
-    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && !inputs.console_mfa_only
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && !inputs.console_mfa_only && !inputs.content_headers_only
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment:
