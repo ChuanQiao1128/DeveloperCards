@@ -78,6 +78,7 @@ public static partial class ContentRelease
         var rows=await DbUtil.QueryAsync(conn,tx,"select kind,result,created_at from content_release_actions where deck_id=$1 and release_id=$2 and action_id=$3",[id,req.Query.GetValueOrDefault("releaseId"),req.Query.GetValueOrDefault("actionId")]);
         if(rows.Count==0)return Helpers.ErrorEnvelope(res,404,"ACTION_NOT_FOUND","Action has not committed");
         var jobs=await DbUtil.QueryAsync(conn,tx,"select job_id,status,build_id,content_sha256,release_generation,error_message from deck_publishes where deck_id=$1 and release_receipt_id in(select id from content_review_receipts where deck_id=$1 and release_id=$2) order by created_at desc",[id,req.Query.GetValueOrDefault("releaseId")]);
+        await PublishDelivery.Annotate(conn,jobs);
         var receipts=await DbUtil.QueryAsync(conn,tx,"select r.id,r.policy,r.editing_snapshot,r.publish_snapshot,r.expires_at,(x.receipt_id is not null) as revoked,x.reason as revocation_reason from content_review_receipts r left join content_review_revocations x on x.receipt_id=r.id where r.deck_id=$1 and r.release_id=$2 order by r.created_at",[id,req.Query.GetValueOrDefault("releaseId")]);
         return res.Ok(new{receipts,action=JsonSerializer.Deserialize<APIGatewayProxyResponse>((string)rows[0]["result"]!),jobs,liveBuildId=await DbUtil.ExecuteScalarAsync(conn,tx,"select live_build_id from decks where id=$1",[id]),manifestVerified=false});
       }

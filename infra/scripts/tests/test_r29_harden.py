@@ -107,7 +107,7 @@ class ConsoleCspTest(unittest.TestCase):
         self.assertEqual(self.csp["base-uri"], ["'none'"])
         self.assertEqual(self.csp["form-action"], ["'self'"])
 
-    def test_connect_src_is_exactly_the_api_cognito_and_sentry_ingest(self):
+    def test_connect_src_is_exactly_the_api_content_cdn_cognito_and_sentry_ingest(self):
         env = env_production()
         api = origin(env["VITE_API_BASE"])
         cognito = origin(env["VITE_COGNITO_DOMAIN"])
@@ -116,10 +116,23 @@ class ConsoleCspTest(unittest.TestCase):
         self.assertEqual(connect[0], "'self'")
         self.assertIn(api, connect)
         self.assertIn(cognito, connect)
-        sentry = [s for s in connect if s not in ("'self'", api, cognito)]
+        content = origin(env["VITE_CONTENT_MANIFEST_URL"])
+        self.assertEqual(content, "https://d1ditdi9jqpy6n.cloudfront.net")
+        self.assertIn(content, connect)
+        sentry = [s for s in connect if s not in ("'self'", api, cognito, content)]
         self.assertEqual(len(sentry), 1, connect)
         # The console DSN's ingest origin (org timeawake-limited, US); the DSN itself lives in SSM and CI, not here.
         self.assertRegex(sentry[0], r"^https://o\d+\.ingest\.us\.sentry\.io$")
+
+    def test_content_cdn_allows_only_anonymous_console_reads(self):
+        headers = (REPO_ROOT / "infra/modules/edge/security_headers.tf").read_text()
+        policy = headers.split('"content_console_read"', 1)[1].split('resource "', 1)[0]
+        self.assertIn('access_control_allow_credentials = false', policy)
+        self.assertIn('items = ["https://${local.console_hostname}"]', policy)
+        self.assertIn('items = ["GET", "HEAD"]', policy)
+        self.assertNotIn('"*"', policy)
+        content = (REPO_ROOT / "infra/modules/edge/cdn.tf").read_text().split('resource "aws_cloudfront_distribution" "content" {', 1)[1].split('resource "', 1)[0]
+        self.assertIn('aws_cloudfront_response_headers_policy.content_console_read.id', content)
 
     def test_the_console_index_html_has_no_inline_script(self):
         # html.parser, not a regex: it lower-cases tag and attribute names, so <SCRIPT> or STYLE= cannot slip past.

@@ -11,7 +11,7 @@ import {
 import { useDeleteDeck, usePublishDeck } from '../hooks/useDecks';
 import { readSessionCache, writeSessionCache } from '../lib/sessionCache';
 import { CONSOLE_NAME } from '../lib/brand';
-import { getContentManifestUrl } from '../api/contentManifest';
+import { getContentManifestUrl } from '../api/contentManifestUrl';
 import { markEnd, markStart } from '../perf/journey';
 import type { Deck } from '../types/deck';
 import type { PublishJob } from '../api/authoring';

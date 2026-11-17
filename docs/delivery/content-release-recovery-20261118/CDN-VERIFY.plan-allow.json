@@ -1,0 +1,9 @@
+{
+  "tags_only_updates": false,
+  "changes": {
+    "module.edge.aws_cloudfront_response_headers_policy.content_console_read": "create",
+    "module.edge.aws_cloudfront_distribution.content": { "action": "update", "keys": ["default_cache_behavior"] },
+    "module.edge.aws_cloudfront_response_headers_policy.security[\"console\"]": { "action": "update", "keys": ["security_headers_config"] }
+  },
+  "_note": "Required for user-authorized controlled content publication verification: Console CSP permits only the existing public content CDN; that CDN permits anonymous GET/HEAD reads from the configured Console origin. No credentials, wildcard origin, upload access, IAM or authentication change. Normal infra-prod approval and saved-plan guards remain in place."
+}

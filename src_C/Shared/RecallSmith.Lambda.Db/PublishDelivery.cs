@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Npgsql;
+using RecallSmith.Lambda.Common;
 
 namespace RecallSmith.Lambda.Db;
 
@@ -15,19 +16,26 @@ public static class PublishDelivery
   {
     var ready=await Ready(conn);
     var stages=ready && rows.Count>0 ? await DbUtil.QueryAsync(conn,null,"""
-      select p.job_id,s.job_id is not null as durable,m.state,
+      select p.job_id,s.job_id is not null as durable,m.state,m.attempts,m.next_attempt_at,m.lease_until,m.last_error,
+        s.next_attempt_at as dispatch_next_attempt_at,s.lease_until as dispatch_lease_until,
         case when p.status<>'PENDING' then 'closed' when s.attempts>=5 then 'needs_attention'
           when s.delivered_at is not null then 'delivered' else 'pending' end as dispatch_state
       from deck_publishes p left join publish_dispatch s using(job_id) left join publish_manifest_delivery m using(job_id)
       where p.job_id=any($1::varchar[])
-      """,[rows.Select(r=>(string)r["jobId"]!).ToArray()]) : [];
+      """,[rows.Select(r=>(string)(r.GetValueOrDefault("jobId")??r["job_id"])!).ToArray()]) : [];
     var byId=stages.ToDictionary(r=>(string)r["job_id"]!);
     foreach(var row in rows)
     {
-      byId.TryGetValue((string)row["jobId"]!,out var stage);
+      byId.TryGetValue((string)(row.GetValueOrDefault("jobId")??row["job_id"])!,out var stage);
       row["recoveryDurable"]=stage?["durable"] is true;
       row["manifestState"]=stage?["state"];
       row["dispatchState"]=stage?["dispatch_state"];
+      row["manifestAttempts"]=stage?["attempts"];
+      row["manifestNextAttemptAt"]=stage?["next_attempt_at"];
+      row["manifestLeaseUntil"]=stage?["lease_until"];
+      row["manifestError"]=stage?["last_error"];
+      row["dispatchNextAttemptAt"]=stage?["dispatch_next_attempt_at"];
+      row["dispatchLeaseUntil"]=stage?["dispatch_lease_until"];
     }
   }
 
@@ -145,6 +153,7 @@ public static class PublishDelivery
     }
     catch (Exception ex)
     {
+      Log.Event("warn",new { tag="publish-manifest-delivery",jobId,error=ex.Message[..Math.Min(ex.Message.Length,400)] });
       await DbUtil.ExecuteAsync(conn, null, """
         update publish_manifest_delivery set state=case when attempts>=5 then 'needs_attention' else 'pending' end,
           next_attempt_at=clock_timestamp()+interval '1 minute',lease_token=null,lease_until=null,last_error=$3

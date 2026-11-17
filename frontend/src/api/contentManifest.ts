@@ -1,4 +1,6 @@
 // src/api/contentManifest.ts
+import { getContentManifestUrl } from './contentManifestUrl';
+export { getContentManifestUrl } from './contentManifestUrl';
 
 export type ManifestTier = 'free' | 'premium';
 export type ManifestAvailability = 'live' | 'coming' | 'retired';
@@ -192,18 +194,6 @@ function normalizeManifest(raw: unknown): ManifestIndex | null {
     ...(generatedAt ? { generatedAt } : {}),
     decks,
   };
-}
-
-export function getContentManifestUrl(): string {
-  const fromEnv =
-    import.meta.env.VITE_CONTENT_MANIFEST_URL ??
-    import.meta.env.VITE_MANIFEST_URL ??
-    '';
-
-  if (isNonEmptyString(fromEnv)) return fromEnv.trim();
-
-  // Local default; /content/manifest.json also works.
-  return '/manifest/index.json';
 }
 
 export async function fetchContentManifest(opts?: {

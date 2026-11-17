@@ -5,6 +5,8 @@
 - 本仓库已授权的应用／Web Console 开发任务：完成实现、必要测试和独立代码审查，修复阻断问题后，由 Agent 自动合并 PR 到 `main`，并跟进现有 CD 自动发布至 production 及发布后 smoke 验证，无需重复请求合并或发布确认。
 - GitHub `production` 环境取消 required reviewers 人工发布审批；保留仅 `main` 可部署的分支限制、CI、OIDC 身份、部署串行化、smoke 和自动回滚。人工发布审批与独立代码审查是不同环节，代码审查继续执行。
 - 此授权不自动扩大功能范围，不授权删除真实用户／业务数据、收费、公开私人资料或无关基础设施变更。AWS 卡包内容制作、发布和暂停状态继续遵循其各自的用户授权及记录。
+- 已审定卡片的小批量内容更新：使用 `/decks/release?deckId=15` 的 **Run reviewed release**，自动备份、登记既有审查、发布和核验公开 CDN；未修改 App 代码时不另发 OTA。仅对变更及受影响依赖做语义复核，其余卡的证据必须先通过精确内容绑定才能复用。
+- 发布超时或索引未同步时，查询原动作并继续相同的 releaseId／actionId／请求正文；只有任务、索引及实际下载的双语卡包均核验通过才报告完成。详见 `frontend/docs/aws-basics-release-bundle.md`。
 
 ## 1. 项目概况与当前里程碑
 

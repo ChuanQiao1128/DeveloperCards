@@ -29,6 +29,57 @@ public sealed class ContentReleaseTests(PostgresFixture db)
   private async Task Restore()=>await Task.Run(()=>{Environment.SetEnvironmentVariable("PGDATABASE",new NpgsqlConnectionStringBuilder(db.ConnectionString).Database);Pg.Reset();});
   private static object Card(string question="English question",string zh="中文问题",string? help=null)=>new{stableUid="aws-1",orderInDeck=1,difficulty=2,question,explanation="English explanation",frontHelp=help is null?(object?)null:new[]{new{term="term",definition=help}},translations=new Dictionary<string,object>{{"zh-CN",new{v=1,question=zh,explanation="中文解释"}}}};
   private static async Task<APIGatewayProxyResponse> Import(long id,string expected,string key="import",object? card=null)=>await CardsImport.HandleCardsImport(Request("POST","/api/v1/authoring/cards/import",new{deckId=id,releaseId="release-test",idempotencyKey=key,expectedEditingSnapshot=expected,cards=new[]{card??Card()}}),new Res("test"),Admin);
+
+  [Theory]
+  [InlineData("pending")]
+  [InlineData("failure")]
+  [InlineData("delivered")]
+  [InlineData("backoff")]
+  [InlineData("lease")]
+  [InlineData("exhausted")]
+  [InlineData("PROCESSING")]
+  [InlineData("FAILED")]
+  public async Task ControlledReplay_RecoversOnlyTheSameManifest_WithinExistingRetryBounds(string stage)
+  {
+    try
+    {
+      var id=await Deck();var initial=await Snapshot(id);Data(await Import(id,initial.GetProperty("editingSnapshot").GetString()!));
+      var snap=await Snapshot(id);var receipt=await Review(id,snap);
+      var body=new{deckId=id,releaseId="release-test",actionId="manifest-recovery",expectedEditingSnapshot=snap.GetProperty("editingSnapshot").GetString(),expectedLive=(string?)null,receiptId=receipt};
+      Vpc.Authoring.Publish.TestEnqueueSeam=new("queue","bucket",_=>Task.CompletedTask);
+      async Task<JsonElement> Submit()=>Data(await Vpc.Authoring.Publish.HandleAuthoringPublish(Request("POST","/api/v1/authoring/publish",body),new Res("test"),Admin));
+      var first=await Submit();Assert.Equal("queued",first.GetProperty("outcome").GetString());var job=first.GetProperty("jobId").GetString()!;
+      var repo=new JobRepository();Assert.True(await repo.TryAcquireJobAsync(job));
+      await using var conn=await Open();
+      await DbUtil.ExecuteAsync(conn,null,"update deck_publishes set content_sha256=$2,content_bytes=100 where job_id=$1",[job,new string('a',64)]);
+      if(stage=="FAILED")await repo.FailJobAsync(job,"injected build failure");
+      else if(stage!="PROCESSING")await repo.CompleteJobAsync(job,1);
+      if(stage=="delivered")await DbUtil.ExecuteAsync(conn,null,"update publish_manifest_delivery set state='delivered' where job_id=$1",[job]);
+      if(stage=="backoff")await DbUtil.ExecuteAsync(conn,null,"update publish_manifest_delivery set next_attempt_at=clock_timestamp()+interval '1 minute' where job_id=$1",[job]);
+      if(stage=="lease")await DbUtil.ExecuteAsync(conn,null,"update publish_manifest_delivery set lease_until=clock_timestamp()+interval '1 minute' where job_id=$1",[job]);
+      if(stage=="exhausted")await DbUtil.ExecuteAsync(conn,null,"update publish_manifest_delivery set attempts=5 where job_id=$1",[job]);
+      var generation=await DbUtil.ExecuteScalarAsync(conn,null,"select release_generation from decks where id=$1",[id]);var rebuilds=0;
+      Vpc.Authoring.Publish.TestControlledManifestRebuild=async c=>{
+        rebuilds++;
+        if(stage=="failure")throw new IOException("injected manifest outage");
+        using var manifest=JsonDocument.Parse((await ManifestBuilder.BuildAsync(c,"content",123)).Json);
+        Assert.Equal(first.GetProperty("buildId").GetString(),manifest.RootElement.GetProperty("decks").EnumerateArray().Single(d=>d.GetProperty("slug").GetString()==ContentRelease.DeckSlug).GetProperty("buildId").GetString());
+      };
+      var replay=await Submit();await Submit();
+      Assert.Equal(first.GetProperty("jobId").GetString(),replay.GetProperty("jobId").GetString());
+      Assert.Equal(first.GetProperty("buildId").GetString(),replay.GetProperty("buildId").GetString());
+      Assert.Equal(stage is "pending" or "failure"?1:0,rebuilds);
+      Assert.Equal(1L,await DbUtil.ExecuteScalarAsync(conn,null,"select count(*) from deck_publishes where deck_id=$1",[id]));
+      Assert.Equal(generation,await DbUtil.ExecuteScalarAsync(conn,null,"select release_generation from decks where id=$1",[id]));
+      if(stage is "pending" or "failure")
+      {
+        var rows=await DbUtil.QueryAsync(conn,null,"select job_id from deck_publishes where job_id=$1",[job]);await PublishDelivery.Annotate(conn,rows);
+        Assert.Equal(stage=="pending"?"delivered":"pending",rows[0]["manifestState"]);Assert.Equal(1,rows[0]["manifestAttempts"]);
+        if(stage=="failure")Assert.Contains("injected manifest outage",(string)rows[0]["manifestError"]!);
+      }
+    }
+    finally { Vpc.Authoring.Publish.TestControlledManifestRebuild=null;Vpc.Authoring.Publish.TestEnqueueSeam=null;await Restore(); }
+  }
   private static async Task<JsonElement> Snapshot(long id)=>Data(await ContentRelease.Handle(Request("GET","/api/v1/authoring/release/snapshot",id:id),new Res("test"),Admin));
   private static object Receipt(long id,JsonElement snap,string key="review",string? verdict=null)=>new{
     deckId=id,releaseId="release-test",actionId=key,expectedEditingSnapshot=snap.GetProperty("editingSnapshot").GetString(),policy=ContentRelease.Policy,policyHash=ContentRelease.PolicyHash,reviewSchema=ContentRelease.ReviewSchema,schemaHash=ContentRelease.ReviewSchemaHash,

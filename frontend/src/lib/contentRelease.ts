@@ -247,7 +247,7 @@ export function assertActionResult(session: ReleaseSession, action: ReleaseActio
     requireValue(data.editingSnapshot === body.expectedEditingSnapshot && data.publishSnapshot === session.verifiedSnapshot?.publishSnapshot, 'Review receipt differs from the verified snapshot.');
   } else {
     text(data.jobId); text(data.buildId);
-    requireValue(data.outcome === 'committed' && data.manifestVerified === false && data.snapshotSha256 === session.verifiedSnapshot?.publishSnapshot, 'Publish result differs from the verified snapshot.');
+    requireValue(['committed', 'queued', 'processing', 'success', 'failed'].includes(String(data.outcome)) && data.manifestVerified === false && data.snapshotSha256 === session.verifiedSnapshot?.publishSnapshot, 'Publish result differs from the verified snapshot.');
   }
 }
 export function parseReleaseSession(raw: string, ownerSubject?: string): ReleaseSession {
