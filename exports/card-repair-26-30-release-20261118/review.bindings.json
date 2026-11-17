@@ -1,0 +1,105 @@
+{
+  "cards": [
+    {
+      "uid": "aws-rb2-20261107-pack-cc20",
+      "pass": true,
+      "checkedRules": [
+        "FACT",
+        "B1",
+        "U1",
+        "R1",
+        "T1",
+        "S1",
+        "P1"
+      ],
+      "reason": "七项通过。E1—E6支持预签名URL的授权方式、对象与操作限制、直接传输、重复使用及凭证有效期边界；英中等义。正文围绕一个判断：如何临时委托对象访问而不让应用转发文件，并解释签发身份的作用。mustAnswer仅覆盖授权方式和直接传输，没有把有效期提醒列为必答。相较previousScope，核心目标和决定条件均保留，scopeChange留空可接受。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-cc21",
+      "pass": true,
+      "checkedRules": [
+        "FACT",
+        "B1",
+        "U1",
+        "R1",
+        "T1",
+        "S1",
+        "P1"
+      ],
+      "reason": "E7、E8支持两种机制的用途、选择条件及保留查询参数冲突提醒；英中等义。正面以Cookie支持和URL能否改变为决定条件，统一考查授权载体选择；背面解释授权信息承载位置为何影响选择，能够迁移到条件变化后的场景。mustAnswer仅覆盖正面两个选择，不把参数冲突提醒列为必答。所需机制及限制均在正文说明，无未教先修。对照previousScope，移除S3预签名URL比较、补充参数冲突边界均已在scopeChange登记。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-cc23",
+      "pass": true,
+      "checkedRules": [
+        "FACT",
+        "B1",
+        "U1",
+        "R1",
+        "T1",
+        "S1",
+        "P1"
+      ],
+      "reason": "E9—E12支持操作归因、管理事件与S3对象数据事件的区分，以及Config配置历史不能单独替代操作归因记录的判断；英中等义。分类和Config对比共同服务于“查谁执行了操作”这一回忆任务，考点解释记录内容与调查目标的关系，可迁移到同类操作。mustAnswer只评事件选择及快照是否足够，未添加无关必答项。管理事件、数据事件与Config的作用已在正文解释。删除权限失败排查扩展已在scopeChange登记，与previousScope一致。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-cmp-m02",
+      "pass": true,
+      "checkedRules": [
+        "FACT",
+        "B1",
+        "U1",
+        "R1",
+        "T1",
+        "S1",
+        "P1"
+      ],
+      "reason": "E13、E14、E16—E19支持网关端点、调用子网路由表、无额外端点费、公有服务端点及网络放行条件；英中等义。同Region作为限定场景保留，未扩张证据结论。端点选择与实际调用路由构成一个可执行判断，考点解释公有服务地址为何不等于必须经过互联网。mustAnswer仅要求端点类型和路由关联，不额外考费用前提或安全提醒。必要条件已有正文支持。机房访问、接口端点比较及服务授权扩展的移除均在scopeChange明确登记。"
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-cmp-m03",
+      "pass": true,
+      "checkedRules": [
+        "FACT",
+        "B1",
+        "U1",
+        "R1",
+        "T1",
+        "S1",
+        "P1"
+      ],
+      "reason": "E22—E24、E26、E27支持默认加密不更新已有对象、清单驱动批处理、SSE-KMS复制写回、保留期限操作及版本选择；英中等义。全卡围绕已有对象批量变更的操作选择，默认加密问题用于排除无效方案，两个变更目标对应不同操作，未引入独立排障任务。正文解释重写对象与修改保留期限的差别，支持条件迁移。mustAnswer仅覆盖正面所问，不把版本提醒列为必答；清单及操作的作用已有说明。相对previousScope的范围收窄、Lambda及删除判断移除、版本边界补充均已登记。"
+    }
+  ],
+  "transfers": [
+    {
+      "uid": "aws-rb2-20261107-pack-cc20",
+      "changedCondition": "应用改用仅剩30分钟有效期的临时凭证签发URL，但仍将URL有效期设置为2小时。",
+      "expectedChoiceAndReason": "仍可使用预签名URL直接传输，但不能承诺2小时访问窗口：该URL最迟随临时凭证在30分钟后失效。若必须覆盖更长窗口，需要在签发安排中满足相应的凭证有效期条件，不能仅调长URL期限。",
+      "supportedByCard": true
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-cmp-m02",
+      "changedCondition": "网关端点已经创建，但调用应用迁入另一个子网，该子网实际使用的路由表尚未关联此端点。",
+      "expectedChoiceAndReason": "仍选择对应服务的网关端点，并将它关联到新调用子网实际使用的路由表。仅创建端点不足以让该子网的服务流量走端点路径；决定流量去向的是调用子网所用路由表中的服务路由。",
+      "supportedByCard": true
+    }
+  ],
+  "additionalTransfers": [
+    {
+      "uid": "aws-rb2-20261107-pack-cc21",
+      "changedCondition": "原客户端不支持Cookie；更换客户端后支持Cookie，同时新增要求：现有URL必须保持不变。",
+      "expectedChoiceAndReason": "改选CloudFront签名Cookie。授权信息可以由Cookie单独携带，因此能满足URL不变的条件；不能继续沿用原先因不支持Cookie而选择签名URL的判断。",
+      "supportedByCard": true
+    },
+    {
+      "uid": "aws-rb2-20261107-pack-cmp-m03",
+      "changedCondition": "批量修改Object Lock保留期限的目标，从对象最新版本改为指定的历史版本。",
+      "expectedChoiceAndReason": "仍使用Batch Operations的Object Lock保留期限操作，但须在清单中明确指定目标版本ID；否则操作针对最新版本，无法表达本次历史版本目标。",
+      "supportedByCard": true
+    }
+  ],
+  "initialReviewSha256": "2a52ec4b11b3bc7241d9d9eeb4109da742821590a2b1e0ca58c1542e609348e5",
+  "targetedReviewSha256": "d585e462ede4537fd059020107de77b1301135933ffe5e58addbc4b3d9defa24",
+  "sameCandidateVerified": true
+}

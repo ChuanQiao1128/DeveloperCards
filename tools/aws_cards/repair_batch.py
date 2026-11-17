@@ -327,7 +327,8 @@ def review_input(packet, candidate):
     return {**packet, 'cards': candidate['cards'],
             'scope': 'Independent knowledge-card review; compare original scope and cited official evidence. Original question support needs recheck.',
             'evidence': [e for e in packet['evidence'] if e['id'] in used],
-            'previousScope': [{k: c[k] for k in ['uid', 'frontEn', 'frontZh', 'goalEn', 'goalZh', 'mustAnswer']}
+            'previousScope': [{k: c[k] for k in ['uid', 'frontEn', 'frontZh', 'answerEn', 'answerZh',
+                'keyPointEn', 'keyPointZh', 'watchOutEn', 'watchOutZh', 'goalEn', 'goalZh', 'mustAnswer']}
                               for c in packet['cards']]}
 
 
@@ -370,22 +371,28 @@ def finish_repair(packet_path, trial, repair, output, source_overrides=None):
     validate_schema(old_review, REVIEW_SCHEMA)
     failing = {r['uid'] for r in old_review['cards'] if r['pass'] is not True}
     current = draft.read(repair / 'review/input.json')
+    evidence_ids = {e['id'] for e in current['evidence']}
+    if (len(evidence_ids) != len(current['evidence']) or not evidence_ids
+        or any(not set(c['evidenceIds']) <= evidence_ids for c in current['cards'])):
+        raise ValueError('Targeted candidate has unknown or ambiguous evidence citations')
     validate_evidence_reuse(packet, current)
     new_review = draft.read(repair / 'review/output.json')
     latest = draft.read(repair / 'review/result.json')
     validate_schema(new_review, REVIEW_SCHEMA)
     if (draft.sha(repair / 'review/input.json') != latest['inputSha256']
         or draft.sha(repair / 'review/output.json') != latest['outputSha256']
+        or len(current['cards']) != len(failing)
         or {c['uid'] for c in current['cards']} != failing
         or not review_ok(new_review, failing)):
         raise ValueError('Targeted review does not close exactly the failed cards')
-    supplement = draft.read(repair / 'supplement-binding.json')
-    source = draft.read(supplement['path'])
-    if draft.sha(supplement['path']) != supplement['sha256']:
-        raise ValueError('Supplemental official source changed')
     extra = [e for e in current['evidence'] if e['id'] not in {e['id'] for e in packet['evidence']}]
-    if len(extra) != 1 or extra[0]['url'] != source['url'] or extra[0]['text'] not in source['text']:
-        raise ValueError('Supplemental excerpt not bound to official source')
+    if extra:
+        supplement = draft.read(repair / 'supplement-binding.json')
+        source = draft.read(supplement['path'])
+        if draft.sha(supplement['path']) != supplement['sha256']:
+            raise ValueError('Supplemental official source changed')
+        if len(extra) != 1 or extra[0]['url'] != source['url'] or extra[0]['text'] not in source['text']:
+            raise ValueError('Supplemental excerpt not bound to official source')
     old_candidates = draft.read(trial / 'review/input.json')['cards']
     replacements = {c['uid']: c for c in current['cards']}
     merged = {'cards': [replacements.get(c['uid'], c) for c in old_candidates]}
@@ -410,8 +417,10 @@ def finish_repair(packet_path, trial, repair, output, source_overrides=None):
     uids = [c['uid'] for c in merged['cards']]
     final_review = {'cards': [next(r for r in (new_review if uid in failing else old_review)['cards'] if r['uid'] == uid) for uid in uids],
                     'transfers': old_review['transfers']}
-    # Original transfer cards must remain among the unchanged, passing set.
-    if any(t['uid'] in failing for t in final_review['transfers']) or not review_ok(final_review, uids):
+    # A scope-record/input correction can reuse a transfer only for an identical candidate.
+    previous = {c['uid']: c for c in old_candidates}
+    if (any(t['uid'] in failing and replacements[t['uid']] != previous[t['uid']]
+            for t in final_review['transfers']) or not review_ok(final_review, uids)):
         raise ValueError('Unchanged review or transfer evidence cannot be reused')
     result = {'status': 'REVIEWED_DRAFT', 'cards': len(uids), 'targetedRepairRounds': 1,
               'unchangedPassReused': len(uids)-len(failing), 'targetedCards': sorted(failing),

@@ -1,0 +1,19 @@
+{
+  "status": "REVIEWED_DRAFT",
+  "cards": 5,
+  "targetedRepairRounds": 1,
+  "unchangedPassReused": 1,
+  "targetedCards": [
+    "aws-rb2-20261107-pack-cc21",
+    "aws-rb2-20261107-pack-cc23",
+    "aws-rb2-20261107-pack-cmp-m02",
+    "aws-rb2-20261107-pack-cmp-m03"
+  ],
+  "candidateSha256": "bcce3d3c04a8ae65ef106c2f9b2380891ca5bc2bc8c3b27a8f38cd625462f71a",
+  "originalReviewSha256": "2a52ec4b11b3bc7241d9d9eeb4109da742821590a2b1e0ca58c1542e609348e5",
+  "targetedReviewSha256": "d585e462ede4537fd059020107de77b1301135933ffe5e58addbc4b3d9defa24",
+  "originalQuestionSupport": "needs_recheck",
+  "learnerEffect": "not_measured",
+  "published": false,
+  "finished": "2026-11-17T21:26:18.665460+00:00"
+}

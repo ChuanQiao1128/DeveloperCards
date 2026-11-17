@@ -1,0 +1,70 @@
+{
+  "reviewedAt": "2026-11-17T23:29:42.376754+00:00",
+  "scope": "Independent review of current repair_batch.py / test_repair_batch.py tool-fix.diff only; no implementation edits, Git, model calls, remote mutations or publication.",
+  "verdict": "REQUEST_CHANGES_FOR_REUSABLE_TOOLING",
+  "currentBatchEvidence": "PASS: actual cards26-30 evidence has complete bound citations, identical targeted candidates, full prior backs, valid review hashes and passing stored mechanical checks.",
+  "toolSha256": {
+    "tools/aws_cards/repair_batch.py": "55aa3145178c6518f2c0e6ddd3246c09a3c68b1aade55829c34b72ae8f24cfd4",
+    "tools/aws_cards/test_repair_batch.py": "bc71c903d9baf7c59d4667c0036e25a875e3a9f325d141f6b7ba61cf78e91dad"
+  },
+  "findings": [
+    {
+      "id": "RMR-001",
+      "priority": "P2",
+      "file": "tools/aws_cards/repair_batch.py",
+      "startLine": 383,
+      "endLine": 390,
+      "title": "Reject repaired-card citations absent from the reviewed evidence packet",
+      "problem": "The newly allowed no-supplement path only examines evidence rows. A repaired candidate can cite a nonexistent evidence ID while extra remains empty; finish_repair does not apply the cited-ID subset validation used by run at line 484 and still emits REVIEWED_DRAFT.",
+      "reproduction": "In a temporary copy of the real batch artifacts, append ABSENT_FROM_REVIEW to evidenceIds of failed non-transfer card cc21, leave current evidence unchanged, recompute the review input result hash, then call finish_repair with the unchanged passing review. Actual draft.render executes; only external node subprocesses are stubbed successful. Observed REVIEWED_DRAFT.",
+      "impact": "The deterministic closeout can certify a repair whose declared official citation was never included in the independently reviewed evidence packet. The supplied current batch does not contain such a missing citation.",
+      "requestedChange": "Before merging, require every current candidate evidenceIds set to be a subset of current evidence IDs; add a focused finish_repair rejection test for a missing ID. Preserve existing exact evidence reuse checks."
+    }
+  ],
+  "essentialRegressionCoverage": {
+    "existingSuite": "7 tests pass: python3 -m unittest discover -s tools/aws_cards -p test_repair*.py -v",
+    "gap": "No checked-in test currently invokes finish_repair. Add coverage for the two changed branches, including exact unchanged transfer reuse versus any changed candidate, no-extra/no-supplement acceptance, and retained supplemental source hash / reused evidence rejection.",
+    "isolatedProbes": [
+      {
+        "case": "no-extra-no-supplement-exact-candidate",
+        "outcome": "ACCEPTED as intended"
+      },
+      {
+        "case": "changed-candidate-old-transfer",
+        "outcome": "REJECTED as intended"
+      },
+      {
+        "case": "one-bound-supplement",
+        "outcome": "ACCEPTED as intended"
+      },
+      {
+        "case": "changed-supplement-file",
+        "outcome": "REJECTED as intended"
+      },
+      {
+        "case": "changed-reused-quote",
+        "outcome": "REJECTED as intended"
+      },
+      {
+        "case": "cited-id-absent-from-review-evidence",
+        "outcome": "ACCEPTED unexpectedly; RMR-001"
+      }
+    ],
+    "probeLimits": "Temporary local copies; source file hash loop used an empty focused fixture; actual draft.render ran; external node mechanical processes were mocked. This verifies closeout branch logic, not real AWS facts or learner outcomes."
+  },
+  "verifiedArtifactChecks": [
+    "Initial/targeted input and output hashes match result bindings",
+    "All four targeted candidates exactly equal the initial reviewed candidate dictionaries",
+    "Full bilingual previousScope fields match the frozen baseline snapshot",
+    "All current actual evidence rows exactly equal original evidence rows; all cited IDs are present",
+    "Targeted review meets all seven rules and transfer checks",
+    "Initial/final candidate SHA-256 is identical: bcce3d3c04a8ae65ef106c2f9b2380891ca5bc2bc8c3b27a8f38cd625462f71a",
+    "Final original/targeted review hashes match files; stored mechanical checks have exitCode 0"
+  ],
+  "notChecked": [
+    "No publication or live CDN validation",
+    "No AWS semantic/content review",
+    "No learner-effect or original-question-support claim",
+    "No Git operation or history read"
+  ]
+}
