@@ -226,11 +226,11 @@ function footerLabels(tree: renderer.ReactTestRenderer): string[] {
     );
 }
 
-async function renderDraw(navigate = vi.fn()) {
+async function renderDraw(navigate = vi.fn(), params: any = { slug: 'csharp' }, setParams = vi.fn()) {
   let tree!: renderer.ReactTestRenderer;
   await act(async () => {
     tree = renderer.create(
-      <DrawScreen navigation={{ goBack: vi.fn(), navigate } as any} route={{ key: 'draw', name: 'Draw', params: { slug: 'csharp' } } as any} />,
+      <DrawScreen navigation={{ goBack: vi.fn(), navigate, setParams } as any} route={{ key: 'draw', name: 'Draw', params } as any} />,
     );
   });
   await flush();
@@ -246,6 +246,22 @@ function footerActions(tree: renderer.ReactTestRenderer) {
 }
 
 describe('DrawScreen v9', () => {
+  it('shows truthful first-lesson feedback and dismisses it without opening or charging a pack', async () => {
+    const setParams = vi.fn();
+    const tree = await renderDraw(vi.fn(), { slug: 'csharp', lessonReadCount: 5 }, setParams);
+    expect(tree.root.findAllByProps({ testID: 'draw-first-lesson-feedback' }).length).toBeGreaterThan(0);
+    expect(collectText(tree)).toContain('You have read 5 cards.');
+    expect(collectText(tree)).not.toContain('mastered 5');
+    const dismiss = tree.root.find((node) => (node.type as any) === 'Pressable'
+      && node.findAll((child) => (child.type as any) === 'Text' && child.props.children === 'Dismiss').length > 0);
+    await act(async () => dismiss.props.onPress());
+    expect(setParams).toHaveBeenCalledWith({ lessonReadCount: undefined });
+    expect(commitDrawMock).not.toHaveBeenCalled();
+    expect(consumeDeckPullsMock).not.toHaveBeenCalled();
+    await act(async () => tree.unmount());
+    const ordinary = await renderDraw();
+    expect(ordinary.root.findAllByProps({ testID: 'draw-first-lesson-feedback' })).toHaveLength(0);
+  });
   beforeEach(() => {
     (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
     walletFixture = { availablePulls: 12, reservePulls: 0 };

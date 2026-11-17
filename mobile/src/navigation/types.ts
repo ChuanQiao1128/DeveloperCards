@@ -27,6 +27,7 @@ export type RootStackParamList = {
   // highlight card #1.
   Library: { focusSlug?: string; scrollToNew?: boolean; highlightUids?: string[] } | undefined;
   CardDetail: { cardId: string; studyContext?: boolean };
+  CardWalkthrough: { slug: string };
   // K02: slug narrows the book to one deck; absent lists every deck.
   MistakeBook: { slug?: string } | undefined;
   // D02 (R24 §1.3): per-domain counts of one deck, with a Practice focus session per domain.
@@ -133,6 +134,7 @@ export type RootStackParamList = {
   Draw: {
     slug?: string;
     rewardPending?: boolean;
+    lessonReadCount?: number;
   } | undefined;
 
   SessionSummary: {

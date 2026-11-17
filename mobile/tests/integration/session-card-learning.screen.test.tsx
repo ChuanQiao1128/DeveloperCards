@@ -701,7 +701,7 @@ describe('SessionCardScreen learning step (R22 §6: teach before testing; 2026-1
     expect(texts(tree)).toContain('A buffer between producer and consumer.');
     expect(byTestID(tree, 'learning-study-source-host')[0].props.children).toBe('docs.aws.amazon.com');
     expect(byTestID(tree, 'learning-study-source-quote')[0].props.children).toBe('Queues decouple producers.');
-    expect(studyHint(tree)).toBe('Read it once. It comes back tomorrow.');
+    expect(studyHint(tree)).toBe('Both choices bring this card back tomorrow.');
     expect(pressables(tree, 'Show answer')).toHaveLength(0);
     const gotIt = byTestID(tree, 'learning-study-got-it');
     expect(gotIt).toHaveLength(1);
@@ -711,6 +711,18 @@ describe('SessionCardScreen learning step (R22 §6: teach before testing; 2026-1
     expect(saveDeckProgress).not.toHaveBeenCalled();
     expect(settleRatingReward).not.toHaveBeenCalled();
     expect(navigation.replace).not.toHaveBeenCalled();
+  });
+
+  it('lets an unclear first reading continue with the same hard review tomorrow', async () => {
+    serve([NEW_A], [fresh('new-a')], 1);
+    const { tree } = await mount();
+    expect(byTestID(tree, 'learning-study-still-learning')).toHaveLength(0);
+    await press(tree, 'Show answer');
+    await press(tree, 'Still learning · continue');
+    const saved = vi.mocked(saveDeckProgress).mock.calls.at(-1)![1];
+    const progress = saved.find((entry) => entry.stableUid === 'new-a')!;
+    expect(progress.nextReviewAt).toBe(FIXED_NOW_MS + 86_400_000);
+    expect(progress.lastReviewedAt).toBe(FIXED_NOW_MS);
   });
 
   it('shows no source with the cardSource flag off', async () => {
@@ -1058,6 +1070,6 @@ describe('SessionCardScreen learning step (R22 §6: teach before testing; 2026-1
     expect(byTestID(tree, 'answer-key-line')).toHaveLength(1);
     expect(texts(tree)).toContain(KEY_LINE);
     // The study dock keeps its own hint: there is nothing to rate yet.
-    expect(studyHint(tree)).toBe('Read it once. It comes back tomorrow.');
+    expect(studyHint(tree)).toBe('Both choices bring this card back tomorrow.');
   });
 });

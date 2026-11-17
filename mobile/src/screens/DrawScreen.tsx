@@ -864,6 +864,19 @@ export function DrawScreen({ navigation, route }: Props) {
             </View>
           </View>
 
+          {ready.slug === routeSlug && Number.isInteger(route.params?.lessonReadCount)
+            && route.params!.lessonReadCount! > 0 && route.params!.lessonReadCount! <= 5 ? (
+            <View testID="draw-first-lesson-feedback" style={styles.lessonFeedback}>
+              <Text style={styles.lessonFeedbackTitle}>Your first lesson is complete</Text>
+              <Text style={styles.lessonFeedbackBody}>You have read {route.params!.lessonReadCount} cards. They are scheduled for review so you can check what you remember.</Text>
+              <Text style={styles.lessonFeedbackBody}>Open your first pack to continue.</Text>
+              <Pressable accessibilityRole="button" onPress={() => navigation.setParams({ lessonReadCount: undefined })}
+                style={styles.lessonFeedbackDismiss}>
+                <Text style={styles.lessonFeedbackBody}>Dismiss</Text>
+              </Pressable>
+            </View>
+          ) : null}
+
           {/* Guarantee countdown. Rendered next to the pulls badge because it
               answers the question a player asks right before spending one. */}
           {ready.pityLabel ? (
@@ -1117,6 +1130,10 @@ export function DrawScreen({ navigation, route }: Props) {
 export default DrawScreen;
 
 const styles = StyleSheet.create({
+  lessonFeedback: { marginVertical: spacing.sm, padding: spacing.md, backgroundColor: colors.softCream, borderRadius: 12 },
+  lessonFeedbackTitle: { fontSize: typography.title3, color: colors.ink, fontWeight: '800', marginBottom: spacing.xs },
+  lessonFeedbackBody: { fontSize: typography.body, color: colors.inkSecondary, lineHeight: 22, marginTop: spacing.xs },
+  lessonFeedbackDismiss: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' },
   safeArea: { flex: 1, backgroundColor: colors.softCream },
   gradient: { flex: 1 },
   centerWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.screenPadding },

@@ -428,7 +428,7 @@ async function runStarterLesson() {
   }
   expect(studied).toEqual(LESSON_UIDS.map(questionOf));
   expect(navigation.replace).toHaveBeenCalledTimes(1);
-  expect(navigation.replace).toHaveBeenCalledWith('Draw', { slug: SLUG, rewardPending: true });
+  expect(navigation.replace).toHaveBeenCalledWith('Draw', { slug: SLUG, rewardPending: true, lessonReadCount: 5 });
   act(() => tree.unmount());
 }
 

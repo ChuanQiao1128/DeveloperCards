@@ -7,8 +7,8 @@ import { typography } from '../../../theme/typography';
 import { cardTextA11yProps, useCardTextLang } from './CardTextLang';
 
 /** Question-side vocabulary only; opening help never flips or grades the card. */
-export function CardFrontHelp({ help }: { help: unknown }) {
-  const [expanded, setExpanded] = useState(false);
+export function CardFrontHelp({ help, initiallyExpanded = false }: { help: unknown; initiallyExpanded?: boolean }) {
+  const [expanded, setExpanded] = useState(initiallyExpanded);
   const lang = useCardTextLang();
   const entries = parseFrontHelp(help);
   if (!entries?.length) return null;
