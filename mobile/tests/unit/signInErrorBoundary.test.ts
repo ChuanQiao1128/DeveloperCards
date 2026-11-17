@@ -59,7 +59,7 @@ describe('QA regression: real sign-in store -> screen error formatter boundary',
     const error = await useAuthStore.getState()
       .signInWithEmail('qa@example.invalid', 'SYNTHETIC_TEST_ONLY').catch(e => e);
     expect(isAuthFlowError(error, 'NEEDS_CONFIRMATION')).toBe(true);
-    expect(friendlyAuthError(error)).toBe('Please verify your email first. We sent you a new code.');
+    expect(friendlyAuthError(error)).toBe('Please verify your email to sign in.');
     expect(resetPassword).not.toHaveBeenCalled();
   });
 

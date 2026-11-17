@@ -17,6 +17,7 @@ vi.mock('react-native', () => {
     ActivityIndicator: (props: any) => React.createElement('ActivityIndicator', props),
     Alert: { alert: vi.fn() },
     Platform: { OS: 'ios' },
+    AppState: { addEventListener: vi.fn(() => ({ remove: vi.fn() })) },
     StyleSheet: { create: (styles: any) => styles, absoluteFill: {} },
   };
 });
@@ -81,9 +82,9 @@ describe('auth polish screens', () => {
       tree = renderer.create(<SignInScreen navigation={{ goBack: vi.fn(), canGoBack: () => true, reset: vi.fn(), navigate: vi.fn() } as any} route={{ key: 'signin', name: 'SignIn' } as any} />);
     });
     const blob = textBlob(tree);
-    expect(blob).toContain('Welcome back');
-    expect(blob).toContain('Sign in to restore your study progress, sync, and account recovery.');
-    expect(blob).toContain('Use the verified email tied to your study history.');
+    expect(blob).toContain('Sign in');
+    expect(blob).toContain('Sync your cards and study progress across devices.');
+    expect(blob).not.toContain('Use the verified email tied to your study history.');
     expect(blob).toContain('Create an account');
     expect(blob).toContain('merge automatically');
     expect(blob).not.toContain('Sign in to sync your progress.');
@@ -96,8 +97,8 @@ describe('auth polish screens', () => {
     });
     const blob = textBlob(tree);
     expect(blob).toContain('Create your account');
-    expect(blob).toContain('Verify email to protect sync and future account recovery.');
-    expect(blob).toContain('We’ll send a verification code before cloud sync turns on.');
+    expect(blob).toContain('Save your study progress and sync it across devices.');
+    expect(blob).toContain('Create account and send code');
     expect(blob).toContain('Use an email you can access again later if you ever need to recover your account.');
     expect(blob).toContain('merge into your new account automatically');
 
@@ -119,15 +120,15 @@ describe('auth polish screens', () => {
   });
 
   it('keeps email-confirmation copy calm, renders 6 OTP slots, and enforces resend cooldown', async () => {
-    const goBack = vi.fn();
+    const replace = vi.fn();
     let tree!: renderer.ReactTestRenderer;
     await act(async () => {
-      tree = renderer.create(<ConfirmSignUpScreen navigation={{ goBack, replace: vi.fn() } as any} route={{ key: 'confirm', name: 'ConfirmSignUp', params: { email: 'person@example.com' } } as any} />);
+      tree = renderer.create(<ConfirmSignUpScreen navigation={{ goBack: vi.fn(), replace } as any} route={{ key: 'confirm', name: 'ConfirmSignUp', params: { email: 'person@example.com' } } as any} />);
     });
     const blob = textBlob(tree);
     expect(blob).toContain('Verify your email');
-    expect(blob).toContain('Use the latest code to finish protecting sync and recovery.');
-    expect(blob).toContain('Only the latest code works. If you requested several, use the newest email.');
+    expect(blob).toContain('Enter the 6-digit code from your latest email.');
+    expect(blob).toContain('Check your spam folder. If you requested several codes, use the newest email.');
     expect(blob).not.toContain('Use the latest code you received.');
 
     const gradient = tree.root.findByType('LinearGradient' as any);
@@ -146,7 +147,7 @@ describe('auth polish screens', () => {
     act(() => {
       changeEmailBtn.props.onPress();
     });
-    expect(goBack).toHaveBeenCalledTimes(1);
+    expect(replace).toHaveBeenCalledWith('SignUp', { email: 'person@example.com' });
   });
 
   it('auto-submits exactly once when 6 digits are entered or pasted', async () => {

@@ -40,6 +40,7 @@ vi.mock('react-native', () => {
     ActivityIndicator: (props: any) => React.createElement('ActivityIndicator', props),
     Alert: { alert: vi.fn() },
     Platform: { OS: 'ios' },
+    AppState: { addEventListener: vi.fn(() => ({ remove: vi.fn() })) },
     StyleSheet: { create: (styles: any) => styles, absoluteFill: {} },
   };
 });
@@ -242,7 +243,7 @@ describe('auth recovery screens', () => {
     await flush();
 
     expect(store.resendConfirmCode).toHaveBeenCalledWith('user@example.com');
-    expect(navigation.navigate).toHaveBeenCalledWith('ConfirmSignUp', { email: 'user@example.com' });
+    expect(navigation.navigate).toHaveBeenCalledWith('ConfirmSignUp', expect.objectContaining({ email: 'user@example.com', source: expect.stringMatching(/^(signin|signup)$/), codeSentAt: expect.any(Number) }));
   });
 
   it('sign-up with an existing email alerts and offers sign-in instead of sending a code', async () => {
@@ -303,11 +304,8 @@ describe('auth recovery screens', () => {
     });
     await flush();
 
-    expect(mockAlert).toHaveBeenCalledWith(
-      'Already verified',
-      'This email is already verified. Please sign in.',
-      expect.any(Array),
-    );
+    expect(mockAlert).not.toHaveBeenCalled();
+    expect(navigation.popTo).toHaveBeenCalledWith('SignIn', { email: 'user@example.com', notice: 'email_verified', noticeAt: expect.any(Number) });
   });
 
   it('forgot password sends a code, then sets the new password and returns to sign-in', async () => {
@@ -343,7 +341,7 @@ describe('auth recovery screens', () => {
     await flush();
 
     expect(store.confirmPasswordReset).toHaveBeenCalledWith('user@example.com', '123456', 'Abcdef1!');
-    expect(navigation.popTo).toHaveBeenCalledWith('SignIn', { email: 'user@example.com' });
+    expect(navigation.popTo).toHaveBeenCalledWith('SignIn', { email: 'user@example.com', notice: 'password_reset', noticeAt: expect.any(Number) });
   });
 
   it('sign-up shows the live password checklist', async () => {
@@ -472,7 +470,7 @@ describe('auth screens record the anonymous funnel steps (R24 M01)', () => {
   it('a valid sign-up submit records signup_started once, with no email or account data', async () => {
     store.signUpWithEmail.mockResolvedValue(undefined);
     const navigation = await renderSignUp('user@example.com', 'Abcdef1!');
-    expect(navigation.replace).toHaveBeenCalledWith('ConfirmSignUp', { email: 'user@example.com' });
+    expect(navigation.replace).toHaveBeenCalledWith('ConfirmSignUp', expect.objectContaining({ email: 'user@example.com', source: expect.stringMatching(/^(signin|signup)$/), codeSentAt: expect.any(Number) }));
     expect(recordFunnelEventMock).toHaveBeenCalledTimes(1);
     expect(recordFunnelEventMock).toHaveBeenCalledWith('signup_started');
   });
