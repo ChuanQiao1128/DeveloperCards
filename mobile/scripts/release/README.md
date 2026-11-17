@@ -32,10 +32,11 @@ fails for any review-notes file after 2.0.0 that does not contain the full path 
 
 Always publish OTAs through `ota.sh`; a bare `eas update` without `--environment production` ships empty `EXPO_PUBLIC_*` values.
 
-`ota.sh` exports inside `eas env:exec production`, disables local dotenv overrides, and verifies that the iOS
+`ota.sh` exports inside `eas env:exec production`, uses a private temporary Metro cache, disables local dotenv overrides, and verifies that the iOS
 launch bundle contains the configured Cognito region, pool and client. A missing value or bad compiled bundle
-stops before upload. Publishing uses `--skip-bundler` so EAS uploads the verified export. This check was added
-after the 2026-11-17 sign-up/sign-in incident; variable names existing in EAS alone do not prove they reached the bundle.
+stops before upload. Source maps and the asset map are required too. Publishing uses `--skip-bundler` so EAS uploads the verified export. This check was added
+after the 2026-11-17 sign-up/sign-in incident: stale Metro transforms retained empty auth settings despite `--clear`.
+Variable names existing in EAS alone do not prove they reached the bundle.
 
 Exit codes: `ota.sh` 0 ok · 2 usage / eas-cli missing or not logged in · 3 missing `EXPO_PUBLIC_*` name(s) · 6 runtime guard;
 `ios-build.sh` 0 ok · 1 build failed · 2 eas-cli missing or not logged in · 3 production is missing `EXPO_PUBLIC_SENTRY_DSN` / `SENTRY_AUTH_TOKEN` in the EAS production environment (names only, DRY_RUN included) · 5 Sentry org/project placeholders; `asc-release.cjs` 0 ok · 1 error · 3 Apple session expired · 4 version held by App Review.
