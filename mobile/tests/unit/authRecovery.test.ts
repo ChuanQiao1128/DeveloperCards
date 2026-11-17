@@ -78,6 +78,14 @@ afterEach(() => {
 });
 
 describe('authRecovery', () => {
+  it.each(['signUpWithEmail', 'signInWithEmail'] as const)('preserves actionable configuration errors from %s through the screen formatter', async method => {
+    const error = { name: 'AuthUserPoolException', message: 'raw internal config details' };
+    if (method === 'signUpWithEmail') mockSignUp.mockRejectedValue(error);
+    else mockSignIn.mockRejectedValue(error);
+    const message = await useAuthStore.getState()[method]('test@example.invalid', 'Abcdef1!').catch(friendlyAuthError);
+    expect(message).toBe('Account services are unavailable in this app update. Restart the app to check for an update.');
+  });
+
   it('maps Cognito error names to friendly copy', () => {
     expect(friendlyAuthError({ name: 'NotAuthorizedException' })).toBe(
       AUTH_ERROR_COPY.NotAuthorizedException,
