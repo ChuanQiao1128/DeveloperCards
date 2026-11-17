@@ -25,16 +25,17 @@ import { colors } from '../theme/colors';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'SignUp'>;
 
-export default function SignUpScreen({ navigation }: Props) {
+export default function SignUpScreen({ navigation, route }: Props) {
   const loading = useAuthStore((s) => s.loading);
   const signUpWithEmail = useAuthStore((s) => s.signUpWithEmail);
 
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(route?.params?.email ?? '');
   const [password, setPassword] = useState('');
   const [showPwd, setShowPwd] = useState(false);
   const [emailBlurred, setEmailBlurred] = useState(false);
   const [inlineError, setInlineError] = useState<string | null>(null);
   const inFlightRef = useRef(false);
+  const passwordRef = useRef<TextInput>(null);
 
   const passwordRules = useMemo(() => evaluatePassword(password), [password]);
   const emailInvalid = emailBlurred && normEmail(email).length > 0 && !isValidEmail(email);
@@ -59,7 +60,7 @@ export default function SignUpScreen({ navigation }: Props) {
     recordFunnelEvent('signup_started');
     try {
       await signUpWithEmail(e, password);
-      navigation.replace('ConfirmSignUp', { email: e });
+      navigation.replace('ConfirmSignUp', { email: e, source: 'signup', codeSentAt: Date.now() });
     } catch (err: any) {
       if (isAuthFlowError(err, 'USERNAME_EXISTS')) {
         // Pre-existing PR #813 contract: route existing email to SignIn via Alert.
@@ -109,14 +110,11 @@ export default function SignUpScreen({ navigation }: Props) {
 
             <View style={{ flex: 1 }}>
               <Text style={styles.title}>Create your account</Text>
-              <Text style={styles.subtitle}>Verify email to protect sync and future account recovery.</Text>
+              <Text style={styles.subtitle}>Save your study progress and sync it across devices.</Text>
             </View>
           </View>
 
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>Sign up</Text>
-            <Text style={styles.cardHint}>We’ll send a verification code before cloud sync turns on.</Text>
-
             <View style={styles.mergeBadge} testID="signup-merge-reassurance">
               <Text style={styles.mergeBadgeText}>
                 Cards and study progress on this device merge into your new account automatically.
@@ -132,6 +130,7 @@ export default function SignUpScreen({ navigation }: Props) {
             <Text style={styles.label}>Email</Text>
             <View style={[styles.inputWrap, emailInvalid && styles.inputWrapError]}>
               <TextInput
+                accessibilityLabel="Email"
                 value={email}
                 onChangeText={(v) => {
                   setEmail(v);
@@ -151,6 +150,8 @@ export default function SignUpScreen({ navigation }: Props) {
                 style={styles.input}
                 editable={!loading}
                 returnKeyType="next"
+                submitBehavior="submit"
+                onSubmitEditing={() => passwordRef.current?.focus()}
               />
             </View>
             {emailInvalid ? (
@@ -162,6 +163,8 @@ export default function SignUpScreen({ navigation }: Props) {
             <Text style={[styles.label, { marginTop: 12 }]}>Password</Text>
             <View style={styles.inputWrap}>
               <TextInput
+                ref={passwordRef}
+                accessibilityLabel="New password"
                 value={password}
                 onChangeText={(v) => {
                   setPassword(v);
@@ -223,7 +226,7 @@ export default function SignUpScreen({ navigation }: Props) {
                   <Text style={[styles.primaryText, { marginLeft: 8 }]}>Creating…</Text>
                 </View>
               ) : (
-                <Text style={styles.primaryText}>Create account</Text>
+                <Text style={styles.primaryText}>Create account and send code</Text>
               )}
             </Pressable>
 
@@ -417,7 +420,7 @@ const styles = StyleSheet.create({
     minHeight: 48,
     borderRadius: 999,
     backgroundColor: 'transparent',
-    borderWidth: 1,
+    borderWidth: 0,
     borderColor: colors.hairline,
     paddingHorizontal: 16,
     alignItems: 'center',

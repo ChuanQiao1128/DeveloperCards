@@ -5,7 +5,6 @@ import {
   TextInput,
   Pressable,
   StyleSheet,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
@@ -22,19 +21,9 @@ import { OTP_SLOT_COUNT, OtpCodeSlots } from '../auth/components/OtpCodeSlots';
 import { leaveAuthFlow, type LeaveAuthNavigation } from '../auth/leaveAuthFlow';
 import { recordFunnelEvent } from '../telemetry/funnel';
 import { colors } from '../theme/colors';
+import { useResendCooldown } from '../auth/useResendCooldown';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ConfirmSignUp'>;
-
-const RESEND_COOLDOWN_SECONDS = 60;
-
-function maskEmail(email: string) {
-  const e = String(email || '').trim();
-  const at = e.indexOf('@');
-  if (at <= 1) return e;
-  const name = e.slice(0, at);
-  const dom = e.slice(at + 1);
-  return `${name.slice(0, 2)}***${name.slice(-1)}@${dom}`;
-}
 
 export default function ConfirmSignUpScreen({ navigation, route }: Props) {
   const email = route.params.email;
@@ -44,18 +33,21 @@ export default function ConfirmSignUpScreen({ navigation, route }: Props) {
   const resendConfirmCode = useAuthStore((s) => s.resendConfirmCode);
 
   const [code, setCode] = useState('');
-  const [inlineError, setInlineError] = useState<string | null>(null);
+  const [inlineError, setInlineError] = useState<string | null>(route.params.deliveryError ?? null);
   const [resendNotice, setResendNotice] = useState<string | null>(null);
-  const [cooldownSec, setCooldownSec] = useState(0);
+  const [codeSent, setCodeSent] = useState(Boolean(route.params.codeSentAt));
+  const { cooldownSec, startCooldown } = useResendCooldown(route.params.codeSentAt);
   const inFlightRef = useRef(false);
   const autoSubmittedCodeRef = useRef<string | null>(null);
   const codeInputRef = useRef<TextInput>(null);
 
   useEffect(() => {
-    if (cooldownSec <= 0) return;
-    const timer = setTimeout(() => setCooldownSec((prev) => Math.max(0, prev - 1)), 1000);
-    return () => clearTimeout(timer);
-  }, [cooldownSec]);
+    setCode('');
+    setInlineError(route.params.deliveryError ?? null);
+    setResendNotice(null);
+    setCodeSent(Boolean(route.params.codeSentAt));
+    autoSubmittedCodeRef.current = null;
+  }, [email, route.params.codeSentAt, route.params.deliveryError]);
 
   const canSubmit = useMemo(() => {
     const c = String(code || '').trim();
@@ -77,14 +69,10 @@ export default function ConfirmSignUpScreen({ navigation, route }: Props) {
         leaveAuthFlow(navigation as unknown as LeaveAuthNavigation);
         return;
       }
-      Alert.alert('Verified', 'Your email is verified. Please sign in.', [
-        { text: 'Continue', onPress: () => navigation.popTo('SignIn', { email }) },
-      ]);
+      navigation.popTo('SignIn', { email, notice: 'email_verified', noticeAt: Date.now() });
     } catch (e: any) {
       if (isAuthFlowError(e, 'ALREADY_CONFIRMED')) {
-        Alert.alert('Already verified', e.message, [
-          { text: 'Sign in', onPress: () => navigation.popTo('SignIn', { email }) },
-        ]);
+        navigation.popTo('SignIn', { email, notice: 'email_verified', noticeAt: Date.now() });
         return;
       }
       setInlineError(friendlyAuthError(e));
@@ -125,7 +113,10 @@ export default function ConfirmSignUpScreen({ navigation, route }: Props) {
     setResendNotice(null);
     try {
       await resendConfirmCode(email);
-      setCooldownSec(RESEND_COOLDOWN_SECONDS);
+      startCooldown();
+      setCodeSent(true);
+      setCode('');
+      autoSubmittedCodeRef.current = null;
       setResendNotice('A new code has been sent to your email.');
     } catch (e: any) {
       setInlineError(friendlyAuthError(e));
@@ -167,13 +158,14 @@ export default function ConfirmSignUpScreen({ navigation, route }: Props) {
 
             <View style={{ flex: 1 }}>
               <Text style={styles.title}>Verify your email</Text>
-              <Text style={styles.subtitle}>Code sent to {maskEmail(email)}.</Text>
+              <Text style={styles.subtitle}>
+                {codeSent ? `Code sent to ${email}.` : `Enter the verification code for ${email}.`}
+              </Text>
             </View>
           </View>
 
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>Confirmation code</Text>
-            <Text style={styles.cardHint}>Use the latest code to finish protecting sync and recovery.</Text>
+            <Text style={styles.cardHint}>Enter the 6-digit code from your latest email.</Text>
 
             {inlineError ? (
               <View style={styles.errorBanner} testID="confirm-error-banner" accessibilityRole="alert">
@@ -191,6 +183,7 @@ export default function ConfirmSignUpScreen({ navigation, route }: Props) {
             <Pressable accessible={false} testID="confirm-code-touch" onPress={() => codeInputRef.current?.focus()}>
             <OtpCodeSlots code={code}>
               <TextInput
+                accessibilityLabel="6-digit verification code"
                 ref={codeInputRef}
                 value={code}
                 onChangeText={handleCodeChange}
@@ -256,13 +249,19 @@ export default function ConfirmSignUpScreen({ navigation, route }: Props) {
               testID="confirm-change-email"
               accessibilityRole="button"
               style={({ pressed }) => [styles.changeEmailLink, pressed && styles.pressed]}
-              onPress={() => navigation.goBack()}
+              onPress={() => {
+                if (route.params.source === 'signin') {
+                  navigation.popTo('SignIn', { email, notice: 'check_email', noticeAt: Date.now() });
+                } else {
+                  navigation.replace('SignUp', { email });
+                }
+              }}
               disabled={loading}
             >
-              <Text style={styles.changeEmailText}>Wrong email address? Go back</Text>
+              <Text style={styles.changeEmailText}>Change email address</Text>
             </Pressable>
 
-            <Text style={styles.footnote}>Only the latest code works. If you requested several, use the newest email.</Text>
+            <Text style={styles.footnote}>Check your spam folder. If you requested several codes, use the newest email.</Text>
           </View>
 
           <View style={{ height: 28 }} />

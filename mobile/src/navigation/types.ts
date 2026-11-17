@@ -152,8 +152,8 @@ export type RootStackParamList = {
     picks?: { landed: number; answered: number };
   };
 
-  SignIn: { email?: string } | undefined;
-  SignUp: undefined;
-  ConfirmSignUp: { email: string };
-  ForgotPassword: { email?: string } | undefined;
+  SignIn: { email?: string; notice?: 'password_reset' | 'email_verified' | 'check_email'; noticeAt?: number } | undefined;
+  SignUp: { email?: string } | undefined;
+  ConfirmSignUp: { email: string; source?: 'signup' | 'signin'; codeSentAt?: number; deliveryError?: string };
+  ForgotPassword: { email?: string; mode?: 'new_password' } | undefined;
 };

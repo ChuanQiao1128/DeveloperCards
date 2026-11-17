@@ -35,7 +35,10 @@ export default function SignInScreen({ navigation, route }: Props) {
   const [showPwd, setShowPwd] = useState(false);
   const [emailBlurred, setEmailBlurred] = useState(false);
   const [inlineError, setInlineError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const inFlightRef = useRef(false);
+  const passwordRef = useRef<TextInput>(null);
+  const emailRef = useRef<TextInput>(null);
 
   useEffect(() => {
     if (isSignedIn) leaveAuthFlow(navigation as unknown as LeaveAuthNavigation);
@@ -47,6 +50,20 @@ export default function SignInScreen({ navigation, route }: Props) {
     const next = route.params?.email;
     if (next) setEmail(next);
   }, [route.params?.email]);
+
+  useEffect(() => {
+    if (!route.params?.notice) return;
+    setPassword('');
+    setShowPwd(false);
+    setInlineError(null);
+    setNotice(route.params.notice === 'check_email'
+      ? 'Check your email address, then sign in.'
+      : route.params.notice === 'password_reset'
+      ? 'Password updated. Sign in with your new password.'
+      : 'Email verified. Sign in to continue.');
+    if (route.params.notice === 'check_email') emailRef.current?.focus();
+    else passwordRef.current?.focus();
+  }, [route.params?.notice, route.params?.noticeAt]);
 
   const emailInvalid = emailBlurred && normEmail(email).length > 0 && !isValidEmail(email);
 
@@ -65,17 +82,29 @@ export default function SignInScreen({ navigation, route }: Props) {
 
     inFlightRef.current = true;
     setInlineError(null);
+    setNotice(null);
     try {
       await signInWithEmail(email, password);
       leaveAuthFlow(navigation as unknown as LeaveAuthNavigation);
     } catch (e: any) {
       if (isAuthFlowError(e, 'NEEDS_CONFIRMATION')) {
+        let codeSentAt: number | undefined;
+        let deliveryError: string | undefined;
         try {
           await resendConfirmCode(email);
-        } catch {
-          // ignore — the confirm screen offers a manual resend
+          codeSentAt = Date.now();
+        } catch (error) {
+          deliveryError = friendlyAuthError(error);
         }
-        navigation.navigate('ConfirmSignUp', { email: normEmail(email) });
+        navigation.navigate('ConfirmSignUp', { email: normEmail(email), source: 'signin', codeSentAt, deliveryError });
+        return;
+      }
+      if (isAuthFlowError(e, 'RESET_REQUIRED') || isAuthFlowError(e, 'NEW_PASSWORD_REQUIRED')) {
+        setPassword('');
+        navigation.navigate('ForgotPassword', {
+          email: normEmail(email),
+          ...(isAuthFlowError(e, 'NEW_PASSWORD_REQUIRED') ? { mode: 'new_password' as const } : {}),
+        });
         return;
       }
 
@@ -123,21 +152,24 @@ export default function SignInScreen({ navigation, route }: Props) {
             </Pressable>
 
             <View style={{ flex: 1 }}>
-              <Text style={styles.title}>Welcome back</Text>
-              <Text style={styles.subtitle}>Sign in to restore your study progress, sync, and account recovery.</Text>
+              <Text style={styles.title}>Sign in</Text>
+              <Text style={styles.subtitle}>Sync your cards and study progress across devices.</Text>
             </View>
           </View>
 
           {/* Card */}
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>Sign in</Text>
-            <Text style={styles.cardHint}>Use the verified email tied to your study history.</Text>
-
             <View style={styles.mergeBadge} testID="signin-merge-reassurance">
               <Text style={styles.mergeBadgeText}>
                 Cards and study progress on this device stay safe and merge automatically when you sign in.
               </Text>
             </View>
+
+            {notice ? (
+              <View style={styles.mergeBadge} testID="signin-notice-banner" accessibilityLiveRegion="polite">
+                <Text style={styles.mergeBadgeText}>{notice}</Text>
+              </View>
+            ) : null}
 
             {inlineError ? (
               <View style={styles.errorBanner} testID="signin-error-banner" accessibilityRole="alert">
@@ -148,6 +180,8 @@ export default function SignInScreen({ navigation, route }: Props) {
             <Text style={styles.label}>Email</Text>
             <View style={[styles.inputWrap, emailInvalid && styles.inputWrapError]}>
               <TextInput
+                ref={emailRef}
+                accessibilityLabel="Email"
                 value={email}
                 onChangeText={(v) => {
                   setEmail(v);
@@ -167,6 +201,8 @@ export default function SignInScreen({ navigation, route }: Props) {
                 style={styles.input}
                 editable={!loading}
                 returnKeyType="next"
+                submitBehavior="submit"
+                onSubmitEditing={() => passwordRef.current?.focus()}
               />
             </View>
             {emailInvalid ? (
@@ -178,6 +214,8 @@ export default function SignInScreen({ navigation, route }: Props) {
             <Text style={[styles.label, { marginTop: 12 }]}>Password</Text>
             <View style={styles.inputWrap}>
               <TextInput
+                ref={passwordRef}
+                accessibilityLabel="Password"
                 value={password}
                 onChangeText={(v) => {
                   setPassword(v);
@@ -234,7 +272,7 @@ export default function SignInScreen({ navigation, route }: Props) {
                   <Text style={[styles.primaryText, { marginLeft: 8 }]}>Signing in…</Text>
                 </View>
               ) : (
-                <Text style={styles.primaryText}>Continue</Text>
+                <Text style={styles.primaryText}>Sign in</Text>
               )}
             </Pressable>
 
@@ -253,9 +291,6 @@ export default function SignInScreen({ navigation, route }: Props) {
               <Text style={styles.secondaryText}>Create an account</Text>
             </Pressable>
 
-            <Text style={styles.footnote}>
-              Keep using an email you can access later if you ever need to restore study history on a new device.
-            </Text>
           </View>
 
           <View style={{ height: 28 }} />
@@ -417,7 +452,7 @@ const styles = StyleSheet.create({
     minHeight: 48,
     borderRadius: 999,
     backgroundColor: 'transparent',
-    borderWidth: 1,
+    borderWidth: 0,
     borderColor: colors.hairline,
     paddingHorizontal: 16,
     alignItems: 'center',
