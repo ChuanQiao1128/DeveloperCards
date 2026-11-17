@@ -22,6 +22,18 @@ public class BootstrapProfileTests(PostgresFixture db)
     public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default) => throw new IOException("private provider stream failure");
   }
 
+  [Fact]
+  public void Production_deploy_config_enables_lookup_for_the_accepted_mobile_issuer()
+  {
+    var dir = new DirectoryInfo(AppContext.BaseDirectory);
+    while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "env", "prod.env.json"))) dir = dir.Parent;
+    Assert.NotNull(dir);
+    using var config = JsonDocument.Parse(File.ReadAllText(Path.Combine(dir!.FullName, "env", "prod.env.json")));
+    var issuer = config.RootElement.GetProperty("COGNITO_MOBILE_ISSUER").GetString();
+    Assert.Equal("https://cognito-idp.ap-southeast-2.amazonaws.com/ap-southeast-2_04hd6iisb", issuer);
+    Assert.Contains(issuer, AuthOptions.Parse(null, null, "production").Issuers);
+  }
+
   [Theory]
   [InlineData("matched")]
   [InlineData("wrong-sub")]
