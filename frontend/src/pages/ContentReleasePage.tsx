@@ -90,10 +90,10 @@ export function ContentReleasePage() {
   function download(name: string, value: unknown) { assertOwner(); downloadJson(name, value); assertOwner(); }
 
   // A journal storage failure blocks dispatch. It must be recoverable after a lost HTTP response.
-  async function save(next: ReleaseSession) {
+  async function save(next: ReleaseSession, archivePrevious = false) {
     assertOwner(next);
     const raw = JSON.stringify(next);
-    const stored = await saveReleaseJournal(user!.sub!, raw, journalRevision.current, () => assertOwner(next));
+    const stored = await saveReleaseJournal(user!.sub!, raw, journalRevision.current, () => assertOwner(next), archivePrevious);
     assertOwner(next);
     journalRevision.current = stored.revision;
     currentSession.current = next;
@@ -252,9 +252,11 @@ export function ContentReleasePage() {
       <label className="block text-sm" htmlFor="release-bundle">Immutable release bundle (JSON)</label>
       <input id="release-bundle" className={INPUT_CLASS} type="file" accept="application/json,.json" disabled={busy || restoreBlocked} onChange={event => { const file = event.target.files?.[0]; if (!file) return; setBundle(null); void run(async () => { if (file.size > 3_000_000) throw new Error('Release bundle is too large.'); const loaded = parseReleaseBundle(await owned(() => file.text())); setBundle(loaded); setMessage(`Loaded ${loaded.cards.length} cards and local model PASS records. No content review was performed by this page.`); }); }} />
       <Button disabled={!bundle || busy || restoreBlocked} onClick={() => void run(capture)}>Capture editing backup and freeze release</Button>
-      <label className="block text-sm" htmlFor="release-recovery">Or restore a downloaded Console recovery journal</label>
-      <input id="release-recovery" className={INPUT_CLASS} type="file" accept="application/json,.json" disabled={busy} onChange={event => { const file = event.target.files?.[0]; if (!file) return; void run(async () => { if (file.size > 10_000_000) throw new Error('Recovery journal is too large.'); await save(parseReleaseSession(await owned(() => file.text()), user!.sub!)); setRestoreBlocked(false); setMessage('Original backup, frozen requests and action keys restored. Query each existing action before continuing.'); }, true); }} />
     </section>}
+    <section className={`${CARD_CLASS} space-y-3`}>
+      <label className="block text-sm" htmlFor="release-recovery">Or restore a downloaded Console recovery journal</label>
+      <input id="release-recovery" className={INPUT_CLASS} type="file" accept="application/json,.json" disabled={busy} onChange={event => { const file = event.target.files?.[0]; if (!file) return; void run(async () => { if (file.size > 10_000_000) throw new Error('Recovery journal is too large.'); await save(parseReleaseSession(await owned(() => file.text()), user!.sub!), true); setRestoreBlocked(false); setDelivery(null); setQueryView(null); setBundle(null); setMessage('Original backup, frozen requests and action keys restored. Query each existing action before continuing.'); }, true); }} />
+    </section>
     {session && <>
       <section className={`${CARD_CLASS} space-y-3`} aria-labelledby="backup-heading">
         <h2 id="backup-heading" className={H2_CLASS}>1. Frozen release and initial backup</h2>

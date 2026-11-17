@@ -17,10 +17,10 @@ describe('durable release journals', () => {
     await expect(saveReleaseJournal('owner', 'stale-import', 1, () => {})).rejects.toThrow('another tab');
     expect(await loadReleaseJournal('owner')).toEqual({ raw: 'frozen-publish', revision: 2 });
   });
-  it('archives a completed journal before clearing the active release and fences old tabs', async () => {
+  it.each(['', 'restored recovery journal'])('archives the previous journal before reset or recovery (%s)', async replacement => {
     await saveReleaseJournal('owner', 'complete recovery backup', 0, () => {});
-    await saveReleaseJournal('owner', '', 1, () => {});
-    expect(await loadReleaseJournal('owner')).toEqual({ raw: '', revision: 2 });
+    await saveReleaseJournal('owner', replacement, 1, () => {}, true);
+    expect(await loadReleaseJournal('owner')).toEqual({ raw: replacement, revision: 2 });
     await expect(saveReleaseJournal('owner', 'stale result', 1, () => {})).rejects.toThrow('another tab');
     const db = await new Promise<IDBDatabase>(resolve => { const request = indexedDB.open('devcards-content-release', 1); request.onsuccess = () => resolve(request.result); });
     const archived = await new Promise(resolve => { const tx = db.transaction('journals', 'readonly'); const request = tx.objectStore('journals').get(['owner', 1]); tx.oncomplete = () => resolve(request.result); });

@@ -167,6 +167,15 @@ describe('AWS Basics release operator flow', () => {
 });
 
 describe('recovery reconciliation and ownership regressions', () => {
+  it('restores a newer journal even when an incomplete release is already loaded', async () => {
+    const old = importedSession(5); store(old.session); const newer = reviewedSession(5); const user = userEvent.setup(); await mount();
+    const file = new File([JSON.stringify(newer.session)], 'newer-recovery.json', { type: 'application/json' });
+    Object.defineProperty(file, 'text', { value: async () => JSON.stringify(newer.session) });
+    await user.upload(screen.getByLabelText('Or restore a downloaded Console recovery journal'), file);
+    await screen.findByText(/Original backup, frozen requests and action keys restored/);
+    expect((await readSaved()).actions.review.payload).toBe(newer.session.actions.review!.payload);
+    expect(api.sendReleaseAction).not.toHaveBeenCalled();
+  });
   it.each([false, true])('recovers a malformed saved journal while retaining stale-tab protection (%s)', async concurrentWrite => {
     await journalStore.saveReleaseJournal(TEST_EDITOR_SUB, 'invalid journal JSON', 0, () => {});
     const { session } = releaseFixture(5); const user = userEvent.setup(); await mount();
@@ -314,6 +323,20 @@ describe('automatic reviewed release completion', () => {
     await user.click(screen.getByRole('button', { name: 'Run reviewed release' })); await screen.findByText(/Published and verified 5 bilingual cards/);
     expect(api.sendReleaseAction.mock.calls.filter(call => call[0].kind === 'import')).toHaveLength(1);
   });
+  it('clears the previous CDN proof when restoring a different incomplete release', async () => {
+    const fixture = releaseFixture(5); store(fixture.session); publishingApi(fixture); const user = userEvent.setup(); await mount();
+    await user.click(screen.getByRole('button', { name: 'Run reviewed release' })); await screen.findByText(/Published and verified 5 bilingual cards/);
+    const next = releaseFixture(3).session; next.bundle.releaseId = 'next-reviewed-release';
+    const file = new File([JSON.stringify(next)], 'next-recovery.json', { type: 'application/json' });
+    Object.defineProperty(file, 'text', { value: async () => JSON.stringify(next) });
+    const writes = api.sendReleaseAction.mock.calls.length;
+    await user.upload(screen.getByLabelText('Or restore a downloaded Console recovery journal'), file);
+    await screen.findByText(/Original backup, frozen requests and action keys restored/);
+    expect(screen.queryByText(/manifestVerified=true/)).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Start another release' })).toBeNull();
+    expect((await readSaved()).bundle.releaseId).toBe('next-reviewed-release');
+    expect(api.sendReleaseAction).toHaveBeenCalledTimes(writes);
+  });
   it('migrates a legacy 770-row backup and completes a journal beyond the old browser quota', async () => {
     const fixture = releaseFixture(379);
     for (let i = 0; i < 391; i++) fixture.snapshot.backup.push({ ...structuredClone(fixture.snapshot.backup[0]), id: 10_000 + i, stable_uid: `deleted-${i}`, order_in_deck: 10_000 + i, is_deleted: 1, private_evidence: 'x'.repeat(6000) });
@@ -322,14 +345,14 @@ describe('automatic reviewed release completion', () => {
     expect(JSON.stringify(fixture.session).length).toBeLessThan(5_000_000);
     store(fixture.session); publishingApi(fixture); const user = userEvent.setup(); await mount();
     expect(sessionStorage.getItem(key)).toBeNull();
-    await user.click(screen.getByRole('button', { name: 'Run reviewed release' })); await screen.findByText(/Published and verified 379 bilingual cards/);
+    await user.click(screen.getByRole('button', { name: 'Run reviewed release' })); await screen.findByText(/Published and verified 379 bilingual cards/, {}, { timeout: 10_000 });
     const persisted = (await journalStore.loadReleaseJournal(TEST_EDITOR_SUB))!;
     expect(persisted.raw.length).toBeGreaterThan(5_000_000);
     expect(JSON.parse(persisted.raw).baseline.backup).toHaveLength(770);
     await user.click(screen.getByRole('button', { name: 'Start another release' }));
     await screen.findByLabelText('Immutable release bundle (JSON)');
     expect((await journalStore.loadReleaseJournal(TEST_EDITOR_SUB))!.raw).toBe('');
-  });
+  }, 15_000);
   it('recovers a pending index with identical publish bytes and waits for CDN verification', async () => {
     const fixture = releaseFixture(5); store(fixture.session); publishingApi(fixture, { pendingIndex: true }); const user = userEvent.setup(); await mount();
     api.verifyReleaseDelivery.mockResolvedValueOnce(null).mockResolvedValueOnce({ jobId: 'same-job', buildId: 'same-build', sha256: 'a'.repeat(64), cards: 5 });

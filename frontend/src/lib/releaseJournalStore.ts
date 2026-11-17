@@ -21,7 +21,7 @@ export async function loadReleaseJournal(owner: string): Promise<StoredReleaseJo
 }
 
 /** Commit the exact journal before transport; a stale tab cannot overwrite a newer action. */
-export async function saveReleaseJournal(owner: string, raw: string, expectedRevision: number, assertOwner: () => void): Promise<StoredReleaseJournal> {
+export async function saveReleaseJournal(owner: string, raw: string, expectedRevision: number, assertOwner: () => void, archivePrevious = false): Promise<StoredReleaseJournal> {
   assertOwner();
   const db = await openJournalDatabase();
   try { assertOwner(); } catch (error) { db.close(); throw error; }
@@ -35,8 +35,8 @@ export async function saveReleaseJournal(owner: string, raw: string, expectedRev
       try {
         assertOwner();
         if ((request.result?.revision ?? 0) !== expectedRevision) throw new Error('Release journal changed in another tab. Reload and reconcile its actions before continuing.');
-        // Clearing a verified release starts the next one without losing its recovery backup.
-        if (!raw && request.result?.raw) store.put(request.result, [owner, expectedRevision]);
+        // Reset or file recovery preserves the previous complete backup in the same transaction.
+        if ((!raw || archivePrevious) && request.result?.raw) store.put(request.result, [owner, expectedRevision]);
         store.put(next, owner);
       } catch (error) { failure = error; tx.abort(); }
     };
