@@ -857,7 +857,7 @@ and the `dotnet10` runtime have to arrive in the same published version.
 
 ## 12. CD pipeline (GitHub OIDC) (enterprise audit SDLC-03, 2026-10-03)
 
-Production is deployed by `.github/workflows/cd.yml`, behind the owner's approval, with short-lived credentials from
+Production is deployed automatically by `.github/workflows/cd.yml` after green main CI, with short-lived credentials from
 GitHub OIDC. No deploy credential is needed on the laptop: `devcards-deploy` becomes break-glass and requires the
 owner's MFA.
 
@@ -872,15 +872,14 @@ push to `main` in this repository, CD starts (`workflow_run`; a pull request, a 
    `main` would otherwise pass for a push to main. Then `scripts/cd/plan.sh decide`: if `main` has moved on and its
    tip's CI is already green, the run deploys the tip instead (runs can reach the queue out of order, see Queueing);
    otherwise it warns which newer commits wait for their own run. Which targets changed between the commit of the
-   last successful *full* CD deployment and that commit. Nothing to deploy: the run ends here, with no approval
-   request. The run summary lists the commit, the base, the targets, any changed environment file
+   last successful *full* CD deployment and that commit. Nothing to deploy: the run ends here. The run summary lists the commit, the base, the targets, any changed environment file
    (`src_C/env/*.env.json`, `services/*/env/*.env.json`: their values replace the live ones) and the changed paths.
 2. **build** (no AWS credentials). The Lambda zips with the .NET 10 SDK (`DRY_RUN=1 src_C/deploy.sh`), the console
    (`npm ci && npm run build`, Sentry DSN from the repository variable `CONSOLE_SENTRY_DSN`), each changed Python
    service (`DRY_RUN=1 services/deploy-python-lambda.sh <svc>`: its tests, then the hash-verified build), a
    `SHA256SUMS` manifest over those files and `TARGETS` (`scripts/cd/artifact.sh stage`). Artifact `cd-build-<sha>`,
    kept 30 days. The site has no build: it is not in the artifact (see step 3).
-3. **deploy** (environment `production`: **waits for the owner's approval**). Then, in one job:
+3. **deploy** (environment `production`, no required reviewers). In one job:
    refuse a stale plan (`plan.sh still-current`: no CD deployment since the plan, see Re-runs) → verify the artifact
    against the manifest sha256 the build job passed (not read from the artifact store): every file matches, the files
    are **exactly** the ones the targets need, the console tarball holds only files and directories under `dist/`
@@ -893,8 +892,7 @@ push to `main` in this repository, CD starts (`workflow_run`; a pull request, a 
    (`PREBUILT=1 services/deploy-python-lambda.sh <svc>`), console (`PREBUILT=1 frontend/deploy.sh`), site
    (`site/deploy.sh`, from this job's own checkout of the plan's commit: the build job runs third-party code, so files
    that need no build are never taken from it) → **smoke** against the baseline → on any new failure or a cancel,
-   **automatic rollback** → job summary. Smoke and rollback are steps of the approved job on purpose: a second job
-   naming `production` would wait for a second approval.
+   **automatic rollback** → job summary. Smoke and rollback remain steps of the same job, holding the production lane through recovery.
 
 `PREBUILT=1` makes each script ship the verified bytes as they are; none of them builds in the deploy job.
 `src_C/deploy.sh` registers every decrypted SSM value (and every live environment value that is not a committed key)
@@ -902,13 +900,13 @@ with `::add-mask::` before anything can print it (this repository and its Action
 environment to Lambda in a 0600 file rather than on the command line, and on an environment update error prints only
 the AWS error code: Lambda's message for an environment over 4 KB quotes every value.
 
-### Approving
+### Automatic production release (owner policy, 2026-11-17)
 
-GitHub notifies the owner (the environment's only required reviewer). Open the run (Actions → CD, or the e-mail /
-GitHub mobile notification), read the **plan** summary (commit, targets, environment files, changed paths) and the
-**build** summary (`SHA256SUMS`), then **Review deployments → production → Approve and deploy** (or **Reject**). A
-pending approval waits up to 30 days. Rejecting deploys nothing; the changes stay in the next run's plan. The
-environment must not have "Prevent self-review" on: the owner both merges and approves.
+The `production` environment has no required reviewers or wait timer. Its deployment branch policy still allows
+only `main`. After implementation, required tests and independent code review pass, the Agent merges the authorized
+application change and follows CD through deployment and smoke verification without another approval prompt.
+CI, artifact verification, OIDC, the production lane and rollback remain enforced. `infra-prod` approval is separate
+and unchanged. The **plan** and **build** summaries retain the commit, targets and artifact checksums for inspection.
 
 ### What deploys when
 
@@ -918,7 +916,7 @@ environment must not have "Prevent self-review" on: the owner both merges and ap
 | `services/<svc>/**` except `tests/**` and `*.md`; svc = ai-qa, notifier, source-watcher, synthetic-check, webhook-dispatcher | `<svc>` | `services/deploy-python-lambda.sh` |
 | `frontend/**` except `frontend/tests/**` and `*.md` | `console` | `frontend/deploy.sh` |
 | `site/**` | `site` | `site/deploy.sh` |
-| everything else: `docs/`, `infra/`, `mobile/`, `tools/`, `.github/`, `scripts/`, … | nothing | no deploy job, no approval request |
+| everything else: `docs/`, `infra/`, `mobile/`, `tools/`, `.github/`, `scripts/`, … | nothing | no deploy job |
 
 "Since the last full deployment", not "in this push": a run that was rejected, rolled back, or cancelled while
 queued leaves its changes in the next run's plan. A full deployment is marked by the environment URL the deploy job
@@ -927,7 +925,7 @@ list sets `#cd-partial` and a manual rollback `#cd-rollback`, and neither become
 when GitHub Actions made the deployment and its first success status came from a successful `deploy (production)` or
 `rollback (production)` job of `cd.yml` on `main` (checked through the Actions API), so a status posted with a token
 cannot stop or redirect CD. With no full deployment on record (the **first run**) every target deploys: backend, the
-five Python services, console and site, under one approval. A commit older than the last deployment (CI finishing out
+five Python services, console and site, in one deployment. A commit older than the last deployment (CI finishing out
 of order, a re-run of an old CI run) deploys nothing older: CD never deploys backwards.
 
 ### Re-runs
@@ -981,7 +979,7 @@ recorded: a stale plan, the artifact, the credentials or the preflight; nothing 
 `incomplete`, finish by hand from the `FAILED` lines. Not rolled back: `$LATEST` code and environment (nothing serves
 `$LATEST`), the database (CD runs no migration), and anything a Python service already did while it ran.
 
-**Cancel or timeout.** A timeout (45 minutes from the approval) is a cancellation, and GitHub force-stops a cancelled
+**Cancel or timeout.** A timeout (45 minutes from the deploy job starting) is a cancellation, and GitHub force-stops a cancelled
 job about 5 minutes after the cancel. The rollback therefore restores every alias and bucket first, prints its state
 as an annotation (`rollback in progress: …`) before the CloudFront part, and on a cancel creates the invalidations
 without waiting for them. A job killed mid-rollback leaves that annotation: check each item it does not list as
@@ -991,8 +989,7 @@ restored, and the invalidation ids it printed (`aws cloudfront get-invalidation`
 
 - **CD:** Actions → CD → Run workflow (from `main`), `rollback_target` = vpc / worker / ai-qa / notifier /
   source-watcher / synthetic-check / webhook-dispatcher, `rollback_version` = the version (a deploy's job summary has
-  "before this run" for each alias; or `aws lambda list-versions-by-function --function-name <fn>`). It waits for the
-  same approval, and refuses (like the deploy job) when a CD deployment succeeded after its plan.
+  "before this run" for each alias; or `aws lambda list-versions-by-function --function-name <fn>`). It runs without a reviewer gate, and refuses (like the deploy job) when a CD deployment succeeded after its plan.
 - **Break-glass, local:** `aws sts get-caller-identity --profile devcards-deploy` (MFA code), then
   `scripts/rollback.sh vpc 75` (`DRY_RUN=1` prints first).
 
@@ -1012,13 +1009,13 @@ create under any name). A dispatch from any other branch is refused.
 
 ### Queueing
 
-One `production` lane for whole runs: a run waits while another (including one waiting for approval) is in flight,
+One `production` lane for whole runs: a run waits while another is in flight,
 and GitHub keeps one queued run. A newly queued run replaces (cancels) the pending one whatever commit either
 carries, so CI runs that finish out of order, or a CI re-run of an old commit, can leave the older commit's run
 queued. Its plan then deploys `main`'s tip when the tip's CI is green, so nothing merged is left behind; when the tip
 is not green yet it deploys its own commit and warns which newer commits wait (their CI finishing queues their run).
 A run that will not deploy (CI failed, a pull request) never takes that slot. Consequences: a manual rollback waits
-behind a deploy that waits for approval (reject that deploy first), and a push landing while a rollback is queued
+behind an in-flight deploy, and a push landing while a rollback is queued
 replaces it (run it again, or use the local rollback).
 
 ### Break-glass local deploy
@@ -1050,8 +1047,8 @@ ruleset 24415242, variable `CONSOLE_SENTRY_DSN` (read from the live console bund
    `mfa_serial = arn:aws:iam::622994489535:mfa/TimeAwakeAdmin` under `[profile devcards-deploy]` in `~/.aws/config`
    (§10), then check with `aws sts get-caller-identity --profile devcards-deploy` (it asks for the code). Without it
    every local deploy, `scripts/rollback.sh` and `infra/scripts/rds-snapshot.sh` gets AccessDenied on AssumeRole.
-3. GitHub environment `production`: required reviewer ChuanQiao1128, deployment branches `main` only, "Prevent
-   self-review" off.
+3. GitHub environment `production`: no required reviewers or wait timer; deployment branches `main` only.
+   This policy was verified through the GitHub environment API on 2026-11-17.
 4. GitHub tag ruleset (defence in depth for the on-main check in the plan job): block creating or updating a tag
    named `main` (or restrict tag creation to the owner).
 5. Repository variable (not a secret: the DSN is public in the bundle) `CONSOLE_SENTRY_DSN` = the SSM String

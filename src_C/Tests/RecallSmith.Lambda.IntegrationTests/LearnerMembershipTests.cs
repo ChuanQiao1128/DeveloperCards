@@ -2,6 +2,7 @@ using System.Text.Json;
 using RecallSmith.Lambda.Common;
 using RecallSmith.Lambda.Db;
 using RecallSmith.Lambda.Vpc.Operations;
+using RecallSmith.Lambda.Vpc.Runtime;
 using static RecallSmith.Lambda.IntegrationTests.ConsoleOperationsCanaryTests;
 
 namespace RecallSmith.Lambda.IntegrationTests;
@@ -81,6 +82,27 @@ public class LearnerMembershipTests(PostgresFixture db)
       var changed = new Dictionary<string,string>(parameters) { [key] = value };
       Assert.Equal(400, (await ConsoleOperations.HandleLearners(Request(query: changed), new Res("cursor-mismatch"), Admin)).StatusCode);
     }
+  }
+
+  [Fact]
+  public async Task Mixed_selected_deck_grants_have_no_aggregate_end_and_keep_individual_expiry_in_detail()
+  {
+    var sub = await User("member-mixed-" + Guid.NewGuid().ToString("N"), "");
+    await db.QueryAsync("insert into user_entitlements(user_sub,entitlement_key,tier,source,expires_at) values($1,'deck:a','premium','manual',null),($1,'deck:b','premium','manual',now()+interval '3 days')", sub);
+    var runtime = Data(await Entitlements.HandleEntitlements(Request(), new Res("mixed-runtime"), Admin with { UserSub = sub }));
+    Assert.Equal("premium", runtime.GetProperty("tier").GetString());
+    Assert.Equal(JsonValueKind.Null, runtime.GetProperty("expiresAtMs").ValueKind);
+    Assert.Equal(new[] { "a", "b" }, runtime.GetProperty("unlockedDeckSlugs").EnumerateArray().Select(v => v.GetString()).Order().ToArray());
+    var response = await ConsoleOperations.HandleLearners(Request(query: new() { ["query"] = sub }), new Res("mixed-list"), Admin);
+    var membership = Assert.Single(Data(response).GetProperty("items").EnumerateArray()).GetProperty("membership");
+    Assert.Equal("selected_decks", membership.GetProperty("scope").GetString());
+    Assert.Equal(JsonValueKind.Null, membership.GetProperty("expiresAt").ValueKind);
+    var filtered = await ConsoleOperations.HandleLearners(Request(query: new() { ["query"] = sub, ["expiry"] = "next7" }), new Res("mixed-filter"), Admin);
+    Assert.Empty(Data(filtered).GetProperty("items").EnumerateArray());
+    var details = Data(await ConsoleOperations.HandleLearner(Request(ConsoleOperations.LearnersPath + "/" + sub), new Res("mixed-detail"), Admin));
+    var grants = details.GetProperty("entitlements").GetProperty("legacy").GetProperty("items").EnumerateArray().ToArray();
+    Assert.Equal(JsonValueKind.Null, grants.Single(g => g.GetProperty("key").GetString() == "deck:a").GetProperty("expiresAt").ValueKind);
+    Assert.Equal(JsonValueKind.String, grants.Single(g => g.GetProperty("key").GetString() == "deck:b").GetProperty("expiresAt").ValueKind);
   }
 
   [Fact]

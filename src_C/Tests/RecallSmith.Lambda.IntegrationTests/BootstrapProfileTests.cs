@@ -17,12 +17,18 @@ public class BootstrapProfileTests(PostgresFixture db)
     protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token) { Calls++; return respond(request, token); }
   }
 
+  private sealed class FailingBody : MemoryStream
+  {
+    public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default) => throw new IOException("private provider stream failure");
+  }
+
   [Theory]
   [InlineData("matched")]
   [InlineData("wrong-sub")]
   [InlineData("unavailable")]
   [InlineData("malformed")]
   [InlineData("oversize")]
+  [InlineData("stream-failure")]
   public async Task Bootstrap_only_stores_identity_email_for_the_verified_subject(string mode)
   {
     var sub = "profile-" + Guid.NewGuid().ToString("N");
@@ -39,7 +45,7 @@ public class BootstrapProfileTests(PostgresFixture db)
       Assert.Equal("fixture-access-token", payload.RootElement.GetProperty("AccessToken").GetString());
       Assert.Null(outbound.Headers.Authorization);
       var body = mode == "malformed" ? "{" : mode == "oversize" ? new string('x', 32769) : JsonSerializer.Serialize(new { UserAttributes = new[] { new { Name = "sub", Value = mode == "wrong-sub" ? "different-user" : sub }, new { Name = "email", Value = "trusted@example.invalid" } } });
-      return new HttpResponseMessage(mode == "unavailable" ? HttpStatusCode.ServiceUnavailable : HttpStatusCode.OK) { Content = new StringContent(body) };
+      return new HttpResponseMessage(mode == "unavailable" ? HttpStatusCode.ServiceUnavailable : HttpStatusCode.OK) { Content = mode == "stream-failure" ? new StreamContent(new FailingBody()) : new StringContent(body) };
     });
     using var client = new HttpClient(handler);
     try

@@ -52,7 +52,7 @@ internal static class CognitoUserProfile
       var email = Value("email");
       return email is { Length: > 0 and <= 320 } && !email.Any(char.IsControl) && MailAddress.TryCreate(email, out var parsed) && parsed.Address == email ? email : null;
     }
-    catch (Exception ex) when (ex is HttpRequestException or OperationCanceledException or JsonException or InvalidOperationException or KeyNotFoundException or ArgumentException)
+    catch (Exception ex) when (ex is HttpRequestException or IOException or OperationCanceledException or JsonException or InvalidOperationException or KeyNotFoundException or ArgumentException)
     {
       // Profile enrichment must not block learning or expose the token/provider response.
       return null;

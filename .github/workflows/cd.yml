@@ -1,23 +1,23 @@
 name: CD
 
 # Continuous delivery to production (enterprise audit 2026-10-03 SDLC-03 "no CD, prod deployed from a laptop";
-# owner's choice C: GitHub OIDC behind an approval, no deploy credential on the laptop). infra/RUNBOOK.md §12 is the
-# operator's guide: what deploys when, how to approve, the automatic and the manual rollback, break-glass.
+# owner's policy updated 2026-11-17: automatic production deployment through GitHub OIDC after green main CI.
+# infra/RUNBOOK.md §12 covers deployment, automatic/manual rollback and break-glass; no laptop credential needed.
 #
 #   plan    no AWS. Runs main's own scripts (never the pushed commit's). Refuses a commit that is not on main (a tag
 #           named main looks like a push to main here). Which targets changed since the last successful full
 #           deployment to production (GitHub Deployments API, scripts/cd/plan.sh); main's tip instead of the commit CI
-#           ran for when the tip is newer and green. Nothing to deploy: the run ends here, with no approval request.
+#           ran for when the tip is newer and green. Nothing to deploy: the run ends here.
 #   build   no AWS. Lambda zips (.NET 10 SDK, src_C/deploy.sh DRY_RUN=1), console bundle, Python zips
 #           (services/deploy-python-lambda.sh DRY_RUN=1, tests included), a SHA256SUMS manifest; artifact kept 30 days.
-#   deploy  environment `production`: waits for the owner's approval, refuses a stale plan (a re-run of an old run's
+#   deploy  environment `production`: no required reviewers; refuses a stale plan (a re-run of an old run's
 #           failed job after a newer deployment), verifies the artifact, then assumes
 #           arn:aws:iam::622994489535:role/developercards-gha-prod through GitHub OIDC (the role trusts only
 #           repo:ChuanQiao1128/DeveloperCards:environment:production). Smokes production as a baseline, records a restore
 #           point, deploys each target with the existing scripts in PREBUILT mode, smokes production again, and on any
 #           new failure restores everything that moved. Smoke and rollback are steps of this job on purpose: a second
-#           job naming `production` would wait for a second approval.
-#   rollback  environment `production` (approval too): workflow_dispatch with rollback_target + rollback_version
+#           job would release the production lane before recovery finished.
+#   rollback  environment `production`: workflow_dispatch with rollback_target + rollback_version
 #           moves one Lambda's prod alias back (scripts/rollback.sh).
 #
 # Not here: Terraform (its own workflow, terraform.yml, RUNBOOK §15), mobile OTA updates and binaries (owner-driven),
@@ -53,7 +53,7 @@ on:
 permissions:
   contents: read
 
-# One production lane. A deploy in flight (including one waiting for approval) is never cancelled; GitHub keeps at most
+# One production lane. A deploy in flight is never cancelled; GitHub keeps at most
 # one run queued behind it, and a newly queued run replaces (cancels) the pending one whatever commit either carries:
 # CI runs finish out of order, and a CI re-run of an old commit arrives last. Nothing is lost: the plan measures changes
 # from the last successful deployment, and deploys main's tip (not the commit CI ran for) when the tip's CI is green;
@@ -249,7 +249,7 @@ jobs:
     needs: [plan, build]
     if: needs.plan.outputs.deploy == 'true'
     runs-on: ubuntu-latest
-    # Counted from the approval, not from the request. A timeout is a cancellation: GitHub then runs the
+    # Counted from the start of the deploy job. A timeout is a cancellation: GitHub then runs the
     # `cancelled()` steps but force-stops the job about 5 minutes later. So the rollback re-assumes the role, restores
     # every alias and bucket first, creates the CloudFront invalidations and, on a cancel, does not wait for them
     # (scripts/cd/restore-point.sh); it prints its state as an annotation before the slow part.
