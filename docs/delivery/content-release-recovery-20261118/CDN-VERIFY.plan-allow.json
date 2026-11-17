@@ -1,13 +1,14 @@
 {
   "tags_only_updates": false,
   "changes": {
-    "module.edge.aws_cloudfront_response_headers_policy.content_console_read": "delete",
+    "module.edge.aws_s3_bucket_cors_configuration.content_console_read": "create",
     "module.edge.aws_cloudfront_distribution.content": {
       "action": "update",
       "keys": [
-        "default_cache_behavior"
+        "default_cache_behavior",
+        "origin"
       ]
     }
   },
-  "_note": "Free-plan recovery after run44082216010: attach AWS managed SimpleCORS (anonymous reads of already-public content from any origin) and remove only the unused custom policy created by that run. Console CSP was already applied. No pricing-plan, IAM, authentication, upload or card-content change. Fixed targets, existing approval and exact saved-plan guards remain in place."
+  "_note": "Public content CORS recovery: S3 allows only Console-origin GET/HEAD; CloudFront always sends the fixed Console Origin to S3 so headers do not depend on viewer Origin or shared-cache order. Remove managed edge SimpleCORS, which omits ACAO on real Priority-header requests. Existing cache, OAC, pricing plan, IAM, card bytes and build identities stay unchanged. Fixed-scope workflow invalidates only /content/* after guarded apply to remove old headerless objects."
 }

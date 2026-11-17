@@ -1451,10 +1451,16 @@ case "$(basename "$0")" in
   terraform)
     case "$*" in
       *"state push"*) [ "$STUB_PUSH" = ok ] && exit 0; echo "Error: cannot push" >&2; exit 1 ;;
+      *"output -raw content_distribution_id"*) echo "${STUB_DISTRIBUTION_ID:-E28BKORJLV6UXG}" ;;
       *show*) echo "{}" ;;
     esac
     exit 0 ;;
-  aws) [ "$STUB_AWS" = ok ] && exit 0; exit 1 ;;
+  aws)
+    if [ "$STUB_AWS" = ok ]; then
+      case "$*" in *"create-invalidation"*) echo "I123" ;; esac
+      exit 0
+    fi
+    exit 1 ;;
 esac
 """
 
@@ -1563,7 +1569,7 @@ class StepBodyTest(unittest.TestCase):
 
     def test_content_recovery_is_fixed_and_uses_the_same_targets_in_both_plans(self):
         expected = [
-            '-target=module.edge.aws_cloudfront_response_headers_policy.content_console_read',
+            '-target=module.edge.aws_s3_bucket_cors_configuration.content_console_read',
             '-target=module.edge.aws_cloudfront_distribution.content',
             '-target=module.edge.aws_cloudfront_response_headers_policy.security["console"]',
         ]
@@ -1615,6 +1621,22 @@ class StepBodyTest(unittest.TestCase):
         self.assertEqual(rc, 0, out)
         self.assertIn("Content verification response headers targeted scope only", self.read(self.summary))
         self.assertIn("full production drift is not checked", self.read(self.summary))
+
+    def test_content_cache_refresh_is_fixed_idempotent_and_fails_closed(self):
+        name = "refresh only public content header caches"
+        rc, out = self.run_step("apply", name, STUB_AWS="ok")
+        self.assertEqual(rc, 0, out)
+        batch = json.loads(self.read(self.tf("content-invalidation.json")))
+        self.assertEqual(batch, {"Paths": {"Quantity": 1, "Items": ["/content/*"]},
+                                 "CallerReference": "content-headers-" + "a" * 40})
+        self.assertIn("--distribution-id E28BKORJLV6UXG", self.read(self.log))
+        self.assertIn("wait invalidation-completed", self.read(self.log))
+        open(self.log, "w").close()
+        rc, out = self.run_step("apply", name, STUB_DISTRIBUTION_ID="other", STUB_AWS="ok")
+        self.assertEqual(rc, 1, out)
+        self.assertNotIn("aws ", self.read(self.log))
+        rc, out = self.run_step("apply", name)
+        self.assertEqual(rc, 1, out)
 
     def test_recovery_selection_emits_the_literal_allow_file(self):
         rc, out = self.run_step("select", "pick this push's allow files", CONSOLE_MFA_ONLY="true")

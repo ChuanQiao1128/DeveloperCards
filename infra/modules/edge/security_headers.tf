@@ -10,13 +10,16 @@ locals {
   security_header_targets = var.manage_domain ? ["console", "site"] : ["console"]
 }
 
-# Public card bytes use AWS managed SimpleCORS: the content distribution's Free plan does not
-# support custom response-header policies. It allows any origin to read already-public bytes,
-# without credentials; the Console verifier always omits its login credentials.
-# https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/flat-rate-pricing-plan.html
-# https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/using-managed-response-headers-policies.html
-data "aws_cloudfront_response_headers_policy" "content_console_read" {
-  name = "Managed-SimpleCORS"
+# CloudFront sends the fixed Console Origin on every S3 request so CORS metadata is
+# independent of viewer Origin and compatible with the existing shared cache key.
+# S3 supplies the header even when the edge's managed SimpleCORS path omits it.
+# https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/add-origin-custom-headers.html
+resource "aws_s3_bucket_cors_configuration" "content_console_read" {
+  bucket = var.content_bucket_name
+  cors_rule {
+    allowed_origins = ["https://${local.console_hostname}"]
+    allowed_methods = ["GET", "HEAD"]
+  }
 }
 
 resource "aws_cloudfront_response_headers_policy" "security" {
