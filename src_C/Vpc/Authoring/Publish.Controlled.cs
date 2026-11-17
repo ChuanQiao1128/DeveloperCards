@@ -9,6 +9,15 @@ namespace RecallSmith.Lambda.Vpc.Authoring;
 
 public static partial class Publish
 {
+  internal static Func<NpgsqlConnection, Task>? TestControlledManifestRebuild;
+
+  private static async Task RebuildControlledManifest(NpgsqlConnection conn)
+  {
+    if (TestControlledManifestRebuild is not null) { await TestControlledManifestRebuild(conn); return; }
+    if (string.IsNullOrEmpty(ContentBucket)) throw new InvalidOperationException("Missing content bucket");
+    await ManifestBuilder.RebuildAsync(conn, ManifestBuilder.S3(), ContentBucket, ContentPrefix, PremiumPrefix);
+  }
+
   private static async Task<APIGatewayProxyResponse> StartControlledAsync(NpgsqlConnection conn,long deckId,JsonElement body,AuthContext auth,string? note,Res res)
   {
     if(auth.IsAgentClient)return Helpers.ErrorEnvelope(res,403,"AGENT_CLIENT_FORBIDDEN","Use the normal authorized Console session");
@@ -61,6 +70,8 @@ public static partial class Publish
     APIGatewayProxyResponse Outcome(string outcome)=>res.Ok(new{outcome,jobId,buildId=data.GetProperty("buildId").GetString(),releaseId=release,snapshotSha256=data.GetProperty("snapshotSha256").GetString(),manifestVerified=false});
     var status=(string?)await DbUtil.ExecuteScalarAsync(conn,null,"select status from deck_publishes where deck_id=$1 and job_id=$2",[deckId,jobId]);
     if(status is null)return Helpers.ErrorEnvelope(res,409,"RELEASE_JOB_NOT_FOUND","Committed publish job is missing; query the release action");
+    if(status=="SUCCESS" && await PublishDelivery.Ready(conn))
+      await PublishDelivery.DeliverManifest(conn,jobId,()=>RebuildControlledManifest(conn));
     if(status!="PENDING")return Outcome(status.ToLowerInvariant());
     // Use the committed actor/note; a replaying administrator cannot replace message identity.
     var sent = await DispatchPublishAsync(conn, new PublishStart(Queued,200,null,null,jobId,

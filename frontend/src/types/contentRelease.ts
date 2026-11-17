@@ -57,7 +57,9 @@ export interface ReleaseSnapshot {
 export interface ReleaseActions {
   action: { Body?: string; body?: string; StatusCode?: number; statusCode?: number };
   receipts: Array<{ id: string; revoked: boolean; expires_at: string }>;
-  jobs: Array<{ job_id: string; status: string; build_id: string; content_sha256: string | null; error_message: string | null }>;
+  jobs: Array<{ job_id: string; status: string; build_id: string; content_sha256: string | null; error_message: string | null;
+    manifestState?: string | null; manifestAttempts?: number | null; manifestNextAttemptAt?: string | null; manifestLeaseUntil?: string | null; manifestError?: string | null;
+    dispatchState?: string | null; dispatchNextAttemptAt?: string | null; dispatchLeaseUntil?: string | null }>;
   liveBuildId: string | null;
   manifestVerified: false;
 }

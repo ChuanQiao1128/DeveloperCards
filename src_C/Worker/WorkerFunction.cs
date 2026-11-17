@@ -124,7 +124,7 @@ public class WorkerFunction
           else await _rebuildManifest(completedAtMs);
         }
 
-        LogWithJobId(jobId, "Processing completed successfully");
+        LogWithJobId(jobId, manifestDelivered ? "Processing completed successfully" : "Card build completed; manifest delivery is pending recovery");
         // A replay of a job that was already terminal (or absent) is acknowledged, not counted (R18I Q4).
         if (replayOutcome == PublishReplayOutcome.None && manifestDelivered)
         {

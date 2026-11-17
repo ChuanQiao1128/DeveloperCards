@@ -98,18 +98,19 @@ resource "aws_cloudfront_distribution" "content" {
   wait_for_deployment = true
   web_acl_id          = aws_wafv2_web_acl.content.arn
   default_cache_behavior {
-    allowed_methods        = ["GET", "HEAD"]
-    cache_policy_id        = "658327ea-f89d-4fab-a63d-7e88639e58f6"
-    cached_methods         = ["GET", "HEAD"]
-    compress               = true
-    default_ttl            = 0
-    max_ttl                = 0
-    min_ttl                = 0
-    smooth_streaming       = false
-    target_origin_id       = local.content_origin_id
-    trusted_key_groups     = []
-    trusted_signers        = []
-    viewer_protocol_policy = "redirect-to-https"
+    allowed_methods            = ["GET", "HEAD"]
+    response_headers_policy_id = aws_cloudfront_response_headers_policy.content_console_read.id
+    cache_policy_id            = "658327ea-f89d-4fab-a63d-7e88639e58f6"
+    cached_methods             = ["GET", "HEAD"]
+    compress                   = true
+    default_ttl                = 0
+    max_ttl                    = 0
+    min_ttl                    = 0
+    smooth_streaming           = false
+    target_origin_id           = local.content_origin_id
+    trusted_key_groups         = []
+    trusted_signers            = []
+    viewer_protocol_policy     = "redirect-to-https"
     grpc_config {
       enabled = false
     }
