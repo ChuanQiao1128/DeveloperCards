@@ -7,6 +7,7 @@ import path from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
+import { baselineReader } from '../fixtures/ownership-baseline/reader';
 const require = createRequire(import.meta.url);
 const mobile = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const producer = require(path.join(mobile, 'scripts/release/nativeBuildProvenance.cjs'));
@@ -24,7 +25,7 @@ const hbc = Buffer.concat([Buffer.from('c61fbc03c103191f', 'hex'), Buffer.from('
 function fixture() {
   const dir = temp(); const root = path.join(dir, 'repo/mobile');
   for (const f of [...producer.PRODUCER_FILES, 'app.json', 'package.json', 'package-lock.json', 'eas.json', 'src/sync/progressSync.ts']) {
-    write(path.join(root, f), fs.readFileSync(path.join(mobile, f)));
+    write(path.join(root, f), f === 'src/sync/progressSync.ts' ? baselineReader : fs.readFileSync(path.join(mobile, f)));
     fs.chmodSync(path.join(root, f), fs.statSync(path.join(mobile, f)).mode);
   }
   fs.cpSync(path.join(mobile, 'vendor'), path.join(root, 'vendor'), { recursive: true });

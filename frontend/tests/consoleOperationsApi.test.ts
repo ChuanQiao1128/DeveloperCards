@@ -2,7 +2,7 @@
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
 import { fetchLearner, fetchLearners, fetchOperations, parseConsoleData } from '../src/api/consoleOperations';
 import { clearTokens, saveTokens } from '../src/auth/tokenStore';
-import { detail, envelope, learners, operations } from './support/consoleOperationsFixture';
+import { detail, envelope, learners, membership, operations } from './support/consoleOperationsFixture';
 const get = vi.hoisted(() => vi.fn());
 vi.mock('../src/api/http', () => ({ http: { get } }));
 beforeEach(() => { get.mockReset(); });
@@ -32,6 +32,19 @@ it('sanitizes untrusted backend messages while retaining safe error code and tra
   get.mockRejectedValue({ response: { status: 503, data: { error: { code: 'SERVICE_UNAVAILABLE', message: 'secret@example.invalid SQL token' }, traceId: 'safe-trace' } } });
   await expect(fetchOperations()).rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE', traceId: 'safe-trace' });
   await expect(fetchOperations()).rejects.not.toThrow('secret@example.invalid');
+});
+it('validates membership summaries while accepting an older API without the optional summary', () => {
+  for (const value of [{ ...membership, tier: 'paid' }, { ...membership, expiresAt: 'tomorrow' }, { ...membership, premiumDownloadEligible: undefined }]) {
+    expect(() => parseConsoleData('learners', { ...learners, items: [{ ...learners.items[0], membership: value }] })).toThrow();
+  }
+  expect(() => parseConsoleData('learners', { ...learners, items: [{ ...learners.items[0], membership: undefined }] })).not.toThrow();
+});
+it('sends membership, source and expiry filters to the API and omits their all defaults', async () => {
+  get.mockResolvedValue(envelope(learners));
+  await fetchLearners('', undefined, undefined, { membership: 'premium', source: 'production', expiry: 'next7' });
+  expect(get.mock.calls.at(-1)?.[1].params).toEqual({ query: undefined, cursor: undefined, limit: 25, membership: 'premium', source: 'production', expiry: 'next7' });
+  await fetchLearners('', undefined, undefined, { membership: 'all', source: 'all', expiry: 'all' });
+  expect(get.mock.calls.at(-1)?.[1].params).toEqual({ query: undefined, cursor: undefined, limit: 25 });
 });
 it.each(['success', 'forbidden'])('rejects delayed earlier-identity %s without affecting the new session', async outcome => {
   let resolve!: (value: unknown) => void;

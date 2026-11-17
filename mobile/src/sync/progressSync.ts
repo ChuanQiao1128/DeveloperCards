@@ -1586,12 +1586,15 @@ async function syncProgressOnce(
   await markSyncStatus(userSub, { lastAttemptAtMs: Date.now() });
   if (!isCurrent()) return stopped(0);
 
+  const deviceId = await getDeviceId();
+  if (!isCurrent() || isSyncBlocked()) return stopped(0);
+
   // best-effort bootstrap（也可以顺便用它来拿 userSub）
   try {
     const boot = await apiJson<ApiOk<BootstrapResp>>('/api/v1/user/bootstrap', {
       method: 'POST',
       accessToken,
-      body: {},
+      body: { deviceId, clientPlatform: Platform.OS, clientVersion: getClientVersion() },
       timeoutMs: 12000,
     });
 
@@ -1608,7 +1611,6 @@ async function syncProgressOnce(
   const BATCH = 25;
   let pushed = 0;
 
-  const deviceId = await getDeviceId();
   const caps = await getClientCapabilities();
 
   for (let round = 0; round < 20; round++) {

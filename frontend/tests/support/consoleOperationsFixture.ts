@@ -1,6 +1,7 @@
-import type { LearnerDetail, Learners, Operations, SourceState } from '../../src/api/consoleOperations';
+import type { LearnerDetail, Learners, MembershipSummary, Operations, SourceState } from '../../src/api/consoleOperations';
 export const AT = '2026-11-16T04:00:00Z';
-export const learner = { sub: 'observed-1', email: 'learner@example.invalid', firstObservedAt: AT, lastServerActivityAt: null, lastReportedPlatform: null, lastReportedVersion: null };
+export const membership: MembershipSummary = { state: 'known', tier: 'premium', status: 'active', source: 'revenuecat', scope: 'all', expiresAt: '2026-11-19T04:00:00Z', environment: 'production', premiumDownloadEligible: true };
+export const learner = { sub: 'observed-1', email: 'learner@example.invalid', firstObservedAt: AT, lastServerActivityAt: null, lastReportedPlatform: null, lastReportedVersion: null, membership };
 export const learners: Learners = { scope: 'backend_observed_users', fetchedAt: AT, asOf: AT, items: [learner], nextCursor: null };
 const source: SourceState = { state: 'unknown', status: 'unknown', source: 'fixture-source', observedAt: null, fetchedAt: AT, expiresAt: null, reason: 'not_configured' };
 export const operations: Operations = {

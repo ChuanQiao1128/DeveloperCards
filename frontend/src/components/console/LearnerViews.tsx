@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ConsoleReadError, type LearnerDetail } from '../../api/consoleOperations';
+import { ConsoleReadError, type LearnerDetail, type MembershipSummary } from '../../api/consoleOperations';
 import { Button } from '../ui/Button';
 import { Callout } from '../ui/Callout';
 
@@ -42,3 +42,14 @@ export function MembershipBadge({ entitlements }: { entitlements: LearnerDetail[
   return <span className={`inline-flex rounded px-2 py-1 text-sm font-medium ${effective.entitlementsTier === 'premium' ? 'bg-indigo-50 text-indigo-800' : 'bg-slate-100 text-slate-700'}`}>{label}</span>;
 }
 
+
+export function DirectoryMembership({ membership }: { membership?: MembershipSummary | null }) {
+  const label = !membership || membership.state === 'unknown' ? 'Access unknown'
+    : membership.status === 'expired' ? 'Expired' : membership.status === 'inactive' ? 'Inactive'
+      : membership.tier === 'free' ? 'Free' : membership.source === 'legacy' ? 'Premium · Grant'
+        : membership.environment === 'sandbox' ? 'Premium · Sandbox' : 'Premium';
+  const source = !membership || membership.source === 'unknown' ? 'Source unavailable'
+    : membership.source === 'legacy' ? 'Manual or legacy grant'
+      : membership.source === 'revenuecat' ? `Subscription · ${membership.environment === 'production' ? 'Production' : membership.environment === 'sandbox' ? 'Sandbox' : 'Environment unknown'}` : 'No premium record';
+  return <div className="space-y-1"><span className={`inline-flex rounded px-2 py-1 text-sm font-medium ${membership?.status === 'active' ? 'bg-indigo-50 text-indigo-800' : 'bg-slate-100 text-slate-700'}`}>{label}</span><p className="text-xs text-slate-600">{source}</p>{membership?.status === 'active' && <p className="text-xs text-slate-600">{membership.scope === 'all' ? 'All decks' : membership.scope === 'selected_decks' ? 'Selected decks' : 'Scope unknown'}</p>}</div>;
+}
