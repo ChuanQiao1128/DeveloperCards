@@ -1,0 +1,69 @@
+{
+  "reviewedAt": "2026-11-17T23:31:53.708899+00:00",
+  "scope": "Independent review of exact current repair_batch.py production changes against frozen baseline. Reviewer added only focused test_repair_batch.py tests at parent request; no Git, model call, remote mutation or publication.",
+  "verdict": "PASS",
+  "currentBatchEvidence": "PASS: actual cards26-30 evidence has complete bound citations, identical targeted candidates, full prior backs, valid review hashes and passing stored mechanical checks.",
+  "toolSha256": {
+    "tools/aws_cards/repair_batch.py": "cca2f0b04ba82117cde158187234c6f2339abd6dce2d5237e6373622275f0acd",
+    "tools/aws_cards/test_repair_batch.py": "233f4eb56e8cc3065be0914f5d2278a1ffd54e3ac14a1821c7a3c6928ccd24de"
+  },
+  "findings": [],
+  "essentialRegressionCoverage": {
+    "existingSuiteBeforeFix": "7 tests passed, none invoked finish_repair",
+    "finalSuite": "12 tests pass, including parameterized rejection subcases",
+    "coverageGap": "Closed for changed branches and reported citation bug",
+    "limits": "The focused fixture invokes real draft.render and mocks external node subprocesses. Existing actual-batch mechanical-check artifacts were separately checked and passed. No AWS fact, original-question support or learner-effect review."
+  },
+  "verifiedArtifactChecks": [
+    "Initial/targeted input and output hashes match result bindings",
+    "All four targeted candidates exactly equal the initial reviewed candidate dictionaries",
+    "Full bilingual previousScope fields match the frozen baseline snapshot",
+    "All current actual evidence rows exactly equal original evidence rows; all cited IDs are present",
+    "Targeted review meets all seven rules and transfer checks",
+    "Initial/final candidate SHA-256 is identical: bcce3d3c04a8ae65ef106c2f9b2380891ca5bc2bc8c3b27a8f38cd625462f71a",
+    "Final original/targeted review hashes match files; stored mechanical checks have exitCode 0"
+  ],
+  "notChecked": [
+    "No publication or live CDN validation",
+    "No AWS semantic/content review",
+    "No learner-effect or original-question-support claim",
+    "No Git operation or history read"
+  ],
+  "initialReviewPath": "exports/card-repair-26-30-main-20261118/independent-tool-review.initial.json",
+  "initialVerdict": "REQUEST_CHANGES_FOR_REUSABLE_TOOLING",
+  "resolvedFindings": [
+    {
+      "id": "RMR-001",
+      "priority": "P2",
+      "file": "tools/aws_cards/repair_batch.py",
+      "startLine": 383,
+      "endLine": 390,
+      "title": "Reject repaired-card citations absent from the reviewed evidence packet",
+      "problem": "The newly allowed no-supplement path only examines evidence rows. A repaired candidate can cite a nonexistent evidence ID while extra remains empty; finish_repair does not apply the cited-ID subset validation used by run at line 484 and still emits REVIEWED_DRAFT.",
+      "reproduction": "In a temporary copy of the real batch artifacts, append ABSENT_FROM_REVIEW to evidenceIds of failed non-transfer card cc21, leave current evidence unchanged, recompute the review input result hash, then call finish_repair with the unchanged passing review. Actual draft.render executes; only external node subprocesses are stubbed successful. Observed REVIEWED_DRAFT.",
+      "impact": "The deterministic closeout can certify a repair whose declared official citation was never included in the independently reviewed evidence packet. The supplied current batch does not contain such a missing citation.",
+      "requestedChange": "Before merging, require every current candidate evidenceIds set to be a subset of current evidence IDs; add a focused finish_repair rejection test for a missing ID. Preserve existing exact evidence reuse checks.",
+      "status": "RESOLVED",
+      "resolution": "Production author added unique/nonempty reviewed evidence-ID validation and candidate cited-ID subset guard at repair_batch.py:374-377. Exact failed-card count is also checked at line 384. New focused finish_repair tests reject absent citations and duplicate evidence/card rows. Independent re-review of complete production diff found no remaining actionable issue within scope."
+    }
+  ],
+  "finalValidation": {
+    "command": "python3 -m unittest discover -s tools/aws_cards -p 'test_repair*.py' -v",
+    "tests": 12,
+    "failures": 0,
+    "errors": 0,
+    "exitCode": 0,
+    "finishRepairCoverage": [
+      "Exact unchanged candidate reuses transfer without supplement file",
+      "Changed transferred candidate rejected",
+      "Missing cited evidence ID rejected",
+      "Duplicate reviewed evidence IDs and duplicate targeted card rows rejected",
+      "Exactly one bound supplement accepted",
+      "Supplement source-file hash tampering rejected",
+      "Unbound supplemental excerpt rejected",
+      "Changed reused evidence quote rejected"
+    ],
+    "productionDiffReviewed": "Full diff against exports/card-repair-26-30-main-20261118/base/tools/aws_cards/repair_batch.py; no Git used",
+    "actualBatch": "Frozen candidate, review and result artifacts were read only; initial/final candidate SHA-256 remains bcce3d3c04a8ae65ef106c2f9b2380891ca5bc2bc8c3b27a8f38cd625462f71a"
+  }
+}

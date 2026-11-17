@@ -9,6 +9,101 @@ import repair_batch as m
 
 
 class RepairBatchTests(unittest.TestCase):
+    def _finish_repair(self, mutate=None):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp); trial = root / 'trial'; repair = root / 'repair'
+            for folder in [trial / 'review', trial / 'draft', repair / 'review']:
+                folder.mkdir(parents=True)
+            cards = [{'uid': u, **{k: k for k in m.draft.TEXT},
+                      'mustAnswer': ['answer'], 'evidenceIds': ['e1'], 'scopeChange': ''}
+                     for u in ['a', 'b', 'c']]
+            packet = {'cards': cards, 'evidence': [
+                {'id': 'e1', 'url': 'https://docs.aws.amazon.com/example', 'text': 'official quote'}]}
+            baseline = [{'stableUid': c['uid'], 'orderInDeck': i, 'difficulty': 2,
+                         'topic': 'topic', 'question': 'old', 'explanation': 'old',
+                         'source': {'url': packet['evidence'][0]['url']}, 'teaching': {},
+                         'translations': {'zh-CN': {'question': '旧', 'explanation': '旧'}}}
+                        for i, c in enumerate(cards, 1)]
+            m.write(root / 'input.json', packet)
+            m.write(trial / 'baseline.snapshot.json', baseline)
+            m.write(root / 'source-bindings.json', {
+                'packetSha256': m.draft.sha(root / 'input.json'),
+                'baselineSha256': m.draft.sha(trial / 'baseline.snapshot.json'), 'files': []})
+            old_review = {'cards': [{'uid': c['uid'], 'pass': c['uid'] == 'a',
+                'checkedRules': m.REVIEW_RULES, 'reason': 'checked'} for c in cards],
+                'transfers': [{'uid': u, 'changedCondition': 'change',
+                    'expectedChoiceAndReason': 'because', 'supportedByCard': True} for u in ['a', 'b']]}
+            m.write(trial / 'draft/candidate.cards.json', cards)
+            m.write(trial / 'review/input.json', packet)
+            m.write(trial / 'review/output.json', old_review)
+            m.write(trial / 'result.json', {'status': 'NEEDS_REPAIR',
+                'candidateSha256': m.draft.sha(trial / 'draft/candidate.cards.json'),
+                'reviewInputSha256': m.draft.sha(trial / 'review/input.json'),
+                'reviewOutputSha256': m.draft.sha(trial / 'review/output.json')})
+            current = json.loads(json.dumps(packet)); current['cards'] = current['cards'][1:]
+            if mutate:
+                mutate(current, repair)
+            m.write(repair / 'review/input.json', current)
+            review = json.loads(json.dumps(old_review)); review['cards'] = review['cards'][1:]
+            for row in review['cards']:
+                row['pass'] = True
+            review['transfers'][0]['uid'] = 'c'
+            m.write(repair / 'review/output.json', review)
+            m.write(repair / 'review/result.json', {
+                'inputSha256': m.draft.sha(repair / 'review/input.json'),
+                'outputSha256': m.draft.sha(repair / 'review/output.json')})
+            with patch.object(m.subprocess, 'run', return_value=SimpleNamespace(
+                    returncode=0, stdout='', stderr='')):
+                return m.finish_repair(root / 'input.json', trial, repair, root / 'out')
+
+    def test_finish_repair_reuses_exact_candidate_without_supplement(self):
+        self.assertEqual(self._finish_repair()['status'], 'REVIEWED_DRAFT')
+
+    def test_finish_repair_rejects_changed_candidate_with_old_transfer(self):
+        def change(current, repair):
+            current['cards'][0]['keyPointEn'] = 'changed mechanism'
+        with self.assertRaisesRegex(ValueError, 'transfer evidence cannot be reused'):
+            self._finish_repair(change)
+
+    def test_finish_repair_rejects_missing_evidence_citation(self):
+        def change(current, repair):
+            current['cards'][1]['evidenceIds'].append('missing')
+        with self.assertRaisesRegex(ValueError, 'unknown or ambiguous evidence citations'):
+            self._finish_repair(change)
+
+    def test_finish_repair_rejects_duplicate_evidence_and_cards(self):
+        for duplicate in ['evidence', 'cards']:
+            with self.subTest(duplicate=duplicate):
+                def change(current, repair):
+                    current[duplicate].append(current[duplicate][0])
+                with self.assertRaisesRegex(ValueError, 'ambiguous evidence|exactly the failed cards'):
+                    self._finish_repair(change)
+
+    def test_finish_repair_checks_supplement_binding_and_reused_evidence(self):
+        for tamper in [None, 'source', 'excerpt', 'reused']:
+            with self.subTest(tamper=tamper):
+                def change(current, repair):
+                    current['evidence'].append({'id': 'e2',
+                        'url': 'https://docs.aws.amazon.com/supplement', 'text': 'supplement quote'})
+                    current['cards'][1]['evidenceIds'].append('e2')
+                    source = repair / 'source.json'
+                    m.write(source, {'url': current['evidence'][-1]['url'], 'text': 'supplement quote'})
+                    m.write(repair / 'supplement-binding.json', {'path': str(source), 'sha256': m.draft.sha(source)})
+                    if tamper == 'source':
+                        source.write_text(source.read_text() + ' ')
+                    elif tamper == 'excerpt':
+                        current['evidence'][-1]['text'] = 'not in source'
+                    elif tamper == 'reused':
+                        current['evidence'][0]['text'] = 'changed original quote'
+                if tamper:
+                    with self.assertRaisesRegex(ValueError, {
+                            'source': 'Supplemental official source changed',
+                            'excerpt': 'Supplemental excerpt not bound',
+                            'reused': 'Reused evidence ID changed'}[tamper]):
+                        self._finish_repair(change)
+                else:
+                    self.assertEqual(self._finish_repair(change)['status'], 'REVIEWED_DRAFT')
+
     def test_rule_label_normalization_does_not_turn_failure_into_pass(self):
         review = {'cards': [{'uid': 'u', 'pass': False, 'checkedRules': ['FACT：通过', 'B1：不通过'], 'reason': 'failed'}], 'transfers': []}
         normalized = m.normalize_review_labels(review)
@@ -82,11 +177,16 @@ command = ["existing-auth-hook"]
 
     def test_scope_and_baseline_remain_frozen(self):
         old = {'uid': 'u', 'frontEn': 'Old task', 'frontZh': '原问题', 'goalEn': 'Old goal',
-               'goalZh': '原目标', 'mustAnswer': ['A', 'B']}
+               'goalZh': '原目标', 'mustAnswer': ['A', 'B'],
+               'answerEn': 'Old answer', 'answerZh': '原答案',
+               'keyPointEn': 'Old comparison removed by candidate', 'keyPointZh': '原有比较',
+               'watchOutEn': 'Old boundary', 'watchOutZh': '原边界'}
         packet = {'cards': [old], 'evidence': [{'id': 'used', 'text': 'full'}, {'id': 'unused', 'text': 'other'}]}
         review = m.review_input(packet, {'cards': [{'uid': 'u', 'goalEn': 'Narrow', 'evidenceIds': ['used']}]})
         self.assertEqual(review['previousScope'][0]['mustAnswer'], ['A', 'B'])
         self.assertEqual(review['previousScope'][0]['goalEn'], 'Old goal')
+        self.assertEqual(review['previousScope'][0]['keyPointZh'], '原有比较')
+        self.assertEqual(review['previousScope'][0]['watchOutEn'], 'Old boundary')
         self.assertEqual(review['evidence'], [{'id': 'used', 'text': 'full'}])
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp); base = root / 'base.json'; base.write_text('{"cards":[]}')
