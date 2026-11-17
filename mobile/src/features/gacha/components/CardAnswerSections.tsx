@@ -373,8 +373,8 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   keyPointBlock: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+    flexDirection: 'column',
+    alignItems: 'stretch',
     marginTop: 4,
   },
   keyPointLabel: {
