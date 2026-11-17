@@ -99,7 +99,7 @@ resource "aws_cloudfront_distribution" "content" {
   web_acl_id          = aws_wafv2_web_acl.content.arn
   default_cache_behavior {
     allowed_methods            = ["GET", "HEAD"]
-    response_headers_policy_id = aws_cloudfront_response_headers_policy.content_console_read.id
+    response_headers_policy_id = data.aws_cloudfront_response_headers_policy.content_console_read.id
     cache_policy_id            = "658327ea-f89d-4fab-a63d-7e88639e58f6"
     cached_methods             = ["GET", "HEAD"]
     compress                   = true

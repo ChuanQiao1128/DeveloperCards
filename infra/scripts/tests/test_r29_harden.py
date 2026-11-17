@@ -124,15 +124,15 @@ class ConsoleCspTest(unittest.TestCase):
         # The console DSN's ingest origin (org timeawake-limited, US); the DSN itself lives in SSM and CI, not here.
         self.assertRegex(sentry[0], r"^https://o\d+\.ingest\.us\.sentry\.io$")
 
-    def test_content_cdn_allows_only_anonymous_console_reads(self):
+    def test_public_content_cdn_uses_free_plan_managed_cors_and_read_methods(self):
         headers = (REPO_ROOT / "infra/modules/edge/security_headers.tf").read_text()
-        policy = headers.split('"content_console_read"', 1)[1].split('resource "', 1)[0]
-        self.assertIn('access_control_allow_credentials = false', policy)
-        self.assertIn('items = ["https://${local.console_hostname}"]', policy)
-        self.assertIn('items = ["GET", "HEAD"]', policy)
-        self.assertNotIn('"*"', policy)
+        self.assertIn('data "aws_cloudfront_response_headers_policy" "content_console_read"', headers)
+        self.assertIn('name = "Managed-SimpleCORS"', headers)
+        self.assertNotIn('resource "aws_cloudfront_response_headers_policy" "content_console_read"', headers)
         content = (REPO_ROOT / "infra/modules/edge/cdn.tf").read_text().split('resource "aws_cloudfront_distribution" "content" {', 1)[1].split('resource "', 1)[0]
-        self.assertIn('aws_cloudfront_response_headers_policy.content_console_read.id', content)
+        self.assertIn('data.aws_cloudfront_response_headers_policy.content_console_read.id', content)
+        self.assertRegex(content, r'allowed_methods\s*= \["GET", "HEAD"\]')
+        self.assertNotIn('"OPTIONS"', content)
 
     def test_the_console_index_html_has_no_inline_script(self):
         # html.parser, not a regex: it lower-cases tag and attribute names, so <SCRIPT> or STYLE= cannot slip past.

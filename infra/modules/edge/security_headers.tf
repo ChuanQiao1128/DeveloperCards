@@ -10,22 +10,13 @@ locals {
   security_header_targets = var.manage_domain ? ["console", "site"] : ["console"]
 }
 
-# The Console verifies public card bytes without sending Console credentials to the content CDN.
-resource "aws_cloudfront_response_headers_policy" "content_console_read" {
-  name = "developercards-${var.env}-content-console-read"
-  cors_config {
-    access_control_allow_credentials = false
-    origin_override                  = true
-    access_control_allow_origins {
-      items = ["https://${local.console_hostname}"]
-    }
-    access_control_allow_methods {
-      items = ["GET", "HEAD"]
-    }
-    access_control_allow_headers {
-      items = ["Accept"]
-    }
-  }
+# Public card bytes use AWS managed SimpleCORS: the content distribution's Free plan does not
+# support custom response-header policies. It allows any origin to read already-public bytes,
+# without credentials; the Console verifier always omits its login credentials.
+# https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/flat-rate-pricing-plan.html
+# https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/using-managed-response-headers-policies.html
+data "aws_cloudfront_response_headers_policy" "content_console_read" {
+  name = "Managed-SimpleCORS"
 }
 
 resource "aws_cloudfront_response_headers_policy" "security" {
