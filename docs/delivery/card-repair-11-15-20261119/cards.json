@@ -1,0 +1,208 @@
+[
+  {
+    "stableUid": "aws-rb2-20261107-pack-cb12",
+    "orderInDeck": 110,
+    "difficulty": 2,
+    "question": "A website serves its content through one CloudFront distribution. Product pages are open to every country, but download pages must accept only requests whose IP addresses geolocate to New Zealand.\n\nShould you use CloudFront’s built-in geographic restrictions or AWS WAF? Why?",
+    "explanation": "Answer: Use AWS WAF to block requests that access the download pages AND have an IP address that does not geolocate to New Zealand.\nKey point: CloudFront’s built-in geographic restrictions apply to every page in the same distribution, so they would also restrict the product pages. WAF can check both which page is requested and which country the IP address comes from, allowing country restrictions to apply only to the download pages.",
+    "codeLanguage": "",
+    "codeSnippet": "",
+    "realWorldUsage": "",
+    "topic": "Geo-based access filtering / 按来源国家过滤",
+    "source": {
+      "url": "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/georestrictions.html",
+      "quote": null
+    },
+    "translations": {
+      "zh-CN": {
+        "v": 1,
+        "question": "网站通过同一个 CloudFront 入口提供内容。产品介绍页对所有国家开放，下载页面只允许 IP 定位在新西兰的请求访问。\n\n应使用 CloudFront 自带地域限制，还是 AWS WAF？为什么？",
+        "explanation": "答：用 AWS WAF，拦截“访问下载页面，且 IP 不属于新西兰”的请求。\n考点：CloudFront 自带地域限制对同一个分配下的所有页面统一生效，会连介绍页一起限制。WAF 能同时判断“访问哪个页面”和“IP 来自哪个国家”，所以可以只限制下载页。"
+      }
+    },
+    "teaching": {
+      "goal": "Choose country-and-path filtering for a subset of one CloudFront distribution, and explain why distribution-wide geographic restrictions do not fit.",
+      "zh-CN": {
+        "goal": "判断同一 CloudFront 分配内仅部分页面需要国家限制时应选择 WAF，并解释统一地域限制为什么不适用。",
+        "answer": "用 AWS WAF，拦截“访问下载页面，且 IP 不属于新西兰”的请求。",
+        "keyPoint": "CloudFront 自带地域限制对同一个分配下的所有页面统一生效，会连介绍页一起限制。WAF 能同时判断“访问哪个页面”和“IP 来自哪个国家”，所以可以只限制下载页。"
+      },
+      "answer": "Use AWS WAF to block requests that access the download pages AND have an IP address that does not geolocate to New Zealand.",
+      "schema": "teaching-v1",
+      "keyPoint": "CloudFront’s built-in geographic restrictions apply to every page in the same distribution, so they would also restrict the product pages. WAF can check both which page is requested and which country the IP address comes from, allowing country restrictions to apply only to the download pages.",
+      "mustAnswer": [
+        "Choose AWS WAF and combine the download-page path with a non-New-Zealand IP country condition.",
+        "Explain that CloudFront’s built-in geographic restrictions apply across the distribution and would also restrict the public product pages."
+      ]
+    },
+    "tags": {
+      "domain": "1",
+      "examTask": "1.2"
+    }
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-cb13",
+    "orderInDeck": 120,
+    "difficulty": 2,
+    "question": "You need to enable HTTPS for two applications’ custom domains, with certificates managed by ACM (AWS Certificate Manager). One application is served through a Regional API Gateway API in Sydney, and the other through CloudFront.\n\nIn which ACM Region should each certificate be placed?",
+    "explanation": "Answer: Place the Regional API Gateway certificate in Sydney, in the same Region as the API. Place the CloudFront certificate in us-east-1 (US East, N. Virginia).\nKey point: Identify the entry that receives the user’s HTTPS connection. When the user connects to CloudFront first, the certificate used is the one on the CloudFront entry, so it must meet CloudFront’s fixed Region requirement. Even if the backend server is in Sydney, that does not change the requirement.",
+    "codeLanguage": "",
+    "codeSnippet": "",
+    "realWorldUsage": "",
+    "topic": "ACM certificate Regions / ACM证书Region",
+    "source": {
+      "url": "https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-custom-domain-tls-version.html",
+      "quote": null
+    },
+    "translations": {
+      "zh-CN": {
+        "v": 1,
+        "question": "你要给两个应用的自有域名配置 HTTPS，证书由 ACM（AWS 的证书管理服务）管理。一个应用通过悉尼的区域型 API Gateway 提供服务，另一个通过 CloudFront 提供服务。\n\n两者的证书分别应放在 ACM 的哪个区域？",
+        "explanation": "答：区域型 API Gateway 的证书放在悉尼，与 API 同区域；CloudFront 的证书固定放在 us-east-1（美国东部，弗吉尼亚北部）。\n考点：看的是接收用户 HTTPS 连接的入口。用户先连接 CloudFront 时，用到的是 CloudFront 入口的证书，需要满足它固定的区域要求；后端服务器即使在悉尼，也不会改变这个要求。"
+      }
+    },
+    "teaching": {
+      "goal": "Choose the ACM certificate Region for a Regional API Gateway custom domain versus a CloudFront viewer-facing custom domain.",
+      "zh-CN": {
+        "goal": "根据用户连接的入口，判断区域型 API Gateway 与 CloudFront 自有域名证书应放在哪个 ACM 区域。",
+        "answer": "区域型 API Gateway 的证书放在悉尼，与 API 同区域；CloudFront 的证书固定放在 us-east-1（美国东部，弗吉尼亚北部）。",
+        "keyPoint": "看的是接收用户 HTTPS 连接的入口。用户先连接 CloudFront 时，用到的是 CloudFront 入口的证书，需要满足它固定的区域要求；后端服务器即使在悉尼，也不会改变这个要求。"
+      },
+      "answer": "Place the Regional API Gateway certificate in Sydney, in the same Region as the API. Place the CloudFront certificate in us-east-1 (US East, N. Virginia).",
+      "schema": "teaching-v1",
+      "keyPoint": "Identify the entry that receives the user’s HTTPS connection. When the user connects to CloudFront first, the certificate used is the one on the CloudFront entry, so it must meet CloudFront’s fixed Region requirement. Even if the backend server is in Sydney, that does not change the requirement.",
+      "mustAnswer": [
+        "Regional API Gateway in Sydney: an ACM certificate in Sydney, the API’s Region.",
+        "CloudFront viewer certificate: ACM us-east-1 (US East, N. Virginia)."
+      ]
+    },
+    "tags": {
+      "domain": "1",
+      "examTask": "1.3"
+    }
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-cb15",
+    "orderInDeck": 130,
+    "difficulty": 2,
+    "question": "For this connection, a client uses port 50000 to access an EC2 server’s HTTPS port 443. The request has been allowed by the server’s security group and by the NACL (subnet-level network access rules) associated with the server’s subnet.\n\nWhat settings do the security group and this NACL need for the response to return to the client?",
+    "explanation": "Answer: The security group automatically allows this response, so no additional outbound rule is needed. The NACL’s outbound rules must allow the response traffic with destination port 50000.\nKey point: The response travels from server port 443 to client port 50000. The security group remembers the allowed connection and automatically allows its response. The NACL does not remember connections and checks its outbound rules as the response leaves the subnet, so the destination port must match the client’s port 50000.",
+    "codeLanguage": "",
+    "codeSnippet": "",
+    "realWorldUsage": "",
+    "topic": "Stateful SG vs NACL return traffic / 有状态安全组与NACL回程",
+    "source": {
+      "url": "https://docs.aws.amazon.com/vpc/latest/userguide/vpc-security-groups.html",
+      "quote": null
+    },
+    "translations": {
+      "zh-CN": {
+        "v": 1,
+        "question": "客户端本次使用 50000 端口，访问 EC2 服务器的 HTTPS 443 端口。请求已被服务器的安全组和服务器所在子网的 NACL（子网级网络访问规则）放行。\n\n响应返回客户端时，安全组和这份 NACL 分别需要怎样设置？",
+        "explanation": "答：安全组会自动允许这次响应，无需另加出站规则；NACL 的出站规则须允许目的端口 50000 的响应流量。\n考点：响应方向是“服务器 443 → 客户端 50000”。安全组记住已放行的连接，自动允许响应；NACL 不记录连接，响应离开子网时还要检查出站规则，因此目的端口要匹配客户端的 50000。"
+      }
+    },
+    "teaching": {
+      "goal": "Distinguish stateful security-group response handling from the server-subnet NACL’s outbound destination-port requirement for the same allowed connection.",
+      "zh-CN": {
+        "goal": "围绕同一条已放行连接，区分安全组自动允许响应与服务器子网 NACL 检查响应出站目的端口的机制。",
+        "answer": "安全组会自动允许这次响应，无需另加出站规则；NACL 的出站规则须允许目的端口 50000 的响应流量。",
+        "keyPoint": "响应方向是“服务器 443 → 客户端 50000”。安全组记住已放行的连接，自动允许响应；NACL 不记录连接，响应离开子网时还要检查出站规则，因此目的端口要匹配客户端的 50000。"
+      },
+      "answer": "The security group automatically allows this response, so no additional outbound rule is needed. The NACL’s outbound rules must allow the response traffic with destination port 50000.",
+      "schema": "teaching-v1",
+      "keyPoint": "The response travels from server port 443 to client port 50000. The security group remembers the allowed connection and automatically allows its response. The NACL does not remember connections and checks its outbound rules as the response leaves the subnet, so the destination port must match the client’s port 50000.",
+      "mustAnswer": [
+        "The security group automatically allows the response without an additional outbound rule.",
+        "The server-subnet NACL must allow outbound response traffic to the client’s port 50000."
+      ]
+    },
+    "tags": {
+      "domain": "1",
+      "examTask": "1.2"
+    }
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-cb19",
+    "orderInDeck": 140,
+    "difficulty": 2,
+    "question": "An HTTP request flood keeps changing source IPs, making a fixed blacklist hard to maintain. How can you automatically block request groups that exceed a rate limit?",
+    "explanation": "Answer: Use an AWS WAF rate-based rule. Set how requests are grouped, the request threshold, and the Block action.\nKey point: The rule counts each group’s requests over an evaluation window and applies the action to groups over the threshold, rather than relying on a manually maintained list of source IPs.\nWatch out: With per-IP grouping, a distributed flood can evade the rule if each IP remains below the threshold.",
+    "codeLanguage": "",
+    "codeSnippet": "",
+    "realWorldUsage": "",
+    "topic": "Rate-based rules / 速率限制规则",
+    "source": {
+      "url": "https://docs.aws.amazon.com/waf/latest/developerguide/waf-rule-statement-type-rate-based.html",
+      "quote": null
+    },
+    "translations": {
+      "zh-CN": {
+        "v": 1,
+        "question": "HTTP请求洪泛的来源IP不断变化，固定黑名单难维护。要自动拦截超过速率限制的请求组，应怎样做？",
+        "explanation": "答：用AWS WAF基于速率的规则，设置请求分组条件、请求量阈值和Block（拦截）动作。\n考点：规则统计每组在一个时间窗口内的请求量，对超阈值的组执行动作，不依赖逐个手工维护来源IP黑名单。\n易错提醒：若按单个IP分组，每个IP都未超阈值的分布式洪泛仍可能漏过。"
+      }
+    },
+    "teaching": {
+      "goal": "Configure a WAF rate-based rule to count and block excessive requests by aggregation group.",
+      "zh-CN": {
+        "goal": "配置WAF基于速率的规则，按请求组统计并拦截过量请求。",
+        "answer": "用AWS WAF基于速率的规则，设置请求分组条件、请求量阈值和Block（拦截）动作。",
+        "keyPoint": "规则统计每组在一个时间窗口内的请求量，对超阈值的组执行动作，不依赖逐个手工维护来源IP黑名单。",
+        "watchOut": "若按单个IP分组，每个IP都未超阈值的分布式洪泛仍可能漏过。"
+      },
+      "answer": "Use an AWS WAF rate-based rule. Set how requests are grouped, the request threshold, and the Block action.",
+      "schema": "teaching-v1",
+      "keyPoint": "The rule counts each group’s requests over an evaluation window and applies the action to groups over the threshold, rather than relying on a manually maintained list of source IPs.",
+      "mustAnswer": [
+        "Use a WAF rate-based rule with request grouping, a threshold, and Block"
+      ],
+      "watchOut": "With per-IP grouping, a distributed flood can evade the rule if each IP remains below the threshold."
+    },
+    "tags": {
+      "domain": "1",
+      "examTask": "1.2"
+    }
+  },
+  {
+    "stableUid": "aws-rb2-20261107-pack-cc01",
+    "orderInDeck": 150,
+    "difficulty": 2,
+    "question": "A fleet of EC2 servers is already managed through Systems Manager. You need to install approved, supported operating system patches across the fleet and identify servers that are still missing patches.\n\nShould you primarily use Patch Manager or Run Command to manage this work? Why?",
+    "explanation": "Answer: Use Patch Manager to manage patching across the fleet.\nKey point: Patch Manager checks which patches are missing according to approval rules and organizes their installation. Run Command sends specified commands to servers for execution; Patch Manager can use it to carry out patching operations.",
+    "codeLanguage": "",
+    "codeSnippet": "",
+    "realWorldUsage": "",
+    "topic": "Managed patching vs custom commands / 托管补丁与自定义命令",
+    "source": {
+      "url": "https://docs.aws.amazon.com/systems-manager/latest/userguide/patch-manager.html",
+      "quote": null
+    },
+    "translations": {
+      "zh-CN": {
+        "v": 1,
+        "question": "一批 EC2 服务器已由 Systems Manager 统一管理。你要统一安装已批准且受支持的系统补丁，并检查哪些服务器还有补丁没装。\n\n这项工作应主要用 Patch Manager，还是 Run Command？为什么？",
+        "explanation": "答：用 Patch Manager 统一管理这批服务器的补丁。\n考点：Patch Manager 按批准规则检查缺失补丁并组织安装；Run Command 负责下发和执行指定命令，Patch Manager 可以借助它执行补丁操作。"
+      }
+    },
+    "teaching": {
+      "goal": "Choose managed patching when approval-based missing-patch checks and installation are required, and understand Run Command as an execution mechanism that Patch Manager can use.",
+      "zh-CN": {
+        "goal": "需要按批准规则检查并安装缺失补丁时，选择 Patch Manager，并理解 Run Command 在其中承担命令执行作用。",
+        "answer": "用 Patch Manager 统一管理这批服务器的补丁。",
+        "keyPoint": "Patch Manager 按批准规则检查缺失补丁并组织安装；Run Command 负责下发和执行指定命令，Patch Manager 可以借助它执行补丁操作。"
+      },
+      "answer": "Use Patch Manager to manage patching across the fleet.",
+      "schema": "teaching-v1",
+      "keyPoint": "Patch Manager checks which patches are missing according to approval rules and organizes their installation. Run Command sends specified commands to servers for execution; Patch Manager can use it to carry out patching operations.",
+      "mustAnswer": [
+        "Choose Patch Manager for managing this fleet’s patching.",
+        "Explain that Patch Manager determines which approved patches are missing, while Run Command supplies command execution."
+      ]
+    },
+    "tags": {
+      "domain": "1",
+      "examTask": "1.2"
+    }
+  }
+]
