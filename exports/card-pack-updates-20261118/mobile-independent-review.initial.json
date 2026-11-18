@@ -1,0 +1,163 @@
+{
+  "schema": "recallsmith-mobile-independent-review-v1",
+  "phase": "initial_review",
+  "verdict": "CHANGES_REQUESTED",
+  "scope": "Independent source review and local focused tests. No implementation edits, model calls, credential reads, remote mutations or publication.",
+  "baseline": {
+    "repository": "ChuanQiao1128/DeveloperCards",
+    "ref": "0da17a25774103a772e679b22522d489b93d597b",
+    "source": "GitHub fetch_file at the exact commit; local Git was not used as authority after pack errors."
+  },
+  "findings": [
+    {
+      "id": "MPU-001",
+      "priority": "P2",
+      "status": "open",
+      "title": "Expose the discovered latest version",
+      "path": "mobile/src/features/gacha/settings/content/CardPackUpdatesSection.tsx",
+      "line": 77,
+      "details": "The section sets latestVersion only after checkAndUpdateCardPack returns. That service returns only when installed.version equals remoteVersion, while the section displays Latest version only when latestVersion differs from installed.version. The latest-version row therefore cannot appear in a normal success. A newly discovered version is also lost when download fails because the service has no manifest-result callback.",
+      "requestedFix": "Show a successful remote check's latest version independently from installed confirmation, including while downloading and after a failed download. Keep Up to date gated on the existing verified installed-version condition.",
+      "testGap": "Existing service/UI tests assert current status and installed version but never assert that the latest version is visible."
+    },
+    {
+      "id": "MPU-002",
+      "priority": "P2",
+      "status": "open",
+      "title": "Recover a missing file despite matching install metadata",
+      "path": "mobile/src/content/cardPackUpdates.ts",
+      "line": 32,
+      "details": "When metadata buildId already matches the fresh remote version but the referenced local card file is missing, getInstalledDeckInfo returns null and the new flow calls installDeckAndInvalidate. Existing installDeckFromUrl at deckRepository.ts:792 returns true solely on matching metadata, without locating the file. The new readback remains null and reports not finished installing. Every retry follows the same path without a download.",
+      "requestedFix": "Make the existing same-version installer shortcut conditional on a valid located installed file, then preserve the normal installer validation/readback. Add a regression using the real repository path with matching metadata and a missing file.",
+      "testGap": "The new repository test proves that the installed-info accessor returns null for a missing file. The service tests mock the installer and do not exercise its same-version shortcut."
+    }
+  ],
+  "independentValidation": [
+    {
+      "command": "npm run test:typecheck",
+      "cwd": "mobile",
+      "result": "PASS",
+      "exitCode": 0
+    },
+    {
+      "command": "npm exec vitest run tests/unit/cardPackUpdates.test.ts tests/integration/card-pack-updates.section.test.tsx tests/unit/deckRepositoryTimeouts.test.ts",
+      "cwd": "mobile",
+      "result": "PASS",
+      "files": 3,
+      "tests": 20
+    },
+    {
+      "command": "npm exec vitest run tests/integration/settings.screen.test.tsx tests/integration/settings-background-refresh.spec.tsx",
+      "cwd": "mobile",
+      "result": "PASS",
+      "files": 2,
+      "tests": 18
+    }
+  ],
+  "sourceBehaviorConfirmed": [
+    "The explicit action uses requireRemote:true; fetch failure returns null and is promoted to an error instead of a cached Up to date result.",
+    "A server304 is accepted only after a real request with an existing manifest cache. The repository test asserts the conditional ETag request.",
+    "The accessor checks local file existence using the existing iOS container-relocation locator and exposes installedAtMs.",
+    "Duplicate presses are synchronously blocked by busy.current, with an independently passing UI test.",
+    "Settings keys the section by account and active slug. Mounted/request guards suppress a previous keyed section's eventual result; this is covered by an independently passing UI test.",
+    "The service compares auth generation after awaited phases, including installation and readback. No new progress or queue write calls appear in the feature."
+  ],
+  "protectedBoundary": [
+    {
+      "path": "mobile/src/screens/SettingsScreen.tsx",
+      "baselineBlobSha": "0fb59fb1de1b1a44fc70b0bb9e2d594b39585a56",
+      "sameAsMain": false,
+      "currentExit": 0,
+      "currentOutputChars": 24284,
+      "baseChars": 23626,
+      "baselineError": false
+    },
+    {
+      "path": "mobile/src/sync/progressSync.ts",
+      "baselineBlobSha": "de14efdb9f5c4200974c2678415198a452d5c58e",
+      "sameAsMain": true,
+      "currentExit": 0,
+      "currentOutputChars": 75795,
+      "baseChars": 75795,
+      "baselineError": false
+    },
+    {
+      "path": "mobile/src/auth/authStore.ts",
+      "baselineBlobSha": "efbf129f8bd01a1738736d1552beb4828bfb1aa5",
+      "sameAsMain": true,
+      "currentExit": 0,
+      "currentOutputChars": 29494,
+      "baseChars": 29494,
+      "baselineError": false
+    },
+    {
+      "path": "mobile/src/sync/syncGuard.ts",
+      "baselineBlobSha": "ec9f20685cee96972d95f621bddbee0b9749bd06",
+      "sameAsMain": true,
+      "currentExit": 0,
+      "currentOutputChars": 1235,
+      "baseChars": 1235,
+      "baselineError": false
+    },
+    {
+      "path": "mobile/src/review/pendingRating.ts",
+      "baselineBlobSha": "7860adfe6012e7e91b681d0973172bff501733ef",
+      "sameAsMain": true,
+      "currentExit": 0,
+      "currentOutputChars": 2130,
+      "baseChars": 2130,
+      "baselineError": false
+    },
+    {
+      "path": "mobile/app.json",
+      "baselineBlobSha": "b3e290c73da07d2c1b360953f31bfeca7975bf8b",
+      "sameAsMain": true,
+      "currentExit": 0,
+      "currentOutputChars": 1733,
+      "baseChars": 1733,
+      "baselineError": false
+    },
+    {
+      "path": "mobile/package.json",
+      "baselineBlobSha": "4a1c36cd6d2b032f63e4cd4322fe54100a8018fb",
+      "sameAsMain": true,
+      "currentExit": 0,
+      "currentOutputChars": 2631,
+      "baseChars": 2631,
+      "baselineError": false
+    },
+    {
+      "path": "mobile/package-lock.json",
+      "baselineBlobSha": "fe092c2bb64482f5acd8b3adc35115369a9e3f77",
+      "sameAsMain": true,
+      "currentExit": 0,
+      "currentOutputChars": 826059,
+      "baseChars": 826059,
+      "baselineError": false
+    },
+    {
+      "path": "mobile/eas.json",
+      "baselineBlobSha": "9a76b32d465b6b491f090d7eebcd80475a5c38f4",
+      "sameAsMain": true,
+      "currentExit": 0,
+      "currentOutputChars": 2955,
+      "baseChars": 2955,
+      "baselineError": false
+    },
+    {
+      "path": "mobile/metro.config.js",
+      "baselineBlobSha": "b7d3ef2a247ab319e1db7f7d117f5495c550dc59",
+      "sameAsMain": true,
+      "currentExit": 0,
+      "currentOutputChars": 276,
+      "baseChars": 276,
+      "baselineError": false
+    }
+  ],
+  "limits": [
+    "No native device, EAS download or physical-phone UI verification was performed in this review.",
+    "Account changes before install and stale keyed UI results have focused tests. A real-account switch during native download was not exercised.",
+    "Initial local Git diff emitted a truncated-pack error; direct main0da17 GitHub content comparison succeeded for the protected files. No repair/reset/clean/fetch was attempted.",
+    "Root is making the fixes; final re-review is pending the fix notice."
+  ]
+}

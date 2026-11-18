@@ -43,6 +43,7 @@ import {
 } from '../features/gacha/settings/account/accountActions';
 import AccountSection from '../features/gacha/settings/account/AccountSection';
 import ContentSection from '../features/gacha/settings/content/ContentSection';
+import { CardPackUpdatesSection } from '../features/gacha/settings/content/CardPackUpdatesSection';
 import RemindersSection from '../features/gacha/settings/reminders/RemindersSection';
 import { FeedbackSection } from '../features/gacha/settings/feedback/FeedbackSection';
 import {
@@ -486,6 +487,18 @@ export function SettingsScreen({ navigation }: Props) {
               onSelect={(next) => void onSelectAudience(next)}
               style={styles.groupedSection}
             />
+          </View>
+
+          <Text style={styles.groupHeading}>Card pack updates</Text>
+          <View style={styles.insetGroupCard}>
+            {activeDeckSlug ? (
+              <CardPackUpdatesSection
+                key={`${authUserSub ?? 'anonymous'}:${activeDeckSlug}`}
+                slug={activeDeckSlug}
+                label={activeDeckLabel ?? 'Current card pack'}
+                style={styles.groupedSection}
+              />
+            ) : <Text style={styles.groupedSection}>Choose a card pack on Home to see its installed version.</Text>}
           </View>
 
           {/* Group 3: Reminders & Audio */}

@@ -22,3 +22,30 @@
 计时须同时报告首次工具维护、资料准备/等待、模型与校验及总耗时。已冻结输入的模型耗时不能冒称每批端到端耗时。现有合格稿不为测速重做，下一批默认接续未修的五张。
 
 当前常规预算为每5张约10分钟（用户接受，取代5分钟目标），涵盖取卡、证据准备、改写、独立审查、至多一次必要局部返修、校验及出稿；授权发布和核验也计实际总时长。稳定修卡优先，符合标准且审查绑定有效的内容保留。预计超时说明具体卡与阻点，事实缺证不降低门槛；一次返修仍未闭合则保留待处理，不反复调用或扩成工具重构。实际token照实记录，2万只作观察参考，既有明确预算门禁不变。
+
+## 固定发布构包（用户看稿后说“发布”）
+
+命令：`python3 tools/aws_cards/repair_release.py prepare REQUEST.json OUTPUT`。REQUEST只有以下字段，路径均填当前冻结产物的绝对路径：
+
+```json
+{
+  "priorRelease": "上次已核验发布目录",
+  "packet": "本批input.json",
+  "trial": "本批原始run目录",
+  "reviewed": "含candidate.cards.json及cards.import.json的当前通过稿目录",
+  "repair": null,
+  "mainSHA": "实际核对的40位main提交",
+  "releaseId": "本批固定发布身份",
+  "authorization": "引用用户本次实际发布指令的JSON文件"
+}
+```
+
+有一次定向补审时repair指向其原始目录。授权文件须保留非空userRequest及humanPerCardReview:false；构包器不生成用户授权或人审声明。输出目录必须不存在，失败目录保留；无模型调用或生产写入。
+
+Console载入release-bundle.json、捕获并下载完整编辑备份后执行：
+
+```sh
+python3 tools/aws_cards/repair_release.py verify-baseline OUTPUT 完整编辑备份.json
+```
+
+通过后继续Console **Run reviewed release**。恢复沿用同一releaseId及import/review/publish动作，不换key或基线。最终仍须实际下载核验CDN并保存最终journal与回执。App代码更新才安排兼容的OTA；日常卡片正文沿内容CDN发布。

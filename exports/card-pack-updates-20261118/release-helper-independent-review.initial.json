@@ -1,0 +1,64 @@
+{
+  "schema": "recallsmith-release-helper-independent-review-v1",
+  "phase": "initial_review",
+  "verdict": "CHANGES_REQUESTED",
+  "scope": "Deterministic helper source and trust-boundary review. No card-fact re-review, model calls, publication, production writes, credential access, Git changes or implementation edits.",
+  "reviewedSourcePaths": [
+    "tools/aws_cards/repair_release.py",
+    "tools/aws_cards/test_repair_release.py"
+  ],
+  "findings": [
+    {
+      "id": "RHR-001",
+      "priority": "P2",
+      "status": "open",
+      "title": "Bind the reused prior release bundle to its published receipt",
+      "path": "tools/aws_cards/repair_release.py",
+      "line": 198,
+      "details": "prepare checks after-deck.json against receipt.sha256 but never checks release-bundle.json against the receipt's existing bundleSha256 or checks its releaseId against receipt.releaseId. A modified prior review prompt/corpus/evidence binding can therefore be reused as verified prior evidence.",
+      "probe": {
+        "change": "In a temporary copy, replace prior review.promptHash with64zeroes while leaving publication-verification.json unchanged.",
+        "actualPriorBundleSha256": "de875e087f524fa4d189a15678c87bdb4995333232f5dce11e15594317160eac",
+        "receiptBundleSha256": "1008cd4f44731e1f90df6f94b034add00e8e80a08a24020818f94726a7f01596",
+        "actualAcceptance": "EXACT_BINDINGS_VERIFIED",
+        "isSyntheticTrustControl": true,
+        "backend": "Only backend_hashes was mocked using the existing real-replay hashes. Current review/model-response/render/source binding functions ran unchanged."
+      },
+      "requestedFix": "Require exact prior bundle SHA and release identity from the verified publication receipt before reusing any prior review evidence; add a tamper regression."
+    },
+    {
+      "id": "RHR-002",
+      "priority": "P2",
+      "status": "open",
+      "title": "Bind baseline verification to the prepared release and deck",
+      "path": "tools/aws_cards/repair_release.py",
+      "line": 250,
+      "details": "verify_baseline loads expected-baseline.json and current backup metadata but never validates the prepared release-bundle/preflight identity. It ignores backup deckId/deck.id/deck.slug and emits PASS without releaseId, bundle SHA or backup SHA. The existing test passes with no prepared release bundle at all.",
+      "requestedFix": "Require the valid prepared-bundle/preflight identity and expected deck ID/slug, then include releaseId, bundle SHA, backup SHA and editingSnapshot in the baseline verification receipt."
+    }
+  ],
+  "independentValidation": [
+    {
+      "command": "python3 -m unittest discover -s tools/aws_cards -p 'test_repair*.py' -v",
+      "result": "PASS",
+      "tests": 17,
+      "exitCode": 0
+    },
+    {
+      "probe": "prior bundle hash mismatch",
+      "result": "unexpectedly accepted; see RHR-001"
+    }
+  ],
+  "confirmedBehavior": [
+    "Frozen model input/output/request/schema files are hashed against execution receipts; the recorded completed response must decode to the actual structured output.",
+    "Rendered import must exactly equal frozen candidate semantics and metadata.",
+    "Targeted review covers exactly failed cards; any changed original transfer card is rejected from old transfer reuse.",
+    "Unselected baseline bodies/revisions and server card hashes are compared against prior data.",
+    "The helper contains no model invocation or publication action; its generated artifacts explicitly record noProductionWrite.",
+    "Output directory creation uses mkdir without exist_ok, refusing an existing output directory."
+  ],
+  "limits": [
+    "Actual PostgreSQL16/.NET hash reproduction is being checked independently.",
+    "Root is applying targeted fixes; final review is pending."
+  ]
+}
