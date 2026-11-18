@@ -26,12 +26,12 @@
     "@sentry/react-native": "~7.2.0",
     "@shopify/react-native-skia": "2.2.12",
     "aws-amplify": "^6.15.9",
+    "decode-uri-component": "file:vendor/decode-uri-component",
     "expo": "~54.0.20",
     "expo-application": "~7.0.8",
     "expo-asset": "~12.0.12",
     "expo-audio": "~1.1.1",
     "expo-constants": "~18.0.11",
-    "decode-uri-component": "file:vendor/decode-uri-component",
     "expo-crypto": "~15.0.8",
     "expo-dev-client": "~6.0.20",
     "expo-file-system": "~19.0.21",
@@ -68,7 +68,7 @@
     "fast-check": "^4.9.0",
     "react-test-renderer": "^19.1.0",
     "typescript": "~5.9.2",
-    "vite": "7.3.6",
+    "vite": "7.3.8",
     "vitest": "^4.1.11"
   },
   "private": true,
@@ -76,4 +76,3 @@
     "decode-uri-component": "$decode-uri-component"
   }
 }
-
