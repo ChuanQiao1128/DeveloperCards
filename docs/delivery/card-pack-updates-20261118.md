@@ -20,7 +20,7 @@ The existing per-account file/metadata publication mechanism persists installed 
 
 ## Runtime boundary
 
-Main is2.1.1/build26 with progress ownership format1 and must not be relabeled for the connected2.1.0/build25 phone. The compatible UI patch is staged from actual published commit `82f246db778a8942bee41c0f2086f3c2788a4c83`. All778 baseline mobile files are verified by GitHub blob SHA. Only four product JS files and five test files change; native config, dependencies and legacy queue remain byte-identical. Main's ownership gates stay intact. Publication and physical-device evidence are recorded separately; a connected phone or379-card count does not prove its installed version.
+Main is2.1.1/build26 with progress ownership format1 and must not be relabeled for the connected2.1.0/build25 phone. The compatible UI patch is staged from actual published commit `82f246db778a8942bee41c0f2086f3c2788a4c83`. All778 baseline mobile files are verified by GitHub blob SHA. The UI backport changes four product JS files and five test files. Native config, runtime dependencies and legacy queue remain unchanged. A fresh audit also requires the existing main build-tool fix node-forge1.4.0→1.4.3; that single lock record and the unchanged main expiring audit policy are carried separately and checked against both platform source maps. Main's ownership gates stay intact. Publication and physical-device evidence are recorded separately; a connected phone or379-card count does not prove its installed version.
 
 ## Fixed release preparation
 
