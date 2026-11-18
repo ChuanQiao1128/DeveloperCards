@@ -1,0 +1,109 @@
+{
+  "schema": "recallsmith-runtime210-backport-review-v1",
+  "verdict": "PASS",
+  "source": "exports/card-pack-updates-20261118/runtime210-source-r2",
+  "baseCommit": "82f246db778a8942bee41c0f2086f3c2788a4c83",
+  "publishedMobileTree": "6b23d6f892908f71c2c0f8fc19b0e223960011cf",
+  "runtime": "2.1.0",
+  "iosBuild": "25",
+  "scope": "Read-only staged-source compatibility review. No Git commands, implementation edits, publication, installations or credentials.",
+  "findings": [
+    {
+      "id": "BP-001",
+      "priority": "P2",
+      "status": "closed",
+      "title": "Remove duplicate test helper in the backport",
+      "initialEvidence": "Independent stage typecheck failed TS2393 at deckRepositoryTimeouts.test.ts:168 and:322; Vitest repository suite failed transform because hangOn was declared twice.",
+      "resolution": "Root removed only the duplicate appended helper and refreshed the manifest. Independent typecheck and all38 focused backport tests now pass."
+    }
+  ],
+  "baselineVerification": {
+    "files": 778,
+    "reconstructedManifestTree": "6b23d6f892908f71c2c0f8fc19b0e223960011cf",
+    "matchesPublishedTree": true,
+    "unchangedFilesMatchOriginalGitBlobShas": true,
+    "repositoryReversePatchMatchesPublishedBlob": true,
+    "settingsReversePatchMatchesPublishedBlob": true,
+    "newServiceAndSectionByteIdenticalToApprovedMain": true,
+    "laterDrawPlannerChangesAbsent": true,
+    "prerequisiteOrderSourceAbsent": true,
+    "legacyQueueReaderPreserved": true,
+    "ownershipFormatKey": "absent, as in published2.1.0 configuration",
+    "ownershipMarkersAbsent": [
+      "devcards:sync:pendingOwners:v1",
+      "PROGRESS_QUEUE_FULL"
+    ],
+    "nativeDependencyAndReleaseScriptsUnchanged": true,
+    "nodeModules": "Existing dependency installation linked for checks only; excluded from source inventory."
+  },
+  "baselineFiles": 778,
+  "missing": [],
+  "unexpectedBlobMismatches": [],
+  "changedPaths": [
+    "mobile/src/content/cardPackUpdates.ts",
+    "mobile/src/content/deckRepository.ts",
+    "mobile/src/features/gacha/settings/content/CardPackUpdatesSection.tsx",
+    "mobile/src/screens/SettingsScreen.tsx",
+    "mobile/tests/integration/card-pack-updates.section.test.tsx",
+    "mobile/tests/integration/settings-background-refresh.spec.tsx",
+    "mobile/tests/integration/settings.screen.test.tsx",
+    "mobile/tests/unit/cardPackUpdates.test.ts",
+    "mobile/tests/unit/deckRepositoryTimeouts.test.ts"
+  ],
+  "exactlyDeclaredChangedPaths": true,
+  "patchHashesMatch": true,
+  "sourceHashes": {
+    "mobile/src/content/cardPackUpdates.ts": "8150dd99b406462917bcd6f5a0a3c498a05a039777648f363f59129ae952bb06",
+    "mobile/src/content/deckRepository.ts": "978df001077f2ce82f5a2d6b9a68603f241caee29957c3154761bbd5b0ff91b5",
+    "mobile/src/features/gacha/settings/content/CardPackUpdatesSection.tsx": "0fb8b92b20c672d7d25278adcbc8b074b0031618979505b59eb465deea7cfb23",
+    "mobile/src/screens/SettingsScreen.tsx": "7cc82df6e2b4abf85cf664d7c00c27d683b206172356e9af234d56144b23d67e",
+    "mobile/tests/integration/card-pack-updates.section.test.tsx": "e0c793550bbfe94ad53581516c80e7ed471cb9173e52e2967c74b20d6cb49298",
+    "mobile/tests/integration/settings-background-refresh.spec.tsx": "6371aede2bbb8d368c97065b5ac4d091c31c318e6127b80c14b98c437e195100",
+    "mobile/tests/integration/settings.screen.test.tsx": "ee387b829660c8b7b06ad0eaad3916dfc97f084eecd5733df44f2e107523fe5b",
+    "mobile/tests/unit/cardPackUpdates.test.ts": "83b4851eee76f36bba0fceb69767197c1d456fc5f84858e8c5ea8cd078b13e56",
+    "mobile/tests/unit/deckRepositoryTimeouts.test.ts": "f1ddd8fc08872f8f276229ead799bbd3ccaa53df533a85b2ec80bc00aad03665"
+  },
+  "protectedHashes": {
+    "mobile/app.json": "580758b54926edae2a9e75c67607ca523819db907abdcf5dd57f3130f881aa68",
+    "mobile/package.json": "50c65220c266ac17e3616b29148930f4c38dcd6fbf3715582ab06df33a43fc4c",
+    "mobile/package-lock.json": "d0d596a32dd581955679d282e6425982c3b05bb3e850463f06bfd6b12e2fa97e",
+    "mobile/eas.json": "8ac21834060855ef708bad404084de4a71ec3d604e0a6618b4670d15446780cd",
+    "mobile/metro.config.js": "e9ddc3a479ab96024674025b2ce6f46ae0cca0eac61afd990da291c7e1faa922",
+    "mobile/src/auth/authStore.ts": "c85ec584ed145e34ea5c97cefc2b9fdd78fcfc3a1312e0e085314854907e71ff",
+    "mobile/src/sync/progressSync.ts": "81d93cf6cdaeffee3dae502c57b1bc64b31e493141028182d5e6ea1b9eab5fc3",
+    "mobile/src/sync/syncGuard.ts": "11e4b3e4baaaec3061a21c8efb31ee9c2a388b13e394077eeb4d7d1b29af2185",
+    "mobile/src/review/pendingRating.ts": "ea4b4c87918e809ac41cc3d0d98e67ef57ebe739de45f14632e245c80728d84e"
+  },
+  "receiptHashes": {
+    "runtime210-source-tree.json": "eb9844e9b9fb725348d93c0affdf3496274ef542cab929ce86989ead45f60f01",
+    "runtime210-original-files.json": "8b81b342053731d7464c028d38d5fb5a61b7c99618be5bc4dceaf42c06e8ee73",
+    "runtime210-patch-manifest.json": "c056a6c7b284764630b8b80e432b18129cd69d9caf59697a672cfb88bb25680e"
+  },
+  "approvedMainReview": {
+    "path": "exports/card-pack-updates-20261118/mobile-independent-review.json",
+    "sha256": "51a904134321304b437ddc74483f7b8b7ed3380aba1f6577c88b7a4a92476108"
+  },
+  "independentValidation": [
+    {
+      "command": "npm run test:typecheck",
+      "cwd": "runtime210-source-r2/mobile",
+      "result": "PASS",
+      "exitCode": 0
+    },
+    {
+      "command": "npm exec vitest run tests/unit/cardPackUpdates.test.ts tests/integration/card-pack-updates.section.test.tsx tests/unit/deckRepositoryTimeouts.test.ts tests/integration/settings.screen.test.tsx tests/integration/settings-background-refresh.spec.tsx",
+      "cwd": "runtime210-source-r2/mobile",
+      "result": "PASS",
+      "files": 5,
+      "tests": 38,
+      "exitCode": 0
+    }
+  ],
+  "limits": [
+    "This verdict binds the exact nine source/test hashes and protected hashes above. Further modifications require a new comparison.",
+    "The backport deliberately retains published2.1.0 teaching parsing, delta validation, progress ownership behavior and native configuration; unrelated main changes were not carried.",
+    "No EAS export, production manifest/CDN or physical-phone OTA/application verification was performed in this review.",
+    "Root's complete mobile suite is running separately; this report records the independently executed focused checks.",
+    "The deterministic card release helper is outside this mobile backport review."
+  ]
+}

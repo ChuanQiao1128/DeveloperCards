@@ -1,0 +1,289 @@
+{
+  "schema": "recallsmith-mobile-independent-review-v1",
+  "phase": "final_source_review",
+  "verdict": "PASS",
+  "scope": "Independent source review and local focused tests. No implementation edits, model calls, credential reads, remote mutations or publication.",
+  "baseline": {
+    "repository": "ChuanQiao1128/DeveloperCards",
+    "ref": "0da17a25774103a772e679b22522d489b93d597b",
+    "source": "GitHub fetch_file at the exact commit; local Git was not used as authority after pack errors."
+  },
+  "findings": [
+    {
+      "id": "MPU-001",
+      "priority": "P2",
+      "status": "closed",
+      "title": "Expose the discovered latest version",
+      "path": "mobile/src/features/gacha/settings/content/CardPackUpdatesSection.tsx",
+      "line": 77,
+      "details": "The section sets latestVersion only after checkAndUpdateCardPack returns. That service returns only when installed.version equals remoteVersion, while the section displays Latest version only when latestVersion differs from installed.version. The latest-version row therefore cannot appear in a normal success. A newly discovered version is also lost when download fails because the service has no manifest-result callback.",
+      "requestedFix": "Show a successful remote check's latest version independently from installed confirmation, including while downloading and after a failed download. Keep Up to date gated on the existing verified installed-version condition.",
+      "testGap": "Existing service/UI tests assert current status and installed version but never assert that the latest version is visible.",
+      "resolution": "Service emits typed checked/updating progress with the freshly discovered remote version. The section always shows latest available version and retains it after an install error; the failure/retry UI test asserts this. Up to date still requires verified post-install version equality."
+    },
+    {
+      "id": "MPU-002",
+      "priority": "P2",
+      "status": "closed",
+      "title": "Recover a missing file despite matching install metadata",
+      "path": "mobile/src/content/cardPackUpdates.ts",
+      "line": 32,
+      "details": "When metadata buildId already matches the fresh remote version but the referenced local card file is missing, getInstalledDeckInfo returns null and the new flow calls installDeckAndInvalidate. Existing installDeckFromUrl at deckRepository.ts:792 returns true solely on matching metadata, without locating the file. The new readback remains null and reports not finished installing. Every retry follows the same path without a download.",
+      "requestedFix": "Make the existing same-version installer shortcut conditional on a valid located installed file, then preserve the normal installer validation/readback. Add a regression using the real repository path with matching metadata and a missing file.",
+      "testGap": "The new repository test proves that the installed-info accessor returns null for a missing file. The service tests mock the installer and do not exercise its same-version shortcut.",
+      "resolution": "The installer now locates the installed file before taking its matching-version shortcut. A real repository regression starts with matching metadata and no file, has native downloadAsync write bytes, lets the mocked move publish them, and confirms local readback."
+    }
+  ],
+  "independentValidation": [
+    {
+      "command": "npm run test:typecheck",
+      "cwd": "mobile",
+      "phase": "final",
+      "result": "PASS",
+      "exitCode": 0
+    },
+    {
+      "command": "npm exec vitest run tests/unit/cardPackUpdates.test.ts tests/integration/card-pack-updates.section.test.tsx tests/unit/deckRepositoryTimeouts.test.ts tests/integration/settings.screen.test.tsx tests/integration/settings-background-refresh.spec.tsx",
+      "cwd": "mobile",
+      "phase": "final",
+      "result": "PASS",
+      "files": 5,
+      "tests": 39,
+      "exitCode": 0
+    },
+    {
+      "phase": "intermediate_retest",
+      "result": "FAIL",
+      "testsPassed": 38,
+      "testsFailed": 1,
+      "reason": "The new missing-file regression initially configured fetch while the real installer selected native FileSystem.downloadAsync. It reached ENOENT because that fixture wrote no bytes. The fixture was corrected; no production download workaround was added."
+    }
+  ],
+  "sourceBehaviorConfirmed": [
+    "The explicit action uses requireRemote:true; fetch failure returns null and is promoted to an error instead of a cached Up to date result.",
+    "A server304 is accepted only after a real request with an existing manifest cache. The repository test asserts the conditional ETag request.",
+    "The accessor checks local file existence using the existing iOS container-relocation locator and exposes installedAtMs.",
+    "Duplicate presses are synchronously blocked by busy.current, with an independently passing UI test.",
+    "Settings keys the section by account and active slug. Mounted/request guards suppress a previous keyed section's eventual result; this is covered by an independently passing UI test.",
+    "The service compares auth generation after awaited phases, including installation and readback. No new progress or queue write calls appear in the feature.",
+    "Freshly discovered latest version is displayed even if download fails; the final UI test asserts the latest field and unchanged old installed field.",
+    "Matching metadata without a local file now enters the ordinary native download/install path; the final real-repository recovery test passes.",
+    "Main exact-ref comparisons show only the requested repository API/accessor/installer-shortcut changes and Settings section insertion. Protected progress/auth/sync/native/dependency files match the exact remote-main baseline."
+  ],
+  "protectedBoundary": [
+    {
+      "path": "mobile/src/screens/SettingsScreen.tsx",
+      "baselineBlobSha": "0fb59fb1de1b1a44fc70b0bb9e2d594b39585a56",
+      "sameAsMain": false,
+      "currentExit": 0,
+      "currentOutputChars": 24284,
+      "baseChars": 23626,
+      "baselineError": false
+    },
+    {
+      "path": "mobile/src/sync/progressSync.ts",
+      "baselineBlobSha": "de14efdb9f5c4200974c2678415198a452d5c58e",
+      "sameAsMain": true,
+      "currentExit": 0,
+      "currentOutputChars": 75795,
+      "baseChars": 75795,
+      "baselineError": false
+    },
+    {
+      "path": "mobile/src/auth/authStore.ts",
+      "baselineBlobSha": "efbf129f8bd01a1738736d1552beb4828bfb1aa5",
+      "sameAsMain": true,
+      "currentExit": 0,
+      "currentOutputChars": 29494,
+      "baseChars": 29494,
+      "baselineError": false
+    },
+    {
+      "path": "mobile/src/sync/syncGuard.ts",
+      "baselineBlobSha": "ec9f20685cee96972d95f621bddbee0b9749bd06",
+      "sameAsMain": true,
+      "currentExit": 0,
+      "currentOutputChars": 1235,
+      "baseChars": 1235,
+      "baselineError": false
+    },
+    {
+      "path": "mobile/src/review/pendingRating.ts",
+      "baselineBlobSha": "7860adfe6012e7e91b681d0973172bff501733ef",
+      "sameAsMain": true,
+      "currentExit": 0,
+      "currentOutputChars": 2130,
+      "baseChars": 2130,
+      "baselineError": false
+    },
+    {
+      "path": "mobile/app.json",
+      "baselineBlobSha": "b3e290c73da07d2c1b360953f31bfeca7975bf8b",
+      "sameAsMain": true,
+      "currentExit": 0,
+      "currentOutputChars": 1733,
+      "baseChars": 1733,
+      "baselineError": false
+    },
+    {
+      "path": "mobile/package.json",
+      "baselineBlobSha": "4a1c36cd6d2b032f63e4cd4322fe54100a8018fb",
+      "sameAsMain": true,
+      "currentExit": 0,
+      "currentOutputChars": 2631,
+      "baseChars": 2631,
+      "baselineError": false
+    },
+    {
+      "path": "mobile/package-lock.json",
+      "baselineBlobSha": "fe092c2bb64482f5acd8b3adc35115369a9e3f77",
+      "sameAsMain": true,
+      "currentExit": 0,
+      "currentOutputChars": 826059,
+      "baseChars": 826059,
+      "baselineError": false
+    },
+    {
+      "path": "mobile/eas.json",
+      "baselineBlobSha": "9a76b32d465b6b491f090d7eebcd80475a5c38f4",
+      "sameAsMain": true,
+      "currentExit": 0,
+      "currentOutputChars": 2955,
+      "baseChars": 2955,
+      "baselineError": false
+    },
+    {
+      "path": "mobile/metro.config.js",
+      "baselineBlobSha": "b7d3ef2a247ab319e1db7f7d117f5495c550dc59",
+      "sameAsMain": true,
+      "currentExit": 0,
+      "currentOutputChars": 276,
+      "baseChars": 276,
+      "baselineError": false
+    }
+  ],
+  "limits": [
+    "No native device, EAS download or physical-phone UI verification was performed in this review.",
+    "Account changes before install and stale keyed UI results have focused tests. A real-account switch during native download was not exercised.",
+    "Initial local Git diff emitted a truncated-pack error; direct main0da17 GitHub content comparison succeeded for the protected files. No repair/reset/clean/fetch was attempted.",
+    "This verdict binds the listed main-tree file hashes. A narrow backport review against published runtime2.1.0 commit82f246 remains required before OTA publication.",
+    "The deterministic card release helper is being handled separately and is outside this mobile-feature review."
+  ],
+  "reviewedModifiedSourcePaths": [
+    "mobile/src/content/deckRepository.ts",
+    "mobile/src/content/cardPackUpdates.ts",
+    "mobile/src/features/gacha/settings/content/CardPackUpdatesSection.tsx",
+    "mobile/src/screens/SettingsScreen.tsx"
+  ],
+  "reviewedTestPaths": [
+    "mobile/tests/unit/cardPackUpdates.test.ts",
+    "mobile/tests/integration/card-pack-updates.section.test.tsx",
+    "mobile/tests/unit/deckRepositoryTimeouts.test.ts",
+    "mobile/tests/integration/settings.screen.test.tsx",
+    "mobile/tests/integration/settings-background-refresh.spec.tsx"
+  ],
+  "initialReview": {
+    "path": "exports/card-pack-updates-20261118/mobile-independent-review.initial.json",
+    "sha256": "1771f3f259ea29116a6cda57c03ee680d0ef291ca3ca4fddcd3933873f9cfb89",
+    "verdict": "CHANGES_REQUESTED"
+  },
+  "surgicalMainComparison": [
+    {
+      "path": "mobile/src/content/deckRepository.ts",
+      "baselineBlobSha": "58ae8387dda885cf639db5c62bb858ee22e1d793",
+      "onlyRequestedChanges": true,
+      "verifiedChanges": [
+        "optional requireRemote flag",
+        "file-backed getInstalledDeckInfo accessor/type",
+        "same-version installer shortcut requires existing located file"
+      ]
+    },
+    {
+      "path": "mobile/src/screens/SettingsScreen.tsx",
+      "baselineBlobSha": "0fb59fb1de1b1a44fc70b0bb9e2d594b39585a56",
+      "onlyRequestedChanges": true,
+      "verifiedChanges": [
+        "section import",
+        "account+active-slug keyed card-pack section"
+      ]
+    }
+  ],
+  "finalFileSha256": [
+    {
+      "path": "mobile/src/content/deckRepository.ts",
+      "sha256": "c75970bf04a4b9384b9bac5ef68a74a71e54ae84098319d6cd015cbdc2becee1"
+    },
+    {
+      "path": "mobile/src/content/cardPackUpdates.ts",
+      "sha256": "8150dd99b406462917bcd6f5a0a3c498a05a039777648f363f59129ae952bb06"
+    },
+    {
+      "path": "mobile/src/features/gacha/settings/content/CardPackUpdatesSection.tsx",
+      "sha256": "0fb8b92b20c672d7d25278adcbc8b074b0031618979505b59eb465deea7cfb23"
+    },
+    {
+      "path": "mobile/src/screens/SettingsScreen.tsx",
+      "sha256": "7cc82df6e2b4abf85cf664d7c00c27d683b206172356e9af234d56144b23d67e"
+    },
+    {
+      "path": "mobile/tests/unit/cardPackUpdates.test.ts",
+      "sha256": "83b4851eee76f36bba0fceb69767197c1d456fc5f84858e8c5ea8cd078b13e56"
+    },
+    {
+      "path": "mobile/tests/integration/card-pack-updates.section.test.tsx",
+      "sha256": "e0c793550bbfe94ad53581516c80e7ed471cb9173e52e2967c74b20d6cb49298"
+    },
+    {
+      "path": "mobile/tests/unit/deckRepositoryTimeouts.test.ts",
+      "sha256": "fe0527317212152d20c48f3d6f63209939f96643b30c9ff1876c691df8c2f49b"
+    },
+    {
+      "path": "mobile/tests/integration/settings.screen.test.tsx",
+      "sha256": "ee387b829660c8b7b06ad0eaad3916dfc97f084eecd5733df44f2e107523fe5b"
+    },
+    {
+      "path": "mobile/tests/integration/settings-background-refresh.spec.tsx",
+      "sha256": "6371aede2bbb8d368c97065b5ac4d091c31c318e6127b80c14b98c437e195100"
+    },
+    {
+      "path": "mobile/src/sync/progressSync.ts",
+      "sha256": "f7519db70eecc8d0d75b1ae8b3e89c270b383dadf5a29a8f4c5613fe080e8934"
+    },
+    {
+      "path": "mobile/src/auth/authStore.ts",
+      "sha256": "691aeae4d337d53abbc9a1d5693465100c7364951e5702e4d4d5f59f51dd8c0f"
+    },
+    {
+      "path": "mobile/src/sync/syncGuard.ts",
+      "sha256": "aa3fca8993bf08338657cb8091e031dd8615e74dd6d8f8eb95bd53f76bf71f05"
+    },
+    {
+      "path": "mobile/src/review/pendingRating.ts",
+      "sha256": "ea4b4c87918e809ac41cc3d0d98e67ef57ebe739de45f14632e245c80728d84e"
+    },
+    {
+      "path": "mobile/app.json",
+      "sha256": "84fb1a84afc359667356ac7647924af3ba18de20c23cfbb5d6877dfdef8fb2cf"
+    },
+    {
+      "path": "mobile/package.json",
+      "sha256": "d87823fd1df51fc3f0e8b93163ff335d75f40ec8d4174bfba1e6db28e7c1fbb8"
+    },
+    {
+      "path": "mobile/package-lock.json",
+      "sha256": "ad25b928407e38aedb54a562d918d8aadbe9682438118b567eae71e1214e43ec"
+    },
+    {
+      "path": "mobile/eas.json",
+      "sha256": "8ac21834060855ef708bad404084de4a71ec3d604e0a6618b4670d15446780cd"
+    },
+    {
+      "path": "mobile/metro.config.js",
+      "sha256": "e9ddc3a479ab96024674025b2ce6f46ae0cca0eac61afd990da291c7e1faa922"
+    },
+    {
+      "path": "mobile/scripts/release/queueOwnershipRollout.cjs",
+      "sha256": "d18f72d0c791c16ffdf2faef6686042baef5ae7828fbb3591ef54e1b7b5f65c0"
+    }
+  ]
+}

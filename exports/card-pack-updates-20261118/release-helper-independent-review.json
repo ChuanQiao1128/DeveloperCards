@@ -1,0 +1,238 @@
+{
+  "schema": "recallsmith-release-helper-independent-review-v1",
+  "phase": "final_review",
+  "verdict": "PASS",
+  "scope": "Deterministic helper source and trust-boundary review. No card-fact re-review, model calls, publication, production writes, credential access, Git changes or implementation edits.",
+  "reviewedSourcePaths": [
+    "tools/aws_cards/repair_release.py",
+    "tools/aws_cards/test_repair_release.py"
+  ],
+  "findings": [
+    {
+      "id": "RHR-001",
+      "priority": "P2",
+      "status": "closed",
+      "title": "Bind the reused prior release bundle to its published receipt",
+      "path": "tools/aws_cards/repair_release.py",
+      "line": 198,
+      "details": "prepare checks after-deck.json against receipt.sha256 but never checks release-bundle.json against the receipt's existing bundleSha256 or checks its releaseId against receipt.releaseId. A modified prior review prompt/corpus/evidence binding can therefore be reused as verified prior evidence.",
+      "probe": {
+        "change": "In a temporary copy, replace prior review.promptHash with64zeroes while leaving publication-verification.json unchanged.",
+        "actualPriorBundleSha256": "de875e087f524fa4d189a15678c87bdb4995333232f5dce11e15594317160eac",
+        "receiptBundleSha256": "1008cd4f44731e1f90df6f94b034add00e8e80a08a24020818f94726a7f01596",
+        "actualAcceptance": "EXACT_BINDINGS_VERIFIED",
+        "isSyntheticTrustControl": true,
+        "backend": "Only backend_hashes was mocked using the existing real-replay hashes. Current review/model-response/render/source binding functions ran unchanged."
+      },
+      "requestedFix": "Require exact prior bundle SHA and release identity from the verified publication receipt before reusing any prior review evidence; add a tamper regression.",
+      "resolution": "Prior bundle SHA and releaseId must match the verified publication receipt; fixed deck identity and baseline live build are also checked. The altered-prior-bundle probe now rejects before preparation."
+    },
+    {
+      "id": "RHR-002",
+      "priority": "P2",
+      "status": "closed",
+      "title": "Bind baseline verification to the prepared release and deck",
+      "path": "tools/aws_cards/repair_release.py",
+      "line": 250,
+      "details": "verify_baseline loads expected-baseline.json and current backup metadata but never validates the prepared release-bundle/preflight identity. It ignores backup deckId/deck.id/deck.slug and emits PASS without releaseId, bundle SHA or backup SHA. The existing test passes with no prepared release bundle at all.",
+      "requestedFix": "Require the valid prepared-bundle/preflight identity and expected deck ID/slug, then include releaseId, bundle SHA, backup SHA and editingSnapshot in the baseline verification receipt.",
+      "resolution": "Prepared preflight binds releaseId, bundle SHA, expected-baseline SHA and before-deck SHA. Baseline verification checks those bindings and backup deck ID/slug, then records releaseId, bundle SHA, backup SHA and editingSnapshot."
+    }
+  ],
+  "independentValidation": [
+    {
+      "command": "python3 -m unittest discover -s tools/aws_cards -p 'test_repair*.py' -v",
+      "result": "PASS",
+      "tests": 18,
+      "exitCode": 0
+    },
+    {
+      "operation": "Actual PostgreSQL16 normalization and backend .NET CardContentHash adapter over all379 projected cards",
+      "result": "PASS",
+      "all379HashesMatchReplay": true,
+      "normalizedSha256": "943b54c9f7add0b6b75d809a0c8dfd37d8944e4a3ad19a03f8a54c69c446c521"
+    },
+    {
+      "operation": "Independent full prepare in a disposable temporary output directory from the real frozen request",
+      "result": "PASS",
+      "changed": 5,
+      "unchanged": 374,
+      "total": 379,
+      "allProjectedBodiesMatchR3": true,
+      "allBackendHashesMatchR3": true,
+      "noProductionWrite": true
+    },
+    {
+      "operation": "Independent verify-baseline using the real saved Console editing backup",
+      "result": "PASS_CURRENT_EDITING_BASELINE",
+      "releaseIdentityBound": true,
+      "bundleAndBackupHashesBound": true
+    },
+    {
+      "operation": "Output directory overwrite rejection after successful independent prepare",
+      "result": "PASS",
+      "existingBundleUnchanged": true
+    },
+    {
+      "operation": "Copied prior bundle with modified review.promptHash and unchanged publication receipt",
+      "result": "REJECTED_AFTER_FIX",
+      "initialUnexpectedAcceptancePreserved": true
+    },
+    {
+      "operation": "Direct comparison of the374 unselected replay cards to prior bundle bodies and review metadata",
+      "result": "PASS",
+      "allBodiesExact": true,
+      "allCardHashesSchemasOrderAndRevisionsExact": true
+    }
+  ],
+  "confirmedBehavior": [
+    "Frozen model input/output/request/schema files are hashed against execution receipts; the recorded completed response must decode to the actual structured output.",
+    "Rendered import must exactly equal frozen candidate semantics and metadata.",
+    "Targeted review covers exactly failed cards; any changed original transfer card is rejected from old transfer reuse.",
+    "Unselected baseline bodies/revisions and server card hashes are compared against prior data.",
+    "The helper contains no model invocation or publication action; its generated artifacts explicitly record noProductionWrite.",
+    "Output directory creation uses mkdir without exist_ok, refusing an existing output directory.",
+    "The current semantic gate relies on the existing actual recorded independent model responses, with seven content rules and exact transfer reuse; this helper did not generate any semantic PASS.",
+    "Prior semantic evidence is now anchored to the exact published bundle and release identity.",
+    "Current editing-baseline verification is anchored to the exact prepared release, backup and snapshot identity."
+  ],
+  "limits": [
+    "This is a deterministic binding and release-helper review. It does not re-review AWS card facts, original-question sufficiency or learner effectiveness.",
+    "No production write, publication, model invocation, native installation or credential read was performed. Actual PostgreSQL/.NET checks used disposable local data only.",
+    "The verdict binds the exact helper/test/dependency source hashes above. New changes require a new comparison.",
+    "Synthetic control fixtures exercise rejection paths; they are separate from the real379-card replay and are not semantic-review evidence."
+  ],
+  "reviewedAt": "2026-11-18T01:01:54.895246+00:00",
+  "initialReview": {
+    "path": "exports/card-pack-updates-20261118/release-helper-independent-review.initial.json",
+    "sha256": "b16c04538e03065104895c38c4b52d06e4de959ca49c2953f2260c80e04a0dd7",
+    "verdict": "CHANGES_REQUESTED"
+  },
+  "sourceSha256": {
+    "tools/aws_cards/repair_release.py": "297534278a35bc344aa657581345c1bea4c6370f27d03aa0b2a30af713b7ba60",
+    "tools/aws_cards/test_repair_release.py": "e06355f8b31d1ce7cb6022f6418669963eabdb789298b9e200a49ad83d1139a0",
+    "tools/aws_cards/repair_batch.py": "cca2f0b04ba82117cde158187234c6f2339abd6dce2d5237e6373622275f0acd",
+    "tools/aws_cards/repair_cards.py": "3c407e7fcc64605b110ef123d80e5e6aef17791ede3b083bcc0856dc4aea2e86",
+    "tools/content-pipeline/HashCards/Program.cs": "d2765d9b7bb805de2f599000250b3bd1750c54e75601c9221fb00e40f1cd5119",
+    "tools/content-pipeline/HashCards/HashCards.csproj": "5c04a050df03be94b242b858d9a82c44aaa442841ee76fdcbb09bc52ecf6df70",
+    "src_C/Vpc/Qa/CardContentHash.cs": "a709a1dd7cfa763cabdb80d52570fadf4624e97032029a6e7a6543bfb7c422dc",
+    "src_C/Shared/RecallSmith.Lambda.Db/PublishSnapshot.cs": "7c9dd85cda9cf88f4af63595000eeeda1d02e91c6123f50cbd9db515fd693aaf"
+  },
+  "replay": {
+    "path": "exports/card-pack-updates-20261118/release-replay26-r3",
+    "preflight": {
+      "status": "EXACT_BINDINGS_VERIFIED",
+      "releaseId": "local-verification-repair26-30-20261118",
+      "changed": 5,
+      "unchanged": 374,
+      "total": 379,
+      "bundleSha256": "492c46703d1019ecb0394aad820e14853b44fc3988deb82ffaa87c80be75787b",
+      "expectedBaselineSha256": "49eee56c13695c1e1548ab2b694a59f0b3a0b240716e0cec24c2d25922a20d6c",
+      "beforeDeckSha256": "8a45039cb36080aa6cc453a89f73e39421751a297c9e4e7edf0d1835e97bd486",
+      "noProductionWrite": true
+    },
+    "fileSha256": {
+      "preflight.json": "8b186741dd31c353d021474fcdc421e6147e76a45dffb8595b6fbad49f2cce95",
+      "release-bundle.json": "492c46703d1019ecb0394aad820e14853b44fc3988deb82ffaa87c80be75787b",
+      "projected-cards.json": "129a8c8f5845e2a76012a1fd1d68b05edd0dc07d37dc6e455e405cc59b239657",
+      "predicted-server-hashes.json": "f59ff7847d8fe5316649d7adb2d9e795f3ab8a9d2e9fcde3a469a085024bd818",
+      "postgres-normalized.jsonl": "943b54c9f7add0b6b75d809a0c8dfd37d8944e4a3ad19a03f8a54c69c446c521",
+      "expected-baseline.json": "49eee56c13695c1e1548ab2b694a59f0b3a0b240716e0cec24c2d25922a20d6c",
+      "before-deck.json": "8a45039cb36080aa6cc453a89f73e39421751a297c9e4e7edf0d1835e97bd486",
+      "release-evidence.json": "928662dc37a252260bc516b2a61e30d7dd6847da1dba4e72f1edd8d1c7181fd1"
+    }
+  },
+  "priorPublicationAnchor": {
+    "release-bundle.json": {
+      "path": "/Users/qc/.codex/worktrees/console-user-management/recallsmith-aws-basic-release379/exports/card-repair-21-25-release-20261118/release-bundle.json",
+      "sha256": "1008cd4f44731e1f90df6f94b034add00e8e80a08a24020818f94726a7f01596"
+    },
+    "after-deck.json": {
+      "path": "/Users/qc/.codex/worktrees/console-user-management/recallsmith-aws-basic-release379/exports/card-repair-21-25-release-20261118/after-deck.json",
+      "sha256": "8a45039cb36080aa6cc453a89f73e39421751a297c9e4e7edf0d1835e97bd486"
+    },
+    "publication-verification.json": {
+      "path": "/Users/qc/.codex/worktrees/console-user-management/recallsmith-aws-basic-release379/exports/card-repair-21-25-release-20261118/publication-verification.json",
+      "sha256": "abba8d038278d1fa6a929fb60833ff91f6330a8dba8bcaffafd3d7a3ca83970a"
+    }
+  },
+  "authorization": {
+    "path": "/Users/qc/.codex/worktrees/console-user-management/recallsmith-aws-basic-release379/exports/card-repair-26-30-release-20261118/authorization.json",
+    "sha256": "a29087870cf9ee962615341fe4fd094460eef9371685f3d53cc173d2d15fe6fa",
+    "referenceIsInBundle": true
+  },
+  "frozenExecutionFiles": [
+    {
+      "path": "/Users/qc/.codex/worktrees/console-user-management/recallsmith-aws-basic-release379/exports/card-repair-26-30-20261118/author/input.json",
+      "sha256": "196103b456d6278befd9d40be832c97a36e2367f26939d1744cd78a295d7c167"
+    },
+    {
+      "path": "/Users/qc/.codex/worktrees/console-user-management/recallsmith-aws-basic-release379/exports/card-repair-26-30-20261118/author/output.json",
+      "sha256": "329e54c18799fe5262b27ac10e35212c9d04c1cbe0fbf816d25117c2ad7356c5"
+    },
+    {
+      "path": "/Users/qc/.codex/worktrees/console-user-management/recallsmith-aws-basic-release379/exports/card-repair-26-30-20261118/author/request.json",
+      "sha256": "0f962cbf2211355a3f8b759bf628b1700a07a714240bfa84de4c749b69843184"
+    },
+    {
+      "path": "/Users/qc/.codex/worktrees/console-user-management/recallsmith-aws-basic-release379/exports/card-repair-26-30-20261118/author/schema.json",
+      "sha256": "2ca542caaebf112794c9b7fbdb397a190e9663d8a75ac57493e83fec84b219da"
+    },
+    {
+      "path": "/Users/qc/.codex/worktrees/console-user-management/recallsmith-aws-basic-release379/exports/card-repair-26-30-20261118/author/response.json",
+      "sha256": "537c1c64953dd5cc71cb47e0d7f1085b9b5d1344d49a2e5d4507e6922bf089a8"
+    },
+    {
+      "path": "/Users/qc/.codex/worktrees/console-user-management/recallsmith-aws-basic-release379/exports/card-repair-26-30-20261118/author/result.json",
+      "sha256": "26fbc13c907c585ae1dfa1953654e70474e7409ab473d47e0e344c0ccec5605a"
+    },
+    {
+      "path": "/Users/qc/.codex/worktrees/console-user-management/recallsmith-aws-basic-release379/exports/card-repair-26-30-20261118/review/input.json",
+      "sha256": "82c5024dc85a2895b073ead9dea85bd6014df482bfb954186e3d12d95cef3e2f"
+    },
+    {
+      "path": "/Users/qc/.codex/worktrees/console-user-management/recallsmith-aws-basic-release379/exports/card-repair-26-30-20261118/review/output.json",
+      "sha256": "2a52ec4b11b3bc7241d9d9eeb4109da742821590a2b1e0ca58c1542e609348e5"
+    },
+    {
+      "path": "/Users/qc/.codex/worktrees/console-user-management/recallsmith-aws-basic-release379/exports/card-repair-26-30-20261118/review/request.json",
+      "sha256": "8942d01aacc8267821cee89a6b5a707fd3eac4157849149b7213dc2467213178"
+    },
+    {
+      "path": "/Users/qc/.codex/worktrees/console-user-management/recallsmith-aws-basic-release379/exports/card-repair-26-30-20261118/review/schema.json",
+      "sha256": "79eb46e0c04acba9c754b53b5242f6c7ce10a44ddad477d077fc755cc603f1f7"
+    },
+    {
+      "path": "/Users/qc/.codex/worktrees/console-user-management/recallsmith-aws-basic-release379/exports/card-repair-26-30-20261118/review/response.json",
+      "sha256": "c3c88873b49f9b1e9eed009c18a21b62785e92c04a2ce5efa1c0f42e185b6189"
+    },
+    {
+      "path": "/Users/qc/.codex/worktrees/console-user-management/recallsmith-aws-basic-release379/exports/card-repair-26-30-20261118/review/result.json",
+      "sha256": "0e73900e39761b2f89f3c136036952a5000fbd28269ae73e1347594ff828ffbd"
+    },
+    {
+      "path": "/Users/qc/.codex/worktrees/console-user-management/recallsmith-aws-basic-release379/exports/card-repair-26-30-20261118/scope-input-review/review/input.json",
+      "sha256": "74d043e76814d23a28fc1739bf142560977eb7ff03203cca4fe6c2aa57730130"
+    },
+    {
+      "path": "/Users/qc/.codex/worktrees/console-user-management/recallsmith-aws-basic-release379/exports/card-repair-26-30-20261118/scope-input-review/review/output.json",
+      "sha256": "d585e462ede4537fd059020107de77b1301135933ffe5e58addbc4b3d9defa24"
+    },
+    {
+      "path": "/Users/qc/.codex/worktrees/console-user-management/recallsmith-aws-basic-release379/exports/card-repair-26-30-20261118/scope-input-review/review/request.json",
+      "sha256": "43cb2407b4771c3b79b9efa2d551533cf9802809e18f58919098f62dea90b9ad"
+    },
+    {
+      "path": "/Users/qc/.codex/worktrees/console-user-management/recallsmith-aws-basic-release379/exports/card-repair-26-30-20261118/scope-input-review/review/schema.json",
+      "sha256": "79eb46e0c04acba9c754b53b5242f6c7ce10a44ddad477d077fc755cc603f1f7"
+    },
+    {
+      "path": "/Users/qc/.codex/worktrees/console-user-management/recallsmith-aws-basic-release379/exports/card-repair-26-30-20261118/scope-input-review/review/response.json",
+      "sha256": "84f005d0ec8bdf3785b0362583127509a0c398f8f4a352158399210ef3f80f79"
+    },
+    {
+      "path": "/Users/qc/.codex/worktrees/console-user-management/recallsmith-aws-basic-release379/exports/card-repair-26-30-20261118/scope-input-review/review/result.json",
+      "sha256": "26b58c5daf811acd976b37f0a32f9dda139e042cf9698fc8ff6dbd5eaf8859f2"
+    }
+  ]
+}

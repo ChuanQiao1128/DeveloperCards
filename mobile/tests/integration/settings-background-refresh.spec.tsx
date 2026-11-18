@@ -122,6 +122,7 @@ vi.mock('../../src/auth/authStore', () => ({
 }));
 
 vi.mock('../../src/content/deckRepository', () => ({
+  getInstalledDeckInfo: vi.fn(async () => null),
   checkManifestForUpdates: vi.fn(async () => ({})),
   installDeckFromUrl: vi.fn(async () => true),
 }));

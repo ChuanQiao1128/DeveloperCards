@@ -1,0 +1,188 @@
+{
+  "schema": "recallsmith-card-pack-runtime-compatibility-review-v1",
+  "reviewedAt": "2026-11-18T00:20:28.214343+00:00",
+  "verdict": "COMPATIBLE_PUBLISHED_BASE_FOUND_REQUIRE_EXACT_COMMIT_STAGING",
+  "scope": "Read-only source/runtime review; only this report was written. No publication, installation, Git repair, source/config edits or credential access.",
+  "primaryReceipt": {
+    "path": "/Users/qc/.codex/worktrees/console-user-management/recallsmith-aws-basic-release379/exports/mobile-ux-ota-210-20261114/verification.json",
+    "sha256": "c3f60ffdad06c4b62ba65ab31f193c2604860c9e5a6c1aec75a2107b54af838e"
+  },
+  "installedPhoneIdentityProvidedByParent": {
+    "bundleIdentifier": "com.timeawake.recallsmith",
+    "version": "2.1.0",
+    "iosBuild": "25"
+  },
+  "publishedBase": {
+    "commit": "82f246db778a8942bee41c0f2086f3c2788a4c83",
+    "mobileTree": "6b23d6f892908f71c2c0f8fc19b0e223960011cf",
+    "runtime": "2.1.0",
+    "iosBuild": "25",
+    "runtimePolicy": "appVersion",
+    "channel": "production",
+    "environment": "production",
+    "updateId": "01a1d63e-64b8-72b5-a564-d8225d02114e",
+    "group": "3fb8ba07-d454-4edf-a47e-95f080c1c63c",
+    "liveBundleSha256": "d4835180efb1abbe7b20e319bd1fdb1be48329dcb35cb72239c33814ab5c5507",
+    "receiptDeliveryStatus": "PASS",
+    "expo": "~54.0.20",
+    "reactNative": "0.81.5",
+    "packageVersion": "2.1.0",
+    "lockVersion": "2.1.0",
+    "lockRootVersion": "2.1.0",
+    "progressQueueOwnershipFormatKey": "absent (historical legacy configuration; do not alter)",
+    "legacyReaderSha256": "81d93cf6cdaeffee3dae502c57b1bc64b31e493141028182d5e6ea1b9eab5fc3",
+    "ownershipMarkersAbsent": [
+      "devcards:sync:pendingOwners:v1",
+      "PROGRESS_QUEUE_FULL"
+    ]
+  },
+  "existingCheckout": {
+    "path": "/Users/qc/.codex/worktrees/mobile-ux-ota-210-20261114/draw-motion-20261113",
+    "branch": "codex/mobile-ux-ota-210-20261114",
+    "head": "b2a14d6641643ea728068049404fff07e4030a8d",
+    "mobileTree": "7dc12a8dd0f617a36062c16b3b3eb5a3a2e55f6e",
+    "workingTreeMobileDiff": [],
+    "stagedMobileDiff": [],
+    "untrackedMobileFiles": [],
+    "suitableWholesaleAsOnlyFeatureBase": false,
+    "reason": "Clean checkout contains later unrelated draw/planner source changes versus the evidenced published commit.",
+    "sourceChangesVsPublishedBase": [
+      "mobile/src/features/gacha/draw/drawCommit.ts",
+      "mobile/src/features/gacha/draw/orderedAcquisition.ts",
+      "mobile/src/features/gacha/draw/prerequisiteOrder.ts (added)",
+      "mobile/src/features/gacha/planner/sessionPlanner.ts",
+      "mobile/src/screens/DrawResultScreen.tsx"
+    ],
+    "testChangesVsPublishedBase": [
+      "mobile/tests/integration/draw-result.screen.test.tsx",
+      "mobile/tests/integration/session-card-learning.screen.test.tsx",
+      "mobile/tests/unit/orderedAcquisition.test.ts",
+      "mobile/tests/unit/prerequisiteInventory.test.ts (added)",
+      "mobile/tests/unit/prerequisiteLearning.test.ts (added)"
+    ],
+    "identityAndDependencyTreesMatchPublishedBase": true,
+    "diffEvidence": "git diff-tree --no-commit-id --name-status -r 82f246db778a8942bee41c0f2086f3c2788a4c83 b2a14d6641643ea728068049404fff07e4030a8d -- mobile; git diff --name-status -- mobile; git diff --cached --name-status -- mobile; git ls-files --others --exclude-standard -- mobile"
+  },
+  "protectedFileEvidence": [
+    {
+      "path": "mobile/app.json",
+      "sha256": "580758b54926edae2a9e75c67607ca523819db907abdcf5dd57f3130f881aa68",
+      "equalsProductionBaseline": true,
+      "observedLegacyCheckoutSha256": "580758b54926edae2a9e75c67607ca523819db907abdcf5dd57f3130f881aa68",
+      "matchesReceipt": true
+    },
+    {
+      "path": "mobile/package.json",
+      "sha256": "50c65220c266ac17e3616b29148930f4c38dcd6fbf3715582ab06df33a43fc4c",
+      "equalsProductionBaseline": true,
+      "observedLegacyCheckoutSha256": "50c65220c266ac17e3616b29148930f4c38dcd6fbf3715582ab06df33a43fc4c",
+      "matchesReceipt": true
+    },
+    {
+      "path": "mobile/package-lock.json",
+      "sha256": "d0d596a32dd581955679d282e6425982c3b05bb3e850463f06bfd6b12e2fa97e",
+      "equalsProductionBaseline": true,
+      "observedLegacyCheckoutSha256": "d0d596a32dd581955679d282e6425982c3b05bb3e850463f06bfd6b12e2fa97e",
+      "matchesReceipt": true
+    },
+    {
+      "path": "mobile/eas.json",
+      "sha256": "8ac21834060855ef708bad404084de4a71ec3d604e0a6618b4670d15446780cd",
+      "equalsProductionBaseline": true,
+      "observedLegacyCheckoutSha256": "8ac21834060855ef708bad404084de4a71ec3d604e0a6618b4670d15446780cd",
+      "matchesReceipt": true
+    },
+    {
+      "path": "mobile/metro.config.js",
+      "sha256": "e9ddc3a479ab96024674025b2ce6f46ae0cca0eac61afd990da291c7e1faa922",
+      "equalsProductionBaseline": true,
+      "observedLegacyCheckoutSha256": "e9ddc3a479ab96024674025b2ce6f46ae0cca0eac61afd990da291c7e1faa922",
+      "matchesReceipt": true
+    },
+    {
+      "path": "mobile/src/auth/authStore.ts",
+      "sha256": "c85ec584ed145e34ea5c97cefc2b9fdd78fcfc3a1312e0e085314854907e71ff",
+      "equalsProductionBaseline": true,
+      "observedLegacyCheckoutSha256": "c85ec584ed145e34ea5c97cefc2b9fdd78fcfc3a1312e0e085314854907e71ff",
+      "matchesReceipt": true
+    },
+    {
+      "path": "mobile/src/sync/progressSync.ts",
+      "sha256": "81d93cf6cdaeffee3dae502c57b1bc64b31e493141028182d5e6ea1b9eab5fc3",
+      "equalsProductionBaseline": true,
+      "observedLegacyCheckoutSha256": "81d93cf6cdaeffee3dae502c57b1bc64b31e493141028182d5e6ea1b9eab5fc3",
+      "matchesReceipt": true
+    },
+    {
+      "path": "mobile/src/sync/syncGuard.ts",
+      "sha256": "11e4b3e4baaaec3061a21c8efb31ee9c2a388b13e394077eeb4d7d1b29af2185",
+      "equalsProductionBaseline": true,
+      "observedLegacyCheckoutSha256": "11e4b3e4baaaec3061a21c8efb31ee9c2a388b13e394077eeb4d7d1b29af2185",
+      "matchesReceipt": true
+    },
+    {
+      "path": "mobile/src/review/pendingRating.ts",
+      "sha256": "ea4b4c87918e809ac41cc3d0d98e67ef57ebe739de45f14632e245c80728d84e",
+      "equalsProductionBaseline": true,
+      "observedLegacyCheckoutSha256": "ea4b4c87918e809ac41cc3d0d98e67ef57ebe739de45f14632e245c80728d84e",
+      "matchesReceipt": true
+    }
+  ],
+  "plannedPatchApiAvailability": {
+    "unchangedByLaterLegacyCommits": true,
+    "checkManifestForUpdates": {
+      "path": "mobile/src/content/deckRepository.ts:481",
+      "available": true,
+      "returns": "Record<string, UpdateInfo> with installedVersion, remoteVersion, remoteUrl, remoteSha256, hasUpdate",
+      "caveat": "Existing installedVersion is metadata-based; a new installed-version accessor should validate file existence via the existing private locator."
+    },
+    "getDeckMeta": {
+      "path": "mobile/src/content/deckRepository.ts:1447",
+      "available": true,
+      "visibility": "private"
+    },
+    "locateInstalledDeckFile": {
+      "path": "mobile/src/content/deckRepository.ts:1487",
+      "available": true,
+      "visibility": "private",
+      "behavior": "Checks file existence and handles iOS container relocation; may repoint metadata safely."
+    },
+    "getAuthIdentitySnapshot": {
+      "path": "mobile/src/auth/sessionBoundary.ts:21",
+      "available": true
+    },
+    "getAuthSessionGeneration": {
+      "path": "mobile/src/auth/sessionBoundary.ts:55",
+      "available": true
+    },
+    "installDeckAndInvalidate": {
+      "path": "mobile/src/content/deckCache.ts:96",
+      "available": true,
+      "signature": "(slug, url, remoteVersion, remoteSha256) => Promise<boolean>"
+    },
+    "SettingsScreen": {
+      "path": "mobile/src/screens/SettingsScreen.tsx:475",
+      "layout": "Grouped cards; Study preferences contains StudySection then ContentSection. Existing authUserSub/currentUserRef guards support scoped async UI."
+    }
+  },
+  "currentOwnershipGuard": {
+    "path": "/Users/qc/.codex/worktrees/console-user-management/recallsmith-aws-basic-release379/mobile/scripts/release/queueOwnershipRollout.cjs",
+    "sha256": "d18f72d0c791c16ffdf2faef6686042baef5ae7828fbb3591ef54e1b7b5f65c0",
+    "readOnlyCheck": "checkRuntime(current mobile root, 2.1.0)",
+    "verdict": "REFUSED",
+    "reason": "ownership updates require runtime 2.1.1; old, mismatched or unknown runtime refused",
+    "rule": "Leave main 2.1.1 configuration, ownership reader/writer and rollout gates untouched. Never relabel that tree as 2.1.0."
+  },
+  "safeNextStep": [
+    "Root stages an isolated checkout or source tree at exact published commit 82f246db778a8942bee41c0f2086f3c2788a4c83. Do not reuse current legacy HEAD wholesale and do not reset or clean either existing checkout.",
+    "Apply only reviewed card-pack version/check/update JS files and required tests/helpers. Exclude main ownership/sync/auth changes, native config, dependencies, plugins and unrelated draw/planner commits. A minimal repository accessor is in scope; getDeckMeta/locator need not be exported wholesale.",
+    "Before building, verify app/package/lock/eas/metro/plugins and legacy progressSync/authStore/syncGuard/pendingRating against the frozen published base. Confirm no ownership markers or new native imports/dependencies and inspect the complete staged diff against that exact base.",
+    "Run typecheck and relevant version/update/auth-boundary tests, then existing mobile required checks. Use the compatible release branch command without modifying or bypassing main ownership gates; preserve the production environment/export checks when carrying any release-script fix.",
+    "Record exact staged source commit and production export hash, publish one authorized runtime-2.1.0 OTA, verify production manifest/CDN identity, then perform the separately authorized connected-phone update and card-pack UI verification."
+  ],
+  "limits": [
+    "No fresh EAS channel lookup or phone/native binary inspection was performed by this review. Historical publication evidence is the single primary receipt above.",
+    "Existing legacy checkout is clean but is not source-identical to its published OTA; using the exact published commit avoids carrying the listed later changes.",
+    "Historical simulator JS swaps do not prove current physical-device OTA application. Final phone verification remains required."
+  ]
+}

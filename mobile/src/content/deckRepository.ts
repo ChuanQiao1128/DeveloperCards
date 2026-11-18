@@ -480,9 +480,13 @@ export type DeckContent = DeckExport;
 
 export async function checkManifestForUpdates(
   _isPremiumUser: boolean = false,
+  options?: { requireRemote?: boolean },
 ): Promise<Record<string, UpdateInfo>> {
-  const manifest = await loadManifestPreferRemote();
-  if (!manifest) return {};
+  const manifest = options?.requireRemote ? await fetchRemoteManifest() : await loadManifestPreferRemote();
+  if (!manifest) {
+    if (options?.requireRemote) throw new Error('Unable to check the latest card packs.');
+    return {};
+  }
 
   // ✅ important: apply retired purges ASAP (before building update list)
   await reconcileRetiredDecks(manifest);
@@ -785,7 +789,8 @@ export async function installDeckFromUrl(
 
     const existing = await getDeckMeta(safeSlug, userKey);
 
-    if (existing?.buildId && remoteVersion && existing.buildId === remoteVersion) {
+    if (existing?.buildId && remoteVersion && existing.buildId === remoteVersion
+      && await locateInstalledDeckFile(safeSlug, userKey, existing)) {
       console.log('[installDeckFromUrl] already_up_to_date', { slug: safeSlug, buildId: existing.buildId });
       return true;
     }
@@ -1459,6 +1464,19 @@ async function getDeckMeta(slug: string, userKey?: string): Promise<DeckInstallM
   } catch {
     return null;
   }
+}
+
+export type InstalledDeckInfo = { version: string; installedAtMs: number | null };
+
+/** Read the current account's installed version only when its card file still exists. */
+export async function getInstalledDeckInfo(slug: string): Promise<InstalledDeckInfo | null> {
+  const userKey = await getCurrentUserKey();
+  const meta = await getDeckMeta(slug, userKey);
+  if (!meta || !await locateInstalledDeckFile(slug, userKey, meta)) return null;
+  return {
+    version: meta.buildId,
+    installedAtMs: Number.isFinite(meta.installedAtMs) ? meta.installedAtMs : null,
+  };
 }
 
 async function removeDeckMeta(slug: string, userKey?: string) {

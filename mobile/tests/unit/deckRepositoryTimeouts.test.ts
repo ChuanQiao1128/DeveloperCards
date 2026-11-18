@@ -55,7 +55,10 @@ vi.mock('expo-file-system/legacy', () => ({
     deletedFiles.push(uri);
     files.delete(uri);
   }),
-  moveAsync: vi.fn(async () => {}),
+  moveAsync: vi.fn(async ({ from, to }: { from: string; to: string }) => {
+    if (!files.has(from)) throw new Error('ENOENT');
+    files.set(to, files.get(from)!); files.delete(from);
+  }),
   getInfoAsync: vi.fn(async (uri: string) => ({ exists: files.has(uri), isDirectory: false, uri })),
   makeDirectoryAsync: vi.fn(async () => {}),
   readDirectoryAsync: vi.fn(async () => []),
@@ -160,6 +163,35 @@ beforeEach(() => {
 function urlsHit(): string[] {
   return calls.map((call) => call.url);
 }
+
+describe('settings card-pack version checks', () => {
+  it('refuses a cached-only answer when a fresh check is required', async () => {
+    seedInstalledDeck('free');
+    const repo = await loadRepo();
+    await expect(repo.checkManifestForUpdates(false, { requireRemote: true })).rejects.toThrow('latest card packs');
+    expect((await repo.checkManifestForUpdates()).algo.installedVersion).toBe('v1');
+    expect(deletedFiles).toEqual([]);
+  });
+
+  it('accepts a remote304 only with the matching cached manifest', async () => {
+    seedInstalledDeck('free');
+    store.set('devcards:content:manifestEtag:v1', 'etag1');
+    respond = () => ({ ok: false, status: 304, headers: { get: () => null } });
+    const repo = await loadRepo();
+    expect((await repo.checkManifestForUpdates(false, { requireRemote: true })).algo.remoteVersion).toBe('v1');
+    expect(calls[0].init.headers['if-none-match']).toBe('etag1');
+  });
+
+  it('reads a local installed version without network and refuses a missing file', async () => {
+    seedInstalledDeck('free');
+    const repo = await loadRepo();
+    expect(await repo.getInstalledDeckInfo('algo')).toEqual({ version: 'v1', installedAtMs: 1 });
+    expect(calls).toEqual([]);
+    files.clear();
+    expect(await repo.getInstalledDeckInfo('algo')).toBeNull();
+    expect(deletedFiles).toEqual([]);
+  });
+});
 
 /** Hangs the named URL forever, rejecting only when its deadline aborts it. */
 function hangOn(url: string, onSignal: (signal: AbortSignal) => void) {
@@ -294,5 +326,24 @@ describe('fetchRemoteManifest · deadline then cache', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+
+describe('same-version card pack recovery', () => {
+  it('downloads again when metadata matches but the installed file is missing', async () => {
+    seedInstalledDeck('free');
+    const body = files.get(DECK_FILE)!;
+    files.clear();
+    const url = 'https://cdn.test/content/decks/algo/builds/v1/deck.json';
+    const fs = await import('expo-file-system/legacy');
+    vi.mocked(fs.downloadAsync).mockImplementationOnce(async (_url, uri) => {
+      files.set(uri, body);
+      return { status: 200, uri } as any;
+    });
+    const repo = await loadRepo();
+    expect(await repo.installDeckFromUrl('algo', url, 'v1', null)).toBe(true);
+    expect(vi.mocked(fs.downloadAsync).mock.calls.some(([requested]) => requested === url)).toBe(true);
+    expect((await repo.getInstalledDeckInfo('algo'))?.version).toBe('v1');
   });
 });
