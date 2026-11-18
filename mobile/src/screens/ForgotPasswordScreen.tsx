@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -21,47 +21,46 @@ import { OTP_SLOT_COUNT, OtpCodeSlots } from '../auth/components/OtpCodeSlots';
 import { EMAIL_FORMAT_HINT, isValidEmail, normEmail } from '../auth/emailPolicy';
 import { evaluatePassword, isPasswordValid } from '../auth/passwordPolicy';
 import { colors } from '../theme/colors';
+import { useResendCooldown } from '../auth/useResendCooldown';
+import { leaveAuthFlow, type LeaveAuthNavigation } from '../auth/leaveAuthFlow';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ForgotPassword'>;
 
 const PASSWORD_RULES_ATTR =
   'minlength: 8; required: lower; required: upper; required: digit; required: special;';
-const RESEND_COOLDOWN_SECONDS = 60;
 
 export default function ForgotPasswordScreen({ navigation, route }: Props) {
   const loading = useAuthStore((s) => s.loading);
   const requestPasswordReset = useAuthStore((s) => s.requestPasswordReset);
   const confirmPasswordReset = useAuthStore((s) => s.confirmPasswordReset);
+  const completeNewPasswordSignIn = useAuthStore((s) => s.completeNewPasswordSignIn);
+  const isNewPasswordChallenge = route.params?.mode === 'new_password';
 
-  const [step, setStep] = useState<'request' | 'confirm'>('request');
+  const [step, setStep] = useState<'request' | 'confirm'>(isNewPasswordChallenge ? 'confirm' : 'request');
   const [email, setEmail] = useState(route.params?.email ?? '');
   const [code, setCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [showPwd, setShowPwd] = useState(false);
   const [emailBlurred, setEmailBlurred] = useState(false);
   const [inlineError, setInlineError] = useState<string | null>(null);
-  const [cooldownSec, setCooldownSec] = useState(0);
+  const [sentEmail, setSentEmail] = useState<string | null>(null);
+  const [resendNotice, setResendNotice] = useState<string | null>(null);
+  const { cooldownSec, startCooldown } = useResendCooldown();
   const inFlightRef = useRef(false);
   const codeInputRef = useRef<TextInput>(null);
   const newPasswordRef = useRef<TextInput>(null);
-
-  useEffect(() => {
-    if (cooldownSec <= 0) return;
-    const timer = setTimeout(() => setCooldownSec((prev) => Math.max(0, prev - 1)), 1000);
-    return () => clearTimeout(timer);
-  }, [cooldownSec]);
 
   const passwordRules = useMemo(() => evaluatePassword(newPassword), [newPassword]);
   const emailInvalid = emailBlurred && normEmail(email).length > 0 && !isValidEmail(email);
 
   const canSend = useMemo(
-    () => isValidEmail(email) && !loading,
-    [email, loading],
+    () => isValidEmail(email) && !loading && (normEmail(email) !== sentEmail || cooldownSec === 0),
+    [email, loading, sentEmail, cooldownSec],
   );
 
   const canConfirm = useMemo(
-    () => String(code || '').trim().length === OTP_SLOT_COUNT && isPasswordValid(newPassword) && !loading,
-    [code, newPassword, loading],
+    () => (isNewPasswordChallenge || String(code || '').trim().length === OTP_SLOT_COUNT) && isPasswordValid(newPassword) && !loading,
+    [code, newPassword, loading, isNewPasswordChallenge],
   );
 
   async function onSend() {
@@ -76,7 +75,11 @@ export default function ForgotPasswordScreen({ navigation, route }: Props) {
     setInlineError(null);
     try {
       await requestPasswordReset(email);
-      setCooldownSec(RESEND_COOLDOWN_SECONDS);
+      setSentEmail(normEmail(email));
+      startCooldown();
+      setCode('');
+      setNewPassword('');
+      setResendNotice(null);
       setStep('confirm');
     } catch (e: any) {
       const friendly = friendlyAuthError(e);
@@ -90,9 +93,12 @@ export default function ForgotPasswordScreen({ navigation, route }: Props) {
     if (cooldownSec > 0 || loading || inFlightRef.current) return;
     inFlightRef.current = true;
     setInlineError(null);
+    setResendNotice(null);
     try {
       await requestPasswordReset(email);
-      setCooldownSec(RESEND_COOLDOWN_SECONDS);
+      startCooldown();
+      setCode('');
+      setResendNotice('If an account uses this email, a new reset code has been sent.');
     } catch (e: any) {
       const friendly = friendlyAuthError(e);
       setInlineError(friendly);
@@ -107,8 +113,14 @@ export default function ForgotPasswordScreen({ navigation, route }: Props) {
     inFlightRef.current = true;
     setInlineError(null);
     try {
+      if (isNewPasswordChallenge) {
+        if (await completeNewPasswordSignIn(newPassword)) {
+          leaveAuthFlow(navigation as unknown as LeaveAuthNavigation);
+        }
+        return;
+      }
       await confirmPasswordReset(e, code, newPassword);
-      navigation.popTo('SignIn', { email: e });
+      navigation.popTo('SignIn', { email: e, notice: 'password_reset', noticeAt: Date.now() });
     } catch (err: any) {
       const friendly = friendlyAuthError(err);
       setInlineError(friendly);
@@ -149,9 +161,9 @@ export default function ForgotPasswordScreen({ navigation, route }: Props) {
             </Pressable>
 
             <View style={{ flex: 1 }}>
-              <Text style={styles.title}>Reset password</Text>
+              <Text style={styles.title}>{isNewPasswordChallenge ? 'Choose a new password' : 'Reset password'}</Text>
               <Text style={styles.subtitle}>
-                We’ll email you a code to set a new password and get back to syncing.
+                {isNewPasswordChallenge ? 'Set a new password to finish signing in.' : 'Use an email code to set a new password.'}
               </Text>
             </View>
           </View>
@@ -165,14 +177,14 @@ export default function ForgotPasswordScreen({ navigation, route }: Props) {
 
             {step === 'request' ? (
               <>
-                <Text style={styles.cardTitle}>Forgot your password?</Text>
                 <Text style={styles.cardHint}>
-                  Enter the email tied to your study history and we’ll send a reset code.
+                  Enter your account email. We’ll send a code if an account uses this address.
                 </Text>
 
                 <Text style={styles.label}>Email</Text>
                 <View style={[styles.inputWrap, emailInvalid && styles.inputWrapError]}>
                   <TextInput
+                    accessibilityLabel="Email"
                     value={email}
                     onChangeText={(v) => {
                       setEmail(v);
@@ -218,25 +230,27 @@ export default function ForgotPasswordScreen({ navigation, route }: Props) {
                       <Text style={[styles.primaryText, { marginLeft: 8 }]}>Sending…</Text>
                     </View>
                   ) : (
-                    <Text style={styles.primaryText}>Send reset code</Text>
+                    <Text style={styles.primaryText}>{cooldownSec > 0 && normEmail(email) === sentEmail ? `Send code in ${cooldownSec}s` : 'Send reset code'}</Text>
                   )}
                 </Pressable>
 
-                <Text style={styles.footnote}>
-                  If an account exists for that email, we sent a code to it.
-                </Text>
               </>
             ) : (
               <>
-                <Text style={styles.cardTitle}>Set a new password</Text>
                 <Text style={styles.cardHint}>
-                  Enter the code from your email and choose a new password.
+                  {isNewPasswordChallenge
+                    ? `Choose a new password for ${email}.`
+                    : `If an account uses ${sentEmail ?? normEmail(email)}, a reset code has been sent. Check your spam folder too.`}
                 </Text>
 
+                {resendNotice ? <Text accessibilityLiveRegion="polite" testID="forgot-resend-notice" style={styles.cardHint}>{resendNotice}</Text> : null}
+
+                {!isNewPasswordChallenge ? <>
                 <Text style={styles.label}>Code</Text>
                 <Pressable accessible={false} testID="forgot-code-touch" onPress={() => codeInputRef.current?.focus()}>
                 <OtpCodeSlots code={code}>
                   <TextInput
+                    accessibilityLabel="6-digit password reset code"
                     ref={codeInputRef}
                     testID="forgot-code-input"
                     value={code}
@@ -262,10 +276,12 @@ export default function ForgotPasswordScreen({ navigation, route }: Props) {
                   />
                 </OtpCodeSlots>
                 </Pressable>
+                </> : null}
 
                 <Text style={[styles.label, { marginTop: 12 }]}>New password</Text>
                 <View style={styles.inputWrap}>
                   <TextInput
+                    accessibilityLabel="New password"
                     ref={newPasswordRef}
                     testID="forgot-new-password-input"
                     value={newPassword}
@@ -330,10 +346,11 @@ export default function ForgotPasswordScreen({ navigation, route }: Props) {
                       <Text style={[styles.primaryText, { marginLeft: 8 }]}>Saving…</Text>
                     </View>
                   ) : (
-                    <Text style={styles.primaryText}>Set new password</Text>
+                    <Text style={styles.primaryText}>{isNewPasswordChallenge ? 'Set password and sign in' : 'Set new password'}</Text>
                   )}
                 </Pressable>
 
+                {!isNewPasswordChallenge ? <>
                 <View style={styles.dividerRow}>
                   <View style={styles.dividerLine} />
                   <Text style={styles.dividerText}>Didn’t get it?</Text>
@@ -355,6 +372,24 @@ export default function ForgotPasswordScreen({ navigation, route }: Props) {
                     {cooldownSec > 0 ? `Resend code in ${cooldownSec}s` : 'Resend code'}
                   </Text>
                 </Pressable>
+
+                <Pressable
+                  testID="forgot-change-email"
+                  accessibilityRole="button"
+                  disabled={loading}
+                  style={styles.changeEmailLink}
+                  onPress={() => {
+                    setStep('request');
+                    setCode('');
+                    setNewPassword('');
+                    setShowPwd(false);
+                    setInlineError(null);
+                    setResendNotice(null);
+                  }}
+                >
+                  <Text style={styles.secondaryText}>Change email address</Text>
+                </Pressable>
+                </> : null}
               </>
             )}
           </View>
@@ -367,6 +402,7 @@ export default function ForgotPasswordScreen({ navigation, route }: Props) {
 }
 
 const styles = StyleSheet.create({
+  changeEmailLink: { minHeight: 44, justifyContent: 'center', alignItems: 'center', marginTop: 10 },
   safeArea: { flex: 1, backgroundColor: colors.parchmentBg },
   flex: { flex: 1 },
   scrollContent: { paddingHorizontal: 18, paddingTop: 16, paddingBottom: 24 },

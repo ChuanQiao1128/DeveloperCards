@@ -25,7 +25,7 @@ import { setActiveUserSubForStorage, invalidateActiveUserSubCache, loadDeckProgr
 import { syncDrawStateNow } from '../../src/sync/drawStateSync';
 import { pickNextCard } from '../../src/features/gacha/planner/sessionPlanner';
 import { selectDrawCards } from '../../src/features/gacha/draw/poolSelection';
-import { orderedCards } from '../../src/features/gacha/draw/orderedAcquisition';
+import { orderedCards, sortingHash } from '../../src/features/gacha/draw/orderedAcquisition';
 import { resetAllProgress } from '../../src/features/debug/resetProgress';
 import { withDrawStateLock, invalidateDrawStateOperations } from '../../src/features/gacha/draw/drawStateLock';
 import { buildRatedSessionState } from '../../src/features/gacha/session/sessionReviewHelpers';
@@ -374,5 +374,68 @@ describe('history and learning compatibility', () => {
     const args = { deck, progress, now: new Date(), mode: 'learn-new' as const, ownedSet: new Set(['c2', 'c3']), kindHint: { mcqAllowed: true, preferMcq: true } };
     expect(pickNextCard(args)?.card.StableUid).toBe('c2'); expect(pickNextCard({ ...args, index: { cards, cardMap: new Map(cards.map(c => [c.StableUid, c])) } })?.card.StableUid).toBe('c2');
     expect(pickNextCard({ ...args, mode: 'review-due' })?.card).toBeUndefined();
+  });
+});
+
+
+describe('prerequisite-aware earned card acquisition', () => {
+  function needs(uid: string, ...parents: string[]) {
+    deck.Cards.find(card => card.StableUid === uid)!.Teaching = {
+      schema: 'teaching-v1', answer: 'Answer', keyPoint: 'Mechanism', mustAnswer: ['Explain'], prerequisites: parents,
+    };
+  }
+  it('earns the later foundation before its earlier dependent and spends one pull per card', async () => {
+    needs('c1', 'c8');
+    const result = await acquireDraw(slug, 3, { deck });
+    expect(uids(result)).toEqual(['c8', 'c1', 'c2']);
+    expect(result.spent).toBe(3);
+    expect((await loadDeckWallet(slug)).availablePulls).toBe(7);
+    expect((await loadDrawState(slug)).pity).toEqual(pity);
+  });
+  it('repairs an old owned/learned dependent before unrelated earlier gaps', async () => {
+    needs('c11', 'c8'); needs('c8', 'c7');
+    seed(['c11']); store.set(progressKey, JSON.stringify([learned('c12')])); needs('c12', 'c9');
+    expect(uids(await acquireDraw(slug, 3, { deck }))).toEqual(['c7', 'c8', 'c9']);
+    expect((await loadDrawState(slug)).owned).toEqual(['c11', 'c7', 'c8', 'c9']);
+    expect(JSON.parse(store.get(progressKey)!)).toEqual([learned('c12')]);
+  });
+  it('batch and singles agree across transitive dependencies and old ownership gaps', async () => {
+    needs('c1', 'c8'); needs('c8', 'c7'); needs('c11', 'c10'); seed(['c11']);
+    const singles: string[] = [];
+    for (let i = 0; i < 5; i++) singles.push(...uids(await acquireDraw(slug, 1, { deck })));
+    seed(['c11']); invalidateDrawStateCache();
+    const batch = await acquireDraw(slug, 5, { deck });
+    expect(uids(batch)).toEqual(singles);
+    expect(singles).toEqual(['c10', 'c7', 'c8', 'c1', 'c2']);
+    expect(batch.spent).toBe(5);
+  });
+  it.each(['missing', 'cycle', 'self', 'malformed'])(
+    'rejects a %s dependency before any grant or wallet debit', async kind => {
+      if (kind === 'missing') needs('c1', 'absent');
+      if (kind === 'cycle') { needs('c1', 'c2'); needs('c2', 'c1'); }
+      if (kind === 'self') needs('c1', 'c1');
+      if (kind === 'malformed') { needs('c1'); deck.Cards.find(c => c.StableUid === 'c1')!.Teaching!.prerequisites = [42] as any; }
+      await expect(acquireDraw(slug, 1, { deck })).rejects.toThrow();
+      expect(writes).toEqual([]);
+      expect((await loadDeckWallet(slug)).availablePulls).toBe(10);
+      expect((await loadDrawState(slug)).owned).toEqual([]);
+    });
+  it('keeps old ordered and new dependency histories replayable without changing the history schema', async () => {
+    needs('c1', 'c8');
+    const old = { drawId: 'old-ordered', slug, seed: 1, drawCount: 2, ownedBefore: [], pityBefore: pity,
+      drawnUids: ['c1', 'c2'], ts: 1, selectionPolicy: 'ordered-v1' as const, deckVersion: deck.Version,
+      sortingHash: sortingHash(deck.Cards) };
+    store.set(historyKey, JSON.stringify([old]));
+    expect(replayDraw(old, deck.Cards, deck.Version).matches).toBe(true);
+    await acquireDraw(slug, 3, { deck }); await flushDrawHistory();
+    const history = await loadDrawHistory(slug);
+    expect(history[0]).toEqual(old);
+    const next = history[1];
+    expect(next.selectionPolicy).toBe('ordered-v1');
+    expect(next.sortingHash).toMatch(/^prerequisites-v1:/);
+    expect(replayDraw(next, deck.Cards, deck.Version).matches).toBe(true);
+    needs('c1', 'c9');
+    expect(replayDraw(next, deck.Cards, deck.Version).matches).toBe(false);
+    expect(replayDraw(old, deck.Cards, deck.Version).matches).toBe(true);
   });
 });

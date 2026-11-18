@@ -70,6 +70,7 @@ sentry_prepare() {
 
 if [ "${DRY_RUN:-0}" = 1 ]; then
   echo "DRY: eas update --channel production --environment production --platform ios --message \"$MESSAGE\" --non-interactive"
+  echo 'DRY: export with production settings, verify compiled auth configuration, then publish with --skip-bundler'
   if [ "$GE190" = 1 ]; then
     sentry_prepare
     if [ -z "$SENTRY_UPLOAD" ]; then
@@ -81,7 +82,9 @@ if [ "${DRY_RUN:-0}" = 1 ]; then
   fi
   exit 0
 fi
-eas update --channel production --environment production --platform ios --message "$MESSAGE" --non-interactive
+# Export and inspect the actual launch bundle under the production environment before upload.
+eas env:exec production --non-interactive "node scripts/release/prepare-ota.cjs"
+eas update --skip-bundler --input-dir dist --channel production --environment production --platform ios --message "$MESSAGE" --non-interactive
 
 # The update is live from here on: the source-map upload reports its result but never fails the script.
 sentry_prepare

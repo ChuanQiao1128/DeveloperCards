@@ -10,7 +10,7 @@ import {
 } from './drawStateStore';
 import { getUserScopedKey } from '../../../review/storage';
 import { withDrawStateLock } from './drawStateLock';
-import { isOrderedDeck, orderedCards, orderedEffectiveOwned, sortingHash } from './orderedAcquisition';
+import { isOrderedDeck, orderedCards, orderedEffectiveOwned, sortingHash, prerequisiteAcquisitionCards, prerequisiteSortingHash } from './orderedAcquisition';
 import { normalizePityState } from './pity';
 import { loadDrawPoolOwned } from './drawPool';
 import { selectDrawCards } from './poolSelection';
@@ -147,7 +147,8 @@ export async function commitDrawUnderLock(
   const ts = Date.now();
   const seed = ts;
 
-  const remaining = ordered ? orderedCards(deck.Cards).filter(card => !ownedSet.has(card.StableUid)) : [];
+  const remaining = ordered ? prerequisiteAcquisitionCards(deck.Cards, ownedSet) : [];
+  const orderFingerprint = ordered ? prerequisiteSortingHash(deck.Cards) : undefined;
   const selection = ordered ? {
     cards: remaining.slice(0, drawCount),
     poolExhausted: remaining.length <= drawCount,
@@ -199,7 +200,7 @@ export async function commitDrawUnderLock(
     ts,
     selectionPolicy: ordered ? 'ordered-v1' : 'random-v1',
     deckVersion: deck.Version,
-    ...(ordered ? { sortingHash: sortingHash(deck.Cards) } : {}),
+    ...(ordered ? { sortingHash: orderFingerprint } : {}),
   }, userSub);
 
   const flags = getFeatureFlags();
@@ -277,6 +278,15 @@ export type DrawReplayResult = {
  */
 export function replayDraw(record: DrawHistoryEntry, deckCards: CardExport[], deckVersion?: string): DrawReplayResult {
   if (record.selectionPolicy === 'ordered-v1') {
+    if (record.sortingHash?.startsWith('prerequisites-v1:')) {
+      try {
+        if (!record.deckVersion || deckVersion !== record.deckVersion || record.sortingHash !== prerequisiteSortingHash(deckCards)) return { drawnUids: [], matches: false };
+        const drawnUids = prerequisiteAcquisitionCards(deckCards, new Set(record.ownedBefore)).slice(0, record.drawCount).map(card => card.StableUid);
+        return { drawnUids, matches: drawnUids.length === record.drawnUids.length && drawnUids.every((uid, index) => uid === record.drawnUids[index]) };
+      } catch {
+        return { drawnUids: [], matches: false };
+      }
+    }
     if (!record.deckVersion || deckVersion !== record.deckVersion || record.sortingHash !== sortingHash(deckCards)) return { drawnUids: [], matches: false };
     const drawnUids = orderedCards(deckCards).filter(card => !new Set(record.ownedBefore).has(card.StableUid)).slice(0, record.drawCount).map(card => card.StableUid);
     return { drawnUids, matches: drawnUids.length === record.drawnUids.length && drawnUids.every((uid, index) => uid === record.drawnUids[index]) };

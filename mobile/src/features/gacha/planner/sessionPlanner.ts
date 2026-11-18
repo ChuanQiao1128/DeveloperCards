@@ -8,6 +8,7 @@ import { formatDateKey } from '../../../review/model';
 import type { StudyMode } from '../../../navigation/types';
 import type { McqKindHint } from '../mcq/mcqRotation';
 import { normalizeMcq } from '../mcq/normalizeMcq';
+import { hasPendingPrerequisite, prerequisiteOrder } from '../draw/prerequisiteOrder';
 
 export type CurrentCardLike = {
   card: CardExport;
@@ -109,8 +110,8 @@ export function pickNextCard(params: {
 
   const progressMap = new Map(progress.map((item) => [item.stableUid, item]));
 
-  const pickWith = (predicate: (card: CardExport, progress: CardProgress) => boolean) => {
-    for (const card of cards) {
+  const pickWith = (predicate: (card: CardExport, progress: CardProgress) => boolean, candidates = cards) => {
+    for (const card of candidates) {
       if (avoidUid && card.StableUid === avoidUid) continue;
       const progressEntry = progressMap.get(card.StableUid);
       if (!progressEntry) continue;
@@ -120,7 +121,7 @@ export function pickNextCard(params: {
     }
 
     if (avoidUid) {
-      for (const card of cards) {
+      for (const card of candidates) {
         const progressEntry = progressMap.get(card.StableUid);
         if (!progressEntry) continue;
         if (predicate(card, progressEntry)) {
@@ -148,7 +149,18 @@ export function pickNextCard(params: {
   const isMcq = (card: CardExport) => normalizeMcq(card.Mcq) !== null;
   const pickNew = () => {
     const isNew = (card: CardExport, p: CardProgress) => owns(card) && isNewProgress(p);
-    if (!kindHint || isOrderedDeck(deck?.Slug ?? index?.deckSlug ?? '')) return pickWith(isNew);
+    if (isOrderedDeck(deck?.Slug ?? index?.deckSlug ?? '')) {
+      const learnedRoots = cards.filter(card => owns(card) && progressMap.has(card.StableUid) &&
+        isLearnedProgress(progressMap.get(card.StableUid)!)).map(card => card.StableUid);
+      const candidates = prerequisiteOrder(cards, learnedRoots).filter(card =>
+        progressMap.has(card.StableUid) && isNew(card, progressMap.get(card.StableUid)!));
+      const pending = new Set(candidates.map(card => card.StableUid));
+      const scope = new Map(cards.map(card => [card.StableUid, card]));
+      const ready = candidates.filter(card => !hasPendingPrerequisite(card, pending, scope));
+      // A corrupt legacy cycle cannot take away cards or the ability to earn another pull.
+      return pickWith(isNew, ready.length > 0 ? ready : candidates);
+    }
+    if (!kindHint) return pickWith(isNew);
     // The cap: mcqAllowed false takes a Q/A new card only (hard filter; maxPerRun 0 = never an MCQ new
     // card). Past a positive mcq.maxPerRun (mcqFallback) a run with no Q/A new card left (an MCQ-only
     // exam deck, or every Q/A card already learned) takes an MCQ new card rather than ending short.

@@ -751,9 +751,12 @@ export function SessionCardScreen({ navigation, route }: Props) {
           if (starterLesson && isStarterLessonComplete(starterLesson, nextProgress)) {
             // Every lesson card is already studied (the app closed between the last rating and the
             // reward, or the deck holds no lesson card): finish now instead of dealing a run.
-            await completeStarterLesson(starterLesson.slug);
+            const completion = await completeStarterLesson(starterLesson.slug);
+            const lessonReadCount = [...new Set(starterLesson.uids)].filter((uid) =>
+              resolved.Cards.some((card) => card.StableUid === uid) && nextProgress.some((entry) => entry.stableUid === uid && isLearned(entry))).length;
             if (cancelled) return;
-            navigation.replace('Draw', { slug: starterLesson.slug, rewardPending: true });
+            navigation.replace('Draw', { slug: starterLesson.slug, rewardPending: true,
+              ...(completion.completed && lessonReadCount ? { lessonReadCount } : {}) });
             return;
           }
           // Resolved against the deck's own slug, not deckForStudy's, so a
@@ -1119,7 +1122,7 @@ export function SessionCardScreen({ navigation, route }: Props) {
       if (await captureProgressUserSub() !== sub) throw new Error('Account changed');
       const starterLesson = starterLessonRef.current;
       const completedLesson = starterLesson && isStarterLessonComplete(starterLesson, nextState.updatedProgress);
-      if (completedLesson) await completeStarterLesson(starterLesson.slug);
+      const lessonCompletion = completedLesson ? await completeStarterLesson(starterLesson.slug) : null;
       await clearPendingRating(sub, deck.Slug, intent.uid);
       pendingRatingRef.current = null;
       recordRewardStep(rewardStep, current.card.StableUid);
@@ -1157,7 +1160,10 @@ export function SessionCardScreen({ navigation, route }: Props) {
       if (completedLesson) {
         starterLessonRef.current = null;
         void clearSessionCheckpoint(sub, deck.Slug).catch(() => {});
-        navigation.replace('Draw', { slug: starterLesson.slug, rewardPending: true });
+        const lessonReadCount = [...new Set(starterLesson.uids)].filter((uid) =>
+          deck.Cards.some((card) => card.StableUid === uid) && nextState.updatedProgress.some((entry) => entry.stableUid === uid && isLearned(entry))).length;
+        navigation.replace('Draw', { slug: starterLesson.slug, rewardPending: true,
+          ...(lessonCompletion?.completed && lessonReadCount ? { lessonReadCount } : {}) });
         return;
       }
       advanceSession();
@@ -1643,6 +1649,7 @@ export function SessionCardScreen({ navigation, route }: Props) {
                   disabled={reviewing}
                   onShowAnswer={handleStudyReveal}
                   onGotIt={handleGotIt}
+                  onStillLearning={handleGotIt}
                 />
               ) : (
                 <RatingBar

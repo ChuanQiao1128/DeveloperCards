@@ -39,6 +39,7 @@ function makeFakeEasDir(): string {
       `echo "$@" >> "${path.join(dir, 'eas.argv.log')}"`,
       'case "$1" in',
       '  whoami) exit 0 ;;',
+    '  env:exec) exit 0 ;;',
       `  env:list) for n in $FAKE_EAS_NAMES; do echo "$n=${MARKER}"; done ;;`,
       '  update)',
       '    echo "$@" >> "$FAKE_EAS_LOG"',
@@ -133,6 +134,14 @@ describe('ota.sh', { timeout: OTA_CASE_TIMEOUT_MS }, () => {
     expect(`${res.stdout}${res.stderr}`).not.toContain(MARKER);
   });
 
+  it('does not publish or upload maps when preparing the verified export fails', () => {
+    const r = runOtaTree({ version: '2.0.0', names: ALL_NAMES, envExecExit: 1, env: { OTA_KEYCHAIN: '0' } });
+    expect(r.res.status, r.diag).toBe(1);
+    expect(r.eas).toContain('env:exec production');
+    expect(r.eas).not.toMatch(/^update /m);
+    expect(r.npx).toBe('');
+  });
+
   it('DRY_RUN=1 checks the names and prints the command without publishing', () => {
     const { res, log, diag } = runOta({ names: ALL_NAMES, dryRun: true });
     expect(res.status, diag).toBe(0);
@@ -186,6 +195,7 @@ type TreeOpts = {
   names: string[];
   env?: Record<string, string>;
   npxExit?: number;
+  envExecExit?: number;
 };
 
 function writeExecutable(file: string, lines: string[]) {
@@ -238,6 +248,7 @@ function runOtaTree(opts: TreeOpts) {
     `echo "$@" >> "${easLog}"`,
     'case "$1" in',
     '  whoami) exit 0 ;;',
+    `  env:exec) exit ${opts.envExecExit ?? 0} ;;`,
     `  env:list) for n in $FAKE_EAS_NAMES; do echo "$n=${MARKER}"; done ;;`,
     '  update) exit 0 ;;',
     'esac',
@@ -294,7 +305,7 @@ describe('ota.sh 1.9.0 release plumbing', { timeout: OTA_CASE_TIMEOUT_MS }, () =
   it('runtime 1.8.0 without the DSN name publishes and skips the upload (skipped-runtime)', () => {
     const r = runOtaTree({ version: '1.8.0', names: NAMES_180, env: { SENTRY_AUTH_TOKEN: 'fake-sentry-token-not-real' } });
     expect(r.res.status, r.diag).toBe(0);
-    expect(r.eas).toContain('update --channel production --environment production --platform ios');
+    expect(r.eas).toContain('update --skip-bundler --input-dir dist --channel production --environment production --platform ios');
     expect(r.res.stdout).toContain('SENTRY_UPLOAD=skipped-runtime');
     expect(r.npx).toBe('');
     expect(r.out).not.toContain('fake-sentry-token-not-real');
@@ -318,7 +329,7 @@ describe('ota.sh 1.9.0 release plumbing', { timeout: OTA_CASE_TIMEOUT_MS }, () =
       env: { SENTRY_AUTH_TOKEN: 'fake-sentry-token-not-real' },
     });
     expect(r.res.status, r.diag).toBe(0);
-    expect(r.eas).toContain('update --channel production');
+    expect(r.eas).toContain('update --skip-bundler --input-dir dist --channel production');
     expect(r.npx).toContain('argv=sentry-expo-upload-sourcemaps dist');
     expect(r.npx).toContain('org=example-org project=example-project');
     expect(r.npx).toContain('token=set');
@@ -345,7 +356,7 @@ describe('ota.sh 1.9.0 release plumbing', { timeout: OTA_CASE_TIMEOUT_MS }, () =
   it('1.9.0 without a token publishes and reports skipped-no-token', () => {
     const r = runOtaTree({ version: '1.9.0', sentryDependency: true, org: 'example-org', project: 'example-project', names: ALL_NAMES });
     expect(r.res.status, r.diag).toBe(0);
-    expect(r.eas).toContain('update --channel production');
+    expect(r.eas).toContain('update --skip-bundler --input-dir dist --channel production');
     expect(r.res.stdout).toContain('SENTRY_UPLOAD=skipped-no-token');
     expect(r.npx).toBe('');
   });

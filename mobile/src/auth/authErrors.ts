@@ -30,9 +30,13 @@ export function isAuthFlowError(err: unknown, code?: AuthFlowCode): err is AuthF
 // Maps Cognito exception `name`s to calm, non-leaky copy. Keys are the exact
 // Amplify error names; values never expose a raw Cognito message.
 export const AUTH_ERROR_COPY: Record<string, string> = {
+  AuthUserPoolException: 'Account services are unavailable in this app update. Restart the app to check for an update.',
+  AuthTokenConfigException: 'Account services are unavailable in this app update. Restart the app to check for an update.',
   NotAuthorizedException: 'Incorrect email or password.',
   UserNotFoundException: 'Incorrect email or password.',
-  UserNotConfirmedException: 'Please verify your email first. We sent you a new code.',
+  UserNotConfirmedException: 'Please verify your email to sign in.',
+  PasswordResetRequiredException: 'Please reset your password to continue.',
+  SignInException: 'Your sign-in session has expired. Go back and sign in again.',
   UsernameExistsException: 'An account with this email already exists.',
   InvalidPasswordException:
     'Use at least 8 characters with an uppercase letter, a lowercase letter, a number and a symbol.',

@@ -4,6 +4,7 @@ import { create } from 'zustand';
 import {
   signUp,
   confirmSignUp,
+  confirmSignIn,
   resendSignUpCode,
   signIn,
   signOut,
@@ -83,6 +84,7 @@ type AuthState = {
   confirmPasswordReset: (email: string, code: string, newPassword: string) => Promise<void>;
 
   signInWithEmail: (email: string, password: string) => Promise<void>;
+  completeNewPasswordSignIn: (password: string) => Promise<boolean>;
   signOutNow: () => Promise<void>;
   deleteAccountNow: () => Promise<void>;
 };
@@ -364,7 +366,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
       const msg = friendlyAuthError(err);
       set({ lastError: msg });
-      throw new Error(msg);
+      throw new AuthFlowError('FAILED', msg);
     } finally {
       set({ loading: false });
     }
@@ -414,7 +416,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
       const msg = friendlyAuthError(err);
       set({ lastError: msg });
-      throw new Error(msg);
+      throw new AuthFlowError('FAILED', msg);
     } finally {
       if (generation === getAuthSessionGeneration()) set({ loading: false });
     }
@@ -430,7 +432,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     } catch (err: any) {
       const msg = friendlyAuthError(err);
       set({ lastError: msg });
-      throw new Error(msg);
+      throw new AuthFlowError('FAILED', msg);
     } finally {
       set({ loading: false });
     }
@@ -449,7 +451,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     } catch (err: any) {
       const msg = friendlyAuthError(err);
       set({ lastError: msg });
-      throw new Error(msg);
+      throw new AuthFlowError('FAILED', msg);
     } finally {
       set({ loading: false });
     }
@@ -470,7 +472,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     } catch (err: any) {
       const msg = friendlyAuthError(err);
       set({ lastError: msg });
-      throw new Error(msg);
+      throw new AuthFlowError('FAILED', msg);
     } finally {
       set({ loading: false });
     }
@@ -538,6 +540,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         throw e2;
       }
 
+      if (name === 'PasswordResetRequiredException') {
+        const reset = new AuthFlowError('RESET_REQUIRED', AUTH_ERROR_COPY.PasswordResetRequiredException);
+        set({ lastError: reset.message });
+        throw reset;
+      }
+
       // Keep the "already signed in" message recognisable so SignInScreen's
       // /already.*signed in/i re-init branch (G05/MACCT-16) still fires.
       if (name === 'UserAlreadyAuthenticatedException') {
@@ -546,6 +554,31 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
 
       const msg = friendlyAuthError(err);
+      set({ lastError: msg });
+      throw new AuthFlowError('FAILED', msg);
+    } finally {
+      if (generation === getAuthSessionGeneration()) set({ loading: false });
+    }
+  },
+
+  completeNewPasswordSignIn: async (password: string) => {
+    if (!isPasswordValid(password)) {
+      throw new AuthFlowError('FAILED', AUTH_ERROR_COPY.InvalidPasswordException);
+    }
+    const generation = getAuthSessionGeneration();
+    set({ loading: true, lastError: null });
+    try {
+      const result = await confirmSignIn({ challengeResponse: password });
+      if (generation !== getAuthSessionGeneration()) return false;
+      if (!result.isSignedIn) {
+        throw new AuthFlowError('FAILED', 'Sign-in could not finish. Go back and sign in again.');
+      }
+      return await applySessionToState(set, generation);
+    } catch (err: unknown) {
+      if (generation !== getAuthSessionGeneration()) return false;
+      const msg = (err as { name?: string })?.name === 'NotAuthorizedException'
+        ? AUTH_ERROR_COPY.SignInException
+        : friendlyAuthError(err);
       set({ lastError: msg });
       throw new AuthFlowError('FAILED', msg);
     } finally {
