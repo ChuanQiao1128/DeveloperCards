@@ -287,7 +287,7 @@ function flags() {
   };
 }
 
-async function rate(tree: renderer.ReactTestRenderer, label: 'Forgot' | 'Remembered') {
+async function rate(tree: renderer.ReactTestRenderer, label: 'Again' | 'Good') {
   await act(async () => {
     findPressableByLabel(tree, 'Reveal answer').props.onPress();
     await Promise.resolve();
@@ -362,7 +362,7 @@ async function openMistakeBookAndStartFocus(): Promise<string[]> {
 async function focusRunAllGood(focusUids: string[]) {
   resetSessionStore();
   const { tree, navigation } = await mountSession({ slug: 'csharp', focusUids });
-  for (let i = 0; i < focusUids.length; i += 1) await rate(tree, 'Remembered');
+  for (let i = 0; i < focusUids.length; i += 1) await rate(tree, 'Good');
   expect(navigation.replace).toHaveBeenCalledWith('SessionSummary', expect.objectContaining({ slug: 'csharp' }));
   await act(async () => {
     tree.unmount();
@@ -413,7 +413,7 @@ describe('Mistake Book loop across SessionCard and the real store', () => {
     } as any);
     vi.mocked(pickNextCard).mockReturnValue({ card: CARDS[0], progress: LEARNED('c1') } as any);
     const normal = await mountSession({ slug: 'csharp', mode: 'mixed' });
-    await rate(normal.tree, 'Forgot');
+    await rate(normal.tree, 'Again');
     await act(async () => {
       normal.tree.unmount();
     });

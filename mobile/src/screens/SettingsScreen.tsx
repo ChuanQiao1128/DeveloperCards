@@ -58,12 +58,6 @@ import { resetSingleDeckProgress } from '../features/gacha/deckReset';
 import { loadCardLangPref, setCardLangPref, useCardLangPref } from '../features/gacha/study/cardLangPrefs';
 import { getStudyGoal, type StudyGoal } from '../features/goal/studyGoal';
 import { loadActiveDeckSlug } from '../content/activeDeck';
-import {
-  getStudyPrefsSync,
-  loadStudyPrefs,
-  setStudyPrefs,
-  type StudyPrefs,
-} from '../features/gacha/study/studyPrefs';
 import { PrivacySection } from '../features/gacha/settings/privacy/PrivacySection';
 import { DataResetsSection } from '../features/gacha/settings/data/DataResetsSection';
 import {
@@ -133,7 +127,6 @@ export function SettingsScreen({ navigation }: Props) {
   const [streakOwner, setStreakOwner] = useState(authUserSub);
   const [resetting, setResetting] = useState(false);
   const [feedbackPrefs, setFeedbackPrefs] = useState<FeedbackPrefs>(() => getFeedbackPrefsSync());
-  const [studyPrefs, setStudyPrefsState] = useState<StudyPrefs>(() => getStudyPrefsSync());
   const cardLang = useCardLangPref();
   const [privacyPrefs, setPrivacyPrefsState] = useState<PrivacyPrefs>(() => getPrivacyPrefsSync());
   const [studyGoal, setStudyGoalState] = useState<StudyGoal | null>(null);
@@ -150,12 +143,11 @@ export function SettingsScreen({ navigation }: Props) {
       setLoadError(null);
     }
     try {
-      const [nextAudience, nextPrefs, nextStreak, nextFeedback, nextStudy, nextPrivacy, nextGoal, nextActiveDeck] = await Promise.all([
+      const [nextAudience, nextPrefs, nextStreak, nextFeedback, nextPrivacy, nextGoal, nextActiveDeck] = await Promise.all([
         loadAudiencePreference(),
         getReminderPrefs(),
         loadStreakSnapshot(),
         loadFeedbackPrefs(),
-        loadStudyPrefs(),
         loadPrivacyPrefs(),
         getStudyGoal(),
         loadActiveDeckSlug(),
@@ -169,7 +161,6 @@ export function SettingsScreen({ navigation }: Props) {
 
       setFeedbackPrefs(nextFeedback);
       setPrivacyPrefsState(nextPrivacy);
-      setStudyPrefsState(nextStudy);
       setAudience(nextAudience);
       setReminderPrefsState(nextPrefs ?? DEFAULT_REMINDER_PREFS);
       setStreak(nextStreak ?? null);
@@ -291,11 +282,6 @@ export function SettingsScreen({ navigation }: Props) {
   const onToggleFeedback = useCallback((key: keyof FeedbackPrefs, value: boolean) => {
     setFeedbackPrefs((prev) => ({ ...prev, [key]: value }));
     void setFeedbackPref(key, value).then((saved) => setFeedbackPrefs(saved));
-  }, []);
-
-  const onToggleFourButtons = useCallback((value: boolean) => {
-    setStudyPrefsState({ fourButtons: value });
-    void setStudyPrefs({ fourButtons: value }).then((saved) => setStudyPrefsState(saved));
   }, []);
 
   const onToggleShareUsageCounts = useCallback((value: boolean) => {
@@ -474,8 +460,6 @@ export function SettingsScreen({ navigation }: Props) {
           <Text style={styles.groupHeading}>Study preferences</Text>
           <View style={styles.insetGroupCard}>
             <StudySection
-              prefs={studyPrefs}
-              onToggleFourButtons={onToggleFourButtons}
               goal={{ value: studyGoal, fallbackDeckSlug: activeDeckSlug, onSaved: setStudyGoalState }}
               cardLang={{ value: cardLang, onSelect: (next) => void setCardLangPref(next) }}
               style={styles.groupedSection}

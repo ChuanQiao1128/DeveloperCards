@@ -24,28 +24,16 @@ export const RATING_ITEMS: ReadonlyArray<RatingItem> = [
   { key: 'easy', title: 'Easy', subtitle: 'Much later', styleKey: 'ratingEasy' },
 ];
 
-// R22 §1.4, §6: the default dock has two buttons. Forgot sends `again` and
-// Remembered sends `good`, so onRate keeps its ReviewRating contract; the four
-// buttons above come back with the 'Show all four rating buttons' study
-// setting (features/gacha/study/studyPrefs.ts). Subtitles reuse the four-up
-// wording of the rating each button sends.
-export const TWO_RATING_ITEMS: ReadonlyArray<RatingItem> = [
-  { key: 'again', title: 'Forgot', subtitle: 'Show soon', styleKey: 'ratingAgain' },
-  { key: 'good', title: 'Remembered', subtitle: 'Normal gap', styleKey: 'ratingGood' },
-];
-
 // The hint changes with the face. Before reveal it asks for the recall
 // attempt; after reveal the old sentence ("…before seeing the answer") kept
 // describing a moment that had already passed, so it now asks the question
-// the buttons answer: yes/no for two buttons, how well for four. An answer
+// the four ratings answer: how well it was recalled. An answer
 // that opens with a highlighted 答 line (2026-10-14 learning flow, B3) is
 // judged on that line alone, so the question names it.
 export const RATING_HINT = {
   beforeReveal: 'Try to recall the answer, then reveal it.',
   afterReveal: 'How well did you recall it?',
-  afterRevealTwo: 'Did you remember it?',
   afterRevealKeyLine: 'How well did you get the highlighted line?',
-  afterRevealTwoKeyLine: 'Did you get the highlighted line?',
 } as const;
 
 // Spoken label for a rating button: "Again, show soon" — the title plus the
@@ -58,29 +46,21 @@ export function RatingBar(props: {
   disabled?: boolean;
   /** Whether the answer is showing. Drives the hint copy only; `disabled` still gates the buttons. */
   revealed?: boolean;
-  /** Show Again/Hard/Good/Easy instead of the two-button default (the study setting). */
-  fourButtons?: boolean;
   /** The answer opens with a highlighted key line (答：…): the after-reveal hint asks about that line. */
   keyLine?: boolean;
   testID?: string;
   onRate: (rating: ReviewRating) => void;
 }) {
   const { disabled = false, revealed = false, keyLine = false, testID = 'review-rating-bar', onRate } = props;
-  const fourButtons = props.fourButtons === true;
-  const items = fourButtons ? RATING_ITEMS : TWO_RATING_ITEMS;
   const afterReveal = keyLine
-    ? fourButtons
-      ? RATING_HINT.afterRevealKeyLine
-      : RATING_HINT.afterRevealTwoKeyLine
-    : fourButtons
-      ? RATING_HINT.afterReveal
-      : RATING_HINT.afterRevealTwo;
+    ? RATING_HINT.afterRevealKeyLine
+    : RATING_HINT.afterReveal;
 
   // At accessibility text sizes a fixed 4-up row clips the labels; reflow to a
   // 2x2 grid instead so each button gets ~half the width and the full title +
-  // subtitle fit. Two buttons already get half the width each.
+  // subtitle fit.
   const fontScale = useFontScale();
-  const large = fourButtons && isLargeFontScale(fontScale);
+  const large = isLargeFontScale(fontScale);
 
   return (
     <View style={styles.wrapper} testID={testID}>
@@ -88,7 +68,7 @@ export function RatingBar(props: {
         {revealed ? afterReveal : RATING_HINT.beforeReveal}
       </Text>
       <View style={[styles.grid, large && styles.gridTwoByTwo]} testID="review-rating-grid">
-        {items.map((item) => (
+        {RATING_ITEMS.map((item) => (
           <Pressable
             key={item.key}
             style={({ pressed }) => [

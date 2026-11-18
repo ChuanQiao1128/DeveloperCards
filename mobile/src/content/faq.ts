@@ -3,7 +3,7 @@ export type FaqEntry = { q: string; a: string };
 export const FAQ_LIST: readonly FaqEntry[] = [
   {
     q: 'How do I earn draws?',
-    a: "AWS Architect Basics unlocks cards in order. After you study all your unlocked cards, up to 5 more are available immediately when your saved draws are used up; you can keep learning on the same day. Learn a new card to earn a draw for its pack: the first time you finish it, by tapping Got it on a new card or answering Remembered, Hard, Good or Easy, or by getting a multiple-choice card right. Clearing all of that pack's due cards adds one more, once a day. Every pack gets 5 draws the first time you open it, and your first lesson ends with 5 draws for its pack. A pack saves up to 60 draws, plus 5 extra draws waiting. Draws are never sold.",
+    a: "AWS Architect Basics unlocks cards in order. After you study all your unlocked cards, up to 5 more are available immediately when your saved draws are used up; you can keep learning on the same day. Learn a new card to earn a draw for its pack: the first time you finish it, by tapping Got it on a new card or answering Hard, Good or Easy, or by getting a multiple-choice card right. Clearing all of that pack's due cards adds one more, once a day. Every pack gets 5 draws the first time you open it, and your first lesson ends with 5 draws for its pack. A pack saves up to 60 draws, plus 5 extra draws waiting. Draws are never sold.",
   },
   {
     q: 'Why is Draw locked?',
@@ -12,6 +12,10 @@ export const FAQ_LIST: readonly FaqEntry[] = [
   {
     q: 'When is a rare card guaranteed?',
     a: "AWS Architect Basics is an ordered course, so rarity does not change which card unlocks next. For random packs, after 10 Commons in a row, the next card is Rare or better, so a rare card is guaranteed within 11 cards while the pack still has a Rare or Legendary you don't own. There are no repeat draws: a card you have drawn never comes up again. Open up to 5 cards at once, or just 1: you only spend draws for the cards you receive.",
+  },
+  {
+    q: 'How should I rate a review?',
+    a: 'Rate what you recalled before revealing the answer. Again means you did not recall it; Hard means you recalled it correctly with difficulty; Good means you recalled it normally; Easy means you recalled it effortlessly. These four ratings help schedule your next review. Understanding the answer after reading it does not count as recalling it. New cards use Show answer and Got it before later reviews.',
   },
   {
     q: 'What do I study?',

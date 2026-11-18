@@ -93,7 +93,6 @@ import { SessionReportButton } from '../features/cardReport/SessionReportButton'
 import { CardSourceLine } from '../features/gacha/components/CardSourceLine';
 import { loadExpoHaptics } from '../components/ceremonyHaptics';
 import { getFeedbackPrefsSync } from '../features/gacha/settings/feedbackPrefs';
-import { getStudyPrefsSync, loadStudyPrefs } from '../features/gacha/study/studyPrefs';
 import { setCardLangPref, useCardLangPref } from '../features/gacha/study/cardLangPrefs';
 import { translationsForCard, useDeckTranslations } from '../features/gacha/study/useDeckTranslations';
 import { TranslationAvailability } from '../features/gacha/study/TranslationAvailability';
@@ -273,10 +272,6 @@ export function SessionCardScreen({ navigation, route }: Props) {
   const [showAnswer, setShowAnswer] = useState(false);
   const [mcqState, setMcqState] = useState<McqCardState>(EMPTY_MCQ_CARD_STATE);
   const [learningPhase, setLearningPhase] = useState<LearningPhase>(null);
-  // Two rating buttons unless the learner has the four-button study setting on.
-  // Seeded from the in-memory value, refreshed on focus (the first read decides
-  // the default from whether the learner already has a learned card).
-  const [fourButtons, setFourButtons] = useState<boolean>(() => getStudyPrefsSync().fourButtons);
   const renderAsMcq = mcqState.mcq !== null;
   const [coachSeen, setCoachSeen] = useState<boolean | null>(null);
   // The dock's measured height (onLayout). The scroll surface reserves exactly this much at the
@@ -435,17 +430,6 @@ export function SessionCardScreen({ navigation, route }: Props) {
   // A learner who chose 中文 must not see the English card first: the loading view stays up until
   // the deck's translations are read. Reading English never waits on them.
   const translationsPending = cardLang === 'zh-CN' && deckTranslations.status === 'loading';
-  useFocusEffect(
-    useCallback(() => {
-      let cancelled = false;
-      void loadStudyPrefs().then((prefs) => {
-        if (!cancelled) setFourButtons(prefs.fourButtons);
-      });
-      return () => {
-        cancelled = true;
-      };
-    }, []),
-  );
   useFocusEffect(
     useCallback(() => {
       if (slugFromRoute) {
@@ -1682,7 +1666,6 @@ export function SessionCardScreen({ navigation, route }: Props) {
                   testID="review-rating-bar"
                   disabled={reviewing || !showAnswer}
                   revealed={showAnswer}
-                  fourButtons={fourButtons}
                   // B3: an answer that opens with 答： is judged on that highlighted line.
                   keyLine={hasKeyLine((display?.card ?? current.card).Explanation)}
                   onRate={handleRating}

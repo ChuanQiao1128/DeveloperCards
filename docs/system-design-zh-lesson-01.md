@@ -109,7 +109,12 @@ flowchart LR
 | 一张卡的字段 | `mobile/src/types/deckExport.ts:15-27` |
 | 内置入门包 | `mobile/src/content/starter/index.ts`、`mobile/src/content/starterOffline.ts` |
 | 打分：先写记录、再写进度 | `mobile/src/screens/SessionCardScreen.tsx:892-897`、`mobile/src/screens/SessionCardScreen.tsx:944` |
-| 默认两个打分按钮 | `mobile/src/features/gacha/components/RatingBar.tsx:27-35`、`mobile/src/features/gacha/study/studyPrefs.ts:24` |
+| 当时默认两个打分按钮（2026-11-18 起复习固定四档） | `mobile/src/features/gacha/components/RatingBar.tsx:27-35`、`mobile/src/features/gacha/study/studyPrefs.ts:24` |
 | 进度里记了什么 | `mobile/src/review/model.ts:4-42` |
 | 按用户分区的存储键 | `mobile/src/review/storage.ts:24`、`mobile/src/review/storage.ts:64-67` |
 | 每次打分最多 2 次抽卡奖励 | `mobile/src/features/gacha/rewards/sessionRewards.ts:38-40`、`mobile/src/features/gacha/rewards/sessionRewards.ts:62` |
+
+<!-- paths-not-on-disk
+- mobile/src/features/gacha/study/studyPrefs.ts
+2026-11-18: mandatory four-rating review removed the optional two-button preference module; the citation above records the earlier implementation.
+-->
