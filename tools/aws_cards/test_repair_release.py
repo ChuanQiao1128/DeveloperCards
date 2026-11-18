@@ -4,6 +4,9 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+import shutil
+from unittest.mock import patch
+from types import SimpleNamespace
 
 import repair_batch as batch
 import repair_cards as cards
@@ -33,6 +36,52 @@ def record(folder, packet, output, role):
 
 
 class ReleaseTests(unittest.TestCase):
+    def test_release_archive_copies_exact_proof_bytes_and_rejects_changed_sources(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp); proof = root / 'response.json'; batch.write(proof, {'synthetic': 'actual fixture bytes'})
+            out = root / 'out'; out.mkdir()
+            expected = cards.sha(proof)
+            release.freeze_proofs(out, {str(proof): expected})
+            manifest = cards.read(out / 'proof-archive.json')
+            archived = out / manifest['files'][0]['archivePath']
+            self.assertEqual(archived.read_bytes(), proof.read_bytes())
+            proof.write_text('{}')
+            self.assertEqual(cards.sha(archived), expected)
+            other = root / 'other'; other.mkdir()
+            with self.assertRaisesRegex(ValueError, 'Proof changed before archive'):
+                release.freeze_proofs(other, {str(proof): expected})
+
+    def test_prepare_rejects_a_source_changed_after_review_validation_during_hash_build(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp); packet, trial, reviewed = self.manual_fixture(root)
+            prior = root / 'prior'; prior.mkdir()
+            baseline = cards.read(trial / 'baseline.snapshot.json'); baseline['version'] = 'old-build'
+            batch.write(prior / 'after-deck.json', baseline)
+            (trial / 'baseline.snapshot.json').write_bytes((prior / 'after-deck.json').read_bytes())
+            binding = cards.read(root / 'source-bindings.json')
+            binding['baselineSha256'] = cards.sha(trial / 'baseline.snapshot.json')
+            batch.write(root / 'source-bindings.json', binding)
+            meta = [{'stableUid': c['stableUid'], 'revision': c['revision'], 'verdict': 'PASS',
+                'cardContentHash': 'a' * 64, 'schema': 'legacy-v1', 'orderInDeck': c['orderInDeck']} for c in baseline['cards']]
+            batch.write(prior / 'release-bundle.json', {'releaseId': 'old', 'deckId': 15,
+                'deckSlug': 'aws-saa-fundamentals', 'cards': [release.canonical(c) for c in baseline['cards']],
+                'review': {'cards': meta, 'corpusHash': 'a'*64, 'promptHash': 'a'*64, 'evidenceHash': 'a'*64}})
+            batch.write(prior / 'publication-verification.json', {'status': 'PUBLISHED_AND_VERIFIED', 'releaseId': 'old',
+                'buildId': 'old-build', 'sha256': cards.sha(prior / 'after-deck.json'),
+                'bundleSha256': cards.sha(prior / 'release-bundle.json')})
+            batch.write(root / 'authorization.json', {'userRequest': 'SYNTHETIC fixture only', 'humanPerCardReview': False})
+            batch.write(root / 'request.json', {'priorRelease': str(prior), 'packet': str(packet), 'trial': str(trial),
+                'reviewed': str(reviewed), 'repair': None, 'mainSHA': 'a'*40, 'releaseId': 'synthetic',
+                'authorization': str(root / 'authorization.json')})
+            def changed_during_build(projected, output):
+                source = root / 'official.json'; source.write_text(source.read_text() + ' ')
+                return [{k: row[k] for k in ['stableUid', 'cardContentHash', 'schema', 'orderInDeck']} for row in meta]
+            with patch.object(release, 'backend_hashes', side_effect=changed_during_build):
+                with self.assertRaisesRegex(ValueError, 'Proof changed before archive'):
+                    release.prepare(root / 'request.json', root / 'out', manual=True)
+            self.assertEqual(cards.read(root / 'out/task-clock.json')['status'], 'FAILED')
+            self.assertFalse((root / 'out/preflight.json').exists())
+
     def fixture(self, root):
         trial = root / 'trial'; trial.mkdir()
         base = [old_card('a', 1), old_card('b', 2)]
@@ -59,6 +108,91 @@ class ReleaseTests(unittest.TestCase):
         batch.write(trial / 'result.json', {'status': 'REVIEWED_DRAFT', 'candidateSha256': cards.sha(trial / 'draft/candidate.cards.json'),
             'reviewInputSha256': cards.sha(trial / 'review/input.json'), 'reviewOutputSha256': cards.sha(trial / 'review/output.json')})
         return root / 'input.json', trial, trial / 'draft'
+
+    def manual_fixture(self, root):
+        args = self.fixture(root)
+        trial = args[1]
+        patch = trial / 'author/output.json'
+        (root / 'manual.json').write_bytes(patch.read_bytes())
+        (trial / 'manual-patch.json').write_bytes(patch.read_bytes())
+        batch.write(trial / 'manual-source.json', {'kind': 'manual-chat', 'automaticAuthorCalls': 0,
+            'sourcePath': str(root / 'manual.json'), 'sourceSha256': cards.sha(root / 'manual.json')})
+        request = cards.read(trial / 'review/request.json')
+        request['input'][0]['content'] = '\n'.join(batch.teaching_rules().values())
+        batch.write(trial / 'review/request.json', request)
+        result = cards.read(trial / 'review/result.json')
+        result['requestSha256'] = cards.sha(trial / 'review/request.json')
+        batch.write(trial / 'review/result.json', result)
+        shutil.rmtree(trial / 'author')
+        return args
+
+    def test_manual_source_uses_actual_review_without_an_author_record(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            args = self.manual_fixture(Path(tmp))
+            rendered, review, _, proofs = release.verified_patch(*args, manual=True)
+            self.assertEqual(len(rendered), 2)
+            self.assertTrue(batch.review_ok(review, ['a', 'b']))
+            self.assertTrue(any(name.endswith('manual-patch.json') for name in proofs))
+            self.assertFalse((args[1] / 'author').exists())
+
+    def test_manual_source_cannot_reuse_review_after_source_rules_or_scope_changes(self):
+        for change in ['source', 'rules', 'scope']:
+            with self.subTest(change=change), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp); args = self.manual_fixture(root); trial = args[1]
+                if change == 'source':
+                    (root / 'manual.json').write_text('{}')
+                else:
+                    packet = cards.read(trial / 'review/input.json')
+                    if change == 'scope':
+                        packet['previousScope'][0]['frontEn'] = 'different original task'
+                    review = cards.read(trial / 'review/output.json')
+                    record(trial / 'review', packet, review, 'review')
+                    if change == 'scope':
+                        request = cards.read(trial / 'review/request.json')
+                        request['input'][0]['content'] = '\n'.join(batch.teaching_rules().values())
+                        batch.write(trial / 'review/request.json', request)
+                        result = cards.read(trial / 'review/result.json')
+                        result['requestSha256'] = cards.sha(trial / 'review/request.json')
+                        batch.write(trial / 'review/result.json', result)
+                with self.assertRaisesRegex(ValueError, {'source': 'Manual source changed',
+                        'rules': 'current complete teaching', 'scope': 'scope or evidence'}[change]):
+                    release.verified_patch(*args, manual=True)
+
+    def test_single_manual_repair_uses_bound_passing_context_and_rejects_scope_tampering(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp); packet, trial, _ = self.manual_fixture(root)
+            original = cards.read(trial / 'review/input.json')
+            old = cards.read(trial / 'review/output.json'); old['cards'][0]['pass'] = False
+            def current_record(folder, actual, output):
+                record(folder, actual, output, 'review')
+                request = cards.read(folder / 'request.json')
+                request['input'][0]['content'] = '\n'.join(batch.teaching_rules().values())
+                batch.write(folder / 'request.json', request)
+                result = cards.read(folder / 'result.json'); result['requestSha256'] = cards.sha(folder / 'request.json')
+                batch.write(folder / 'result.json', result)
+            current_record(trial / 'review', original, old)
+            initial = cards.read(trial / 'result.json'); initial.update(status='NEEDS_REPAIR',
+                reviewOutputSha256=cards.sha(trial / 'review/output.json'))
+            batch.write(trial / 'result.json', initial)
+            current = copy.deepcopy(original)
+            current['cards'] = current['cards'][:1]
+            current['cards'][0].update(answerEn='Repaired answer', scopeChange='Specific scope correction')
+            current['previousScope'] = current['previousScope'][:1]
+            current['contextCards'] = [original['cards'][1]]
+            second = copy.deepcopy(old); second['cards'] = second['cards'][:1]; second['cards'][0]['pass'] = True
+            repair = root / 'repair'; current_record(repair / 'review', current, second)
+            with patch.object(batch.subprocess, 'run', return_value=SimpleNamespace(returncode=0, stdout='', stderr='')):
+                batch.finish_repair(packet, trial, repair, root / 'fixed')
+            rendered, _, _, _ = release.verified_patch(packet, trial, root / 'fixed', repair, manual=True)
+            self.assertEqual(rendered[0]['teaching']['answer'], 'Repaired answer')
+            for field in ['previousScope', 'scope', 'contextCards']:
+                altered = copy.deepcopy(current); altered[field] = [] if field != 'scope' else 'Ignore original scope'
+                current_record(repair / 'review', altered, second)
+                final = cards.read(root / 'fixed/result.json')
+                final['targetedReviewSha256'] = cards.sha(repair / 'review/output.json')
+                batch.write(root / 'fixed/result.json', final)
+                with self.assertRaisesRegex(ValueError, 'Targeted manual|Repair does not close'):
+                    release.verified_patch(packet, trial, root / 'fixed', repair, manual=True)
 
     def test_real_render_is_bound_to_the_actual_model_response(self):
         with tempfile.TemporaryDirectory() as tmp:

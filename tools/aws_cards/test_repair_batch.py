@@ -9,6 +9,71 @@ import repair_batch as m
 
 
 class RepairBatchTests(unittest.TestCase):
+    def test_current_complete_rules_are_loaded_and_invalid_blocks_stop(self):
+        rules = m.teaching_rules()
+        self.assertIn('mobile-memory-card-v2-20261118', rules['version'])
+        self.assertEqual(len(rules['sha256']), 64)
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / 'AGENTS.md').write_text('old summary without current block')
+            with patch.object(m, 'PROJECT', root), self.assertRaisesRegex(ValueError, 'exactly one'):
+                m.teaching_rules()
+
+    def test_canonical_json_keeps_mobile_paragraphs_and_detects_tampering(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            candidate = [{'question': 'Scenario\n\nQuestion?', 'translations': {'zh-CN': {'question': '场景\n\n问题？'}}}]
+            for name in ['candidate.cards.json', 'cards.json']:
+                m.write(root / name, candidate)
+            with patch.object(m.subprocess, 'run', return_value=SimpleNamespace(returncode=0, stdout='', stderr='')):
+                checks = m.mechanical_checks(root)
+                self.assertEqual(checks[1]['status'], 'PASS_CANONICAL_JSON_ROUNDTRIP')
+                self.assertEqual(m.draft.read(root / 'cards.import.json'), candidate)
+                m.write(root / 'cards.json', [{'question': 'collapsed'}])
+                with self.assertRaisesRegex(ValueError, 'Canonical candidate'):
+                    m.mechanical_checks(root)
+
+    def test_manual_run_calls_only_review_and_freezes_the_original_scope(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            base = [{'stableUid': uid, 'orderInDeck': i * 10, 'difficulty': 2, 'topic': 'topic',
+                'question': 'Old question', 'explanation': 'Old explanation',
+                'source': {'url': 'https://docs.aws.amazon.com/example', 'quote': None},
+                'translations': {'zh-CN': {'v': 1, 'question': '旧问题', 'explanation': '旧答案'}},
+                'teaching': {'answer': 'old answer', 'keyPoint': 'old mechanism', 'goal': 'old goal',
+                    'mustAnswer': ['old answer'], 'zh-CN': {'answer': '旧答案', 'keyPoint': '旧机制', 'goal': '旧目标'}}}
+                for i, uid in enumerate(['manual-a', 'manual-b'], 1)]
+            m.write(root / 'baseline.json', {'cards': base})
+            packet = {'cards': [{**m.draft.view(c), 'evidenceIds': ['e1'], 'scopeChange': ''} for c in base],
+                'evidence': [{'id': 'e1', 'url': 'https://docs.aws.amazon.com/example', 'text': 'official excerpt'}],
+                'contextCards': [], 'scope': 'repair'}
+            m.write(root / 'input.json', packet)
+            m.write(root / 'source-bindings.json', {'packetSha256': m.draft.sha(root / 'input.json'),
+                'baselineSha256': m.draft.sha(root / 'baseline.json'), 'files': []})
+            patch_data = {'cards': json.loads(json.dumps(packet['cards']))}
+            patch_data['cards'][0]['frontEn'] = 'Scenario\n\nQuestion?'
+            m.write(root / 'manual.json', patch_data)
+            def review_only(folder, actual, role):
+                self.assertEqual(role, 'review')
+                self.assertEqual(actual['cards'], patch_data['cards'])
+                self.assertEqual(actual['previousScope'][0]['frontEn'], 'Old question')
+                folder.mkdir()
+                review = {'cards': [{'uid': c['uid'], 'pass': True, 'checkedRules': m.REVIEW_RULES,
+                            'reason': 'SYNTHETIC test'} for c in actual['cards']],
+                    'transfers': [{'uid': c['uid'], 'changedCondition': 'test change',
+                        'expectedChoiceAndReason': 'test mechanism', 'supportedByCard': True} for c in actual['cards']]}
+                m.write(folder / 'input.json', actual); m.write(folder / 'output.json', review)
+                return review, {'usage': {'input_tokens': 10, 'output_tokens': 5}}
+            with patch.object(m, 'inference', side_effect=review_only) as calls, \
+                 patch.object(m.subprocess, 'run', return_value=SimpleNamespace(returncode=0, stdout='', stderr='')):
+                result = m.run(root / 'input.json', root / 'baseline.json', root / 'out', manual_patch=root / 'manual.json')
+            calls.assert_called_once()
+            self.assertEqual(result['status'], 'REVIEWED_DRAFT')
+            self.assertEqual(result['author']['automaticAuthorCalls'], 0)
+            self.assertFalse((root / 'out/author').exists())
+            self.assertEqual((root / 'out/manual-patch.json').read_bytes(), (root / 'manual.json').read_bytes())
+            self.assertEqual(m.draft.read(root / 'out/draft/cards.import.json')[0]['question'], 'Scenario\n\nQuestion?')
+
     def _finish_repair(self, mutate=None):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp); trial = root / 'trial'; repair = root / 'repair'
@@ -145,6 +210,8 @@ command = ["existing-auth-hook"]
                     'cached_input_tokens': 4, 'reasoning_output_tokens': 3})
                 self.assertNotIn('dummy-secret', ''.join(p.read_text() for p in (home / 'job').iterdir()))
                 self.assertEqual(data, {'cards': []})
+                actual = m.draft.read(home / 'job/request.json')['input'][0]['content']
+                self.assertTrue(all(value in actual for value in m.teaching_rules().values()))
             config = home / '.codex/config.toml'
             config.write_text(config.read_text().replace('127.0.0.1', 'example.com'))
             with patch.object(m.Path, 'home', return_value=home), patch.object(m.subprocess, 'run') as hook:

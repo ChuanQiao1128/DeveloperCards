@@ -25,6 +25,17 @@
 
 ## 固定发布构包（用户看稿后说“发布”）
 
+完整顺序与当前／待实现能力见 [五卡内容发布 workflow](../../docs/delivery/card-content-release-workflow.md)。先完成一次独立语义审查和真实 Console JSON 校验，再冻结内容就绪；发布阶段不重新写卡或例行重审整批。JSON 是发布真源，Markdown 仅作阅读输出，避免已知的题面空行丢失。
+
+**人工定稿入口**：先使用已准备且证据绑定有效的原卡 packet：
+
+```sh
+python3 tools/aws_cards/repair_batch.py run PACKET/input.json BASELINE.json RESULT --manual-patch FINAL.patch.json
+python3 tools/aws_cards/repair_release.py prepare-manual REQUEST.json OUTPUT
+```
+
+第一步只调用 Reviewer，不调用作者，冻结真实人工来源与原任务；失败只做一次受限定向返修。第二步校验实际 Responses 审查、完整当前规则、精确渲染及官方证据，再按下列相同 REQUEST 契约构包。普通自动作者批次继续用 `prepare`，不能将人工稿伪造成作者运行。发布器保留实际模型输入/响应/来源的逐文件归档。`mainSHA` 引用已验证的发布代码 main 提交，正文由独立全包哈希绑定，Git 内容归档不阻塞发布。代码或规则变化先合并验证，所有实际 PR 仍遵守强制检查。
+
 命令：`python3 tools/aws_cards/repair_release.py prepare REQUEST.json OUTPUT`。REQUEST只有以下字段，路径均填当前冻结产物的绝对路径：
 
 ```json
