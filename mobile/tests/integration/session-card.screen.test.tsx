@@ -117,7 +117,7 @@ vi.mock('../../src/content/activeDeck', () => ({
   setActiveDeckSlug: vi.fn(async () => {}),
 }));
 
-// Backs the study prefs (recallsmith:study-prefs:v1) the screen reads on focus.
+// Keep legacy preference and progress values available for upgrade regressions.
 const asyncStore = new Map<string, string>();
 vi.mock('@react-native-async-storage/async-storage', () => ({
   default: {
@@ -350,7 +350,7 @@ describe('SessionCardScreen', () => {
     });
 
     await act(async () => {
-      findPressableByLabel(tree, 'Remembered').props.onPress();
+      findPressableByLabel(tree, 'Good').props.onPress();
       await Promise.resolve();
       await Promise.resolve();
     });
@@ -410,7 +410,7 @@ describe('SessionCardScreen', () => {
       await Promise.resolve();
     });
     await act(async () => {
-      findPressableByLabel(tree, 'Remembered').props.onPress();
+      findPressableByLabel(tree, 'Good').props.onPress();
       await Promise.resolve();
       await Promise.resolve();
     });
@@ -446,7 +446,7 @@ describe('SessionCardScreen', () => {
     });
 
     await act(async () => {
-      findPressableByLabel(tree, 'Remembered').props.onPress();
+      findPressableByLabel(tree, 'Good').props.onPress();
       await Promise.resolve();
       await Promise.resolve();
     });
@@ -481,7 +481,7 @@ describe('SessionCardScreen', () => {
     });
 
     await act(async () => {
-      findPressableByLabel(tree, 'Remembered').props.onPress();
+      findPressableByLabel(tree, 'Good').props.onPress();
       await Promise.resolve();
       await Promise.resolve();
     });
@@ -764,7 +764,7 @@ describe('SessionCardScreen', () => {
       });
 
       await act(async () => {
-        findPressableByLabel(tree, 'Remembered').props.onPress();
+        findPressableByLabel(tree, 'Good').props.onPress();
         await Promise.resolve();
         await Promise.resolve();
       });
@@ -1103,7 +1103,7 @@ describe('SessionCardScreen', () => {
         await Promise.resolve();
       });
       await act(async () => {
-        findPressableByLabel(tree, 'Remembered').props.onPress();
+        findPressableByLabel(tree, 'Good').props.onPress();
         await Promise.resolve();
         await Promise.resolve();
       });
@@ -1179,7 +1179,7 @@ describe('SessionCardScreen', () => {
         await Promise.resolve();
       });
       await act(async () => {
-        findPressableByLabel(tree, 'Remembered').props.onPress();
+        findPressableByLabel(tree, 'Good').props.onPress();
         await Promise.resolve();
         await Promise.resolve();
       });
@@ -1328,7 +1328,7 @@ describe('SessionCardScreen', () => {
         findPressableByLabel(tree, 'Reveal answer').props.onPress();
         await Promise.resolve();
       });
-      expect(hint()).toBe('Did you remember it?');
+      expect(hint()).toBe('How well did you recall it?');
       await act(async () => {
         findPressableByLabel(tree, 'Hide').props.onPress();
         await Promise.resolve();
@@ -1370,8 +1370,7 @@ describe('SessionCardScreen', () => {
     });
   });
 
-  // R22 §1.4, §6: two rating buttons by default; existing learners keep four.
-  describe('rating buttons (two by default, four as a study setting)', () => {
+  describe('mandatory four-rating review', () => {
     const STUDY_PREFS_KEY = 'recallsmith:study-prefs:v1';
 
     async function mount() {
@@ -1398,38 +1397,35 @@ describe('SessionCardScreen', () => {
         .findAll((node) => (node.type as any) === 'Pressable' && String(node.props.testID ?? '').startsWith('review-rating-'))
         .map((node) => node.props.testID);
 
-    it('shows Forgot / Remembered to a new learner and stores that default', async () => {
-      const { tree } = await mount();
-      expect(ratingIds(tree)).toEqual(['review-rating-again', 'review-rating-good']);
-      expect(findTextByLabel(tree, 'Hard')).toHaveLength(0);
-      expect(JSON.parse(asyncStore.get(STUDY_PREFS_KEY) as string)).toEqual({ fourButtons: false });
+    const allRatingIds = ['review-rating-again', 'review-rating-hard', 'review-rating-good', 'review-rating-easy'];
 
-      // Remembered still sends 'good' through the unchanged rating path.
-      await act(async () => {
-        findPressableByLabel(tree, 'Remembered').props.onPress();
-        await Promise.resolve();
-      });
-      await flush();
-      expect(vi.mocked(settleRatingReward).mock.calls[0][0]).toMatchObject({ rating: 'good' });
+    it('shows all four ratings without creating a preference', async () => {
+      const { tree } = await mount();
+      expect(ratingIds(tree)).toEqual(allRatingIds);
+      expect(asyncStore.has(STUDY_PREFS_KEY)).toBe(false);
     });
 
-    it('keeps all four buttons for an existing learner who already has a learned card', async () => {
-      // The probe reads every deck-progress key on the device, whoever is signed in (F02 x-deploy-1).
-      asyncStore.set(
-        'devcards:u:some-sub:deck-progress:csharp',
-        JSON.stringify([{ stableUid: '9', stage: 2, nextReviewAt: 5, lastReviewedAt: 1_700_000_000_000 }]),
-      );
-      const { tree } = await mount();
-      expect(ratingIds(tree)).toEqual(['review-rating-again', 'review-rating-hard', 'review-rating-good', 'review-rating-easy']);
-      expect(JSON.parse(asyncStore.get(STUDY_PREFS_KEY) as string)).toEqual({ fourButtons: true });
-    });
+    it('ignores a saved two-button preference without changing existing learning progress', async () => {
+      const storedPreference = JSON.stringify({ fourButtons: false });
+      const progress = [{ stableUid: '1', stage: 2, nextReviewAt: LEARNED_AT + 86_400_000, lastReviewedAt: LEARNED_AT }];
+      const progressBefore = structuredClone(progress);
+      const progressKey = 'devcards:u:anon:deck-progress:csharp';
+      const storedProgress = JSON.stringify(progress);
+      asyncStore.set(STUDY_PREFS_KEY, storedPreference);
+      asyncStore.set(progressKey, storedProgress);
+      vi.mocked(loadDeckProgress).mockResolvedValue(progress);
 
-    it('honours a stored choice over the learned-card default', async () => {
-      asyncStore.set(STUDY_PREFS_KEY, JSON.stringify({ fourButtons: true }));
       const { tree } = await mount();
-      // No learned card on the device, so four buttons can only come from the stored choice, which stays.
-      expect(ratingIds(tree)).toHaveLength(4);
-      expect(JSON.parse(asyncStore.get(STUDY_PREFS_KEY) as string)).toEqual({ fourButtons: true });
+
+      expect(ratingIds(tree)).toEqual(allRatingIds);
+      expect(findTextByLabel(tree, 'Forgot')).toHaveLength(0);
+      expect(findTextByLabel(tree, 'Remembered')).toHaveLength(0);
+      expect(progress).toEqual(progressBefore);
+      expect(asyncStore.get(progressKey)).toBe(storedProgress);
+      expect(asyncStore.get(STUDY_PREFS_KEY)).toBe(storedPreference);
+      expect(saveDeckProgress).not.toHaveBeenCalled();
+      expect(recordReviewEvent).not.toHaveBeenCalled();
+      expect(settleRatingReward).not.toHaveBeenCalled();
     });
   });
 });

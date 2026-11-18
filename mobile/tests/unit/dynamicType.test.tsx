@@ -40,10 +40,10 @@ function flatten(style: any): Record<string, any> {
   return style && typeof style === 'object' ? style : {};
 }
 
-function renderBar(fourButtons = true) {
+function renderBar() {
   let tree!: renderer.ReactTestRenderer;
   act(() => {
-    tree = renderer.create(<RatingBar onRate={() => {}} revealed fourButtons={fourButtons} />);
+    tree = renderer.create(<RatingBar onRate={() => {}} revealed />);
   });
   return tree;
 }
@@ -83,6 +83,14 @@ describe('dynamicType policy', () => {
       (node) => (node.type as any) === 'View' && node.props.testID === 'review-rating-grid',
     );
     expect(flatten(largeGrid.props.style).flexWrap).toBe('wrap');
+    const largeButtons = large.root.findAll((node) => (node.type as any) === 'Pressable');
+    expect(largeButtons.map((button) => button.props.testID)).toEqual([
+      'review-rating-again', 'review-rating-hard', 'review-rating-good', 'review-rating-easy',
+    ]);
+    for (const button of largeButtons) {
+      expect(flatten(button.props.style({ pressed: false })).flexBasis).toBe('47%');
+      expect(flatten(button.props.style({ pressed: false })).flexGrow).toBe(1);
+    }
 
     dims.fontScale = 1.0;
     const normal = renderBar();
@@ -90,17 +98,6 @@ describe('dynamicType policy', () => {
       (node) => (node.type as any) === 'View' && node.props.testID === 'review-rating-grid',
     );
     expect(flatten(normalGrid.props.style).flexWrap).toBeUndefined();
-  });
-
-  it('RatingBar keeps the two-button default on one row at large font scales', () => {
-    dims.fontScale = 1.5;
-    const two = renderBar(false);
-    const grid = two.root.find((node) => (node.type as any) === 'View' && node.props.testID === 'review-rating-grid');
-    expect(flatten(grid.props.style).flexWrap).toBeUndefined();
-    for (const text of two.root.findAll((node) => (node.type as any) === 'Text')) {
-      expect(text.props.maxFontSizeMultiplier).toBe(CHROME_MAX_FONT_SCALE);
-    }
-    dims.fontScale = 1.0;
   });
 
   // 2026-10-14 learning flow: the study dock is chrome (capped); the highlighted 答 line is card body
@@ -143,7 +140,7 @@ describe('dynamicType policy', () => {
       tree = renderer.create(<RatingBar onRate={() => {}} revealed keyLine />);
     });
     const hint = tree.root.find((node) => (node.type as any) === 'Text' && node.props.testID === 'review-rating-hint');
-    expect(hint.props.children).toBe('Did you get the highlighted line?');
+    expect(hint.props.children).toBe('How well did you get the highlighted line?');
     expect(hint.props.maxFontSizeMultiplier).toBe(CHROME_MAX_FONT_SCALE);
   });
 });
