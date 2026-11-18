@@ -8,9 +8,10 @@ import { CARD_CLASS, H1_CLASS, H2_CLASS, INPUT_CLASS } from '../components/conso
 import { Button } from '../components/ui/Button';
 import { Callout } from '../components/ui/Callout';
 import { CONSOLE_NAME } from '../lib/brand';
-import { loadReleaseJournal, saveReleaseJournal } from '../lib/releaseJournalStore';
-import { verifyReleaseDelivery, waitForReleasePoll, type ReleaseDeliveryProof } from '../lib/contentReleaseDelivery';
-import { captureReleaseBackupInventory, assertActionDependencies, assertActionResult, assertFrozenAction, isConfirmedAction, assertOriginalLive, assertReleaseSnapshot, assertReplayAllowed, decodeCommittedAction, parseReleaseBundle, parseReleaseSession, prepareReleaseAction, verifyReleaseReadback } from '../lib/contentRelease';
+import { loadReleaseJournal, saveReleaseJournal, withReleaseJournalLock } from '../lib/releaseJournalStore';
+import { verifyReleaseDelivery, verifyStoredReleaseDelivery, waitForReleasePoll, type ReleaseDeliveryProof } from '../lib/contentReleaseDelivery';
+import { chooseArtifactDirectory, loadArtifactDirectory, loadDeliveryArtifact, releaseArtifactDownload, saveDeliveryArtifact, supportsArtifactDirectory, writeReleaseArtifacts, type ArtifactDirectory, type DeliveryArtifact } from '../lib/releaseArtifacts';
+import { assertExpectedReleaseBaseline, captureReleaseBackupInventory, assertActionDependencies, assertActionResult, assertFrozenAction, isConfirmedAction, assertOriginalLive, assertReleaseSnapshot, assertReplayAllowed, decodeCommittedAction, parseReleaseBundle, parseReleaseSession, prepareReleaseAction, verifyReleaseReadback } from '../lib/contentRelease';
 import type { ApiResult } from '../types/api';
 import type { ReleaseBundle, ReleaseKind, ReleaseSession } from '../types/contentRelease';
 
@@ -31,6 +32,8 @@ export function ContentReleasePage() {
   const storageKey = `aws-basics-release-v1:${user?.sub ?? 'no-session'}`;
   const [session, setSession] = useState<ReleaseSession | null>(null);
   const currentSession = useRef<ReleaseSession | null>(null);
+  const artifactDirectory = useRef<ArtifactDirectory | undefined>(undefined);
+  const [automaticSave, setAutomaticSave] = useState(false);
   const running = useRef<AbortController | null>(null);
   const [delivery, setDelivery] = useState<ReleaseDeliveryProof | null>(null);
   const journalRevision = useRef(0);
@@ -63,7 +66,7 @@ export function ContentReleasePage() {
         const restored = stored?.raw ?? legacy;
         const recovered = restored ? parseReleaseSession(restored, user!.sub!) : null;
         if (legacy) {
-          stored = await saveReleaseJournal(user!.sub!, legacy, 0, () => assertOwner(recovered));
+          stored = await withReleaseJournalLock(user!.sub!, () => saveReleaseJournal(user!.sub!, legacy, 0, () => assertOwner(recovered)));
           if (cancelled) return;
           assertOwner(recovered);
           sessionStorage.removeItem(storageKey);
@@ -71,6 +74,9 @@ export function ContentReleasePage() {
         journalRevision.current = stored?.revision ?? 0;
         currentSession.current = recovered;
         setSession(recovered);
+        const directory = await loadArtifactDirectory(user!.sub!, () => assertOwner(recovered));
+        if (cancelled) return;
+        assertOwner(recovered); artifactDirectory.current = directory; setAutomaticSave(Boolean(directory));
       } catch (failure) {
         if (!cancelled) {
           setRestoreBlocked(true);
@@ -90,7 +96,8 @@ export function ContentReleasePage() {
   function download(name: string, value: unknown) { assertOwner(); downloadJson(name, value); assertOwner(); }
 
   // A journal storage failure blocks dispatch. It must be recoverable after a lost HTTP response.
-  async function save(next: ReleaseSession, archivePrevious = false) {
+  async function save(next: ReleaseSession, archivePrevious = false, artifact?: DeliveryArtifact) {
+    return withReleaseJournalLock(next.ownerSubject, async () => {
     assertOwner(next);
     const raw = JSON.stringify(next);
     const stored = await saveReleaseJournal(user!.sub!, raw, journalRevision.current, () => assertOwner(next), archivePrevious);
@@ -98,6 +105,8 @@ export function ContentReleasePage() {
     journalRevision.current = stored.revision;
     currentSession.current = next;
     setSession(next);
+    if (artifactDirectory.current) await writeReleaseArtifacts(artifactDirectory.current, next, () => assertOwner(next), artifact);
+    });
   }
   async function run(work: () => Promise<unknown>, recovery = false) {
     if (!allowed || loading || busyRef.current || restoreBlocked && !recovery) return;
@@ -108,19 +117,19 @@ export function ContentReleasePage() {
   }
   async function capture() {
     if (!bundle || currentSession.current) return;
+    if (bundle.schema !== 'aws-basics-release-bundle-v2') throw new Error('Regenerate this legacy bundle with its expected baseline before starting a new release. Existing frozen journals can still recover.');
     const baseline = dataOrThrow(await owned(() => fetchReleaseSnapshot(user!.sub!)));
     assertReleaseSnapshot(baseline);
+    assertExpectedReleaseBaseline(bundle, baseline);
     await save({ schema: 'aws-basics-console-session-v1', ownerSubject: user!.sub!, baseline, baselineInventory: captureReleaseBackupInventory(baseline), bundle, actions: {} });
     setMessage('Complete editing backup captured. The initial live build and bundle are now frozen for this release.');
   }
   async function verify(current: ReleaseSession): Promise<ReleaseSession> {
     assertOwner(current);
     if (!isConfirmedAction(current.actions.import)) throw new Error('Query and confirm import before readback.');
-    const before = dataOrThrow(await owned(() => fetchReleaseSnapshot(user!.sub!)));
     const cards = dataOrThrow(await owned(() => fetchReleaseCards(user!.sub!), current));
     const snapshot = dataOrThrow(await owned(() => fetchReleaseSnapshot(user!.sub!)));
     if (current.actions.import?.result?.data?.editingSnapshot !== snapshot.editingSnapshot) throw new Error('Editing content changed since the confirmed import. The frozen release cannot adopt another editing snapshot.');
-    if (before.editingSnapshot !== snapshot.editingSnapshot) throw new Error('Editing content changed during readback. Verify again before registering evidence.');
     verifyReleaseReadback(current, snapshot, cards);
     return { ...current, verifiedSnapshot: snapshot };
   }
@@ -140,11 +149,10 @@ export function ContentReleasePage() {
       if (kind === 'import') {
         const now = dataOrThrow(await owned(() => fetchReleaseSnapshot(user!.sub!)));
         assertOriginalLive(current, now);
+        assertExpectedReleaseBaseline(current.bundle, now);
         if (now.editingSnapshot !== current.baseline.editingSnapshot) throw new Error('Editing content changed since the backup. Nothing was imported.');
-      } else {
-        const priorSnapshot = current.verifiedSnapshot?.editingSnapshot;
+      } else if (kind === 'review') {
         current = await owned(() => verify(current), current);
-        if (kind === 'publish' && priorSnapshot !== current.verifiedSnapshot?.editingSnapshot) throw new Error('Editing content changed after the review receipt. Publishing is blocked.');
       }
       action = prepareReleaseAction(current, kind, kind);
     }
@@ -214,9 +222,18 @@ export function ContentReleasePage() {
         if (job?.status === 'PENDING' && job.dispatchState === 'needs_attention') throw new Error('Publish queue delivery needs attention. The original job and journal are retained.');
         if (job?.manifestState === 'needs_attention') throw new Error(`Index delivery needs attention: ${job.manifestError ?? 'Retry limit reached.'} The original job and journal are retained.`);
         if (job?.status === 'SUCCESS' && job.manifestState === 'delivered') {
-          const proof = await owned(() => verifyReleaseDelivery(current, action.query!, controller.signal), current);
+          const cached = await loadDeliveryArtifact(current, () => assertOwner(current));
+          const proof = cached ? await owned(() => verifyStoredReleaseDelivery(current, action.query!, cached), current)
+            : await owned(() => verifyReleaseDelivery(current, action.query!, controller.signal,
+              (proof, bytes) => saveDeliveryArtifact(current, proof, bytes, () => assertOwner(current))), current);
           active();
-          if (proof) { setDelivery(proof); setMessage(`Published and verified ${proof.cards} bilingual cards on the public CDN.`); return; }
+          if (proof) {
+            const completed = { ...current, delivery: proof };
+            const artifact = await loadDeliveryArtifact(current, () => assertOwner(current));
+            if (artifactDirectory.current && !artifact) throw new Error('Verified deck bytes have not finished saving.');
+            await save(completed, false, artifact); active(); setDelivery(proof);
+            setMessage(`Published and verified ${proof.cards} bilingual cards on the public CDN.`); return;
+          }
           setMessage('Card build and index delivery succeeded. Waiting for the public CDN index to refresh.');
         } else {
           setMessage(job?.status === 'SUCCESS' ? 'Card build succeeded. Recovering the download index for the same job.' : 'Waiting for the published card build.');
@@ -232,7 +249,7 @@ export function ContentReleasePage() {
 
   async function startAnotherRelease() {
     if (!delivery) throw new Error('Verify the current publication before starting another release.');
-    const stored = await saveReleaseJournal(user!.sub!, '', journalRevision.current, () => assertOwner(currentSession.current));
+    const stored = await withReleaseJournalLock(user!.sub!, () => saveReleaseJournal(user!.sub!, '', journalRevision.current, () => assertOwner(currentSession.current)));
     journalRevision.current = stored.revision; currentSession.current = null;
     setSession(null); setBundle(null); setDelivery(null); setQueryView(null);
     setMessage('Completed release archived. Load the next reviewed bundle to begin.');
@@ -245,8 +262,28 @@ export function ContentReleasePage() {
     <Callout tone="info">Load the immutable local bundle containing the existing model review. File checks and readback comparisons do not review content. The receipt records reviewedBy=codex and humanPerCardReview=false; the author submits batch authorization without asserting per-card human review.</Callout>
     {error && <Callout tone="danger" role="alert">{error}</Callout>}
     {message && <Callout tone="info" role="status">{message}</Callout>}
+    {supportsArtifactDirectory() && <Button variant="outline" disabled={busy || restoreBlocked} onClick={() => void run(async () => {
+      const directory = await chooseArtifactDirectory(user!.sub!, () => assertOwner(currentSession.current));
+      artifactDirectory.current = directory; setAutomaticSave(true);
+      await withReleaseJournalLock(user!.sub!, async () => {
+        const current = currentSession.current;
+        if (!current) return;
+        const stored = await loadReleaseJournal(user!.sub!); assertOwner(current);
+        if (stored?.revision !== journalRevision.current || stored.raw !== JSON.stringify(current)) throw new Error('Release changed in another tab. Reload before exporting it.');
+        const artifact = current.delivery ? await loadDeliveryArtifact(current, () => assertOwner(current)) : undefined;
+        if (current.delivery && !artifact) throw new Error('Verified bytes are unavailable. Continue this saved release before exporting it.');
+        await writeReleaseArtifacts(directory, current, () => assertOwner(current), artifact);
+      });
+      setMessage('Save folder selected. Recovery files and verified card packs will save here automatically.');
+    })}>{automaticSave ? 'Change automatic save folder' : 'Choose automatic save folder'}</Button>}
     {(bundle || session) && <Button disabled={busy || restoreBlocked} onClick={() => void run(completeRelease)}>Run reviewed release</Button>}
     {delivery && <Button variant="outline" disabled={busy} onClick={() => void run(startAnotherRelease)}>Start another release</Button>}
+    {delivery && <Button variant="outline" disabled={busy} onClick={() => void run(async () => {
+      const current = currentSession.current!;
+      const artifact = await loadDeliveryArtifact(current, () => assertOwner(current));
+      if (!artifact) throw new Error('Verified card bytes are unavailable. Continue this saved release to verify and save them.');
+      download(`${current.bundle.releaseId}-verified-artifacts.json`, releaseArtifactDownload(current, artifact));
+    })}>Download verified release artifacts</Button>}
     {!session && <section className={`${CARD_CLASS} space-y-3`} aria-labelledby="bundle-heading">
       <h2 id="bundle-heading" className={H2_CLASS}>1. Load bundle and capture complete editing backup</h2>
       <label className="block text-sm" htmlFor="release-bundle">Immutable release bundle (JSON)</label>

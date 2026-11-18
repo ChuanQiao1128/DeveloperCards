@@ -47,16 +47,21 @@ python3 tools/aws_cards/repair_release.py prepare-manual REQUEST.json OUTPUT
   "repair": null,
   "mainSHA": "实际核对的40位main提交",
   "releaseId": "本批固定发布身份",
-  "authorization": "引用用户本次实际发布指令的JSON文件"
+  "authorization": "引用用户本次实际发布指令的JSON文件",
+  "publisherCodeVerification": "已核对main与成功CI及12个关键文件的缓存JSON"
 }
 ```
 
 有一次定向补审时repair指向其原始目录。授权文件须保留非空userRequest及humanPerCardReview:false；构包器不生成用户授权或人审声明。输出目录必须不存在，失败目录保留；无模型调用或生产写入。
 
-Console载入release-bundle.json、捕获并下载完整编辑备份后执行：
+Console 载入 v2 `release-bundle.json` 后执行一次 **Run reviewed release**。首次可选择自动保存目录；以后复用该目录和登录权限。Console 自动核对包内 `expectedBaseline`，保存完整备份，再导入、一次全量回读、登记已有审查、发布及 CDN 核验。基线变化在导入前停止；不重新捕获当前状态来覆盖并发修改。`verify-baseline` 仅用于诊断，不再例行人工执行。
+
+完成后，使用自动保存的本批子目录（或 **Download verified release artifacts** 的单文件）统一收尾：
 
 ```sh
-python3 tools/aws_cards/repair_release.py verify-baseline OUTPUT 完整编辑备份.json
+python3 tools/aws_cards/repair_release.py finalize OUTPUT ARTIFACT_DIRECTORY_OR_PACKET.json
 ```
 
-通过后继续Console **Run reviewed release**。恢复沿用同一releaseId及import/review/publish动作，不换key或基线。最终仍须实际下载核验CDN并保存最终journal与回执。App代码更新才安排兼容的OTA；日常卡片正文沿内容CDN发布。
+`finalize` 校验已完成的原 journal、同一 bundle/job/build/hash 和保存的真实 CDN 字节，保留全部双语内容、revision 及回执，输出可作下一批 `priorRelease` 的目录。不调用模型、不重复下载；相同字节重试幂等，不覆盖不同结果。
+
+`publisherCodeVerification` 由实际 GitHub main 文件与成功 required checks 形成，发布器消费它并比较本机12个关键文件的SHA；改动或缺少成功检查时不能复用。正常内容批次复用未变代码的缓存，代码/规则/契约变化先合入验证。恢复沿用同一 releaseId/actionId/正文/job/build，先查后续。普通内容走内容CDN；App代码变化才安排兼容OTA。

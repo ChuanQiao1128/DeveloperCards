@@ -11,10 +11,39 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import os
+import base64
 from urllib.parse import urlparse
 
 import repair_batch as batch
 import repair_cards as cards
+
+PUBLISHER_CODE_FILES = (
+    'tools/aws_cards/repair_batch.py', 'tools/aws_cards/repair_release.py', 'tools/aws_cards/repair_cards.py',
+    'tools/aws_cards/validate_release_json.mjs', 'frontend/src/lib/contentRelease.ts',
+    'frontend/src/lib/contentReleaseDelivery.ts', 'frontend/src/lib/releaseArtifacts.ts',
+    'frontend/src/lib/releaseJournalStore.ts', 'frontend/src/pages/ContentReleasePage.tsx',
+    'frontend/src/types/contentRelease.ts', 'frontend/package-lock.json', '.github/workflows/ci.yml')
+REQUIRED_CODE_CHECKS = {'CodeQL', 'frontend (vitest + build)', 'frontend (playwright smoke)',
+    'backend (dotnet test)', 'python (uv lock + pytest)', 'mobile (typecheck + vitest + expo export)',
+    'tools/mcp-server (build + vitest)', 'tools/author-runner (build + vitest)',
+    'infra (terraform fmt/validate + agent routes + deploy scripts)', 'integrations/n8n (signature verifier + recipe logic)'}
+
+
+def verified_publisher_code(proof_path, main_sha):
+    proof = cards.read(proof_path)
+    require(proof.get('schema') == 'verified-publisher-code-v1' and
+            proof.get('repository') == 'ChuanQiao1128/DeveloperCards' and proof.get('mainSHA') == main_sha,
+            'Publisher-code verification does not bind this main SHA')
+    checks = proof.get('checks', [])
+    require(REQUIRED_CODE_CHECKS <= {c['name'] for c in checks} and
+            all(c['status'] == 'completed' and c['conclusion'] == 'success' for c in checks if c['name'] in REQUIRED_CODE_CHECKS),
+            'Publisher-code required checks are incomplete or failed')
+    files = proof.get('files', {})
+    require(all(name in files and files[name].get('sourceExact') is True and
+                files[name].get('sha256') == cards.sha(batch.PROJECT / name) for name in PUBLISHER_CODE_FILES),
+            'Publisher code changed since its verified main version; merge and refresh the verification record')
+    return {name: files[name]['sha256'] for name in PUBLISHER_CODE_FILES}
 
 
 def require(ok, message):
@@ -263,7 +292,8 @@ def prepare(request_path, output, manual=False):
     input_proofs = {}
     bind_proof(input_proofs, request_path)
     request = cards.read(request_path)
-    require(set(request) == {'priorRelease', 'packet', 'trial', 'reviewed', 'repair', 'mainSHA', 'releaseId', 'authorization'}, 'Unexpected release request fields')
+    required = {'priorRelease', 'packet', 'trial', 'reviewed', 'repair', 'mainSHA', 'releaseId', 'authorization'}
+    require(required <= set(request) <= required | {'publisherCodeVerification'}, 'Unexpected release request fields')
     require(bool(re.fullmatch('[0-9a-f]{40}', request['mainSHA'])) and 0 < len(request['releaseId']) <= 160, 'Invalid main/release identity')
     path = lambda key: Path(request[key]).resolve()
     prior_dir = path('priorRelease'); trial = path('trial'); reviewed = path('reviewed')
@@ -282,6 +312,9 @@ def prepare(request_path, output, manual=False):
     bind_proof(input_proofs, path('authorization'))
     authorization = cards.read(path('authorization'))
     require(bool(authorization.get('userRequest', '').strip()) and authorization.get('humanPerCardReview') is False, 'Actual batch authorization reference required')
+    require(bool(request.get('publisherCodeVerification')), 'A cached publisher-code verification record is required')
+    bind_proof(input_proofs, path('publisherCodeVerification'))
+    publisher_code = verified_publisher_code(path('publisherCodeVerification'), request['mainSHA'])
     changed, review, bindings, prompts = verified_patch(path('packet'), trial, reviewed,
                                                        path('repair') if request['repair'] else None, manual)
     projected = project(prior, baseline, changed)
@@ -297,10 +330,6 @@ def prepare(request_path, output, manual=False):
         proof_paths.extend(folder / name for name in ['request.json', 'response.json', 'result.json',
                                                       'input.json', 'output.json', 'schema.json'])
     proof_paths.extend(Path(s['path']) for s in bindings['files'])
-    publisher_code = {name: cards.sha(batch.PROJECT / name) for name in [
-        'tools/aws_cards/repair_batch.py', 'tools/aws_cards/repair_release.py',
-        'tools/aws_cards/repair_cards.py', 'tools/aws_cards/validate_release_json.mjs',
-        'frontend/src/lib/contentRelease.ts']}
     proof_paths.extend(batch.PROJECT / name for name in publisher_code)
     if request['repair']:
         proof_paths.append(reviewed / 'result.json')
@@ -334,12 +363,16 @@ def prepare(request_path, output, manual=False):
             'sourceBindings': bindings, 'authoringKind': 'manual-chat' if manual else 'model-author',
             'publisherCodeMainSHA': request['mainSHA'],
             'publisherCodeFiles': publisher_code,
+            'publisherCodeVerificationSha256': proofs[str(path('publisherCodeVerification'))],
             'contentArtifactSha256': cards.sha(output / 'projected-cards.json'),
             'proofArchiveSha256': cards.sha(output / 'proof-archive.json'),
             'gitArchiveStatus': 'pending-independent-archive',
             'originalQuestionSupport': 'needs_recheck', 'learnerEffect': 'not_measured'})
-        bundle = {'schema': 'aws-basics-release-bundle-v1', 'deckId': prior['deckId'], 'deckSlug': prior['deckSlug'],
-            'releaseId': request['releaseId'], 'cards': projected, 'review': {
+        bundle = {'schema': 'aws-basics-release-bundle-v2', 'deckId': prior['deckId'], 'deckSlug': prior['deckSlug'],
+            'releaseId': request['releaseId'], 'cards': projected,
+            'expectedBaseline': {'liveBuildId': receipt['buildId'], 'cards': [
+                {k: row[k] for k in ['stableUid', 'cardContentHash', 'schema', 'revision', 'orderInDeck']}
+                for row in prior['review']['cards']]}, 'review': {
                 'runId': request['releaseId'], 'batchAuthorizationRef': str(path('authorization')),
                 'authorizationScope': prior['review']['authorizationScope'], 'model': 'Bound current and prior independent reviews',
                 'mainSHA': request['mainSHA'], 'evidenceRef': str(output / 'release-evidence.json'),
@@ -394,12 +427,74 @@ def verify_baseline(folder, backup_path):
     return result
 
 
+def finalize(folder, artifact_dir):
+    """Bind one actual Console/CDN receipt to the prepared folder; no API or model call."""
+    folder, artifact_dir = Path(folder).resolve(), Path(artifact_dir).resolve()
+    if artifact_dir.is_file():
+        packet = cards.read(artifact_dir)
+        require(packet.get('schema') == 'aws-basics-completed-artifacts-v1', 'Unsupported completed-artifact download')
+        with tempfile.TemporaryDirectory(prefix='release-closeout-') as temporary:
+            extracted = Path(temporary); bundle_raw = json.dumps(packet['session']['bundle']).encode()
+            (extracted / 'release-bundle.json').write_bytes(bundle_raw)
+            batch.write(extracted / 'console-journal.json', packet['session'])
+            (extracted / 'after-deck.json').write_bytes(base64.b64decode(packet['deckBase64'], validate=True))
+            batch.write(extracted / 'publication-verification.json', {**packet['proof'], 'status': 'PUBLISHED_AND_VERIFIED',
+                'releaseId': packet['session']['bundle']['releaseId'], 'bundleSha256': hashlib.sha256(bundle_raw).hexdigest()})
+            return finalize(folder, extracted)
+    with tempfile.TemporaryDirectory(prefix='frozen-release-closeout-') as temporary:
+        frozen = Path(temporary)
+        for name in ['release-bundle.json', 'console-journal.json', 'publication-verification.json', 'after-deck.json']:
+            (frozen / name).write_bytes((artifact_dir / name).read_bytes())
+        return _finalize_frozen(folder, frozen)
+
+
+def _finalize_frozen(folder, artifact_dir):
+    prepared = cards.read(folder / 'preflight.json'); bundle = cards.read(folder / 'release-bundle.json')
+    require(prepared['status'] == 'EXACT_BINDINGS_VERIFIED' and
+            cards.sha(folder / 'release-bundle.json') == prepared['bundleSha256'], 'Prepared bundle changed')
+    require(cards.read(artifact_dir / 'release-bundle.json') == bundle, 'Console saved another release bundle')
+    journal = cards.read(artifact_dir / 'console-journal.json'); proof = cards.read(artifact_dir / 'publication-verification.json')
+    check = subprocess.run([shutil.which('node'), str(batch.PROJECT / 'tools/aws_cards/validate_release_json.mjs'),
+        str(folder / 'release-bundle.json'), str(artifact_dir / 'console-journal.json')],
+        cwd=batch.PROJECT, capture_output=True, text=True, timeout=40)
+    require(check.returncode == 0, 'Console journal binding failed: ' + check.stderr)
+    require(proof['status'] == 'PUBLISHED_AND_VERIFIED' and proof['releaseId'] == bundle['releaseId'] and
+            proof['bundleSha256'] == cards.sha(artifact_dir / 'release-bundle.json') and
+            all(proof[k] == journal['delivery'][k] for k in ['jobId', 'buildId', 'sha256', 'cards', 'verifiedAt']),
+            'Console completion receipt differs from its frozen journal')
+    raw = (artifact_dir / 'after-deck.json').read_bytes()
+    require(hashlib.sha256(raw).hexdigest() == proof['sha256'], 'Saved CDN bytes changed')
+    deck = json.loads(raw); expected = {c['stableUid']: c for c in bundle['cards']}
+    revisions = {c['stableUid']: c['revision'] for c in bundle['review']['cards']}
+    require(deck['slug'] == bundle['deckSlug'] and deck['version'] == proof['buildId'] and
+            len(deck['cards']) == len(expected) and len({c['stableUid'] for c in deck['cards']}) == len(expected) and
+            all(c['stableUid'] in expected and canonical(c) == expected[c['stableUid']] and
+                c['revision'] == revisions[c['stableUid']] for c in deck['cards']), 'Saved card content differs from the reviewed bundle')
+    receipt = {**proof, 'browserBundleSha256': proof['bundleSha256'], 'bundleSha256': prepared['bundleSha256']}
+    def save_once(name, content):
+        target = folder / name
+        if target.exists():
+            require(target.read_bytes() == content, 'Existing closeout differs; inspect instead of overwriting ' + name)
+            return
+        with tempfile.NamedTemporaryFile(dir=folder, delete=False) as temp:
+            temp.write(content); temp.flush(); os.fsync(temp.fileno()); staged = Path(temp.name)
+        try: os.link(staged, target)
+        finally: staged.unlink()
+    save_once('after-deck.json', raw)
+    save_once('console-journal-final.json', (artifact_dir / 'console-journal.json').read_bytes())
+    save_once('publication-verification.json', (json.dumps(receipt, ensure_ascii=False, indent=2) + '\n').encode())
+    return {'status': 'PUBLISHED_AND_VERIFIED', 'releaseId': bundle['releaseId'], 'buildId': proof['buildId'],
+            'cards': proof['cards'], 'nextBaseline': str(folder), 'newNetworkRequests': 0}
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest='command', required=True)
     prep = commands.add_parser('prepare'); prep.add_argument('request', type=Path); prep.add_argument('output', type=Path)
     manual_prep = commands.add_parser('prepare-manual'); manual_prep.add_argument('request', type=Path); manual_prep.add_argument('output', type=Path)
     verify = commands.add_parser('verify-baseline'); verify.add_argument('folder', type=Path); verify.add_argument('backup', type=Path)
+    finish = commands.add_parser('finalize'); finish.add_argument('folder', type=Path); finish.add_argument('artifacts', type=Path)
     args = parser.parse_args()
     print(json.dumps(prepare(args.request, args.output, args.command == 'prepare-manual') if args.command in {'prepare', 'prepare-manual'}
+                     else finalize(args.folder, args.artifacts) if args.command == 'finalize'
                      else verify_baseline(args.folder, args.backup), ensure_ascii=False))

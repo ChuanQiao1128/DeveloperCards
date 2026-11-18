@@ -32,12 +32,16 @@ export interface ReleaseEvidence {
 }
 
 export interface ReleaseBundle {
-  schema: 'aws-basics-release-bundle-v1';
+  schema: 'aws-basics-release-bundle-v1' | 'aws-basics-release-bundle-v2';
   deckId: 15;
   deckSlug: 'aws-saa-fundamentals';
   releaseId: string;
   cards: Array<ImportCardInput & { source: NonNullable<ImportCardInput['source']>; frontHelp: ImportCardInput['frontHelp']; translations: NonNullable<ImportCardInput['translations']> }>;
   review: ReleaseEvidence & { cards: ReleaseCardReview[] };
+  expectedBaseline?: {
+    liveBuildId: string | null;
+    cards: Array<Pick<ReleaseCardReview, 'stableUid' | 'cardContentHash' | 'schema' | 'revision' | 'orderInDeck'>>;
+  };
 }
 
 export interface ReleaseSnapshot {
@@ -92,4 +96,5 @@ export interface ReleaseSession {
   bundle: ReleaseBundle;
   actions: Partial<Record<ReleaseKind, ReleaseAction>>;
   verifiedSnapshot?: ReleaseSnapshot;
+  delivery?: { jobId: string; buildId: string; sha256: string; cards: number; verifiedAt: string };
 }

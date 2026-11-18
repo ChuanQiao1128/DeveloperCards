@@ -1,5 +1,11 @@
 export interface StoredReleaseJournal { raw: string; revision: number }
 
+/** One owner slot spans the journal CAS and any external recovery-file commit. */
+export async function withReleaseJournalLock<T>(owner: string, work: () => Promise<T>): Promise<T> {
+  const locks = globalThis.navigator?.locks;
+  return locks ? locks.request(`recallsmith-release:${owner}`, work) : work();
+}
+
 async function openJournalDatabase(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open('devcards-content-release', 1);

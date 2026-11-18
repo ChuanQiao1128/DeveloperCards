@@ -2,6 +2,7 @@ import { fetchContentManifest, getContentManifestUrl } from '../api/contentManif
 import type { ImportCardInput } from '../api/authoring';
 import type { ReleaseActions, ReleaseSession } from '../types/contentRelease';
 import { canonicalReleaseCard } from './contentRelease';
+import type { DeliveryArtifact } from './releaseArtifacts';
 
 export interface ReleaseDeliveryProof { jobId: string; buildId: string; sha256: string; cards: number; verifiedAt: string }
 
@@ -15,7 +16,7 @@ export function waitForReleasePoll(signal: AbortSignal): Promise<void> {
 }
 
 /** A successful build is complete only after the public index and downloaded bytes agree. */
-export async function verifyReleaseDelivery(session: ReleaseSession, query: ReleaseActions, signal: AbortSignal): Promise<ReleaseDeliveryProof | null> {
+export async function verifyReleaseDelivery(session: ReleaseSession, query: ReleaseActions, signal: AbortSignal, onVerified?: (proof: ReleaseDeliveryProof, bytes: Uint8Array) => Promise<void>): Promise<ReleaseDeliveryProof | null> {
   const expected = session.actions.publish?.result?.data;
   const job = query.jobs.find(item => item.job_id === expected?.jobId && item.build_id === expected?.buildId);
   if (!job || job.status !== 'SUCCESS') return null;
@@ -34,10 +35,17 @@ export async function verifyReleaseDelivery(session: ReleaseSession, query: Rele
   const response = await fetch(deckUrl, { signal, credentials: 'omit', redirect: 'error', cache: 'no-store', headers: { accept: 'application/json' } });
   if (!response.ok) throw new Error(`Published deck download failed (HTTP ${response.status}).`);
   const bytes = await response.arrayBuffer();
+  await assertDeliveredBytes(session, job.build_id, job.content_sha256!, bytes);
+  const proof = { jobId: job.job_id, buildId: job.build_id, sha256: job.content_sha256!, cards: session.bundle.cards.length, verifiedAt: new Date().toISOString() };
+  if (onVerified) await onVerified(proof, new Uint8Array(bytes));
+  return proof;
+}
+
+async function assertDeliveredBytes(session: ReleaseSession, buildId: string, expectedHash: string, bytes: ArrayBuffer) {
   const sha256 = [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))].map(byte => byte.toString(16).padStart(2, '0')).join('');
-  if (sha256 !== job.content_sha256) throw new Error('Downloaded deck hash differs from the published job.');
+  if (sha256 !== expectedHash) throw new Error('Downloaded deck hash differs from the published job.');
   const deck = JSON.parse(new TextDecoder().decode(bytes)) as { slug: string; version: string; cards: Array<ImportCardInput & { revision: number }> };
-  if (deck.slug !== session.bundle.deckSlug || deck.version !== job.build_id || !Array.isArray(deck.cards) || deck.cards.length !== session.bundle.cards.length) throw new Error('Downloaded deck identity or card count differs.');
+  if (deck.slug !== session.bundle.deckSlug || deck.version !== buildId || !Array.isArray(deck.cards) || deck.cards.length !== session.bundle.cards.length) throw new Error('Downloaded deck identity or card count differs.');
   const candidates = new Map(session.bundle.cards.map(card => [card.stableUid, card]));
   const revisions = new Map(session.bundle.review.cards.map(card => [card.stableUid, card.revision]));
   const seen = new Set<string>();
@@ -46,5 +54,12 @@ export async function verifyReleaseDelivery(session: ReleaseSession, query: Rele
     if (!candidate || seen.has(card.stableUid) || card.revision !== revisions.get(card.stableUid) || canonicalReleaseCard(card) !== canonicalReleaseCard(candidate)) throw new Error('Downloaded bilingual cards differ from the reviewed candidate.');
     seen.add(card.stableUid);
   }
-  return { jobId: job.job_id, buildId: job.build_id, sha256, cards: deck.cards.length, verifiedAt: new Date().toISOString() };
+}
+
+export async function verifyStoredReleaseDelivery(session: ReleaseSession, query: ReleaseActions, artifact: DeliveryArtifact): Promise<ReleaseDeliveryProof> {
+  const proof = artifact.proof; const published = session.actions.publish?.result?.data;
+  const job = query.jobs.find(row => row.job_id === proof.jobId && row.build_id === proof.buildId);
+  if (proof.jobId !== published?.jobId || proof.buildId !== published?.buildId || query.liveBuildId !== proof.buildId || job?.status !== 'SUCCESS' || job.manifestState !== 'delivered' || job.content_sha256 !== proof.sha256 || proof.cards !== session.bundle.cards.length || !Number.isFinite(Date.parse(proof.verifiedAt))) throw new Error('Saved CDN proof no longer matches the reconciled publication.');
+  await assertDeliveredBytes(session, proof.buildId, proof.sha256, artifact.bytes.slice().buffer);
+  return proof;
 }
