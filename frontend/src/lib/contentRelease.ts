@@ -33,8 +33,9 @@ export function assertEvidenceFresh(bundle: ReleaseBundle, now = Date.now()) {
 export function parseReleaseBundle(raw: string, now = Date.now(), requireFresh = true): ReleaseBundle {
   requireValue(raw.length <= 3_000_000, 'Release bundle is too large.');
   const bundle = object(JSON.parse(raw));
-  keys(bundle, ['schema', 'deckId', 'deckSlug', 'releaseId', 'cards', 'review']);
-  requireValue(bundle.schema === 'aws-basics-release-bundle-v1' && bundle.deckId === 15 && bundle.deckSlug === 'aws-saa-fundamentals', 'This page accepts only the AWS Basics release bundle v1 for deck 15.');
+  const v2 = bundle.schema === 'aws-basics-release-bundle-v2';
+  keys(bundle, ['schema', 'deckId', 'deckSlug', 'releaseId', 'cards', 'review', ...(v2 ? ['expectedBaseline'] : [])]);
+  requireValue((v2 || bundle.schema === 'aws-basics-release-bundle-v1') && bundle.deckId === 15 && bundle.deckSlug === 'aws-saa-fundamentals', 'This page accepts only AWS Basics release bundles for deck 15.');
   text(bundle.releaseId);
   requireValue(Array.isArray(bundle.cards) && bundle.cards.length >= 1 && bundle.cards.length <= 500, 'The frozen release must contain 1–500 cards.');
   const uids = new Set<string>(); const orders = new Set<number>();
@@ -89,6 +90,19 @@ export function parseReleaseBundle(raw: string, now = Date.now(), requireFresh =
     requireValue(item.verdict === 'PASS' && ['legacy-v1', 'front-help-v1', 'tags-only-v1'].includes(String(item.schema)) && typeof item.revision === 'number' && Number.isSafeInteger(item.revision) && item.revision >= 1, 'Every model review needs PASS, schema and a positive revision.');
     requireValue(Array.isArray(item.blockers) && item.blockers.length === 0 && Array.isArray(item.unknowns) && item.unknowns.length === 0, 'Model review blockers and unknowns must be empty.');
     requireValue(bundle.cards.some((card: ImportCardInput) => card.stableUid === item.stableUid && card.orderInDeck === item.orderInDeck), 'Model review order differs from the candidate.');
+  }
+  if (v2) {
+    const baseline = object(bundle.expectedBaseline); keys(baseline, ['liveBuildId', 'cards']);
+    requireValue(baseline.liveBuildId === null || typeof baseline.liveBuildId === 'string' && baseline.liveBuildId.length > 0, 'Expected baseline live build is missing.');
+    requireValue(Array.isArray(baseline.cards) && baseline.cards.length <= 500, 'Invalid expected baseline inventory.');
+    const baselineUids = new Set<string>(); const baselineOrders = new Set<number>();
+    for (const rawMeta of baseline.cards) {
+      const meta = object(rawMeta); keys(meta, ['stableUid', 'cardContentHash', 'schema', 'revision', 'orderInDeck']);
+      requireValue(typeof meta.stableUid === 'string' && uids.has(meta.stableUid) && !baselineUids.has(meta.stableUid), 'Expected baseline has duplicate, unknown or omitted UIDs.');
+      hash(meta.cardContentHash);
+      requireValue(['legacy-v1', 'front-help-v1', 'tags-only-v1'].includes(String(meta.schema)) && integer(meta.revision) && integer(meta.orderInDeck) && !baselineOrders.has(meta.orderInDeck), 'Invalid expected baseline binding.');
+      baselineUids.add(meta.stableUid); baselineOrders.add(meta.orderInDeck);
+    }
   }
   const result = bundle as unknown as ReleaseBundle;
   requireValue(Number.isFinite(Date.parse(result.review.expiresAt)), 'Invalid evidence expiry.');
@@ -145,6 +159,17 @@ export function assertOriginalLive(session: ReleaseSession, snapshot: ReleaseSna
   requireValue(snapshot.deck.live_build_id === session.baseline.deck.live_build_id, 'Live build changed since the initial backup. This release cannot rebase onto it.');
 }
 
+export function assertExpectedReleaseBaseline(bundle: ReleaseBundle, snapshot: ReleaseSnapshot): void {
+  if (bundle.schema !== 'aws-basics-release-bundle-v2') return; // Already-captured legacy journals remain recoverable.
+  const expected = bundle.expectedBaseline;
+  requireValue(expected && expected.liveBuildId === snapshot.deck.live_build_id, 'Prepared original live build changed. Reconcile this release; do not capture a new baseline.');
+  const actual = new Map(snapshot.cards.map(card => [card.stableUid, card]));
+  requireValue(actual.size === snapshot.cards.length && actual.size === expected.cards.length && expected.cards.every(card => {
+    const row = actual.get(card.stableUid);
+    return row && ['cardContentHash', 'schema', 'revision', 'orderInDeck'].every(key => row[key as keyof typeof row] === card[key as keyof typeof card]);
+  }), 'Prepared editing baseline changed. Nothing may be imported over these edits.');
+}
+
 export function canonicalReleaseCard(card: ImportCardInput | Card): string {
   return JSON.stringify([
     card.stableUid, card.orderInDeck, card.difficulty,
@@ -184,6 +209,7 @@ function expectedActionBody(session: ReleaseSession, kind: ReleaseKind): object 
   const { bundle, baseline } = session;
   const common = { deckId: 15, releaseId: bundle.releaseId, expectedLive: baseline.deck.live_build_id };
   if (kind === 'import') {
+    assertExpectedReleaseBaseline(bundle, baseline);
     requireValue(baseline.cards.every(card => bundle.cards.some(candidate => candidate.stableUid === card.stableUid)), 'Candidate omits an existing live UID.');
     return { ...common, idempotencyKey: kind, expectedEditingSnapshot: baseline.editingSnapshot, cards: bundle.cards };
   }
@@ -259,6 +285,7 @@ export function parseReleaseSession(raw: string, ownerSubject?: string): Release
   assertReleaseSnapshot(session.baseline);
   requireValue(structurallyEqual(session.baselineInventory, captureReleaseBackupInventory(session.baseline)), 'Recovery backup inventory is missing or differs from the original editing snapshot/all-row capture.');
   session.bundle = parseReleaseBundle(JSON.stringify(session.bundle), Date.now(), false);
+  assertExpectedReleaseBaseline(session.bundle, session.baseline);
   object(session.actions);
   if (session.verifiedSnapshot) assertOriginalLive(session, session.verifiedSnapshot);
   for (const [kind, action] of Object.entries(session.actions)) {
@@ -266,6 +293,11 @@ export function parseReleaseSession(raw: string, ownerSubject?: string): Release
     assertFrozenAction(session, action);
     requireValue(action.outcome !== 'confirmed' || action.result?.success === true, 'Confirmed journal action is missing its committed result.');
     if (action.result) assertActionResult(session, action, action.result);
+  }
+  if (session.delivery) {
+    const proof = session.delivery; const action = session.actions.publish;
+    requireValue(proof.jobId === action?.result?.data?.jobId && proof.buildId === action?.result?.data?.buildId &&
+      SHA256.test(proof.sha256) && proof.cards === session.bundle.cards.length && Number.isFinite(Date.parse(proof.verifiedAt)), 'Saved CDN proof differs from the frozen publication.');
   }
   // Stored confirmations and query output are historical evidence until queried in this session.
   for (const action of Object.values(session.actions)) { action.queried = false; action.reconciled = false; }

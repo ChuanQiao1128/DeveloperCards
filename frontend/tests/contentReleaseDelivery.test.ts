@@ -6,7 +6,8 @@ import { assertActionResult } from '../src/lib/contentRelease';
 
 const manifestApi = vi.hoisted(() => ({ fetchContentManifest: vi.fn() }));
 vi.mock('../src/api/contentManifest', () => ({ ...manifestApi, getContentManifestUrl: () => 'https://cdn.example/content/manifest.json' }));
-const { verifyReleaseDelivery } = await import('../src/lib/contentReleaseDelivery');
+const { verifyReleaseDelivery, verifyStoredReleaseDelivery } = await import('../src/lib/contentReleaseDelivery');
+const { canonicalizeJson } = await import('../src/lib/canonicalJson');
 const signal = new AbortController().signal;
 async function fixture() {
   const { session, snapshot } = releaseFixture(5);
@@ -25,6 +26,18 @@ async function fixture() {
 beforeEach(() => { vi.clearAllMocks(); vi.stubGlobal('location', { href: 'https://console.example/decks/release' }); });
 
 describe('published content delivery', () => {
+  it('reuses the exact saved verified bytes after reconciliation without another CDN download', async () => {
+    const { session, query, fetch } = await fixture();
+    let artifact: import('../src/lib/releaseArtifacts').DeliveryArtifact | undefined;
+    await verifyReleaseDelivery(session, query, signal, async (proof, bytes) => {
+      artifact = { owner: session.ownerSubject, releaseId: session.bundle.releaseId, bundle: JSON.stringify(canonicalizeJson(session.bundle)), proof, bytes };
+    });
+    expect(artifact).toBeTruthy();
+    expect(await verifyStoredReleaseDelivery(session, query, artifact!)).toMatchObject({ buildId: 'build-123', cards: 5 });
+    expect(fetch).toHaveBeenCalledTimes(1); expect(manifestApi.fetchContentManifest).toHaveBeenCalledTimes(1);
+    artifact!.bytes[0] ^= 1;
+    await expect(verifyStoredReleaseDelivery(session, query, artifact!)).rejects.toThrow(/hash/);
+  });
   it('verifies the actual CDN bytes and all five bilingual identities/revisions', async () => {
     const { session, query, fetch } = await fixture();
     expect(await verifyReleaseDelivery(session, query, signal)).toMatchObject({ jobId: 'job', buildId: 'build-123', cards: 5 });

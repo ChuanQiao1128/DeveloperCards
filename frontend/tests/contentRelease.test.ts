@@ -1,9 +1,28 @@
 import { describe, expect, it } from 'vitest';
-import { captureReleaseBackupInventory, assertReleaseSnapshot, assertReplayAllowed, canonicalReleaseCard, parseReleaseBundle, parseReleaseSession, prepareReleaseAction, verifyReleaseReadback } from '../src/lib/contentRelease';
+import { assertExpectedReleaseBaseline, captureReleaseBackupInventory, assertReleaseSnapshot, assertReplayAllowed, canonicalReleaseCard, parseReleaseBundle, parseReleaseSession, prepareReleaseAction, verifyReleaseReadback } from '../src/lib/contentRelease';
 import { releaseFixture } from './support/contentReleaseFixtures';
 import { ok } from './support/apiResult';
 
 describe('immutable AWS Basics bundle contract', () => {
+  it.each(['live', 'hash', 'schema', 'revision', 'order', 'inventory'])('blocks an unexpected prepared %s baseline before importing', kind => {
+    const { bundle, snapshot } = releaseFixture(5);
+    if (kind === 'live') snapshot.deck.live_build_id = 'changed';
+    if (kind === 'hash') snapshot.cards[0].cardContentHash = '0'.repeat(64);
+    if (kind === 'schema') snapshot.cards[0].schema = 'legacy-v1';
+    if (kind === 'revision') snapshot.cards[0].revision++;
+    if (kind === 'order') snapshot.cards[0].orderInDeck = 99;
+    if (kind === 'inventory') snapshot.cards.pop();
+    expect(() => assertExpectedReleaseBaseline(bundle, snapshot)).toThrow(/Prepared/);
+  });
+  it('parses historical v1 bundles without inventing an expected baseline', () => {
+    const { bundle } = releaseFixture(5); bundle.schema = 'aws-basics-release-bundle-v1'; delete bundle.expectedBaseline;
+    expect(parseReleaseBundle(JSON.stringify(bundle))).toEqual(bundle);
+  });
+  it('rejects a saved receipt attached to another job', () => {
+    const { session } = releaseFixture(5);
+    session.delivery = { jobId: 'another-job', buildId: 'x', sha256: 'a'.repeat(64), cards: 5, verifiedAt: new Date().toISOString() };
+    expect(() => parseReleaseSession(JSON.stringify(session))).toThrow(/Saved CDN proof/);
+  });
   it.each([1, 337, 379, 500])('accepts a complete %i-card bilingual/help bundle without inventing review fields', cardCount => {
     const { bundle } = releaseFixture(cardCount);
     expect(parseReleaseBundle(JSON.stringify(bundle))).toEqual(bundle);

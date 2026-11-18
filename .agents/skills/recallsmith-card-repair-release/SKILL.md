@@ -25,8 +25,8 @@ description: 修订 RecallSmith 现有 AWS 双语短卡，沿已认可五卡写�
 ## 执行：主聊天只调度
 
 - 当前批次默认5张。区分仅改稿、测试与已授权发布；节奏不构成新增授权，不恢复暂停的全库任务。
-- 优先使用`tools/aws_cards/repair_batch.py prepare/run`：作者与独立Reviewer分别向既有本机Responses代理进行一次冻结文本调用，沿用同一认证及模型，不启动完整编码Agent携带插件、Skill目录或聊天历史。主聊天只调度和验收，不传旧PASS或作者自评结论。代理失败保留记录并停止，不自动重试或换通道。
-- 每批一次改写、一次独立审查，最多一次有必要的定向返修。现有合格稿及未变依赖先做精确内容／版本／规则绑定再复用，不重做第1—10张。
+- 聊天已定稿默认使用`run --manual-patch`，只调用一次独立Reviewer，不另派作者。自动代写批次使用`tools/aws_cards/repair_batch.py prepare/run`：作者与独立Reviewer分别向既有本机Responses代理进行一次冻结文本调用，沿用同一认证及模型，不启动完整编码Agent携带插件、Skill目录或聊天历史。主聊天只调度和验收，不传旧PASS或作者自评结论。代理失败保留记录并停止，不自动重试或换通道。
+- 自动代写批次一次改写、一次独立审查；聊天定稿只做一次独立审查，最多一次有必要的定向返修。现有合格稿及未变依赖先做精确内容／版本／规则绑定再复用，不重做第1—10张。
 
 ### 唯一模型数据格式
 
@@ -42,7 +42,7 @@ Reviewer可在同轮给出精确的删除补丁，仅删除重复话语或题面
 
 ## 机械工作与计量
 
-使用`tools/aws_cards/repair_batch.py prepare/run`完成原句及哈希预检、两次独立文本调用、渲染、Linter、真实解析与计量；一次必要局部返修保留原FAIL，由`finish-repair`核验新旧正文与审查绑定后收尾。细节见`tools/aws_cards/repair_batch.md`。`repair_cards.py`仍只负责本地序列化。官方证据不截断，审查输入可移除候选未使用的证据；云端文件读取限15秒，优先传本地快照。输出schema在本地验证；凭证只留内存，禁止代理重定向。这些工具不能代替语义审查、服务器绑定或发布门禁。
+使用`tools/aws_cards/repair_batch.py prepare/run`完成原句及哈希预检、人工稿一次Reviewer调用（自动代写为作者/Reviewer两次）、渲染、Linter、真实解析与计量；一次必要局部返修保留原FAIL，由`finish-repair`核验新旧正文与审查绑定后收尾。细节见`tools/aws_cards/repair_batch.md`。`repair_cards.py`仍只负责本地序列化。官方证据不截断，审查输入可移除候选未使用的证据；云端文件读取限15秒，优先传本地快照。输出schema在本地验证；凭证只留内存，禁止代理重定向。这些工具不能代替语义审查、服务器绑定或发布门禁。
 
 时钟区分一次性工具／规则修复与后续真实批次，均保留实际起止；不能隐藏前者。用已有本机token_count事件在同一收尾步骤计算本批主任务和子任务用量，只读取本次会话的计量事件。缓存输入、非缓存输入、输出分别列出；推理已含输出时不重复相加，尾部未观测标unknown，不推算费用。
 
@@ -54,8 +54,8 @@ Reviewer可在同轮给出精确的删除补丁，仅删除重复话语或题面
 
 日常五卡顺序与流程缩减以 [`docs/delivery/card-content-release-workflow.md`](../../../docs/delivery/card-content-release-workflow.md) 为入口：聊天定稿 → 一次独立审查与 JSON 校验 → 冻结内容就绪 → 用户“发布” → 当前基线／主干契约／备份预检 → 一次 Console 自动发布与 CDN 核验 → 保存回执。聊天已定稿不另派作者；规则、证据、自评或正文变化只核对失效卡与受影响依赖。七项标准合并在同次审查，不拆成七轮。用户可见稿发生变化须给用户看受影响稿；已有相同冻结批次发布授权不重复询问。
 
-canonical JSON 是发布真源，阅读 Markdown 不作为发布中转；使用真实 Console JSON 解析校验。人工稿使用 `repair_batch.py run ... --manual-patch FINAL.patch.json` 和 `repair_release.py prepare-manual`，保留真实来源、实际审查和原范围，不伪造作者。`mainSHA` 绑定实际已验证的发布代码 main 提交，完整正文及实际证明另按哈希归档，Git 内容归档独立完成。代码/规则/契约变化先按正常门禁合入验证，未变版本复用验证记录；不可把未归档正文声称为已在 main。文件对话框交接仍沿现有方式。
+canonical JSON 是发布真源，阅读 Markdown 不作为发布中转；使用真实 Console JSON 解析校验。人工稿使用 `repair_batch.py run ... --manual-patch FINAL.patch.json` 和 `repair_release.py prepare-manual`，保留真实来源、实际审查和原范围，不伪造作者。`mainSHA` 绑定实际已验证的发布代码 main 提交，完整正文及实际证明另按哈希归档，Git 内容归档独立完成。代码/规则/契约变化先按正常门禁合入验证，未变版本复用验证记录；不可把未归档正文声称为已在 main。首次选目录后自动保存；不支持时一次导出完整文件。
 
-发布时才读`frontend/docs/aws-basics-release-bundle.md`的自动发布／恢复契约。绑定真实独立审查和服务器版本，不伪造PASS或人工审查声明；使用Console `/decks/release?deckId=15` 的 **Run reviewed release**。纯内容不另发OTA、不额外启动App全套CI，必要内容检查及仓库强制门禁保留。
+发布时才读`frontend/docs/aws-basics-release-bundle.md`的自动发布／恢复契约。绑定真实独立审查和服务器版本，不伪造PASS或人工审查声明；使用Console `/decks/release?deckId=15` 的 **Run reviewed release**。v2包自动核对原库存基线；`publisherCodeVerification`必须绑定真实main/成功CI和未变的12个文件。首次选保存目录后自动留存，或导出单文件；完成用`repair_release.py finalize`收尾并生成下一批baseline。`verify-baseline`仅诊断，不例行重复执行。纯内容不另发OTA、不额外启动App全套CI，必要内容检查及仓库强制门禁保留。
 
 恢复先查询，继续同一releaseId／actionId／正文／job／build；遵守lease、退避和上限，不换key绕错误。job、live指针、索引、公开manifest、实际下载SHA和全部双语身份／顺序／revision／正文一致才报告完成。Console已有实际CDN核验通过时，保存其真实结果和回执，不例行再做第二次全包下载；结果缺失或冲突才排查。普通内容不强制手机逐张验收，也不声称手机已安装新版。只给改稿、验证状态、耗时／用量和产物路径；不让一批内容修订扩展成无关基础设施改造。

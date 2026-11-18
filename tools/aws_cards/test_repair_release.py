@@ -36,6 +36,80 @@ def record(folder, packet, output, role):
 
 
 class ReleaseTests(unittest.TestCase):
+    def completed_fixture(self, root):
+        program = '''
+import {createRequire} from 'node:module';
+import {createHash} from 'node:crypto';
+const root=ROOT;
+const {build}=createRequire(root+'/frontend/package.json')('esbuild');
+const compiled=await build({stdin:{contents:'export {releaseFixture} from '+JSON.stringify(root+'/frontend/tests/support/contentReleaseFixtures.ts')+'; export {prepareReleaseAction} from '+JSON.stringify(root+'/frontend/src/lib/contentRelease.ts')+';',resolveDir:root+'/frontend',loader:'ts'},bundle:true,write:false,platform:'node',format:'esm',logLevel:'silent'});
+const {releaseFixture,prepareReleaseAction}=await import('data:text/javascript;base64,'+Buffer.from(compiled.outputFiles[0].text).toString('base64'));
+const {bundle,session,snapshot}=releaseFixture(2); const ok=data=>({success:true,data,error:null});
+for(const kind of ['import','review','publish']) {
+ if(kind==='review')session.verifiedSnapshot=snapshot;
+ const data=kind==='import'?{editingSnapshot:snapshot.editingSnapshot}:kind==='review'?{receiptId:'synthetic-receipt',editingSnapshot:snapshot.editingSnapshot,publishSnapshot:snapshot.publishSnapshot}:{jobId:'synthetic-job',buildId:'synthetic-build',outcome:'queued',manifestVerified:false,snapshotSha256:snapshot.publishSnapshot};
+ session.actions[kind]={...prepareReleaseAction(session,kind,kind),outcome:'confirmed',reconciled:true,result:ok(data)};
+}
+const deckRaw=JSON.stringify({slug:bundle.deckSlug,version:'synthetic-build',cards:bundle.cards.map(c=>({...c,revision:2}))});
+const sha=createHash('sha256').update(deckRaw).digest('hex');
+session.delivery={jobId:'synthetic-job',buildId:'synthetic-build',sha256:sha,cards:2,verifiedAt:new Date().toISOString()};
+session.actions.publish.query={action:{},receipts:[],jobs:[{job_id:'synthetic-job',build_id:'synthetic-build',status:'SUCCESS',manifestState:'delivered',content_sha256:sha,error_message:null}],liveBuildId:'synthetic-build',manifestVerified:false};
+console.log(JSON.stringify({bundle,session,deckRaw}));
+'''.replace('ROOT', json.dumps(str(batch.PROJECT)))
+        raw = release.subprocess.run(['node', '--input-type=module', '-e', program], capture_output=True, text=True, check=True, timeout=40)
+        fixture = json.loads(raw.stdout); prepared = root / 'prepared'; artifacts = root / 'artifacts'
+        prepared.mkdir(); artifacts.mkdir()
+        for folder in [prepared, artifacts]: batch.write(folder / 'release-bundle.json', fixture['bundle'])
+        batch.write(prepared / 'preflight.json', {'status': 'EXACT_BINDINGS_VERIFIED', 'bundleSha256': cards.sha(prepared / 'release-bundle.json')})
+        batch.write(artifacts / 'console-journal.json', fixture['session'])
+        (artifacts / 'after-deck.json').write_text(fixture['deckRaw'])
+        batch.write(artifacts / 'publication-verification.json', {**fixture['session']['delivery'],
+            'status': 'PUBLISHED_AND_VERIFIED', 'releaseId': fixture['bundle']['releaseId'],
+            'bundleSha256': cards.sha(artifacts / 'release-bundle.json')})
+        return prepared, artifacts
+
+    def test_actual_console_parser_closeout_is_idempotent_and_rejects_changed_bytes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            prepared, artifacts = self.completed_fixture(Path(tmp))
+            result = release.finalize(prepared, artifacts)
+            self.assertEqual(result['newNetworkRequests'], 0)
+            self.assertEqual(release.finalize(prepared, artifacts), result)
+            self.assertEqual((prepared / 'after-deck.json').read_bytes(), (artifacts / 'after-deck.json').read_bytes())
+            (artifacts / 'after-deck.json').write_text('{}')
+            with self.assertRaisesRegex(ValueError, 'CDN bytes changed'): release.finalize(prepared, artifacts)
+
+    def test_closeout_validates_and_copies_the_same_frozen_journal_bytes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            prepared, artifacts = self.completed_fixture(Path(tmp))
+            expected = (artifacts / 'console-journal.json').read_bytes(); real_run = release.subprocess.run
+            def concurrent_change(*args, **kwargs):
+                (artifacts / 'console-journal.json').write_text('{}')
+                return real_run(*args, **kwargs)
+            with patch.object(release.subprocess, 'run', side_effect=concurrent_change):
+                release.finalize(prepared, artifacts)
+            self.assertEqual((prepared / 'console-journal-final.json').read_bytes(), expected)
+
+    def code_proof(self, root, main_sha='a'*40):
+        path = root / 'publisher-code.json'
+        batch.write(path, {'schema': 'verified-publisher-code-v1', 'repository': 'ChuanQiao1128/DeveloperCards',
+            'mainSHA': main_sha, 'files': {name: {'sha256': cards.sha(batch.PROJECT / name), 'sourceExact': True}
+                for name in release.PUBLISHER_CODE_FILES},
+            'checks': [{'name': name, 'status': 'completed', 'conclusion': 'success'} for name in release.REQUIRED_CODE_CHECKS],
+            'source': 'SYNTHETIC local test fixture, not GitHub verification'})
+        return path
+
+    def test_code_cache_rejects_stale_source_wrong_main_or_incomplete_checks(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            path = self.code_proof(root)
+            self.assertEqual(set(release.verified_publisher_code(path, 'a'*40)), set(release.PUBLISHER_CODE_FILES))
+            for mutation in ['sha', 'checks', 'file']:
+                path = self.code_proof(root); record = cards.read(path)
+                if mutation == 'sha': record['mainSHA'] = 'b'*40
+                if mutation == 'checks': record['checks'][0]['status'] = 'in_progress'
+                if mutation == 'file': record['files'][release.PUBLISHER_CODE_FILES[0]]['sha256'] = '0'*64
+                batch.write(path, record)
+                with self.assertRaises(ValueError): release.verified_publisher_code(path, 'a'*40)
     def test_release_archive_copies_exact_proof_bytes_and_rejects_changed_sources(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp); proof = root / 'response.json'; batch.write(proof, {'synthetic': 'actual fixture bytes'})
@@ -72,7 +146,7 @@ class ReleaseTests(unittest.TestCase):
             batch.write(root / 'authorization.json', {'userRequest': 'SYNTHETIC fixture only', 'humanPerCardReview': False})
             batch.write(root / 'request.json', {'priorRelease': str(prior), 'packet': str(packet), 'trial': str(trial),
                 'reviewed': str(reviewed), 'repair': None, 'mainSHA': 'a'*40, 'releaseId': 'synthetic',
-                'authorization': str(root / 'authorization.json')})
+                'authorization': str(root / 'authorization.json'), 'publisherCodeVerification': str(self.code_proof(root))})
             def changed_during_build(projected, output):
                 source = root / 'official.json'; source.write_text(source.read_text() + ' ')
                 return [{k: row[k] for k in ['stableUid', 'cardContentHash', 'schema', 'orderInDeck']} for row in meta]

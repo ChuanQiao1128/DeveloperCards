@@ -38,6 +38,18 @@ beforeEach(() => { vi.stubGlobal('indexedDB', new IDBFactory()); signOut(); vi.r
 afterEach(() => { cleanup(); signOut(); });
 
 describe('AWS Basics release operator flow', () => {
+  it('refuses a changed editing baseline without saving or importing over it', async () => {
+    const { bundle, snapshot } = releaseFixture(5); const user = userEvent.setup();
+    snapshot.cards[0].cardContentHash = '0'.repeat(64);
+    api.fetchReleaseSnapshot.mockResolvedValue(ok(snapshot)); await mount();
+    const file = new File([JSON.stringify(bundle)], 'reviewed.json', { type: 'application/json' });
+    Object.defineProperty(file, 'text', { value: async () => JSON.stringify(bundle) });
+    await user.upload(screen.getByLabelText('Immutable release bundle (JSON)'), file);
+    await user.click(screen.getByRole('button', { name: 'Run reviewed release' }));
+    await screen.findByText(/Prepared editing baseline changed/);
+    expect(api.sendReleaseAction).not.toHaveBeenCalled();
+    expect(await journalStore.loadReleaseJournal(TEST_EDITOR_SUB)).toBeNull();
+  });
   it('denies unsigned sessions and other decks without issuing any request', async () => {
     signOut(); await mount();
     expect(screen.getByRole('alert').textContent).toContain('requires a signed-in Console');
@@ -77,6 +89,7 @@ describe('AWS Basics release operator flow', () => {
     baseline.publishSnapshot = '6'.repeat(64);
     baseline.deck.total_cards = 347;
     baseline.backup = baseline.backup.slice(0, 347).map((row, index) => ({ ...row, id: index + 1001, stable_uid: `old-card-${index + 1}`, order_in_deck: index + 1001, is_deleted: 1 }));
+    bundle.expectedBaseline!.cards = [];
     snapshot.backup.push(...structuredClone(baseline.backup));
     api.fetchReleaseSnapshot.mockResolvedValueOnce(ok(baseline)).mockResolvedValueOnce(ok(baseline)).mockResolvedValue(ok(snapshot));
     api.fetchReleaseCards.mockResolvedValue(ok(cards));
@@ -154,14 +167,16 @@ describe('AWS Basics release operator flow', () => {
     await user.click(screen.getByRole('button', { name: 'Retry identical publish request' }));
     await waitFor(() => expect(api.sendReleaseAction).toHaveBeenCalledTimes(2));
     expect(api.sendReleaseAction.mock.calls[1][0].payload).toBe(first.payload);
-    expect(api.fetchReleaseSnapshot).toHaveBeenCalledTimes(2);
+    expect(api.fetchReleaseSnapshot).not.toHaveBeenCalled();
   });
   it('blocks a new publish after a concurrent live change without rebasing its initial baseline', async () => {
     const user = userEvent.setup(); const { session, snapshot, cards } = reviewedSession(); store(session);
     api.fetchReleaseSnapshot.mockResolvedValue(ok({ ...snapshot, deck: { ...snapshot.deck, live_build_id: 'concurrent-live' } })); api.fetchReleaseCards.mockResolvedValue(ok(cards));
+    api.sendReleaseAction.mockResolvedValue(refused('LIVE_BUILD_CONFLICT', 'Live build changed; this release cannot rebase.'));
     await mount(); await reconcile(user, session, ['import', 'review']); await user.click(screen.getByRole('button', { name: 'Publish reviewed release' }));
     await screen.findByText(/cannot rebase/);
-    expect(api.sendReleaseAction).not.toHaveBeenCalled();
+    expect(api.sendReleaseAction).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(api.sendReleaseAction.mock.calls[0][0].payload).expectedLive).toBe('original-live');
     expect((await readSaved()).baseline.deck.live_build_id).toBe('original-live');
   });
 });
@@ -255,7 +270,7 @@ describe('recovery reconciliation and ownership regressions', () => {
     await screen.findByText(/Signed-in subject changed/);
     expect((await journalStore.loadReleaseJournal(TEST_EDITOR_SUB))!.raw).toBe(priorJournal);
     expect(api.sendReleaseAction).toHaveBeenCalledTimes(step === 'write' ? 1 : 0);
-    if (step === 'readback') expect(api.fetchReleaseSnapshot).toHaveBeenCalledTimes(1);
+    if (step === 'readback') expect(api.fetchReleaseSnapshot).not.toHaveBeenCalled();
   });
   it('rejects a foreign uploaded journal without saving it', async () => {
     const user = userEvent.setup(); const { session } = releaseFixture(); session.ownerSubject = TEST_ADMIN_SUB; await mount();
@@ -316,6 +331,9 @@ describe('automatic reviewed release completion', () => {
     await user.click(screen.getByRole('button', { name: 'Run reviewed release' }));
     await screen.findByText(/Published and verified 5 bilingual cards/);
     expect(api.sendReleaseAction.mock.calls.map(call => call[0].kind)).toEqual(['import', 'review', 'publish']);
+    expect(api.fetchReleaseCards).toHaveBeenCalledTimes(1);
+    expect(api.fetchReleaseSnapshot).toHaveBeenCalledTimes(3);
+    expect((await readSaved()).delivery).toMatchObject({ jobId: 'same-job', buildId: 'same-build', cards: 5 });
     expect(screen.getByText(/manifestVerified=true/)).toBeTruthy();
   });
   it('queries a lost import response and continues without importing again', async () => {
