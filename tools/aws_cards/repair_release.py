@@ -30,7 +30,18 @@ def canonical(card):
     return result
 
 
-def inference(folder, role):
+def bind_proof(files, path, expected=None):
+    name = str(path)
+    expected = files.get(name, expected) if expected is None else expected
+    actual = cards.sha(path)
+    require(expected is None or actual == expected, 'Validated proof changed: ' + name)
+    require(name not in files or files[name] == actual, 'Conflicting proof binding: ' + name)
+    files[name] = actual
+
+
+def inference(folder, role, proofs=None):
+    before = {str(folder / name): cards.sha(folder / name) for name in
+              ['request.json', 'response.json', 'result.json', 'input.json', 'output.json', 'schema.json']}
     result = cards.read(folder / 'result.json')
     require(result['exitCode'] == 0 and result['completedTurns'] == 1 and not result['toolCalls'], 'Incomplete model execution')
     require(result.get('transport') == 'existing-local-responses-provider', 'Unrecognized model execution')
@@ -51,7 +62,10 @@ def inference(folder, role):
     if role == 'review':
         recorded = batch.normalize_review_labels(recorded)
     require(recorded == output, 'Output differs from recorded model response')
-    return cards.read(folder / 'input.json'), output
+    packet = cards.read(folder / 'input.json')
+    for name, expected in before.items():
+        bind_proof(proofs if proofs is not None else {}, Path(name), expected)
+    return packet, output
 
 
 def validate_evidence(original, current, sources):
@@ -67,7 +81,12 @@ def validate_evidence(original, current, sources):
         ), 'Unbound official quote')
 
 
-def verified_patch(packet_path, trial, reviewed, repair=None):
+def verified_patch(packet_path, trial, reviewed, repair=None, manual=False):
+    proofs = {}
+    for p in [packet_path, packet_path.with_name('source-bindings.json'), trial / 'baseline.snapshot.json',
+              trial / 'result.json', reviewed / 'candidate.cards.json', reviewed / 'cards.import.json',
+              reviewed / 'draft-manifest.json']:
+        bind_proof(proofs, p)
     packet = cards.read(packet_path)
     bindings = cards.read(packet_path.with_name('source-bindings.json'))
     require(cards.sha(packet_path) == bindings['packetSha256'] and
@@ -78,11 +97,31 @@ def verified_patch(packet_path, trial, reviewed, repair=None):
             'from pathlib import Path; import sys; sys.stdout.buffer.write(Path(sys.argv[1]).read_bytes())',
             source['path']], check=True, capture_output=True, timeout=15).stdout
         require(hashlib.sha256(raw).hexdigest() == source['sha256'], 'Official source changed')
+        bind_proof(proofs, Path(source['path']), source['sha256'])
         sources.append(json.loads(raw))
-    author_input, candidate = inference(trial / 'author', 'author')
-    require(author_input == packet, 'Author packet changed')
-    original_input, original_review = inference(trial / 'review', 'review')
+    if manual:
+        baseline = cards.read(trial / 'baseline.snapshot.json')
+        original_cards = baseline['cards'] if isinstance(baseline, dict) else baseline
+        originals = {c['stableUid']: c for c in original_cards}
+        require(all(c['uid'] in originals and all(c[k] == v for k, v in cards.view(originals[c['uid']]).items())
+                    for c in packet['cards']), 'Manual packet original scope differs from the published baseline')
+        source = cards.read(trial / 'manual-source.json')
+        bind_proof(proofs, trial / 'manual-source.json')
+        require(source['kind'] == 'manual-chat' and source['automaticAuthorCalls'] == 0
+                and cards.sha(source['sourcePath']) == source['sourceSha256']
+                and cards.sha(trial / 'manual-patch.json') == source['sourceSha256'], 'Manual source changed')
+        bind_proof(proofs, Path(source['sourcePath']), source['sourceSha256'])
+        bind_proof(proofs, trial / 'manual-patch.json', source['sourceSha256'])
+        candidate = cards.read(trial / 'manual-patch.json')
+        batch.validate_schema(candidate, batch.AUTHOR_SCHEMA)
+    else:
+        author_input, candidate = inference(trial / 'author', 'author', proofs)
+        require(author_input == packet, 'Author packet changed')
+    original_input, original_review = inference(trial / 'review', 'review', proofs)
     require(original_input['cards'] == candidate['cards'], 'Initial review did not see the candidate')
+    if manual:
+        require(original_input == batch.review_input(packet, candidate), 'Manual review scope or evidence changed')
+        require_current_rules(trial / 'review')
     validate_evidence(packet, original_input, sources)
     initial = cards.read(trial / 'result.json')
     require(cards.sha(trial / 'draft/candidate.cards.json') == initial['candidateSha256'] and
@@ -90,34 +129,39 @@ def verified_patch(packet_path, trial, reviewed, repair=None):
             cards.sha(trial / 'review/output.json') == initial['reviewOutputSha256'], 'Initial closeout changed')
     final_result_path = reviewed / 'result.json' if (reviewed / 'result.json').exists() else trial / 'result.json'
     final = cards.read(final_result_path)
+    bind_proof(proofs, final_result_path)
     require(final['status'] == 'REVIEWED_DRAFT' and cards.sha(reviewed / 'candidate.cards.json') == final['candidateSha256'], 'Draft is not bound and approved')
     rows = candidate['cards']
     uid_list = [c['uid'] for c in rows]
     require(1 <= len(uid_list) <= 10 and len(set(uid_list)) == len(uid_list), 'Expected 1-10 unique reviewed cards')
     require(uid_list == [c['uid'] for c in packet['cards']], 'Card identity/order changed')
     review = original_review
-    proof_files = [trial / 'author/request.json', trial / 'review/request.json']
     if repair:
         require(initial['status'] == 'NEEDS_REPAIR' and final.get('targetedRepairRounds') == 1, 'Unexpected repair round')
-        current, second = inference(repair / 'review', 'review')
+        current, second = inference(repair / 'review', 'review', proofs)
+        allowed_transfers = None
+        if manual:
+            require_current_rules(repair / 'review')
+            allowed_transfers = batch.manual_target_context(original_input, current, original_review)
         failing = {r['uid'] for r in original_review['cards'] if r['pass'] is not True}
         require(len(current['cards']) == len(failing) and {c['uid'] for c in current['cards']} == failing and
-                batch.review_ok(second, failing), 'Repair does not close exactly the failed cards')
+                batch.review_ok(second, failing, allowed_transfers), 'Repair does not close exactly the failed cards')
         require(cards.sha(trial / 'review/output.json') == final['originalReviewSha256'] and
                 cards.sha(repair / 'review/output.json') == final['targetedReviewSha256'], 'Targeted review binding changed')
         extra = [e for e in current['evidence'] if e['id'] not in {x['id'] for x in packet['evidence']}]
         if extra:
             supplement = cards.read(repair / 'supplement-binding.json')
             require(cards.sha(supplement['path']) == supplement['sha256'] and len(extra) == 1, 'Supplement changed')
+            bind_proof(proofs, repair / 'supplement-binding.json')
+            bind_proof(proofs, Path(supplement['path']), supplement['sha256'])
             sources.append(cards.read(supplement['path']))
         validate_evidence(packet, current, sources)
         replacements = {c['uid']: c for c in current['cards']}
-        require(all(t['uid'] not in replacements or replacements[t['uid']] == next(
+        require(manual or all(t['uid'] not in replacements or replacements[t['uid']] == next(
             c for c in rows if c['uid'] == t['uid']) for t in original_review['transfers']), 'Changed transfer cannot be reused')
         rows = [replacements.get(c['uid'], c) for c in rows]
         review = {'cards': [next(r for r in (second if uid in failing else original_review)['cards'] if r['uid'] == uid)
-                            for uid in uid_list], 'transfers': original_review['transfers']}
-        proof_files.append(repair / 'review/request.json')
+                            for uid in uid_list], 'transfers': second['transfers'] if manual else original_review['transfers']}
     else:
         require(initial['status'] == 'REVIEWED_DRAFT', 'Failed review requires its exact targeted repair')
     require(batch.review_ok(review, uid_list), 'Not every content rule and transfer passed')
@@ -134,10 +178,37 @@ def verified_patch(packet_path, trial, reviewed, repair=None):
         rendered = cards.render(trial / 'baseline.snapshot.json', patch, Path(tmp) / 'draft', overrides)
     require(rendered == cards.read(reviewed / 'candidate.cards.json') == cards.read(reviewed / 'cards.import.json'),
             'Import does not exactly render the reviewed semantics and frozen metadata')
-    checks = cards.read(reviewed / 'mechanical-checks.json' if (reviewed / 'mechanical-checks.json').exists()
-                        else trial / 'mechanical-checks.json')
+    checks_path = reviewed / 'mechanical-checks.json' if (reviewed / 'mechanical-checks.json').exists() else trial / 'mechanical-checks.json'
+    checks = cards.read(checks_path)
+    bind_proof(proofs, checks_path)
     require(len(checks) == 2 and all(c['exitCode'] == 0 for c in checks), 'Linter/real parser checks did not pass')
-    return rendered, review, bindings, {str(p): cards.sha(p) for p in proof_files}
+    for name, expected in list(proofs.items()):
+        bind_proof(proofs, Path(name), expected)
+    return rendered, review, bindings, proofs
+
+
+def require_current_rules(folder):
+    rules = batch.teaching_rules()
+    request = cards.read(folder / 'request.json')
+    system = request['input'][0]
+    require(system['role'] == 'system' and all(value in system['content'] for value in rules.values()),
+            'Actual review request does not contain current complete teaching rules/version/hash')
+
+
+def freeze_proofs(output, files):
+    """Keep the actual reviewed inputs/responses/sources with the release, not only external paths."""
+    archive = output / 'proofs'; archive.mkdir()
+    entries = []
+    for i, (name, expected) in enumerate(sorted(files.items())):
+        source = Path(name)
+        raw = subprocess.run([sys.executable, '-c',
+            'from pathlib import Path; import sys; sys.stdout.buffer.write(Path(sys.argv[1]).read_bytes())',
+            str(source)], check=True, capture_output=True, timeout=15).stdout
+        require(hashlib.sha256(raw).hexdigest() == expected, 'Proof changed before archive: ' + name)
+        target = archive / (str(i).zfill(3) + '-' + source.name)
+        target.write_bytes(raw)
+        entries.append({'originalPath': name, 'sha256': expected, 'archivePath': str(target.relative_to(output))})
+    batch.write(output / 'proof-archive.json', {'files': entries, 'noModelCalls': True})
 
 
 def project(prior, baseline, changed):
@@ -188,13 +259,19 @@ def backend_hashes(projected, output):
                            output / 'postgres-normalized.jsonl']).stdout)
 
 
-def prepare(request_path, output):
+def prepare(request_path, output, manual=False):
+    input_proofs = {}
+    bind_proof(input_proofs, request_path)
     request = cards.read(request_path)
     require(set(request) == {'priorRelease', 'packet', 'trial', 'reviewed', 'repair', 'mainSHA', 'releaseId', 'authorization'}, 'Unexpected release request fields')
     require(bool(re.fullmatch('[0-9a-f]{40}', request['mainSHA'])) and 0 < len(request['releaseId']) <= 160, 'Invalid main/release identity')
     path = lambda key: Path(request[key]).resolve()
     prior_dir = path('priorRelease'); trial = path('trial'); reviewed = path('reviewed')
-    prior = cards.read(prior_dir / 'release-bundle.json'); baseline = cards.read(prior_dir / 'after-deck.json')
+    for p in [prior_dir / 'release-bundle.json', prior_dir / 'after-deck.json', prior_dir / 'publication-verification.json']:
+        bind_proof(input_proofs, p)
+    prior = cards.read(prior_dir / 'release-bundle.json')
+    baseline_bytes = (prior_dir / 'after-deck.json').read_bytes()
+    baseline = json.loads(baseline_bytes)
     receipt = cards.read(prior_dir / 'publication-verification.json')
     require(receipt['status'] == 'PUBLISHED_AND_VERIFIED' and cards.sha(prior_dir / 'after-deck.json') == receipt['sha256'], 'Prior publication is not verified')
     require(cards.sha(prior_dir / 'release-bundle.json') == receipt.get('bundleSha256') and
@@ -202,11 +279,38 @@ def prepare(request_path, output):
     require(prior['deckId'] == 15 and prior['deckSlug'] == 'aws-saa-fundamentals' and
             baseline['version'] == receipt['buildId'], 'Wrong deck or prior live build')
     require(cards.sha(trial / 'baseline.snapshot.json') == receipt['sha256'], 'Draft is based on another live version')
+    bind_proof(input_proofs, path('authorization'))
     authorization = cards.read(path('authorization'))
     require(bool(authorization.get('userRequest', '').strip()) and authorization.get('humanPerCardReview') is False, 'Actual batch authorization reference required')
     changed, review, bindings, prompts = verified_patch(path('packet'), trial, reviewed,
-                                                       path('repair') if request['repair'] else None)
+                                                       path('repair') if request['repair'] else None, manual)
     projected = project(prior, baseline, changed)
+    proofs = dict(prompts)
+    proof_paths = [path('authorization'), path('packet'), path('packet').with_name('source-bindings.json'),
+                   prior_dir / 'release-bundle.json', prior_dir / 'publication-verification.json',
+                   trial / 'result.json', reviewed / 'draft-manifest.json', reviewed / 'candidate.cards.json',
+                   reviewed / 'cards.import.json']
+    if manual:
+        proof_paths.append(Path(cards.read(trial / 'manual-source.json')['sourcePath']))
+    for folder in [trial / 'review', *([trial / 'author'] if not manual else []),
+                   *([path('repair') / 'review'] if request['repair'] else [])]:
+        proof_paths.extend(folder / name for name in ['request.json', 'response.json', 'result.json',
+                                                      'input.json', 'output.json', 'schema.json'])
+    proof_paths.extend(Path(s['path']) for s in bindings['files'])
+    publisher_code = {name: cards.sha(batch.PROJECT / name) for name in [
+        'tools/aws_cards/repair_batch.py', 'tools/aws_cards/repair_release.py',
+        'tools/aws_cards/repair_cards.py', 'tools/aws_cards/validate_release_json.mjs',
+        'frontend/src/lib/contentRelease.ts']}
+    proof_paths.extend(batch.PROJECT / name for name in publisher_code)
+    if request['repair']:
+        proof_paths.append(reviewed / 'result.json')
+        supplement = path('repair') / 'supplement-binding.json'
+        if supplement.exists():
+            proof_paths += [supplement, Path(cards.read(supplement)['path'])]
+    for p in proof_paths:
+        bind_proof(proofs, p)
+    for name, expected in input_proofs.items():
+        bind_proof(proofs, Path(name), expected)
     output = Path(output).resolve(); output.mkdir()
     clock = {'started': batch.now(), 'status': 'PREPARING', 'published': False}; batch.write(output / 'task-clock.json', clock)
     try:
@@ -221,25 +325,38 @@ def prepare(request_path, output):
             rows.append({**row, 'verdict': 'PASS', 'revision': old_cards[uid]['revision'] + int(row['cardContentHash'] != previous['cardContentHash']),
                          'blockers': [], 'unknowns': []})
         batch.write(output / 'review.bindings.json', review)
+        batch.write(output / 'projected-cards.json', projected)
         batch.write(output / 'corpus-bindings.json', {'priorCorpusHash': prior['review']['corpusHash'], 'currentSourceBindings': bindings})
-        batch.write(output / 'prompt-bindings.json', {'priorPromptHash': prior['review']['promptHash'], 'currentRequests': prompts})
-        batch.write(output / 'release-evidence.json', {'changedUids': sorted(changed_uids), 'candidateSha256': cards.sha(reviewed / 'candidate.cards.json'),
-            'priorBundleSha256': cards.sha(prior_dir / 'release-bundle.json'), 'priorEvidenceHash': prior['review']['evidenceHash'],
-            'sourceBindings': bindings, 'originalQuestionSupport': 'needs_recheck', 'learnerEffect': 'not_measured'})
+        batch.write(output / 'prompt-bindings.json', {'priorPromptHash': prior['review']['promptHash'], 'currentProofFiles': prompts})
+        freeze_proofs(output, proofs)
+        batch.write(output / 'release-evidence.json', {'changedUids': sorted(changed_uids), 'candidateSha256': proofs[str(reviewed / 'candidate.cards.json')],
+            'priorBundleSha256': proofs[str(prior_dir / 'release-bundle.json')], 'priorEvidenceHash': prior['review']['evidenceHash'],
+            'sourceBindings': bindings, 'authoringKind': 'manual-chat' if manual else 'model-author',
+            'publisherCodeMainSHA': request['mainSHA'],
+            'publisherCodeFiles': publisher_code,
+            'contentArtifactSha256': cards.sha(output / 'projected-cards.json'),
+            'proofArchiveSha256': cards.sha(output / 'proof-archive.json'),
+            'gitArchiveStatus': 'pending-independent-archive',
+            'originalQuestionSupport': 'needs_recheck', 'learnerEffect': 'not_measured'})
         bundle = {'schema': 'aws-basics-release-bundle-v1', 'deckId': prior['deckId'], 'deckSlug': prior['deckSlug'],
             'releaseId': request['releaseId'], 'cards': projected, 'review': {
                 'runId': request['releaseId'], 'batchAuthorizationRef': str(path('authorization')),
                 'authorizationScope': prior['review']['authorizationScope'], 'model': 'Bound current and prior independent reviews',
                 'mainSHA': request['mainSHA'], 'evidenceRef': str(output / 'release-evidence.json'),
-                'evidenceHash': cards.sha(output / 'release-evidence.json'), 'evidenceVersion': 'repair-release-v1',
+                'evidenceHash': cards.sha(output / 'release-evidence.json'), 'evidenceVersion': 'repair-release-v2-code-content-separated',
                 'reportRef': str(output / 'review.bindings.json'), 'reportHash': cards.sha(output / 'review.bindings.json'),
                 'reportVersion': 'bound-content-review-v1', 'promptHash': cards.sha(output / 'prompt-bindings.json'),
                 'promptVersion': 'bound-prior-current-v1', 'corpusHash': cards.sha(output / 'corpus-bindings.json'),
                 'corpusVersion': 'bound-prior-current-v1', 'expiresAt': (datetime.now(timezone.utc) + timedelta(hours=12)).isoformat(), 'cards': rows}}
         batch.write(output / 'release-bundle.json', bundle)
-        batch.write(output / 'projected-cards.json', projected)
+        check = subprocess.run([shutil.which('node'), str(batch.PROJECT / 'tools/aws_cards/validate_release_json.mjs'),
+                                str(output / 'release-bundle.json')], cwd=batch.PROJECT,
+                               capture_output=True, text=True, timeout=40)
+        batch.write(output / 'console-json-check.json', {'exitCode': check.returncode,
+                    'stdout': check.stdout, 'stderr': check.stderr})
+        require(check.returncode == 0, 'Real Console JSON parser rejected the release; see console-json-check.json')
         batch.write(output / 'predicted-server-hashes.json', hashes)
-        (output / 'before-deck.json').write_bytes((prior_dir / 'after-deck.json').read_bytes())
+        (output / 'before-deck.json').write_bytes(baseline_bytes)
         batch.write(output / 'expected-baseline.json', {'cards': prior['cards'], 'metadata': prior['review']['cards'], 'liveBuild': receipt['buildId']})
         result = {'status': 'EXACT_BINDINGS_VERIFIED', 'releaseId': bundle['releaseId'],
                   'changed': len(changed_uids), 'unchanged': len(projected)-len(changed_uids),
@@ -281,7 +398,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest='command', required=True)
     prep = commands.add_parser('prepare'); prep.add_argument('request', type=Path); prep.add_argument('output', type=Path)
+    manual_prep = commands.add_parser('prepare-manual'); manual_prep.add_argument('request', type=Path); manual_prep.add_argument('output', type=Path)
     verify = commands.add_parser('verify-baseline'); verify.add_argument('folder', type=Path); verify.add_argument('backup', type=Path)
     args = parser.parse_args()
-    print(json.dumps(prepare(args.request, args.output) if args.command == 'prepare'
+    print(json.dumps(prepare(args.request, args.output, args.command == 'prepare-manual') if args.command in {'prepare', 'prepare-manual'}
                      else verify_baseline(args.folder, args.backup), ensure_ascii=False))

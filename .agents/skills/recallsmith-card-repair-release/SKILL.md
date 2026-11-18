@@ -52,6 +52,10 @@ Reviewer可在同轮给出精确的删除补丁，仅删除重复话语或题面
 
 ## 仅在授权范围发布
 
+日常五卡顺序与流程缩减以 [`docs/delivery/card-content-release-workflow.md`](../../../docs/delivery/card-content-release-workflow.md) 为入口：聊天定稿 → 一次独立审查与 JSON 校验 → 冻结内容就绪 → 用户“发布” → 当前基线／主干契约／备份预检 → 一次 Console 自动发布与 CDN 核验 → 保存回执。聊天已定稿不另派作者；规则、证据、自评或正文变化只核对失效卡与受影响依赖。七项标准合并在同次审查，不拆成七轮。用户可见稿发生变化须给用户看受影响稿；已有相同冻结批次发布授权不重复询问。
+
+canonical JSON 是发布真源，阅读 Markdown 不作为发布中转；使用真实 Console JSON 解析校验。人工稿使用 `repair_batch.py run ... --manual-patch FINAL.patch.json` 和 `repair_release.py prepare-manual`，保留真实来源、实际审查和原范围，不伪造作者。`mainSHA` 绑定实际已验证的发布代码 main 提交，完整正文及实际证明另按哈希归档，Git 内容归档独立完成。代码/规则/契约变化先按正常门禁合入验证，未变版本复用验证记录；不可把未归档正文声称为已在 main。文件对话框交接仍沿现有方式。
+
 发布时才读`frontend/docs/aws-basics-release-bundle.md`的自动发布／恢复契约。绑定真实独立审查和服务器版本，不伪造PASS或人工审查声明；使用Console `/decks/release?deckId=15` 的 **Run reviewed release**。纯内容不另发OTA、不额外启动App全套CI，必要内容检查及仓库强制门禁保留。
 
-恢复先查询，继续同一releaseId／actionId／正文／job／build；遵守lease、退避和上限，不换key绕错误。job、live指针、索引、公开manifest、实际下载SHA和全部双语身份／顺序／revision／正文一致才报告完成。只给改稿、验证状态、耗时／用量和产物路径；不让一批内容修订扩展成无关基础设施改造。
+恢复先查询，继续同一releaseId／actionId／正文／job／build；遵守lease、退避和上限，不换key绕错误。job、live指针、索引、公开manifest、实际下载SHA和全部双语身份／顺序／revision／正文一致才报告完成。Console已有实际CDN核验通过时，保存其真实结果和回执，不例行再做第二次全包下载；结果缺失或冲突才排查。普通内容不强制手机逐张验收，也不声称手机已安装新版。只给改稿、验证状态、耗时／用量和产物路径；不让一批内容修订扩展成无关基础设施改造。
