@@ -155,8 +155,7 @@
       "schema": "teaching-v1",
       "keyPoint": "The rule counts each group’s requests over an evaluation window and applies the action to groups over the threshold, rather than relying on a manually maintained list of source IPs.",
       "mustAnswer": [
-        "Use a WAF rate-based rule with request grouping, a threshold, and Block",
-        "Explain that requests are counted and limited per group over a time window"
+        "Use a WAF rate-based rule with request grouping, a threshold, and Block"
       ],
       "watchOut": "With per-IP grouping, a distributed flood can evade the rule if each IP remains below the threshold."
     },
