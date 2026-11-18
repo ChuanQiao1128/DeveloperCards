@@ -143,7 +143,7 @@ vi.mock('../../src/review/storage', () => ({
   loadDeckProgress: vi.fn(async () => []),
   saveDeckProgress: vi.fn(async () => {}),
   loadOrInitDailyStats: vi.fn(async () => ({ dateKey: '2026-09-22', plannedCount: 0, doneCount: 0 })),
-  // The real Mistake Book and study prefs read through these.
+  // The real Mistake Book reads through this.
   getUserScopedKey: vi.fn(async (key: string) => `test:${key}`),
   loadAllProgress: vi.fn(async () => ({})),
 }));
@@ -210,7 +210,6 @@ import { loadDeckProgress } from '../../src/review/storage';
 import { planChallengeRoute } from '../../src/features/gacha/planner/sessionPlanner';
 import { resetSessionStore } from '../../src/features/gacha/session/sessionStore';
 import { getCardSource } from '../../src/content/cardSource';
-import { STUDY_PREFS_KEY } from '../../src/features/gacha/study/studyPrefs';
 
 const FIXED_NOW_MS = Date.UTC(2026, 9, 4, 9, 0, 0);
 const DAY_MS = 86_400_000;
@@ -336,7 +335,6 @@ describe('SessionCardScreen source line (U3)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     store.clear();
-    store.set(STUDY_PREFS_KEY, JSON.stringify({ fourButtons: false }));
     resetSessionStore();
     featureFlagsMock.mockReturnValue(flags());
     vi.mocked(getCardSource).mockResolvedValue({ url: 'https://docs.aws.amazon.com/sqs/', quote: 'Queues decouple producers.' });

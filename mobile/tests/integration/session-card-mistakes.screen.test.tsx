@@ -394,7 +394,7 @@ describe('SessionCardScreen Mistake Book hook', () => {
       await Promise.resolve();
     });
     await act(async () => {
-      findPressableByLabel(tree, 'Forgot').props.onPress();
+      findPressableByLabel(tree, 'Again').props.onPress();
       await Promise.resolve();
       await Promise.resolve();
     });

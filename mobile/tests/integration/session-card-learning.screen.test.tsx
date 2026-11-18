@@ -164,7 +164,7 @@ vi.mock('../../src/review/storage', () => ({
   readStoredDeckProgress: vi.fn(async () => []),
   saveDeckProgress: vi.fn(async () => {}),
   loadOrInitDailyStats: vi.fn(async () => ({ dateKey: '2026-09-22', plannedCount: 0, doneCount: 0 })),
-  // The real Mistake Book and study prefs read through these.
+  // The real Mistake Book reads through this.
   getUserScopedKey: vi.fn(async (key: string) => `test:${key}`),
   loadAllProgress: vi.fn(async () => ({})),
 }));
@@ -239,7 +239,6 @@ import { resetSessionStore, useSessionStore } from '../../src/features/gacha/ses
 import { studyHaptic } from '../../src/features/gacha/session/studyHaptics';
 import { MISTAKE_BOOK_KEY, recordMistakeOutcome, withMistakeBookLock } from '../../src/features/gacha/mistakes/mistakeBook';
 import { getCardSource } from '../../src/content/cardSource';
-import { STUDY_PREFS_KEY } from '../../src/features/gacha/study/studyPrefs';
 
 const FIXED_NOW_MS = Date.UTC(2026, 8, 27, 9, 0, 0);
 const DAY_MS = 86_400_000;
@@ -403,8 +402,6 @@ describe('SessionCardScreen learning step (R22 §6: teach before testing; 2026-1
     store.clear();
     ratingStorageFault = null;
     failJournalScan = false;
-    // A new learner on the two-button default, stored so the first read does not probe.
-    store.set(STUDY_PREFS_KEY, JSON.stringify({ fourButtons: false }));
     resetSessionStore();
     focusEffects.entries.clear();
     featureFlagsMock.mockReturnValue(flags());
@@ -524,7 +521,7 @@ describe('SessionCardScreen learning step (R22 §6: teach before testing; 2026-1
       state: { updatedOne: previous, updatedProgress: [previous] } });
     serve([LEARNED], [previous], 1);
     const { tree } = await mount();
-    await press(tree, 'Reveal answer'); await press(tree, 'Remembered');
+    await press(tree, 'Reveal answer'); await press(tree, 'Good');
     const event = vi.mocked(recordReviewEvent).mock.calls[0][0] as any;
     expect(event.eventId).not.toBe('completed-old-event');
     expect(event.reviewedAtMs).toBe(FIXED_NOW_MS);
@@ -613,8 +610,8 @@ describe('SessionCardScreen learning step (R22 §6: teach before testing; 2026-1
     expect(pressables(tree, 'Got it')).toHaveLength(0);
     expect(byTestID(tree, 'learning-study-got-it')).toHaveLength(0);
     expect(pressables(tree, 'Reveal answer')).toHaveLength(0);
-    expect(pressables(tree, 'Forgot')).toHaveLength(0);
-    expect(pressables(tree, 'Remembered')).toHaveLength(0);
+    expect(pressables(tree, 'Again')).toHaveLength(0);
+    expect(pressables(tree, 'Good')).toHaveLength(0);
     // The source is read on mount, ready for the reveal.
     expect(getCardSource).toHaveBeenCalledWith('csharp', 'new-a');
   });
@@ -674,7 +671,7 @@ describe('SessionCardScreen learning step (R22 §6: teach before testing; 2026-1
     // The learned card first: its review shows Report once revealed.
     await press(tree, 'Reveal answer');
     expect(byTestID(tree, 'session-card-report')).toHaveLength(1);
-    await press(tree, 'Remembered');
+    await press(tree, 'Good');
 
     expect(byTestID(tree, 'learning-study-view')).toHaveLength(1);
     expect(byTestID(tree, 'session-card-report')).toHaveLength(0);
@@ -829,21 +826,20 @@ describe('SessionCardScreen learning step (R22 §6: teach before testing; 2026-1
     expect(navigation.replace).toHaveBeenCalledWith('SessionSummary', expect.objectContaining({ sessionDone: 2, sessionLimit: 3 }));
   });
 
-  it('keeps the study view on Show answer / Got it with four rating buttons on, and Got it still sends hard', async () => {
-    store.set(STUDY_PREFS_KEY, JSON.stringify({ fourButtons: true }));
+  it('keeps the study view on Show answer / Got it during four-rating review, and Got it still sends hard', async () => {
     serve([NEW_A], [fresh('new-a')], 1);
     const { tree } = await mount();
 
-    for (const title of ['Again', 'Hard', 'Good', 'Easy', 'Forgot', 'Remembered']) expect(pressables(tree, title)).toHaveLength(0);
+    for (const title of ['Again', 'Hard', 'Good', 'Easy']) expect(pressables(tree, title)).toHaveLength(0);
     await press(tree, 'Show answer');
-    for (const title of ['Again', 'Hard', 'Good', 'Easy', 'Forgot', 'Remembered']) expect(pressables(tree, title)).toHaveLength(0);
+    for (const title of ['Again', 'Hard', 'Good', 'Easy']) expect(pressables(tree, title)).toHaveLength(0);
     await press(tree, 'Got it');
     expect(vi.mocked(recordReviewEvent).mock.calls[0][0]).toEqual(
       expect.objectContaining({ rating: 'hard', reviewStage: 'learning_study' }),
     );
   });
 
-  it('leaves a learned Q/A card as it was: reveal, rate, repeat_review, and a Forgot is a mistake', async () => {
+  it('leaves a learned Q/A card as it was: reveal, rate, repeat_review, and Again is a mistake', async () => {
     serve([LEARNED], [learnedDue('old-c')], 1);
     const { tree, navigation } = await mount('review-due');
 
@@ -852,7 +848,7 @@ describe('SessionCardScreen learning step (R22 §6: teach before testing; 2026-1
     expect(pressables(tree, 'Show answer')).toHaveLength(0);
     expect(pressables(tree, 'Reveal answer')).toHaveLength(1);
     await press(tree, 'Reveal answer');
-    await press(tree, 'Forgot');
+    await press(tree, 'Again');
 
     expect(recordReviewEvent).toHaveBeenCalledTimes(1);
     expect(vi.mocked(recordReviewEvent).mock.calls[0][0]).toEqual(
@@ -863,14 +859,19 @@ describe('SessionCardScreen learning step (R22 §6: teach before testing; 2026-1
     expect(navigation.replace).toHaveBeenCalledWith('SessionSummary', expect.objectContaining({ sessionDone: 1, sessionLimit: 1 }));
   });
 
-  it('keeps Remembered as good on a learned card', async () => {
+  it.each([
+    ['Again', 'again'],
+    ['Hard', 'hard'],
+    ['Good', 'good'],
+    ['Easy', 'easy'],
+  ] as const)('sends %s as %s on a learned card', async (label, rating) => {
     serve([LEARNED], [learnedDue('old-c')], 1);
     const { tree } = await mount('review-due');
     await press(tree, 'Reveal answer');
-    await press(tree, 'Remembered');
+    await press(tree, label);
 
     expect(vi.mocked(recordReviewEvent).mock.calls[0][0]).toEqual(
-      expect.objectContaining({ rating: 'good', reviewStage: 'repeat_review' }),
+      expect.objectContaining({ rating, reviewStage: 'repeat_review' }),
     );
   });
 
@@ -914,7 +915,7 @@ describe('SessionCardScreen learning step (R22 §6: teach before testing; 2026-1
         await study(tree);
       } else {
         await press(tree, 'Reveal answer');
-        await press(tree, 'Remembered');
+        await press(tree, 'Good');
       }
     }
 
@@ -953,7 +954,7 @@ describe('SessionCardScreen learning step (R22 §6: teach before testing; 2026-1
         await press(tree, 'Got it');
       } else {
         await press(tree, 'Reveal answer');
-        await press(tree, 'Remembered');
+        await press(tree, 'Good');
       }
     }
 
@@ -975,21 +976,13 @@ describe('SessionCardScreen learning step (R22 §6: teach before testing; 2026-1
     expect(hint()).toBe('Try to recall the answer, then reveal it.');
     await press(tree, 'Reveal answer');
     expect(byTestID(tree, 'answer-key-line')).toHaveLength(1);
-    expect(hint()).toBe('Did you get the highlighted line?');
-    await press(tree, 'Remembered');
+    expect(hint()).toBe('How well did you get the highlighted line?');
+    await press(tree, 'Good');
 
     expect(questionShown(tree)).toBe('What is a stream?');
     await press(tree, 'Reveal answer');
     expect(byTestID(tree, 'answer-key-line')).toHaveLength(0);
-    expect(hint()).toBe('Did you remember it?');
-  });
-
-  it('asks how well the highlighted line went with four rating buttons on', async () => {
-    store.set(STUDY_PREFS_KEY, JSON.stringify({ fourButtons: true }));
-    serve([KEYED], [learnedDue('awsf-cidr')], 1);
-    const { tree } = await mount('review-due');
-    await press(tree, 'Reveal answer');
-    expect(byTestID(tree, 'review-rating-hint')[0].props.children).toBe('How well did you get the highlighted line?');
+    expect(hint()).toBe('How well did you recall it?');
   });
 
   it('highlights the 答 line on the study view once the answer is open', async () => {
