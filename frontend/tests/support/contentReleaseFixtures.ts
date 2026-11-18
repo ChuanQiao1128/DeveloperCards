@@ -30,6 +30,6 @@ export function releaseFixture(cardCount = 337): { bundle: ReleaseBundle; snapsh
     backup: cards.map(card => ({ id: card.id, deck_id: 15, stable_uid: card.stableUid, question: card.question, explanation: card.explanation, code_snippet: card.codeSnippet, code_language: card.codeLanguage, real_world_usage: card.realWorldUsage, difficulty: card.difficulty, order_in_deck: card.orderInDeck, revision: card.revision, is_deleted: 0, version: card.version, created_at: '2026-10-28T00:00:00Z', updated_at: '2026-10-28T00:00:00Z', topic: card.topic, mcq: card.mcq, source: structuredClone(card.source), translations: structuredClone(card.translations), translation_basis: { 'zh-CN': '0123456789abcdef' }, front_help: structuredClone(card.frontHelp) })),
     cards: bundle.review.cards.map(({ stableUid, cardContentHash, schema, revision, orderInDeck }) => ({ stableUid, cardContentHash, schema, revision, orderInDeck, version: 3 })),
   };
-  bundle.expectedBaseline = { liveBuildId: snapshot.deck.live_build_id, cards: snapshot.cards.map(({ version: _version, ...meta }) => meta) };
+  bundle.expectedBaseline = { liveBuildId: snapshot.deck.live_build_id, cards: snapshot.cards.map(({ stableUid, cardContentHash, schema, revision, orderInDeck }) => ({ stableUid, cardContentHash, schema, revision, orderInDeck })) };
   return { bundle, cards, snapshot, session: { schema: 'aws-basics-console-session-v1', ownerSubject: TEST_EDITOR_SUB, baseline: structuredClone(snapshot), baselineInventory: captureReleaseBackupInventory(snapshot), bundle, actions: {} } };
 }
