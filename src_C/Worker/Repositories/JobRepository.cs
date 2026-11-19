@@ -148,6 +148,7 @@ public class JobRepository : IJobRepository
     if (done.Count > 0)
     {
       if (await PublishDelivery.Ready(conn)) await PublishDelivery.StageManifest(conn, tx, jobId);
+      await PublishCdnVerification.WakeAsync(conn, tx, jobId);
       var row = done[0];
       var now = DateTimeOffset.UtcNow;
       await WebhookEvents.StageAsync(conn, tx, "deck.published", PublishedEventId(jobId), now, new

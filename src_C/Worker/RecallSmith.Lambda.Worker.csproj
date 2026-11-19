@@ -24,6 +24,7 @@
     <!-- 内部引用 -->
     <ProjectReference Include="..\Shared\RecallSmith.Lambda.Common\RecallSmith.Lambda.Common.csproj" />
     <ProjectReference Include="..\Shared\RecallSmith.Lambda.Db\RecallSmith.Lambda.Db.csproj" />
+    <InternalsVisibleTo Include="RecallSmith.Lambda.IntegrationTests" />
   </ItemGroup>
 
 </Project>

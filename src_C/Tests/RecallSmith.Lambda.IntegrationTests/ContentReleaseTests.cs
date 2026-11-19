@@ -4,6 +4,7 @@ using Npgsql;
 using RecallSmith.Lambda.Common;
 using RecallSmith.Lambda.Db;
 using RecallSmith.Lambda.Vpc.Authoring;
+using RecallSmith.Lambda.Vpc.Automation;
 using RecallSmith.Lambda.Vpc.Qa;
 using RecallSmith.Lambda.Worker.Repositories;
 
@@ -94,6 +95,87 @@ public sealed class ContentReleaseTests(PostgresFixture db)
   }
   private static Task<APIGatewayProxyResponse> AuthoringPublish(object body)=>Vpc.Authoring.Publish.HandleAuthoringPublish(Request("POST","/api/v1/authoring/publish",body),new Res("test"),Admin);
   private static async Task<NpgsqlConnection> Open(){var c=await Pg.OpenConnectionOrNullAsync();Assert.NotNull(c);return c!;}
+
+  [Theory]
+  [InlineData("verified")]
+  [InlineData("superseded")]
+  [InlineData("queue unavailable")]
+  [InlineData("bad CDN bytes")]
+  public async Task ReviewedArtifact_CanBeVerifiedByTheBackgroundCallback(string scenario)
+  {
+    const string queueEnv = "AUTOMATION_NOTIFY_QUEUE_URL";
+    var previousQueue = Environment.GetEnvironmentVariable(queueEnv);
+    var previousSince = Environment.GetEnvironmentVariable(ContentPublishFailureEvents.SinceEnv);
+    try
+    {
+      var id = await Deck();
+      var initial = await Snapshot(id);
+      Data(await Import(id, initial.GetProperty("editingSnapshot").GetString()!));
+      var snapshot = await Snapshot(id);
+      var receipt = await Review(id, snapshot);
+      var job = await Publish(id, snapshot, receipt);
+      var jid = job.GetProperty("jobId").GetString()!;
+      var build = job.GetProperty("buildId").GetString()!;
+      var sha = new string('a', 64);
+      var repo = new JobRepository();
+      Assert.True(await repo.TryAcquireJobAsync(jid));
+      await using var conn = await Open();
+      await using (var tx = await conn.BeginTransactionAsync())
+      {
+        await DbUtil.ExecuteAsync(conn, tx, "update deck_publishes set content_sha256=$2,content_bytes=100 where job_id=$1", [jid, sha]);
+        await PublishCdnVerification.StageAsync(conn, tx, jid, sha, 1);
+        await tx.CommitAsync();
+      }
+      Environment.SetEnvironmentVariable(queueEnv, "test-queue");
+      Environment.SetEnvironmentVariable(ContentPublishFailureEvents.SinceEnv, "2026-01-01T00:00:00Z");
+      var alert = false;
+      ContentPublishFailureEvents.TestSendSeam = request =>
+      {
+        if (scenario == "queue unavailable") throw new IOException("queue unavailable");
+        using var message = JsonDocument.Parse(request.MessageBody);
+        var eventType = message.RootElement.GetProperty("eventType").GetString();
+        if (eventType == ContentPublishFailureEvents.EventType)
+        {
+          Assert.Equal("verification", message.RootElement.GetProperty("stage").GetString());
+          alert = true;
+        }
+        else Assert.Equal(PublishCdnVerification.EventType, eventType);
+        Assert.Equal(jid, message.RootElement.GetProperty("jobId").GetString());
+        return Task.CompletedTask;
+      };
+      if (scenario == "queue unavailable")
+      {
+        await Assert.ThrowsAsync<IOException>(() => repo.CompleteJobAsync(jid, 1));
+        Assert.Equal("PROCESSING", (await repo.GetJobAsync(jid))!.Status);
+        Assert.Null(await DbUtil.ExecuteScalarAsync(conn, null, "select live_build_id from decks where id=$1", [id]));
+        return;
+      }
+      await repo.CompleteJobAsync(jid, 1);
+      Vpc.Authoring.Publish.TestControlledManifestRebuild = _ => Task.CompletedTask;
+      var prepared = JsonSerializer.SerializeToElement(await ContentCdnVerification.PrepareAsync(conn, jid));
+      Assert.Equal(build, prepared.GetProperty("buildId").GetString());
+      if (scenario == "superseded")
+        await DbUtil.ExecuteAsync(conn, null, "update decks set release_generation=release_generation+1 where id=$1", [id]);
+      var result = JsonSerializer.SerializeToElement(await ContentCdnVerification.RecordAsync(conn, jid,
+        JsonSerializer.SerializeToElement(new { buildId = build, sha256 = sha, failure = scenario == "bad CDN bytes" ? "HASH_MISMATCH" : null })));
+      Assert.True(result.GetProperty(scenario == "superseded" ? "skip" : "recorded").GetBoolean());
+      var rows = await DbUtil.QueryAsync(conn, null, "select job_id from deck_publishes where job_id=$1", [jid]);
+      await PublishCdnVerification.AnnotateAsync(conn, rows);
+      Assert.Equal(scenario switch { "verified" => "verified", "bad CDN bytes" => "needs_attention", _ => "pending" }, rows[0]["cdnVerificationState"]);
+      Assert.Equal(scenario == "bad CDN bytes", alert);
+      if (scenario == "verified")
+        Assert.True(JsonSerializer.SerializeToElement(await ContentCdnVerification.PrepareAsync(conn, jid)).GetProperty("skip").GetBoolean());
+    }
+    finally
+    {
+      Vpc.Authoring.Publish.TestControlledManifestRebuild = null;
+      Vpc.Authoring.Publish.TestEnqueueSeam = null;
+      ContentPublishFailureEvents.TestSendSeam = null;
+      Environment.SetEnvironmentVariable(queueEnv, previousQueue);
+      Environment.SetEnvironmentVariable(ContentPublishFailureEvents.SinceEnv, previousSince);
+      await Restore();
+    }
+  }
 
   [Theory]
   [InlineData(false)]

@@ -15,7 +15,7 @@ from collections import OrderedDict
 from collections.abc import Callable, Mapping
 from typing import Any
 
-from . import emf, revenuecat, ses, tracectx
+from . import content_cdn, emf, revenuecat, ses, tracectx
 from .internal_client import REPORT_PATH, TICK_PATH, InternalClient
 from .logs import log
 from .settings import Settings, get_recipient, get_secret, load_settings, previous_secret_name, ses_client
@@ -217,11 +217,17 @@ def _handle_record(settings: Settings, record: Mapping[str, Any], context: Any) 
         wakeup = json.loads(record.get("body", ""))
     except (TypeError, ValueError):
         wakeup = None
+    if isinstance(wakeup, dict) and wakeup.get("eventType") == content_cdn.EVENT_TYPE:
+        job = wakeup.get("jobId")
+        if type(wakeup.get("v")) is not int or wakeup["v"] != 1 or not _valid_uuid(job) or secret is None:
+            log("error", TAG, event="content_cdn_verification_invalid")
+            return False
+        return content_cdn.verify(_client(settings, secret), job, final_receive=attempt >= MAX_RECEIVES)
     if isinstance(wakeup, dict) and wakeup.get("eventType") == CONTENT_PUBLISH_EVENT:
         job, stage = wakeup.get("jobId"), wakeup.get("stage")
         if (type(wakeup.get("v")) is not int or wakeup["v"] != 1
                 or not isinstance(job, str) or not 1 <= len(job) <= 200
-                or stage not in ("build", "dispatch", "manifest")):
+                or stage not in ("build", "dispatch", "manifest", "verification")):
             log("error", TAG, event="content_publish_event_invalid")
             return False
         if secret is None:

@@ -11,7 +11,7 @@ public static partial class Publish
 {
   internal static Func<NpgsqlConnection, Task>? TestControlledManifestRebuild;
 
-  private static async Task RebuildControlledManifest(NpgsqlConnection conn)
+  internal static async Task RebuildControlledManifest(NpgsqlConnection conn)
   {
     if (TestControlledManifestRebuild is not null) { await TestControlledManifestRebuild(conn); return; }
     if (string.IsNullOrEmpty(ContentBucket)) throw new InvalidOperationException("Missing content bucket");

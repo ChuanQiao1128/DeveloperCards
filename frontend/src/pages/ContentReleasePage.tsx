@@ -12,7 +12,7 @@ import { CONSOLE_NAME } from '../lib/brand';
 import { hasReviewedDeckRelease } from '../lib/deckWorkspace';
 import { assertPublicationQuery, publicationStatus, type PublicationStatus } from '../lib/contentReleaseStatus';
 import { loadReleaseJournal, saveReleaseJournal, withReleaseJournalLock } from '../lib/releaseJournalStore';
-import { verifyReleaseDelivery, verifyStoredReleaseDelivery, waitForReleasePoll, type ReleaseDeliveryProof } from '../lib/contentReleaseDelivery';
+import { backgroundDeliveryProof, downloadVerifiedDeck, verifyReleaseDelivery, verifyStoredReleaseDelivery, waitForReleasePoll, type ReleaseDeliveryProof } from '../lib/contentReleaseDelivery';
 import { chooseArtifactDirectory, loadArtifactDirectory, loadDeliveryArtifact, releaseArtifactDownload, saveDeliveryArtifact, supportsArtifactDirectory, writeReleaseArtifacts, type ArtifactDirectory, type DeliveryArtifact } from '../lib/releaseArtifacts';
 import { assertExpectedReleaseBaseline, captureReleaseBackupInventory, assertActionDependencies, assertActionResult, assertFrozenAction, isConfirmedAction, assertOriginalLive, assertReleaseSnapshot, assertReplayAllowed, decodeCommittedAction, parseReleaseBundle, parseReleaseSession, prepareReleaseAction, verifyReleaseReadback } from '../lib/contentRelease';
 import type { ApiResult } from '../types/api';
@@ -247,24 +247,49 @@ export function ContentReleasePage({ deck, children }: {
 
   async function verifyPublicCards(current: ReleaseSession, signal: AbortSignal): Promise<boolean> {
     const action = current.actions.publish!;
+    const query = action.query!;
+    const job = query.jobs.find(item => item.job_id === action.result?.data?.jobId && item.build_id === action.result?.data?.buildId);
+    const background = job?.cdnVerificationState ? backgroundDeliveryProof(current, query) : undefined;
+    if (job?.cdnVerificationState && !background) return false;
     const cached = await loadDeliveryArtifact(current, () => assertOwner(current));
-    const proof = cached ? await owned(() => verifyStoredReleaseDelivery(current, action.query!, cached), current)
-      : await owned(() => verifyReleaseDelivery(current, action.query!, signal,
-        (proof, bytes) => saveDeliveryArtifact(current, proof, bytes, () => assertOwner(current))), current);
+    const proof = background ?? (cached ? await owned(() => verifyStoredReleaseDelivery(current, query, cached), current)
+      : await owned(() => verifyReleaseDelivery(current, query, signal,
+        (proof, bytes) => saveDeliveryArtifact(current, proof, bytes, () => assertOwner(current))), current));
     if (!proof) return false;
     const completed = { ...current, delivery: proof };
     const artifact = await loadDeliveryArtifact(current, () => assertOwner(current));
-    if (artifactDirectory.current && !artifact) throw new Error('Verified deck bytes have not finished saving.');
     await save(completed, false, artifact); assertOwner(current); setDelivery(proof);
     setMessage(`Published and verified ${proof.cards} bilingual cards on the public CDN.`);
+    if (background && artifactDirectory.current && !artifact) {
+      const saved = await loadArchiveBytes(completed, signal);
+      await save(completed, false, saved);
+    }
     return true;
   }
-  async function verifyExistingPublication() {
+
+  async function loadArchiveBytes(current: ReleaseSession, signal = AbortSignal.timeout(20_000)) {
+    const guard = () => assertOwner(current);
+    const saved = await loadDeliveryArtifact(current, guard);
+    if (saved) return saved;
+    const query = current.actions.publish?.query;
+    const proof = query && backgroundDeliveryProof(current, query);
+    if (!proof || !current.delivery) throw new Error('Check this release’s public verification before downloading its files.');
+    const bytes = await owned(() => downloadVerifiedDeck(current, proof, signal), current);
+    await saveDeliveryArtifact(current, proof, bytes, guard);
+    const artifact = await loadDeliveryArtifact(current, guard);
+    if (!artifact) throw new Error('Could not save the verified download.');
+    return artifact;
+  }
+  async function verifyExistingPublication(checkOnly = false) {
     const controller = new AbortController(); running.current = controller; setDelivery(null);
     try {
       const current = await query('publish');
-      if (!current || publicationStatus(current, false)?.kind !== 'verification') return;
-      if (!await verifyPublicCards(current, controller.signal)) setMessage('Waiting for the public CDN index to refresh. Check again to verify this same card pack.');
+      if (!current) return;
+      const { kind } = publicationStatus(current, false) ?? {};
+      if (kind === 'background_verification' || (kind === 'verification' && !checkOnly)) {
+        if (!await verifyPublicCards(current, controller.signal))
+          setMessage(kind === 'verification' ? 'Waiting for the public CDN index to refresh. Check again to verify this same card pack.' : '');
+      }
     } finally { if (running.current === controller) running.current = null; }
   }
 
@@ -299,9 +324,11 @@ export function ContentReleasePage({ deck, children }: {
         if (job?.status === 'SUCCESS' && action.query?.liveBuildId !== job.build_id) throw new Error('Another release changed the live build. Publication verification stopped.');
         if (job?.status === 'PENDING' && job.dispatchState === 'needs_attention') { setError('Queue delivery retries are exhausted. The original job and journal are retained.'); return; }
         if (job?.manifestState === 'needs_attention') { setError(job.manifestError ?? 'Index delivery retry limit reached. The original job and journal are retained.'); return; }
+        if (job?.cdnVerificationState === 'needs_attention') { setError(job.cdnVerificationError ?? 'CDN verification needs attention.'); return; }
         if (job?.status === 'SUCCESS' && job.manifestState === 'delivered') {
           if (await verifyPublicCards(current, controller.signal)) return;
-          setMessage('Card build and index delivery succeeded. Waiting for the public CDN index to refresh.');
+          setMessage(job.cdnVerificationState ? 'The server is verifying this release on the public CDN. It will continue if you close this page.' :
+            'Card build and index delivery succeeded. Waiting for the public CDN index to refresh.');
         } else {
           setMessage(job?.status === 'SUCCESS' ? 'Card build succeeded. Recovering the download index for the same job.' : 'Waiting for the published card build.');
           const manifestDue = Math.max(Date.parse(job?.manifestNextAttemptAt ?? '') || 0, Date.parse(job?.manifestLeaseUntil ?? '') || 0);
@@ -345,14 +372,13 @@ export function ContentReleasePage({ deck, children }: {
         <Button variant="outline" disabled={busy} onClick={() => void run(startAnotherRelease)}>Start another release</Button>
         <Button variant="outline" disabled={busy} onClick={() => void run(async () => {
           const current = currentSession.current!;
-          const artifact = await loadDeliveryArtifact(current, () => assertOwner(current));
-          if (!artifact) throw new Error('Verified card bytes are unavailable. Continue this saved release to verify and save them.');
+          const artifact = await loadArchiveBytes(current);
           download(`${current.bundle.releaseId}-verified-artifacts.json`, releaseArtifactDownload(current, artifact));
         })}>Download verified release artifacts</Button>
       </div>}
     </section>
     {publication && <PublicationStatusPanel status={publication} busy={busy} blocked={restoreBlocked}
-      onCheck={() => void run(() => query('publish'))} onContinue={() => void run(continuePublication)} onVerify={() => void run(verifyExistingPublication)} />}
+      onCheck={() => void run(() => verifyExistingPublication(true))} onContinue={() => void run(continuePublication)} onVerify={() => void run(() => verifyExistingPublication())} />}
     {error && <Callout tone={publication?.kind === 'unknown' || publication?.kind === 'verification' ? 'warning' : 'danger'} title="Action needs attention" role="alert">{error}</Callout>}
     {message && <Callout tone="info" role="status">{message}</Callout>}
     <details open={restoreBlocked || undefined} className={`${CARD_CLASS} space-y-3`}>
@@ -370,13 +396,12 @@ export function ContentReleasePage({ deck, children }: {
       {supportsArtifactDirectory() && <Button variant="outline" disabled={busy || restoreBlocked} onClick={() => void run(async () => {
         const directory = await chooseArtifactDirectory(user!.sub!, () => assertOwner(currentSession.current));
         artifactDirectory.current = directory; setAutomaticSave(true);
+        const current = currentSession.current;
+        const artifact = current?.delivery ? await loadArchiveBytes(current) : undefined;
         await withReleaseJournalLock(user!.sub!, async () => {
-          const current = currentSession.current;
           if (!current) return;
           const stored = await loadReleaseJournal(user!.sub!); assertOwner(current);
           if (stored?.revision !== journalRevision.current || stored.raw !== JSON.stringify(current)) throw new Error('Release changed in another tab. Reload before exporting it.');
-          const artifact = current.delivery ? await loadDeliveryArtifact(current, () => assertOwner(current)) : undefined;
-          if (current.delivery && !artifact) throw new Error('Verified bytes are unavailable. Continue this saved release before exporting it.');
           await writeReleaseArtifacts(directory, current, () => assertOwner(current), artifact);
         });
         setMessage('Save folder selected. Recovery files and verified card packs will save here automatically.');

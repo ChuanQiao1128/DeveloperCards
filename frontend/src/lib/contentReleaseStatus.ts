@@ -1,7 +1,7 @@
 import type { ReleaseActions, ReleaseSession } from '../types/contentRelease';
 
 export interface PublicationStatus {
-  kind: 'unknown' | 'queued' | 'building' | 'index' | 'attention' | 'failed' | 'verification' | 'verified' | 'superseded';
+  kind: 'unknown' | 'queued' | 'building' | 'index' | 'attention' | 'failed' | 'verification' | 'background_verification' | 'verified' | 'superseded';
   tone: 'info' | 'success' | 'warning' | 'danger';
   title: string;
   description: string;
@@ -15,7 +15,10 @@ export function assertPublicationQuery(query: ReleaseActions): void {
   if (!query || !Array.isArray(query.jobs) || !(query.liveBuildId === null || typeof query.liveBuildId === 'string') ||
       query.jobs.some(job => !job || typeof job !== 'object' || typeof job.job_id !== 'string' || typeof job.build_id !== 'string' || typeof job.status !== 'string' ||
         [job.error_message, job.content_sha256, job.manifestState, job.manifestError, job.manifestNextAttemptAt, job.manifestLeaseUntil,
-          job.dispatchState, job.dispatchNextAttemptAt, job.dispatchLeaseUntil].some(value => value != null && typeof value !== 'string'))) {
+          job.dispatchState, job.dispatchNextAttemptAt, job.dispatchLeaseUntil, job.cdnVerifiedAt, job.cdnVerifiedSha256,
+          job.cdnVerificationError].some(value => value != null && typeof value !== 'string') ||
+        (job.cdnVerificationState != null && !['pending', 'verified', 'needs_attention'].includes(job.cdnVerificationState)) ||
+        (job.cdnVerifiedCards != null && !Number.isSafeInteger(job.cdnVerifiedCards)))) {
     throw new Error('Publication status response is incomplete. Check the saved action again; no publication was retried.');
   }
 }
@@ -43,6 +46,12 @@ export function publicationStatus(session: ReleaseSession | null, verified: bool
     description: 'Queue delivery retries are exhausted. The original job is retained; this page cannot start a replacement job.' };
   if (job.manifestState === 'needs_attention') return { ...current, kind: 'attention', tone: 'warning', title: 'Index delivery needs attention',
     description: 'The card build is ready, but index delivery retries are exhausted. Public availability has not been verified.' };
+  if (job.cdnVerificationState === 'needs_attention') return { ...current, kind: 'attention', tone: 'warning', title: 'CDN verification needs attention',
+    description: 'The background verifier exhausted its attempts. The existing build and its diagnostics are retained.' };
+  if (job.status === 'SUCCESS' && job.cdnVerificationState && !verified) return {
+    ...current, kind: 'background_verification', tone: 'info', title: 'Background CDN verification',
+    description: 'The server continues this check after you close the page. Check publication status for the saved receipt.',
+  };
   if (job.status === 'SUCCESS' && job.manifestState === 'delivered') return verified
     ? { ...current, kind: 'verified', tone: 'success', title: 'Published and verified', description: 'The public card pack matches the reviewed content.' }
     : { ...current, kind: 'verification', tone: 'warning', title: 'Public verification incomplete',

@@ -610,6 +610,7 @@ public static class EmailTemplates
     {
       "dispatch" => "Queue dispatch retries exhausted; the card build has not started.",
       "manifest" => "The card build succeeded, but public index delivery needs attention.",
+      "verification" => "The card build succeeded, but the public CDN file could not be verified.",
       _ => "The card build failed. Inspect the job diagnostics for the specific error."
     };
     return Render(mode, $"Action needed: content publication {OneLine(releaseId)}",

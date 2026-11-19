@@ -13,7 +13,11 @@ import type { ReleaseSession } from '../src/types/contentRelease';
 
 const api = vi.hoisted(() => ({ fetchReleaseSnapshot: vi.fn(), fetchReleaseAction: vi.fn(), sendReleaseAction: vi.fn(), fetchReleaseCards: vi.fn(), verifyReleaseDelivery: vi.fn(), waitForReleasePoll: vi.fn() }));
 vi.mock('../src/api/contentRelease', () => ({ fetchReleaseSnapshot: api.fetchReleaseSnapshot, fetchReleaseAction: api.fetchReleaseAction, sendReleaseAction: api.sendReleaseAction, fetchReleaseCards: api.fetchReleaseCards }));
-vi.mock('../src/lib/contentReleaseDelivery', () => ({ verifyReleaseDelivery: api.verifyReleaseDelivery, waitForReleasePoll: api.waitForReleasePoll }));
+vi.mock('../src/lib/contentReleaseDelivery', async original => ({
+  ...await original<typeof import('../src/lib/contentReleaseDelivery')>(),
+  verifyReleaseDelivery: api.verifyReleaseDelivery,
+  waitForReleasePoll: api.waitForReleasePoll,
+}));
 const { ContentReleasePage } = await import('../src/pages/ContentReleasePage');
 const key = `aws-basics-release-v1:${TEST_EDITOR_SUB}`;
 function store(session: ReleaseSession) { sessionStorage.setItem(key, JSON.stringify(session)); }
@@ -44,6 +48,26 @@ beforeEach(() => { vi.stubGlobal('indexedDB', new IDBFactory()); signOut(); vi.r
 afterEach(() => { cleanup(); signOut(); });
 
 describe('AWS Basics release operator flow', () => {
+  it('restores the server receipt without downloading or rechecking cards in the browser', async () => {
+    const { session, snapshot } = reviewedSession(5);
+    const result = ok({ jobId: 'server-job', buildId: 'server-build', outcome: 'committed',
+      snapshotSha256: snapshot.publishSnapshot, manifestVerified: false });
+    session.actions.publish = { ...prepareReleaseAction(session, 'publish', 'publish'), outcome: 'confirmed', reconciled: true, result };
+    store(session);
+    const sha256 = 'a'.repeat(64); const verifiedAt = '2026-04-20T00:00:00Z';
+    api.fetchReleaseAction.mockResolvedValue(ok({ action: { StatusCode: 200, Body: JSON.stringify(result) }, receipts: [],
+      jobs: [{ job_id: 'server-job', build_id: 'server-build', status: 'SUCCESS', content_sha256: sha256, error_message: null,
+        manifestState: 'delivered', cdnVerificationState: 'verified', cdnVerifiedSha256: sha256, cdnVerifiedAt: verifiedAt, cdnVerifiedCards: 5 }],
+      liveBuildId: 'server-build', manifestVerified: false }));
+    await mount();
+    await userEvent.click(screen.getByRole('button', { name: 'Check publication status' }));
+    await screen.findByText('Published and verified');
+    expect((await readSaved()).delivery).toMatchObject({ jobId: 'server-job', buildId: 'server-build', sha256, verifiedAt, cards: 5 });
+    expect(api.verifyReleaseDelivery).not.toHaveBeenCalled();
+    expect(api.fetchReleaseCards).not.toHaveBeenCalled();
+    expect(api.sendReleaseAction).not.toHaveBeenCalled();
+  });
+
   it('refuses a changed editing baseline without saving or importing over it', async () => {
     const { bundle, snapshot } = releaseFixture(5); const user = userEvent.setup();
     snapshot.cards[0].cardContentHash = '0'.repeat(64);

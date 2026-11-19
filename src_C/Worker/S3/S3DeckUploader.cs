@@ -75,8 +75,7 @@ public class S3DeckUploader : IS3DeckUploader
         await JsonSerializer.SerializeAsync(fs, data, ContentJson.Options);
       }
 
-      // 1.5 在上传前对临时文件计算 sha256（覆盖的正是即将上传的精确字节）
-      var result = await ComputeFileSha256Async(tmpPath);
+      var result = await VerifyAndHashAsync(tmpPath, data);
 
       // 2. 调用 SDK 的 FilePath 上传 (SDK 自动按 8MB 分块上传，极低内存消耗)
       var putRequest = new PutObjectRequest
@@ -171,15 +170,21 @@ public class S3DeckUploader : IS3DeckUploader
     return await reader.ReadToEndAsync();
   }
 
-  private static async Task<S3UploadResult> ComputeFileSha256Async(string path)
+  internal static async Task<S3UploadResult> VerifyAndHashAsync(string path, DeckExportData data)
   {
     await using var fs = new FileStream(path, FileMode.Open, FileAccess.Read);
+    if (data.VerifyReviewedContent)
+    {
+      await ContentJson.VerifyReviewedArtifactAsync(fs, data);
+      fs.Position = 0;
+    }
     using var sha = SHA256.Create();
     var hash = await sha.ComputeHashAsync(fs);
     return new S3UploadResult
     {
       Sha256 = Convert.ToHexString(hash).ToLowerInvariant(),
       Bytes = fs.Length,
+      ReviewedContentVerified = data.VerifyReviewedContent,
     };
   }
 }
