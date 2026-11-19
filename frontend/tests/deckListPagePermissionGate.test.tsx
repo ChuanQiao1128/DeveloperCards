@@ -143,7 +143,8 @@ function inventory(): string[] {
 // else in either list moved.
 // Console W1 added three administrator destinations. Commercial shell (2026-11-17)
 // remeasurement adds the full closed mobile navigation copy, persistent Decks in
-// both copies, skip link, Open navigation and Close navigation. This census
+// both copies, skip link, Open navigation and Close navigation. Deck titles
+// now open the workspace in both roles. This census
 // intentionally includes hidden DOM controls; role-based tests separately check
 // accessible links and current-session gating. No page action changed.
 const SUPER_ADMIN_CONTROLS = [
@@ -158,20 +159,14 @@ const SUPER_ADMIN_CONTROLS = [
   'a:Skip to content',
   'a:System',
   'a:System',
-  'button:4',
-  'button:4',
-  'button:Cards',
-  'button:Cards',
+  'a:Title alpha-deck',
+  'a:Title beta-deck',
   'button:Close navigation',
   'button:Decks',
   'button:Delete',
   'button:Delete',
-  'button:Edit',
-  'button:Edit',
   'button:New Deck',
   'button:Open navigation',
-  'button:Preview',
-  'button:Preview',
   'button:Publish',
   'button:Publish',
   'button:Publish Jobs',
@@ -194,16 +189,10 @@ const EDITOR_CONTROLS = [
   'a:Skip to content',
   'a:System',
   'a:System',
-  'button:4',
-  'button:4',
-  'button:Cards',
-  'button:Cards',
+  'a:Title alpha-deck',
+  'a:Title beta-deck',
   'button:Close navigation',
-  'button:Edit',
-  'button:Edit',
   'button:Open navigation',
-  'button:Preview',
-  'button:Preview',
   'button:Refresh',
   'button:Sign out',
   'input:Search decks|Search by slug or title...',

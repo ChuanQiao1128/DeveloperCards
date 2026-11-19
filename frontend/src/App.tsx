@@ -46,6 +46,7 @@ const NewCardPage = lazy(() => import('./pages/NewCardPage').then(m => ({ defaul
 const EditCardPage = lazy(() => import('./pages/EditCardPage').then(m => ({ default: m.EditCardPage })));
 const DeckImportPage = lazy(() => import('./pages/DeckImportPage').then(m => ({ default: m.DeckImportPage })));
 const ContentReleasePage = lazy(() => import('./pages/ContentReleasePage').then(m => ({ default: m.ContentReleasePage })));
+const DeckPublicationPage = lazy(() => import('./pages/DeckPublicationPage').then(m => ({ default: m.DeckPublicationPage })));
 const DeckPreviewPage = lazy(() => import('./pages/DeckPreviewPage').then(m => ({ default: m.DeckPreviewPage })));
 const AdminUsersPage = lazy(() => import('./pages/AdminUsersPage').then(m => ({ default: m.AdminUsersPage })));
 const DeckEditPage = lazy(() => import('./pages/DeckEditPage').then(m => ({ default: m.DeckEditPage })));
@@ -134,6 +135,8 @@ function App() {
                 <Route path="/decks/cards/edit" element={<EditCardPage />} />
                 <Route path="/decks/cards/import" element={<DeckImportPage />} />
                 <Route path="/decks/release" element={<ContentReleasePage />} />
+                <Route path="/decks/publish" element={<DeckPublicationPage view="publishing" />} />
+                <Route path="/decks/versions" element={<DeckPublicationPage view="versions" />} />
                 <Route path="/decks/publish-jobs/:jobId" element={<PublishJobDetailPage />} />
 
                 <Route path="/decks/preview" element={<DeckPreviewPage />} />

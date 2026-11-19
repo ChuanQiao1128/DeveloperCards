@@ -335,7 +335,7 @@ test('a signed-in console renders decks and navigates into a lazily-loaded route
   // would be measuring nothing.
   expect(cardsChunkLoadedBefore).toBe(false);
 
-  await deckRow.getByRole('button', { name: 'Cards', exact: true }).click();
+  await deckRow.getByRole('link', { name: DECK.title, exact: true }).click();
 
   await expect(page).toHaveURL(`http://localhost:5173/decks/cards?deckId=${DECK.id}`);
 
@@ -783,4 +783,132 @@ test('an unsaved deck edit survives refresh 503 and saves once after manual retr
     body: { title: 'Unsaved edit through a Cognito outage' }, authorization: `Bearer ${recoveredAccessToken}`,
   });
   await expect(title).toHaveValue('Unsaved edit through a Cognito outage');
+});
+
+test('deck workspace keeps publication and versions scoped to the selected deck', async ({ page }, testInfo) => {
+  const otherDeck = { ...DECK, id: 15, title: 'AWS Basics', slug: 'aws-saa-fundamentals' };
+  const job = { jobId: 'tracked-job-42', deckId: DECK.id, deckSlug: DECK.slug, status: 'PENDING', createdAt: Date.UTC(2026, 10, 19) };
+  const requests: { deckId: number; actionId: string }[] = [];
+  let status = 'PENDING';
+  const reply = (route: Route, data: unknown) => route.fulfill({ contentType: 'application/json', body: ok(data) });
+
+  await stubApi(page);
+  await page.route('**/api/v1/admin/decks?*', route => reply(route, {
+    items: [DECK, otherDeck].map(deck => ({ ...deck, latestBuildId: deck.id === DECK.id ? 'v1' : null, updatedAtMs: Date.UTC(2026, 10, 19) })),
+    hasMore: false, nextCursor: null,
+  }));
+  await page.route('**/api/v1/authoring/qa/status?*', route => reply(route, { enabled: false }));
+  await page.route('**/api/v1/authoring/publish', route => {
+    requests.push(route.request().postDataJSON());
+    if (requests.length === 1) {
+      return route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({
+        success: false,
+        data: { mode: 'async', jobId: job.jobId },
+        error: { code: 'PUBLISH_DISPATCH_UNCONFIRMED', message: 'Dispatch could not be confirmed.' },
+        traceId: 'e2e',
+      }) });
+    }
+    if (requests.length === 3) return route.fulfill({ status: 504, body: 'Gateway Timeout' });
+    status = 'SUCCESS';
+    return reply(route, { mode: 'async', jobId: requests.length === 4 ? 'second-job-42' : job.jobId });
+  });
+  await page.route('**/api/v1/authoring/publish/jobs', route => reply(route, [
+    { ...job, deckId: otherDeck.id, deckSlug: otherDeck.slug, jobId: 'unrelated-job' },
+    // The recent list deliberately omits the first newly submitted job until retry succeeds.
+    ...(requests.length >= 2 ? [{ ...job, status }] : []),
+  ]));
+  await page.route('**/api/v1/authoring/publish/status?*', route => {
+    const id = new URL(route.request().url()).searchParams.get('jobId');
+    expect(['tracked-job-42', 'second-job-42']).toContain(id);
+    return reply(route, { ...job, jobId: id, status, buildId: 'v2', manifestState: status === 'SUCCESS' ? 'delivered' : null });
+  });
+  await page.route(`**/api/v1/admin/decks/${DECK.id}/builds`, route => reply(route, {
+    deckId: DECK.id, slug: DECK.slug, liveBuildId: status === 'SUCCESS' ? 'v2' : 'v1',
+    builds: [
+      ...(status === 'SUCCESS' ? [{ buildId: 'v2', jobId: job.jobId, note: 'Updated examples', createdAt: '2026-11-19T09:58:00Z', isLive: true }] : []),
+      { buildId: 'v1', jobId: 'older-job', note: null, createdAt: '2026-11-18T09:58:00Z', isLive: status !== 'SUCCESS' },
+    ],
+  }));
+  await page.addInitScript(([key, value]) => sessionStorage.setItem(key, value), [TOKEN_KEY, superAdminSession()]);
+  await page.setViewportSize({ width: 1440, height: 920 });
+  await page.goto('/');
+  await expect(page.getByRole('link', { name: 'Reviewed release', exact: true })).toHaveAttribute('href', '/decks/publish?deckId=15');
+  const deckTable = page.getByRole('table', { name: 'Decks' });
+  expect((await deckTable.getByRole('columnheader', { name: 'Updated' }).boundingBox())?.height).toBeLessThan(60);
+  await page.screenshot({ path: testInfo.outputPath('deck-list-desktop.png') });
+  await page.setViewportSize({ width: 320, height: 780 });
+  await expect.poll(() => deckTable.evaluate(table => table.scrollWidth <= table.parentElement!.clientWidth)).toBe(true);
+  const awsRow = deckTable.getByRole('row', { name: /AWS Basics/ });
+  await expect(awsRow.getByText('Needs Publish', { exact: true }).filter({ visible: true })).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath('deck-list-mobile.png') });
+  await page.setViewportSize({ width: 1440, height: 920 });
+  await page.getByRole('link', { name: DECK.title, exact: true }).click();
+
+  const nav = page.getByRole('navigation', { name: 'Deck pages' });
+  await expect(nav.getByRole('link', { name: 'Cards' })).toHaveAttribute('aria-current', 'page');
+  await expect(page.getByText(CARD.question)).toBeVisible();
+  await nav.getByRole('link', { name: 'Settings' }).click();
+  const title = page.getByText('Title *', { exact: true }).locator('..').getByRole('textbox');
+  await title.fill('Unsaved deck title');
+  await nav.getByRole('link', { name: 'Published versions' }).click();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Cancel' }).click();
+  await expect(title).toHaveValue('Unsaved deck title');
+  await nav.getByRole('link', { name: 'Published versions' }).click();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Discard changes' }).click();
+  await expect(page.getByRole('listitem').filter({ hasText: 'v1' }).getByText('Live')).toBeVisible();
+  await nav.getByRole('link', { name: 'Publishing' }).click();
+  await expect(page.getByText('No jobs for this deck in the recent publish history.')).toBeVisible();
+  await page.getByRole('button', { name: 'Publish deck' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Publish', exact: true }).click();
+
+  const tracked = page.getByRole('region', { name: 'Your publish job' });
+  await expect(tracked.getByText('Queued', { exact: true })).toBeVisible();
+  await expect(tracked.getByRole('link', { name: 'View job details' })).toHaveAttribute('href', '/decks/publish-jobs/tracked-job-42');
+  await page.getByRole('button', { name: 'Retry this request' }).click();
+  await expect(tracked.getByText('Build complete · index updated', { exact: true })).toBeVisible();
+  expect(requests[0].deckId).toBe(DECK.id);
+  expect(requests[0].actionId).toBeTruthy();
+  expect(requests[1]).toEqual(requests[0]);
+
+  await expect(page.getByRole('link', { name: /unrelated-job/ })).toHaveCount(0);
+  await expect(page).toHaveURL(`/decks/publish?deckId=${DECK.id}`);
+  await expectNoAxeViolations(page, 'deck publishing');
+  await page.screenshot({ path: testInfo.outputPath('deck-publishing-desktop.png') });
+
+  await page.getByRole('button', { name: 'Publish deck' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Publish', exact: true }).click();
+  await page.getByRole('button', { name: 'Retry this request' }).click();
+  await expect(tracked.getByRole('link', { name: 'View job details' })).toHaveAttribute('href', '/decks/publish-jobs/second-job-42');
+  expect(requests[2].actionId).not.toBe(requests[0].actionId);
+  expect(requests[3]).toEqual(requests[2]);
+
+  await nav.getByRole('link', { name: 'Published versions' }).click();
+  await expect(page.getByRole('listitem').filter({ hasText: 'v2' }).getByText('Live')).toBeVisible();
+  await expect(page.getByRole('listitem').filter({ hasText: 'v1' }).getByText('Live')).toHaveCount(0);
+  await page.setViewportSize({ width: 320, height: 780 });
+  await expect(nav.getByRole('link', { name: 'Published versions' })).toHaveAttribute('aria-current', 'page');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(320);
+  await expectNoAxeViolations(page, 'deck versions at 320px');
+  await page.screenshot({ path: testInfo.outputPath('deck-versions-mobile.png') });
+});
+
+test('the controlled deck keeps its reviewed release available to its editors', async ({ page }) => {
+  await stubApi(page);
+  const aws = { ...DECK, id: 15, slug: 'aws-saa-fundamentals', title: 'AWS Basics' };
+  await page.route('**/api/v1/authoring/decks?*', route => route.fulfill({ contentType: 'application/json', body: ok([aws]) }));
+  let jobsRequests = 0;
+  await page.route('**/api/v1/authoring/publish/**', route => {
+    jobsRequests++;
+    return route.abort();
+  });
+  await page.addInitScript(([key, value]) => sessionStorage.setItem(key, value), [TOKEN_KEY, editorSession()]);
+  await page.goto('/decks/publish?deckId=15');
+  await expect(page.getByRole('link', { name: 'Open reviewed release' })).toHaveAttribute('href', '/decks/release?deckId=15');
+  await expect(page.getByRole('button', { name: 'Publish deck' })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Published versions' })).toHaveCount(0);
+  expect(jobsRequests).toBe(0);
+
+  await page.goto('/decks/publish?deckId=42');
+  await expect(page.getByText('Super administrator access required')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Open reviewed release' })).toHaveCount(0);
 });

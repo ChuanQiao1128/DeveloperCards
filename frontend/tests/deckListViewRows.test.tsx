@@ -315,11 +315,9 @@ function typeCellText(slug: string): string {
   return (cells[2]?.textContent ?? '').trim();
 }
 
-/** The `#<manifestOrder ?? '-'>` chip, found by its title attribute (:1043). */
-function orderChip(slug: string): string {
-  const chip = rowFor(slug).querySelector('[title="Manifest Order"]');
-  expect(chip, `expected an order chip on row "${slug}"`).not.toBeNull();
-  return (chip?.textContent ?? '').trim();
+function manifestOrderText(slug: string): string | null {
+  const order = rowFor(slug).querySelector('[title="Manifest order"]');
+  return order?.textContent?.trim() ?? null;
 }
 
 async function selectFilter(label: string, value: string): Promise<void> {
@@ -528,7 +526,7 @@ describe('viewRows: the status filter', () => {
 });
 
 describe('viewRows: manifest order', () => {
-  it('V9a: legacy — a missing order sorts last as 999999 and its chip reads #-', async () => {
+  it('V9a: legacy — a missing order sorts last without a label', async () => {
     // Four decks in an order the sort has to undo, covering all four states a
     // manifestOrder can be in.
     api.fetchDecks.mockResolvedValue(
@@ -548,20 +546,20 @@ describe('viewRows: manifest order', () => {
     // order, because Array.prototype.sort is stable.
     expect(visibleSlugs()).toEqual(['ord-a', 'ord-b', 'ord-c', 'ord-d']);
 
-    expect(orderChip('ord-a')).toBe('#0');
-    expect(orderChip('ord-b')).toBe('#2');
-    expect(orderChip('ord-c')).toBe('#-');
-    expect(orderChip('ord-d')).toBe('#-');
+    expect(manifestOrderText('ord-a')).toBe('Order 0');
+    expect(manifestOrderText('ord-b')).toBe('Order 2');
+    expect(manifestOrderText('ord-c')).toBeNull();
+    expect(manifestOrderText('ord-d')).toBeNull();
   });
 
-  it('V9b: paginated — manifestOrder is hard-coded null, so every chip reads #-', async () => {
+  it('V9b: paginated — unknown order is omitted on every row', async () => {
     await mountPaginated();
 
     // buildViewRows' paginated branch sets manifestOrder: null unconditionally
     // on this path, so the
     // column is decoration in paginated mode no matter what the server sent.
     for (const slug of [AMB, CTRL_STARTER, CTRL_PAID]) {
-      expect(orderChip(slug)).toBe('#-');
+      expect(manifestOrderText(slug)).toBeNull();
     }
   });
 });

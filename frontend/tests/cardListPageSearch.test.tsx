@@ -130,7 +130,7 @@ describe('the filter bar narrows the card list', () => {
     await waitFor(() => expect(screen.queryByText('No cards match these filters.')).not.toBeNull());
     // The empty-deck sentence must not appear for a deck that does have cards.
     expect(
-      screen.queryByText('No cards yet. Click "New Card" to add the first one.'),
+      screen.queryByText('No cards yet. Click "New card" to add the first one.'),
     ).toBeNull();
   });
 

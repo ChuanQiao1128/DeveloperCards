@@ -138,10 +138,10 @@ describe('an editor session skips the manifest and the poll', () => {
 
     // The published signal is liveBuildId, not a manifest entry: no manifest was
     // fetched at all.
-    expect(within(rowFor('C# Async')).getByText('Published')).not.toBeNull();
+    expect(within(rowFor('C# Async')).getByRole('cell', { name: 'Published' })).not.toBeNull();
     // Same card count, null liveBuildId: it has content but is not live yet.
-    expect(within(rowFor('C# LINQ')).getByText('Needs Publish')).not.toBeNull();
-    expect(within(rowFor('C# LINQ')).queryByText('Published')).toBeNull();
+    expect(within(rowFor('C# LINQ')).getByRole('cell', { name: 'Needs Publish' })).not.toBeNull();
+    expect(within(rowFor('C# LINQ')).queryByRole('cell', { name: 'Published' })).toBeNull();
   });
 
   it('does not poll publish jobs for an editor', async () => {

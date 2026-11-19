@@ -710,18 +710,27 @@ export async function importCardsBatch(params: {
 
 // ---------------------- publish ----------------------
 
+type PublishStarted = { mode: string; jobId?: string };
+
 export async function publishDeck(
-  deckId: number, 
-  note?: string
-): Promise<ApiResult<{ mode: string; jobId?: string }>> {
+  deckId: number,
+  note?: string,
+  actionId?: string,
+): Promise<ApiResult<PublishStarted>> {
   try {
-    const resp = await http.post<ApiResult<{ mode: string; jobId?: string }>>('/api/v1/authoring/publish', {
+    const resp = await http.post<ApiResult<PublishStarted>>('/api/v1/authoring/publish', {
       deckId,
       note: note ?? '',
+      ...(actionId ? { actionId } : {}),
     });
     return resp.data;
   } catch (err) {
-    return apiResultFromError<{ mode: string; jobId?: string }>(err);
+    const failure = apiResultFromError<PublishStarted>(err);
+    if (failure.error?.code === 'PUBLISH_DISPATCH_UNCONFIRMED' && axios.isAxiosError(err)) {
+      const jobId: unknown = err.response?.data?.data?.jobId;
+      if (typeof jobId === 'string' && jobId) return { ...failure, data: { mode: 'async', jobId } };
+    }
+    return failure;
   }
 }
 

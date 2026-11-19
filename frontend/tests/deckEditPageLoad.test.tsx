@@ -220,7 +220,7 @@ describe('a deck that will not load', () => {
     expect(screen.queryByText(THROWN_MESSAGE)).not.toBeNull();
   });
 
-  it('sends Back to the deck list', async () => {
+  it('links back to all decks', async () => {
     api.fetchDeckById.mockResolvedValue(refused<Deck>('FORBIDDEN', REFUSAL_MESSAGE));
     mount();
 
@@ -486,18 +486,18 @@ describe('what a super admin may touch', () => {
 });
 
 describe('the two header links', () => {
-  it('sends View Cards to the card list for this deck', async () => {
+  it('links to the cards for this deck', async () => {
     await mountLoaded();
-    await userEvent.click(screen.getByRole('button', { name: 'View Cards' }));
+    await userEvent.click(screen.getByRole('link', { name: 'Cards' }));
 
     // The id comes from the loaded deck, not from the query string, so a deck
     // whose canonical id differs from the URL still lands correctly.
     expect(locationText()).toBe(`/decks/cards?deckId=${DECK_ID}`);
   });
 
-  it('sends Back to the deck list', async () => {
+  it('links back to all decks', async () => {
     await mountLoaded();
-    await userEvent.click(screen.getByRole('button', { name: 'Back' }));
+    await userEvent.click(screen.getByRole('link', { name: 'All decks' }));
 
     expect(locationText()).toBe('/');
   });

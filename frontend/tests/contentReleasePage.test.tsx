@@ -419,7 +419,9 @@ describe('automatic reviewed release completion', () => {
     const writes = api.sendReleaseAction.mock.calls.length;
     const snapshots = api.fetchReleaseSnapshot.mock.calls.length;
     const readbacks = api.fetchReleaseCards.mock.calls.length;
-    await user.click(screen.getByRole('button', { name: 'Verify public cards' }));
+    const verifyButton = screen.getByRole<HTMLButtonElement>('button', { name: 'Verify public cards' });
+    await waitFor(() => expect(verifyButton.disabled).toBe(false));
+    await user.click(verifyButton);
     await screen.findByText('Published and verified');
     expect(api.sendReleaseAction).toHaveBeenCalledTimes(writes);
     expect(api.fetchReleaseSnapshot).toHaveBeenCalledTimes(snapshots);

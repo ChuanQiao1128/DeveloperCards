@@ -200,13 +200,13 @@ describe('the legacy deck list path', () => {
     // The first deck carries a liveBuildId, so it reads Published even though no
     // manifest was ever fetched.
     expect(await screen.findByText('C# Async')).not.toBeNull();
-    expect(within(rowFor('C# Async')).getByText('Published')).not.toBeNull();
+    expect(within(rowFor('C# Async')).getByRole('cell', { name: 'Published' })).not.toBeNull();
 
     // The second deck has a null liveBuildId, so it must NOT be published —
     // otherwise "Published" above would prove nothing about the field, only that
     // the page can print the word.
-    expect(within(rowFor('C# LINQ')).getByText('Needs Publish')).not.toBeNull();
-    expect(within(rowFor('C# LINQ')).queryByText('Published')).toBeNull();
+    expect(within(rowFor('C# LINQ')).getByRole('cell', { name: 'Needs Publish' })).not.toBeNull();
+    expect(within(rowFor('C# LINQ')).queryByRole('cell', { name: 'Published' })).toBeNull();
   });
 
   it('L2: a super admin whose paged endpoint is missing actually re-fetches, not just re-labels', async () => {
@@ -225,7 +225,7 @@ describe('the legacy deck list path', () => {
     // And the rows arrived, so the fallback produced a usable page rather than
     // an empty table under a switched flag.
     expect(await screen.findByText('C# Async')).not.toBeNull();
-    expect(within(rowFor('C# Async')).getByText('Published')).not.toBeNull();
+    expect(within(rowFor('C# Async')).getByRole('cell', { name: 'Published' })).not.toBeNull();
   });
 
   it('L3: an error outside the fallback set stays on the paged path and surfaces', async () => {
