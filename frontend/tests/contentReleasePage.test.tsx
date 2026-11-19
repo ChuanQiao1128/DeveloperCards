@@ -159,12 +159,12 @@ describe('AWS Basics release operator flow', () => {
     await screen.findByText(/PUBLISH_DISPATCH_UNCONFIRMED:/);
     const first = api.sendReleaseAction.mock.calls[0][0];
     expect(JSON.parse(first.payload)).toMatchObject({ actionId: 'publish', expectedLive: 'original-live', receiptId: 'original-receipt' });
-    expect(screen.getByRole('button', { name: 'Retry identical publish request' }).hasAttribute('disabled')).toBe(true);
-    api.fetchReleaseAction.mockResolvedValue(ok({ action: { StatusCode: 200, Body: JSON.stringify(committed) }, receipts: [], jobs: [{ job_id: 'same-job', build_id: 'same-build', status: 'PENDING', content_sha256: null, error_message: null }], liveBuildId: 'original-live', manifestVerified: false }));
-    await user.click(screen.getByRole('button', { name: 'Query publish action' }));
+    expect(screen.queryByRole('button', { name: 'Continue queue delivery' })).toBeNull();
+    api.fetchReleaseAction.mockImplementation(async (_release, kind) => ok({ action: { StatusCode: 200, Body: JSON.stringify(kind === 'publish' ? committed : session.actions[kind as 'import' | 'review']!.result) }, receipts: [], jobs: [{ job_id: 'same-job', build_id: 'same-build', status: 'PENDING', content_sha256: null, error_message: null }], liveBuildId: 'original-live', manifestVerified: false }));
+    await user.click(screen.getByRole('button', { name: 'Check publication status' }));
     await screen.findByText(/Committed publish action found/);
     expect(screen.getByText(/"PENDING"/, { exact: false }).textContent).toContain('same-job');
-    await user.click(screen.getByRole('button', { name: 'Retry identical publish request' }));
+    await user.click(screen.getByRole('button', { name: 'Continue queue delivery' }));
     await waitFor(() => expect(api.sendReleaseAction).toHaveBeenCalledTimes(2));
     expect(api.sendReleaseAction.mock.calls[1][0].payload).toBe(first.payload);
     expect(api.fetchReleaseSnapshot).not.toHaveBeenCalled();
@@ -296,8 +296,8 @@ describe('reconciled receipt binds the original publish bytes', () => {
     session.actions.review!.result!.data!.receiptId = 'actual-different-receipt';
     await mount(); await reconcile(user, session, ['import', 'review']);
     api.fetchReleaseAction.mockResolvedValue(ok({ action: { StatusCode: 200, Body: JSON.stringify(ok({ jobId: 'same-job', buildId: 'same-build', outcome: 'committed', manifestVerified: false, snapshotSha256: snapshot.publishSnapshot })) }, receipts: [], jobs: [], liveBuildId: 'original-live', manifestVerified: false }));
-    await user.click(screen.getByRole('button', { name: 'Query publish action' })); await screen.findByText(/Committed publish action found/);
-    await user.click(screen.getByRole('button', { name: 'Retry identical publish request' })); await screen.findByText(/differs from its frozen/);
+    await user.click(screen.getByRole('button', { name: 'Check publication status' })); await screen.findByText(/differs from its frozen/);
+    expect(screen.queryByRole('button', { name: 'Continue queue delivery' })).toBeNull();
     expect(api.sendReleaseAction).not.toHaveBeenCalled();
     expect((await readSaved()).actions.publish.payload).toBe(originalBytes);
     expect(api.fetchReleaseSnapshot).not.toHaveBeenCalled();
@@ -305,7 +305,7 @@ describe('reconciled receipt binds the original publish bytes', () => {
 });
 
 describe('automatic reviewed release completion', () => {
-  function publishingApi(fixture: ReturnType<typeof releaseFixture>, options: { pendingIndex?: boolean; unknownImport?: boolean; attention?: boolean } = {}) {
+  function publishingApi(fixture: ReturnType<typeof releaseFixture>, options: { pendingIndex?: boolean; unknownImport?: boolean; attention?: boolean; failedBuild?: boolean; queueAttention?: boolean } = {}) {
     const { session, snapshot, cards } = fixture;
     api.fetchReleaseSnapshot.mockResolvedValue(ok(snapshot)); api.fetchReleaseCards.mockResolvedValue(ok(cards));
     const published = ok({ jobId: 'same-job', buildId: 'same-build', outcome: 'queued', manifestVerified: false, snapshotSha256: snapshot.publishSnapshot });
@@ -317,7 +317,8 @@ describe('automatic reviewed release completion', () => {
     });
     api.fetchReleaseAction.mockImplementation(async (_release, kind) => ok({
       action: { StatusCode: 200, Body: JSON.stringify(kind === 'import' ? ok({ editingSnapshot: snapshot.editingSnapshot }) : kind === 'review' ? session.actions.review?.result : published) },
-      receipts: [], jobs: [{ job_id: 'same-job', build_id: 'same-build', status: 'SUCCESS', content_sha256: 'a'.repeat(64), error_message: null,
+      receipts: [], jobs: [{ job_id: 'same-job', build_id: 'same-build', status: options.failedBuild ? 'FAILED' : options.queueAttention ? 'PENDING' : 'SUCCESS', content_sha256: 'a'.repeat(64), error_message: options.failedBuild ? 'Synthetic build validation failed.' : null,
+        dispatchState: options.queueAttention ? 'needs_attention' : 'closed',
         manifestState: options.attention ? 'needs_attention' : options.pendingIndex && publishCalls < 2 ? 'pending' : 'delivered', manifestNextAttemptAt: '2020-01-01T00:00:00Z' }],
       liveBuildId: 'same-build', manifestVerified: false,
     }));
@@ -392,4 +393,55 @@ describe('automatic reviewed release completion', () => {
     await user.click(screen.getByRole('button', { name: 'Run reviewed release' })); await screen.findByText(/Signed-in subject changed/);
     expect(screen.queryByText(/manifestVerified=true/)).toBeNull();
   });
+  it('shows terminal build failure without a retry or run button and status checks never restart it', async () => {
+    const fixture = releaseFixture(5); store(fixture.session); publishingApi(fixture, { failedBuild: true }); const user = userEvent.setup(); await mount();
+    await user.click(screen.getByRole('button', { name: 'Run reviewed release' }));
+    await screen.findByText('Publication failed');
+    expect(screen.queryByRole('button', { name: 'Continue queue delivery' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Run reviewed release' })).toBeNull();
+    const writes = api.sendReleaseAction.mock.calls.length;
+    await user.click(screen.getByRole('button', { name: 'Check publication status' }));
+    expect(api.sendReleaseAction).toHaveBeenCalledTimes(writes);
+    expect((await readSaved()).actions.publish.result.data.jobId).toBe('same-job');
+  });
+  it('shows exhausted queue delivery as needing attention without offering another publish', async () => {
+    const fixture = releaseFixture(5); store(fixture.session); publishingApi(fixture, { queueAttention: true }); const user = userEvent.setup(); await mount();
+    await user.click(screen.getByRole('button', { name: 'Run reviewed release' }));
+    await screen.findByText('Queue delivery needs attention');
+    expect(screen.queryByRole('button', { name: 'Continue queue delivery' })).toBeNull();
+    expect(api.sendReleaseAction.mock.calls.filter(call => call[0].kind === 'publish')).toHaveLength(1);
+  });
+  it('rechecks public verification without importing, reviewing or publishing again', async () => {
+    const fixture = releaseFixture(5); store(fixture.session); publishingApi(fixture); const user = userEvent.setup(); await mount();
+    api.verifyReleaseDelivery.mockRejectedValueOnce(new Error('Synthetic public download unavailable.'));
+    await user.click(screen.getByRole('button', { name: 'Run reviewed release' }));
+    await screen.findByText('Public verification incomplete');
+    const writes = api.sendReleaseAction.mock.calls.length;
+    const snapshots = api.fetchReleaseSnapshot.mock.calls.length;
+    const readbacks = api.fetchReleaseCards.mock.calls.length;
+    await user.click(screen.getByRole('button', { name: 'Verify public cards' }));
+    await screen.findByText('Published and verified');
+    expect(api.sendReleaseAction).toHaveBeenCalledTimes(writes);
+    expect(api.fetchReleaseSnapshot).toHaveBeenCalledTimes(snapshots);
+    expect(api.fetchReleaseCards).toHaveBeenCalledTimes(readbacks);
+  });
+  it.each(['timeout', 'missing jobs', 'null job'] as const)('clears current success and forbids writes after a %s status reply', async failure => {
+    const fixture = releaseFixture(5); store(fixture.session); publishingApi(fixture); const user = userEvent.setup(); await mount();
+    await user.click(screen.getByRole('button', { name: 'Run reviewed release' }));
+    await screen.findByText('Published and verified');
+    const raw = (await journalStore.loadReleaseJournal(TEST_EDITOR_SUB))!.raw;
+    const writes = api.sendReleaseAction.mock.calls.length;
+    const action = JSON.parse(raw).actions.publish;
+    api.fetchReleaseAction.mockResolvedValue(failure === 'timeout' ? refused('TIMEOUT', 'Status check timed out.')
+      : ok({ ...action.query, jobs: failure === 'null job' ? [null] : undefined }));
+    await user.click(screen.getByRole('button', { name: 'Check publication status' }));
+    await screen.findByText('Publication result not confirmed');
+    expect(screen.queryByText('Published and verified')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Start another release' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Verify public cards' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Continue queue delivery' })).toBeNull();
+    expect(api.sendReleaseAction).toHaveBeenCalledTimes(writes);
+    expect((await journalStore.loadReleaseJournal(TEST_EDITOR_SUB))!.raw).toBe(raw);
+  });
+
 });

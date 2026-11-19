@@ -8,6 +8,7 @@ import { CARD_CLASS, H1_CLASS, H2_CLASS, INPUT_CLASS } from '../components/conso
 import { Button } from '../components/ui/Button';
 import { Callout } from '../components/ui/Callout';
 import { CONSOLE_NAME } from '../lib/brand';
+import { assertPublicationQuery, publicationStatus, type PublicationStatus } from '../lib/contentReleaseStatus';
 import { loadReleaseJournal, saveReleaseJournal, withReleaseJournalLock } from '../lib/releaseJournalStore';
 import { verifyReleaseDelivery, verifyStoredReleaseDelivery, waitForReleasePoll, type ReleaseDeliveryProof } from '../lib/contentReleaseDelivery';
 import { chooseArtifactDirectory, loadArtifactDirectory, loadDeliveryArtifact, releaseArtifactDownload, saveDeliveryArtifact, supportsArtifactDirectory, writeReleaseArtifacts, type ArtifactDirectory, type DeliveryArtifact } from '../lib/releaseArtifacts';
@@ -23,6 +24,22 @@ function downloadJson(name: string, value: unknown) {
   const url = URL.createObjectURL(new Blob([JSON.stringify(value, null, 2)], { type: 'application/json' }));
   const anchor = document.createElement('a'); anchor.href = url; anchor.download = name; anchor.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+export function PublicationStatusPanel({ status, busy, blocked, onCheck, onContinue, onVerify }: {
+  status: PublicationStatus; busy: boolean; blocked: boolean; onCheck: () => void; onContinue: () => void; onVerify: () => void;
+}) {
+  return <Callout tone={status.tone} title={status.title} role={status.tone === 'danger' ? 'alert' : 'status'}>
+      <p>{status.description}</p>
+      {status.nextAttemptAt && <p className="mt-2">Next retry no earlier than {status.nextAttemptAt.replace('T', ' ').replace('.000Z', ' UTC')}</p>}
+      {status.liveBuildId !== undefined && <p className="mt-2 break-all">Current server live build: {status.liveBuildId ?? 'none'}. Phone availability requires public verification.</p>}
+      <p className="mt-2">Your frozen content and recovery journal are retained.</p>
+      <div className="mt-3 flex flex-wrap gap-3">
+        <Button variant="outline" disabled={busy} onClick={onCheck}>Check publication status</Button>
+        {status.continueLabel && <Button disabled={busy || blocked} onClick={onContinue}>{status.continueLabel}</Button>}
+        {status.kind === 'verification' && <Button disabled={busy || blocked} onClick={onVerify}>Verify public cards</Button>}
+      </div>
+    </Callout>;
 }
 
 export function ContentReleasePage() {
@@ -46,6 +63,9 @@ export function ContentReleasePage() {
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [queryView, setQueryView] = useState<unknown>(null);
+  const [publicationLookupFailed, setPublicationLookupFailed] = useState(false);
+  const freshPublishQuery = useRef(false);
+  const publication = publicationStatus(session, Boolean(delivery), publicationLookupFailed);
 
   const assertOwner = useCallback((current?: ReleaseSession | null) => {
     if (running.current?.signal.aborted) throw new Error('Publication monitoring stopped.');
@@ -143,6 +163,7 @@ export function ContentReleasePage() {
     if (replay) {
       if (!action) throw new Error('No frozen request to replay.');
       assertReplayAllowed(action);
+      if (kind === 'publish' && (!freshPublishQuery.current || !publicationStatus(current, false)?.continueLabel)) throw new Error('Check the current publication status. This job is not eligible for delivery replay.');
       assertFrozenAction(current, action);
     } else {
       if (action) throw new Error('Action is already frozen. Query it before retrying.');
@@ -157,6 +178,7 @@ export function ContentReleasePage() {
       action = prepareReleaseAction(current, kind, kind);
     }
     if (!action) return;
+    if (kind === 'publish') freshPublishQuery.current = false;
     action = { ...action, outcome: 'unknown', queried: false, reconciled: false, result: undefined, query: undefined };
     current = { ...current, actions: { ...current.actions, [kind]: action }, ...(kind === 'import' ? { verifiedSnapshot: undefined } : {}) };
     await save(current);
@@ -175,19 +197,60 @@ export function ContentReleasePage() {
     if (!session?.actions[kind]) return;
     const action = session.actions[kind];
     assertOwner();
-    const result = await owned(() => fetchReleaseAction(session.bundle.releaseId, action.actionId, user!.sub!));
+    if (kind === 'publish') { setDelivery(null); setPublicationLookupFailed(true); freshPublishQuery.current = false; }
+    let result;
+    try {
+      result = await owned(() => fetchReleaseAction(session.bundle.releaseId, action.actionId, user!.sub!));
+    } catch (failure) { if (kind === 'publish') setPublicationLookupFailed(true); throw failure; }
     if (!result.success || !result.data) {
       if (result.error?.code !== 'ACTION_NOT_FOUND') dataOrThrow(result);
       await save({ ...session, actions: { ...session.actions, [kind]: { ...action, queried: true, reconciled: true, outcome: 'unknown', result: undefined, query: undefined } } });
+      if (kind === 'publish') { setPublicationLookupFailed(false); freshPublishQuery.current = true; }
       setQueryView(result); setMessage('The action has not committed as of this query. Its original request and key are retained for an identical replay.'); return;
     }
     const committed = decodeCommittedAction(result.data.action);
     assertActionResult(session, action, committed);
+    if (kind === 'publish') { assertPublicationQuery(result.data); assertFrozenAction(session, action); }
     const next: ReleaseSession = { ...session, actions: { ...session.actions, [kind]: { ...action, outcome: 'confirmed', queried: true, reconciled: true, result: committed, query: result.data } } };
     if (JSON.stringify(next.actions[kind]) !== JSON.stringify(action)) await save(next);
+    if (kind === 'publish') { setPublicationLookupFailed(false); freshPublishQuery.current = true; }
     setQueryView(result.data);
     setMessage(`Committed ${kind} action found. Current live build: ${result.data.liveBuildId ?? 'none'}. manifestVerified=false. A PENDING publish can replay the identical action to deliver the same job.`);
     return next;
+  }
+
+  async function continuePublication() {
+    for (const kind of ['import', 'review'] as const) {
+      if (currentSession.current?.actions[kind] && !currentSession.current.actions[kind]!.reconciled) await query(kind);
+    }
+    await query('publish');
+    const current = currentSession.current;
+    if (!publicationStatus(current, false)?.continueLabel) return;
+    await dispatch('publish', true);
+    await completeRelease();
+  }
+
+  async function verifyPublicCards(current: ReleaseSession, signal: AbortSignal): Promise<boolean> {
+    const action = current.actions.publish!;
+    const cached = await loadDeliveryArtifact(current, () => assertOwner(current));
+    const proof = cached ? await owned(() => verifyStoredReleaseDelivery(current, action.query!, cached), current)
+      : await owned(() => verifyReleaseDelivery(current, action.query!, signal,
+        (proof, bytes) => saveDeliveryArtifact(current, proof, bytes, () => assertOwner(current))), current);
+    if (!proof) return false;
+    const completed = { ...current, delivery: proof };
+    const artifact = await loadDeliveryArtifact(current, () => assertOwner(current));
+    if (artifactDirectory.current && !artifact) throw new Error('Verified deck bytes have not finished saving.');
+    await save(completed, false, artifact); assertOwner(current); setDelivery(proof);
+    setMessage(`Published and verified ${proof.cards} bilingual cards on the public CDN.`);
+    return true;
+  }
+  async function verifyExistingPublication() {
+    const controller = new AbortController(); running.current = controller; setDelivery(null);
+    try {
+      const current = await query('publish');
+      if (!current || publicationStatus(current, false)?.kind !== 'verification') return;
+      if (!await verifyPublicCards(current, controller.signal)) setMessage('Waiting for the public CDN index to refresh. Check again to verify this same card pack.');
+    } finally { if (running.current === controller) running.current = null; }
   }
 
   async function completeRelease() {
@@ -217,23 +280,12 @@ export function ContentReleasePage() {
         if (!current) throw new Error('Publish action was not found; its original request is retained.');
         const action = current.actions.publish!;
         const job = action.query?.jobs.find(item => item.job_id === action.result?.data?.jobId && item.build_id === action.result?.data?.buildId);
-        if (job?.status === 'FAILED') throw new Error(`Publication failed: ${job.error_message ?? 'Inspect the saved job.'}`);
+        if (job?.status === 'FAILED') { setError(job.error_message ?? 'Inspect the saved job for its failure reason.'); return; }
         if (job?.status === 'SUCCESS' && action.query?.liveBuildId !== job.build_id) throw new Error('Another release changed the live build. Publication verification stopped.');
-        if (job?.status === 'PENDING' && job.dispatchState === 'needs_attention') throw new Error('Publish queue delivery needs attention. The original job and journal are retained.');
-        if (job?.manifestState === 'needs_attention') throw new Error(`Index delivery needs attention: ${job.manifestError ?? 'Retry limit reached.'} The original job and journal are retained.`);
+        if (job?.status === 'PENDING' && job.dispatchState === 'needs_attention') { setError('Queue delivery retries are exhausted. The original job and journal are retained.'); return; }
+        if (job?.manifestState === 'needs_attention') { setError(job.manifestError ?? 'Index delivery retry limit reached. The original job and journal are retained.'); return; }
         if (job?.status === 'SUCCESS' && job.manifestState === 'delivered') {
-          const cached = await loadDeliveryArtifact(current, () => assertOwner(current));
-          const proof = cached ? await owned(() => verifyStoredReleaseDelivery(current, action.query!, cached), current)
-            : await owned(() => verifyReleaseDelivery(current, action.query!, controller.signal,
-              (proof, bytes) => saveDeliveryArtifact(current, proof, bytes, () => assertOwner(current))), current);
-          active();
-          if (proof) {
-            const completed = { ...current, delivery: proof };
-            const artifact = await loadDeliveryArtifact(current, () => assertOwner(current));
-            if (artifactDirectory.current && !artifact) throw new Error('Verified deck bytes have not finished saving.');
-            await save(completed, false, artifact); active(); setDelivery(proof);
-            setMessage(`Published and verified ${proof.cards} bilingual cards on the public CDN.`); return;
-          }
+          if (await verifyPublicCards(current, controller.signal)) return;
           setMessage('Card build and index delivery succeeded. Waiting for the public CDN index to refresh.');
         } else {
           setMessage(job?.status === 'SUCCESS' ? 'Card build succeeded. Recovering the download index for the same job.' : 'Waiting for the published card build.');
@@ -260,7 +312,9 @@ export function ContentReleasePage() {
   return <ConsoleShell title={CONSOLE_NAME} subtitle="AWS Basics bilingual release" {...consoleNav()}>
     <div className="flex flex-wrap items-center justify-between gap-3"><h1 className={H1_CLASS}>AWS Basics release{cardCount ? ` · ${cardCount} cards` : ''}</h1><Link className="text-sm text-indigo-700 underline" to="/decks/cards?deckId=15">Back to AWS Basics</Link></div>
     <Callout tone="info">Load the immutable local bundle containing the existing model review. File checks and readback comparisons do not review content. The receipt records reviewedBy=codex and humanPerCardReview=false; the author submits batch authorization without asserting per-card human review.</Callout>
-    {error && <Callout tone="danger" role="alert">{error}</Callout>}
+    {publication && <PublicationStatusPanel status={publication} busy={busy} blocked={restoreBlocked}
+      onCheck={() => void run(() => query('publish'))} onContinue={() => void run(continuePublication)} onVerify={() => void run(verifyExistingPublication)} />}
+    {error && <Callout tone={publication?.kind === 'unknown' || publication?.kind === 'verification' ? 'warning' : 'danger'} title="Action needs attention" role="alert">{error}</Callout>}
     {message && <Callout tone="info" role="status">{message}</Callout>}
     {supportsArtifactDirectory() && <Button variant="outline" disabled={busy || restoreBlocked} onClick={() => void run(async () => {
       const directory = await chooseArtifactDirectory(user!.sub!, () => assertOwner(currentSession.current));
@@ -276,7 +330,7 @@ export function ContentReleasePage() {
       });
       setMessage('Save folder selected. Recovery files and verified card packs will save here automatically.');
     })}>{automaticSave ? 'Change automatic save folder' : 'Choose automatic save folder'}</Button>}
-    {(bundle || session) && <Button disabled={busy || restoreBlocked} onClick={() => void run(completeRelease)}>Run reviewed release</Button>}
+    {(bundle || session) && !session?.actions.publish && <Button disabled={busy || restoreBlocked} onClick={() => void run(completeRelease)}>Run reviewed release</Button>}
     {delivery && <Button variant="outline" disabled={busy} onClick={() => void run(startAnotherRelease)}>Start another release</Button>}
     {delivery && <Button variant="outline" disabled={busy} onClick={() => void run(async () => {
       const current = currentSession.current!;
@@ -292,7 +346,7 @@ export function ContentReleasePage() {
     </section>}
     <section className={`${CARD_CLASS} space-y-3`}>
       <label className="block text-sm" htmlFor="release-recovery">Or restore a downloaded Console recovery journal</label>
-      <input id="release-recovery" className={INPUT_CLASS} type="file" accept="application/json,.json" disabled={busy} onChange={event => { const file = event.target.files?.[0]; if (!file) return; void run(async () => { if (file.size > 10_000_000) throw new Error('Recovery journal is too large.'); await save(parseReleaseSession(await owned(() => file.text()), user!.sub!), true); setRestoreBlocked(false); setDelivery(null); setQueryView(null); setBundle(null); setMessage('Original backup, frozen requests and action keys restored. Query each existing action before continuing.'); }, true); }} />
+      <input id="release-recovery" className={INPUT_CLASS} type="file" accept="application/json,.json" disabled={busy} onChange={event => { const file = event.target.files?.[0]; if (!file) return; void run(async () => { if (file.size > 10_000_000) throw new Error('Recovery journal is too large.'); await save(parseReleaseSession(await owned(() => file.text()), user!.sub!), true); setRestoreBlocked(false); setDelivery(null); setQueryView(null); setPublicationLookupFailed(false); freshPublishQuery.current = false; setBundle(null); setMessage('Original backup, frozen requests and action keys restored. Query each existing action before continuing.'); }, true); }} />
     </section>
     {session && <>
       <section className={`${CARD_CLASS} space-y-3`} aria-labelledby="backup-heading">
@@ -310,15 +364,15 @@ export function ContentReleasePage() {
           {action && <p className="text-sm break-all">Action: {action.actionId} · {!action.reconciled ? 'Recovery unreconciled — query before continuing' : action.outcome === 'unknown' ? 'Outcome unknown — query before retry' : 'Commit confirmed'}{action.result?.error ? ` · ${action.result.error.code}` : ''}</p>}
           <div className="flex flex-wrap gap-3">
             {!action && <Button disabled={busy || !ready} onClick={() => void run(() => dispatch(kind))}>{kind === 'import' ? `Import ${session.bundle.cards.length} cards` : kind === 'review' ? 'Verify and register model review' : 'Publish reviewed release'}</Button>}
-            {action && <Button variant="outline" disabled={busy} onClick={() => void run(() => query(kind))}>Query {kind} action</Button>}
-            {action && (action.outcome === 'unknown' || kind === 'publish') && <Button variant="outline" disabled={busy || !action.queried || !ready} onClick={() => void run(() => dispatch(kind, true))}>Retry identical {kind} request</Button>}
+            {action && kind !== 'publish' && <Button variant="outline" disabled={busy} onClick={() => void run(() => query(kind))}>Query {kind} action</Button>}
+            {action && kind !== 'publish' && action.outcome === 'unknown' && <Button variant="outline" disabled={busy || !action.queried || !ready} onClick={() => void run(() => dispatch(kind, true))}>Retry identical {kind} request</Button>}
           </div>
           {kind === 'review' && <p className="text-sm text-slate-600">All English and Chinese fields, help, source, difficulty and order must match. Every local PASS must match the current server hash, schema and revision. Policy hashes come from the current snapshot.</p>}
           {kind === 'publish' && <p className="text-sm text-slate-600">A 503 or timeout can leave a committed publish job. Query, then replay the same action if delivery is unconfirmed. Current job and live status appear below; manifestVerified remains false until external CDN verification.</p>}
         </section>;
       })}
       <section className={`${CARD_CLASS} space-y-3`} aria-labelledby="verification-heading"><h2 id="verification-heading" className={H2_CLASS}>Readback and server status</h2><Button variant="outline" disabled={busy || !isConfirmedAction(session.actions.import) || !Object.values(session.actions).every(action => action.reconciled)} onClick={() => void run(async () => { const next = await owned(() => verify(session)); await save(next); setMessage(`Exact ${session.bundle.cards.length}-card readback and local model review bindings verified. No new model review was performed.`); })}>Verify current editing readback</Button><p className="text-sm">{delivery ? `manifestVerified=true · ${delivery.buildId} · ${delivery.cards} cards · ${delivery.sha256}` : 'manifestVerified=false · External CDN verification is pending.'}</p>
-        <details><summary className="cursor-pointer text-sm">Latest action query (actual jobs and live build)</summary><pre className="text-xs overflow-auto max-h-96 whitespace-pre-wrap break-all">{JSON.stringify(queryView ?? Object.fromEntries(Object.entries(session.actions).map(([kind, action]) => [kind, action?.query ?? action?.result])), null, 2)}</pre></details>
+        <details><summary className="cursor-pointer text-sm">{publicationLookupFailed ? 'Previous action query (not current after a failed check)' : 'Latest action query (actual jobs and live build)'}</summary><pre className="text-xs overflow-auto max-h-96 whitespace-pre-wrap break-all">{JSON.stringify(queryView ?? Object.fromEntries(Object.entries(session.actions).map(([kind, action]) => [kind, action?.query ?? action?.result])), null, 2)}</pre></details>
         <details><summary className="cursor-pointer text-sm">Frozen complete editing backup</summary><pre className="text-xs overflow-auto max-h-96 whitespace-pre-wrap break-all">{JSON.stringify(session.baseline, null, 2)}</pre></details>
       </section>
     </>}

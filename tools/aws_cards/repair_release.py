@@ -21,7 +21,7 @@ import repair_cards as cards
 PUBLISHER_CODE_FILES = (
     'tools/aws_cards/repair_batch.py', 'tools/aws_cards/repair_release.py', 'tools/aws_cards/repair_cards.py',
     'tools/aws_cards/validate_release_json.mjs', 'frontend/src/lib/contentRelease.ts',
-    'frontend/src/lib/contentReleaseDelivery.ts', 'frontend/src/lib/releaseArtifacts.ts',
+    'frontend/src/lib/contentReleaseDelivery.ts', 'frontend/src/lib/contentReleaseStatus.ts', 'frontend/src/lib/releaseArtifacts.ts',
     'frontend/src/lib/releaseJournalStore.ts', 'frontend/src/pages/ContentReleasePage.tsx',
     'frontend/src/types/contentRelease.ts', 'frontend/package-lock.json', '.github/workflows/ci.yml')
 REQUIRED_CODE_CHECKS = {'CodeQL', 'frontend (vitest + build)', 'frontend (playwright smoke)',
