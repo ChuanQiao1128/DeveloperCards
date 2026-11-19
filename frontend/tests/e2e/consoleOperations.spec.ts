@@ -42,11 +42,11 @@ test('mock sources render with safe semantics and a keyboard-operable learner dr
   await expect(page.getByRole('heading', { name: 'Operational sources' })).toBeVisible();
   await expect(page.getByText('Stale — historical results')).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('overview-desktop.png'), fullPage: true });
-  await page.getByRole('link', { name: 'Operations: checks, alarms and publishing' }).click();
+  await expect(page).toHaveURL(/\/operations$/);
   await expect(page.getByRole('heading', { name: 'Synthetic checks', level: 2 })).toBeVisible();
   expect(fixture.reads.filter(path => path.endsWith('/operations/overview'))).toHaveLength(1);
   await expect(page.getByText(/OK means the alarm is not firing/)).toBeVisible();
-  await page.getByRole('link', { name: 'Learners', exact: true }).click();
+  await page.getByRole('link', { name: 'App users', exact: true }).click();
   await expect(page.getByRole('table')).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('user-directory-desktop.png'), fullPage: true });
   const search = page.getByLabel('Search users');
@@ -128,12 +128,12 @@ test('mock editor cannot read the new direct routes or see their navigation', as
   for (const path of ['/overview', '/operations', '/learners', '/learners/observed-1']) {
     await page.goto(path);
     await expect(page.getByText('Super administrator access required')).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Learners', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'App users', exact: true })).toHaveCount(0);
   }
   expect(fixture.reads).toEqual([]);
 });
 
-test('commercial shell keeps desktop categories and traps mobile navigation focus', async ({ page }, testInfo) => {
+test('console shell keeps five desktop areas and traps mobile navigation focus', async ({ page }, testInfo) => {
   const fixture = await setup(page);
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/overview');
@@ -144,7 +144,7 @@ test('commercial shell keeps desktop categories and traps mobile navigation focu
   expect(bounds?.x).toBe(0);
   expect(bounds?.width).toBe(248);
   expect(await page.locator('main').evaluate(node => node.getBoundingClientRect().left)).toBeGreaterThanOrEqual(248);
-  await expect(sidebar.getByRole('link', { name: 'Overview', exact: true })).toHaveAttribute('aria-current', 'page');
+  await expect(sidebar.getByRole('link', { name: 'System', exact: true })).toHaveAttribute('aria-current', 'page');
   await page.screenshot({ path: testInfo.outputPath('commercial-desktop-1440.png'), fullPage: true });
 
   for (const width of [768, 320]) {
@@ -156,7 +156,7 @@ test('commercial shell keeps desktop categories and traps mobile navigation focu
     await expect(drawer).toBeVisible();
     await expect(trigger).toHaveAttribute('aria-expanded', 'true');
     const close = drawer.getByRole('button', { name: 'Close navigation', exact: true });
-    const last = drawer.getByRole('link', { name: 'Admin Management', exact: true });
+    const last = drawer.getByRole('link', { name: 'System', exact: true });
     await last.focus();
     await page.keyboard.press('Tab');
     // Native dialogs may put focus in browser chrome between the final and
@@ -170,7 +170,7 @@ test('commercial shell keeps desktop categories and traps mobile navigation focu
     expect(backwardFocus).not.toBe('background');
     if (backwardFocus === 'browser') await page.keyboard.press('Shift+Tab');
     await expect(last).toBeFocused();
-    await page.screenshot({ path: testInfo.outputPath(`commercial-navigation-${width}.png`), fullPage: true });
+    await page.screenshot({ path: testInfo.outputPath(`commercial-navigation-${width}.png`), animations: 'disabled' });
     await page.keyboard.press('Escape');
     await expect(drawer).toBeHidden();
     await expect(trigger).toBeFocused();

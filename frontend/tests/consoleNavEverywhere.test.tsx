@@ -76,44 +76,32 @@ afterEach(() => {
   localStorage.clear();
 });
 
-describe('the console sections on the landing page', () => {
-  // B07 (frontend-console-12): the Automation console is in the shared set, so
-  // the landing page links it too; before, only the four automation-area pages did.
-  it('links a super_admin to Review queue, AI QA, Automation ledger, Automation and Webhooks', async () => {
+describe('the task areas on the landing page', () => {
+  it('shows five primary destinations to a super administrator', async () => {
     signInAsSuperAdmin();
     await mountHome();
     expect(navLinks()).toEqual({
-      Decks: '/',
-      Overview: '/overview',
-      Operations: '/operations',
-      Learners: '/learners',
-      Reports: '/reports',
-      Usage: '/usage',
-      Webhooks: '/admin/webhooks',
-      'Automation ledger': '/ledger',
-      Automation: '/automation',
-      'Review queue': '/review',
-      'AI QA': '/decks/qa',
-      'Admin Management': '/admin/users',
+      'Decks & publishing': '/',
+      'Needs attention': '/needs-attention',
+      'App users': '/learners',
+      Analytics: '/usage',
+      System: '/operations',
     });
   });
 
-  it('gives an editor the same sections minus the super_admin ones', async () => {
+  it('retains card feedback and automation for editors without exposing privileged destinations', async () => {
     signInAsEditor();
     await mountHome();
     expect(navLinks()).toEqual({
-      Decks: '/',
-      Reports: '/reports',
-      Usage: '/usage',
-      'Automation ledger': '/ledger',
-      Automation: '/automation',
-      'Review queue': '/review',
-      'AI QA': '/decks/qa',
+      'Decks & publishing': '/',
+      'Needs attention': '/reports',
+      Analytics: '/usage',
+      System: '/automation',
     });
   });
 });
 
-describe('the current section in the header (frontend-console-27)', () => {
+describe('the active task area', () => {
   function shellAt(path: string) {
     return render(
       <MemoryRouter initialEntries={[path]}>
@@ -124,60 +112,46 @@ describe('the current section in the header (frontend-console-27)', () => {
     );
   }
 
-  it('marks the link of the page on screen with aria-current and an active look, and no other', () => {
+  it('marks one area for every deep link with exactly five visible desktop links', () => {
     signInAsSuperAdmin();
     for (const [path, name] of [
-      ['/overview', 'Overview'],
-      ['/operations', 'Operations'],
-      ['/learners/subject', 'Learners'],
-      ['/review?deckId=7', 'Review queue'],
-      ['/decks/qa', 'AI QA'],
-      ['/ledger', 'Automation ledger'],
-      ['/automation', 'Automation'],
-      ['/admin/webhooks', 'Webhooks'],
-      ['/admin/users', 'Admin Management'],
-      ['/reports', 'Reports'],
-      ['/usage', 'Usage'],
-      ['/decks/cards?deckId=7', 'Decks'],
-      ['/', 'Decks'],
+      ['/overview', 'System'],
+      ['/operations', 'System'],
+      ['/learners/subject', 'App users'],
+      ['/review?deckId=7', 'Needs attention'],
+      ['/decks/qa', 'Decks & publishing'],
+      ['/ledger', 'System'],
+      ['/automation?tab=email', 'System'],
+      ['/admin/webhooks', 'System'],
+      ['/admin/users', 'System'],
+      ['/reports', 'Needs attention'],
+      ['/usage', 'Analytics'],
+      ['/decks/cards?deckId=7', 'Decks & publishing'],
+      ['/', 'Decks & publishing'],
     ] as const) {
       shellAt(path);
       const nav = screen.getByRole('navigation', { name: 'Console sections' });
-      const current = within(nav)
-        .getAllByRole('link')
-        .filter(a => a.getAttribute('aria-current') === 'page');
+      const links = within(nav).getAllByRole('link');
+      expect(links).toHaveLength(5);
+      const current = links.filter(link => link.hasAttribute('aria-current'));
       expect(current.map(a => a.textContent), path).toEqual([name]);
       expect(current[0].className).toContain('bg-indigo-50');
-      for (const link of within(nav).getAllByRole('link')) {
-        expect(link.className, `${path} ${link.textContent}`).toContain('focus-visible:ring-2');
-      }
+      for (const link of links) expect(link.className).toContain('focus-visible:ring-2');
       cleanup();
     }
     expect(consoleSectionFor('/login')).toBeNull();
-    // R26 C01: the Content Intelligence page was retired with Snowflake; its path
-    // is no longer a console section.
     expect(consoleSectionFor('/content-intelligence')).toBeNull();
   });
 
-  it('organizes the sidebar into management categories with system tools last', () => {
+  it('separates system tools from the sidebar and marks Notifications as current', () => {
     signInAsSuperAdmin();
-    shellAt('/ledger');
-    const nav = screen.getByRole('navigation', { name: 'Console sections' });
-    expect(within(nav).getAllByRole('link').map(a => a.textContent)).toEqual([
-      'Overview',
-      'Decks',
-      'Review queue',
-      'AI QA',
-      'Reports',
-      'Learners',
-      'Automation',
-      'Automation ledger',
-      'Usage',
-      'Operations',
-      'Webhooks',
-      'Admin Management',
+    shellAt('/automation?tab=email');
+    const secondary = screen.getByRole('navigation', { name: 'System pages' });
+    expect(within(secondary).getAllByRole('link').map(link => link.textContent)).toEqual([
+      'Operations', 'Notifications', 'Automation', 'Integrations', 'Administrators & permissions',
     ]);
-    expect(within(nav).getAllByRole('group').map(group => group.getAttribute('aria-label'))).toEqual(['Workbench navigation', 'Content navigation', 'Learners navigation', 'Automation navigation', 'Analytics navigation', 'System navigation']);
+    expect(within(secondary).getByRole('link', { name: 'Notifications' }).getAttribute('aria-current')).toBe('page');
+    expect(within(secondary).getByRole('link', { name: 'Automation' }).hasAttribute('aria-current')).toBe(false);
   });
 });
 
@@ -187,13 +161,12 @@ describe('consoleNav', () => {
     expect(Object.keys(CONSOLE_NAV).sort()).toEqual(
       [
         'adminUsersHref',
+        'attentionHref',
         'automationHref',
         'decksHref',
         'learnersHref',
         'ledgerHref',
         'operationsHref',
-        'overviewHref',
-        'qaHref',
         'reportsHref',
         'reviewHref',
         'usageHref',
@@ -216,7 +189,7 @@ describe('consoleNav', () => {
         shells += 1;
         expect(tag, `${file}: a ConsoleShell without consoleNav()`).toContain('{...consoleNav(');
         expect(tag, `${file}: a hard-coded destination next to consoleNav()`).not.toMatch(
-          /\s(decksHref|reviewHref|qaHref|reportsHref|usageHref|ledgerHref|automationHref|webhooksHref|adminUsersHref)=/,
+          /\s(decksHref|reviewHref|reportsHref|usageHref|ledgerHref|automationHref|webhooksHref|adminUsersHref)=/,
         );
       }
     }

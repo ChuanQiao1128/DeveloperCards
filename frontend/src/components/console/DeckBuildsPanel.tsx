@@ -134,10 +134,10 @@ export function DeckBuildsPanel({ deckId, deckSlug }: { deckId: number; deckSlug
       className="mt-6 bg-white border border-slate-200 rounded-lg shadow-sm p-4"
     >
       <h2 id="deck-builds-heading" className="text-lg font-semibold text-slate-900">
-        Builds
+        Published versions
       </h2>
       <p className="text-sm text-slate-600 mt-1">
-        Every successful publish of this deck. Rolling back points the app at an older build and rebuilds the manifest.
+        Recent successful publishes of this deck. Rolling back points the app at an older version and rebuilds the manifest.
       </p>
 
       <div className="mt-3">

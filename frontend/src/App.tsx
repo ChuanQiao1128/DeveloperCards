@@ -55,7 +55,8 @@ const ReviewQueuePage = lazy(() => import('./pages/ReviewQueuePage').then(m => (
 const DeckQaPage = lazy(() => import('./pages/DeckQaPage').then(m => ({ default: m.DeckQaPage })));
 const AutomationPage = lazy(() => import('./pages/AutomationPage').then(m => ({ default: m.AutomationPage })));
 const ReportsPage = lazy(() => import('./pages/ReportsPage').then(m => ({ default: m.ReportsPage })));
-const OverviewPage = lazy(() => import('./pages/OverviewPage').then(m => ({ default: m.OverviewPage })));
+const NeedsAttentionPage = lazy(() => import('./pages/NeedsAttentionPage').then(m => ({ default: m.NeedsAttentionPage })));
+const PublishJobDetailPage = lazy(() => import('./pages/NeedsAttentionPage').then(m => ({ default: m.PublishJobDetailPage })));
 const OperationsPage = lazy(() => import('./pages/OperationsPage').then(m => ({ default: m.OperationsPage })));
 const LearnersPage = lazy(() => import('./pages/LearnersPage').then(m => ({ default: m.LearnersPage })));
 const UsagePage = lazy(() => import('./pages/UsagePage').then(m => ({ default: m.UsagePage })));
@@ -72,8 +73,8 @@ function App() {
 
   // Give each route its own tab title, set once here rather than in a per-page hook.
   useEffect(() => {
-    document.title = documentTitleFor(location.pathname);
-  }, [location.pathname]);
+    document.title = documentTitleFor(location.pathname, location.search);
+  }, [location.pathname, location.search]);
 
   return (
     <>
@@ -121,7 +122,8 @@ function App() {
               {/* Protected */}
               <Route element={<RequireAuth><Outlet /></RequireAuth>}>
                 <Route path="/" element={<DeckListPage />} />
-                <Route path="/overview" element={<OverviewPage />} />
+                <Route path="/overview" element={<Navigate to="/operations" replace />} />
+                <Route path="/needs-attention" element={<NeedsAttentionPage />} />
                 <Route path="/operations" element={<OperationsPage />} />
                 <Route path="/learners/*" element={<LearnersPage />} />
                 <Route path="/decks/new" element={<NewDeckPage />} />
@@ -132,6 +134,7 @@ function App() {
                 <Route path="/decks/cards/edit" element={<EditCardPage />} />
                 <Route path="/decks/cards/import" element={<DeckImportPage />} />
                 <Route path="/decks/release" element={<ContentReleasePage />} />
+                <Route path="/decks/publish-jobs/:jobId" element={<PublishJobDetailPage />} />
 
                 <Route path="/decks/preview" element={<DeckPreviewPage />} />
 

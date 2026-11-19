@@ -119,7 +119,8 @@ describe('WebhooksPage', () => {
     expect(screen.getByText('This page requires super_admin.')).toBeTruthy();
     await act(async () => {});
     for (const fn of Object.values(api)) expect(fn).not.toHaveBeenCalled();
-    expect(screen.queryByRole('link', { name: 'Webhooks' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Integrations' })).toBeNull();
+    expect(screen.getByRole('link', { name: 'System' }).getAttribute('href')).toBe('/automation');
   });
 
   it('shows the signing secret SSM parameter name and never a secret value', async () => {
@@ -424,7 +425,7 @@ describe('WebhooksPage', () => {
     expect(await screen.findByText('No subscriptions yet.')).toBeTruthy();
   });
 
-  it('shows the Webhooks nav link to a super_admin only', () => {
+  it('offers the System destination for integrations to a super_admin only', () => {
     function shell(href?: string) {
       return render(
         <MemoryRouter initialEntries={[href ?? '/']}>
@@ -436,7 +437,7 @@ describe('WebhooksPage', () => {
     }
 
     shell('/admin/webhooks');
-    const link = screen.getByRole('link', { name: 'Webhooks' });
+    const link = screen.getByRole('link', { name: 'System' });
     expect(link.getAttribute('href')).toBe('/admin/webhooks');
     expect(link.tagName).toBe('A');
     expect(link.getAttribute('aria-current')).toBe('page');
@@ -444,13 +445,13 @@ describe('WebhooksPage', () => {
     cleanup();
 
     shell(undefined);
-    expect(screen.queryByRole('link', { name: 'Webhooks' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'System' })).toBeNull();
     cleanup();
 
     signOut();
     signInAsEditor();
     shell('/admin/webhooks');
-    expect(screen.queryByRole('link', { name: 'Webhooks' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'System' })).toBeNull();
   });
 
   it('names the route Webhooks in the tab title', () => {

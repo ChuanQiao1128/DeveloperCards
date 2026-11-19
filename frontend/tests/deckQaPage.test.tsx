@@ -492,17 +492,17 @@ describe('DeckQaPage', () => {
     expect(screen.queryByText('ai_qa tables are missing')).toBeNull();
   });
 
-  it('names the route AI QA and links it from the shell', () => {
+  it('keeps AI QA scoped to the deck instead of the global rail', () => {
     expect(documentTitleFor('/decks/qa')).toBe('AI QA · DeveloperCards Console');
 
     render(
       <MemoryRouter>
-        <ConsoleShell title="t" qaHref="/decks/qa?deckId=7">
+        <ConsoleShell title="t">
           body
         </ConsoleShell>
       </MemoryRouter>,
     );
-    expect(screen.getByRole('link', { name: 'AI QA' }).getAttribute('href')).toBe('/decks/qa?deckId=7');
+    expect(screen.queryByRole('link', { name: 'AI QA' })).toBeNull();
 
     cleanup();
     render(

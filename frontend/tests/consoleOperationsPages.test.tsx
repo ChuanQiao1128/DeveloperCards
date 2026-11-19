@@ -1,13 +1,13 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '../src/auth/AuthContext';
 import { clearTokens, getSessionGeneration, saveTokens } from '../src/auth/tokenStore';
 import { LearnersPage } from '../src/pages/LearnersPage';
 import { OperationsPage } from '../src/pages/OperationsPage';
-import { OverviewPage } from '../src/pages/OverviewPage';
+import { NeedsAttentionPage, PublishJobDetailPage } from '../src/pages/NeedsAttentionPage';
 import { detail, envelope, learners, operations } from './support/consoleOperationsFixture';
 const get = vi.hoisted(() => vi.fn());
 vi.mock('../src/api/http', () => ({ http: { get } }));
@@ -17,15 +17,50 @@ function login(sub = 'A', groups = ['super_admin'], refresh = false) {
 }
 let client: QueryClient;
 function mount(path = '/learners') {
-  return render(<QueryClientProvider client={client}><AuthProvider><MemoryRouter initialEntries={[path]}><Routes><Route path="/learners/*" element={<LearnersPage />} /><Route path="/operations" element={<OperationsPage />} /><Route path="/overview" element={<OverviewPage />} /></Routes></MemoryRouter></AuthProvider></QueryClientProvider>);
+  return render(<QueryClientProvider client={client}><AuthProvider><MemoryRouter initialEntries={[path]}><Routes><Route path="/learners/*" element={<LearnersPage />} /><Route path="/operations" element={<OperationsPage />} /><Route path="/overview" element={<Navigate to="/operations" replace />} /><Route path="/needs-attention" element={<NeedsAttentionPage />} /><Route path="/decks/publish-jobs/:jobId" element={<PublishJobDetailPage />} /></Routes></MemoryRouter></AuthProvider></QueryClientProvider>);
 }
 beforeEach(() => { client = new QueryClient({ defaultOptions: { queries: { retry: false } } }); get.mockReset(); login(); });
 afterEach(() => { cleanup(); clearTokens(); client.clear(); localStorage.clear(); });
-it.each(['/overview', '/operations', '/learners', '/learners/observed-1'])('guards direct route %s and makes no request for editors', async path => {
+it.each(['/overview', '/operations', '/learners', '/learners/observed-1', '/needs-attention', '/decks/publish-jobs/old-job'])('guards direct route %s and makes no request for editors', async path => {
   login('editor', ['editor']); mount(path);
   expect(await screen.findByText('Super administrator access required')).toBeTruthy();
-  expect(screen.queryByRole('link', { name: 'Learners' })).toBeNull();
+  expect(screen.queryByRole('link', { name: 'App users' })).toBeNull();
   expect(get).not.toHaveBeenCalled();
+});
+
+it('shows only recent actionable attempts and opens the exact job independently of the deck list', async () => {
+  get.mockResolvedValueOnce(envelope([
+    { jobId: 'published', deckId: 1, deckSlug: 'renamed', status: 'SUCCESS', manifestState: 'delivered' },
+    { jobId: 'old-failure', deckId: 1, deckSlug: 'old-name', status: 'FAILED' },
+    { jobId: 'working', deckId: 2, deckSlug: 'still-building', status: 'PROCESSING' },
+    { jobId: 'rolled-back', deckId: 3, deckSlug: 'rolled-back', status: 'FAILED', errorMessage: 'RELEASE_ROLLED_BACK' },
+    { jobId: 'build-failed', deckId: 4, deckSlug: 'failed-build', status: 'FAILED' },
+    { jobId: 'index-failed', deckId: 5, deckSlug: 'failed-index', status: 'SUCCESS', manifestState: 'needs_attention' },
+  ])).mockResolvedValueOnce(envelope({
+    jobId: 'index-failed', buildId: 'saved-build', status: 'SUCCESS', manifestState: 'needs_attention',
+    manifestError: 'Index update timed out', manifestAttempts: 5,
+  }));
+  mount('/needs-attention');
+  expect(await screen.findAllByRole('link', { name: /^View publish job for/ })).toHaveLength(2);
+  expect(screen.queryByText('old-name')).toBeNull();
+  fireEvent.click(screen.getByRole('link', { name: 'View publish job for failed-index' }));
+  expect(await screen.findByText('Index update timed out')).toBeTruthy();
+  expect(screen.getByText('saved-build')).toBeTruthy();
+  expect(get.mock.calls.map(([url]) => url)).toEqual(['/api/v1/authoring/publish/jobs', '/api/v1/authoring/publish/status']);
+  expect(get.mock.calls.at(-1)?.[1].params).toEqual({ jobId: 'index-failed' });
+  expect(screen.getByRole('link', { name: 'All publish jobs' }).getAttribute('href')).toBe('/?view=publish-jobs');
+});
+
+it('shows older directly linked jobs and rejects a mismatched job on refresh', async () => {
+  get.mockResolvedValueOnce(envelope({ jobId: 'older-job', buildId: 'older-build', status: 'FAILED' }))
+    .mockResolvedValueOnce(envelope({ jobId: 'another-job', buildId: 'another-build', status: 'SUCCESS' }));
+  mount('/decks/publish-jobs/older-job');
+  await screen.findByText('older-build');
+  fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+  await screen.findByRole('alert');
+  expect(screen.queryByText('another-build')).toBeNull();
+  expect(screen.queryByText('older-build')).toBeNull();
+  expect(get.mock.calls.every(([url]) => url === '/api/v1/authoring/publish/status')).toBe(true);
 });
 it('shows loading, observed directory semantics, literal search, empty state and server cursor paging', async () => {
   let resolve!: (value: unknown) => void;
@@ -76,11 +111,10 @@ it('labels stale samples, insufficient data and failed refresh without promoting
   expect(screen.getByRole('alert').textContent).toContain('historical; current status is unknown');
   expect(screen.getByRole('alert').textContent).not.toContain('sensitive-query');
 });
-it('shares overview / operations data and one polling owner on navigation', async () => {
+it('redirects the old overview bookmark to operations with one polling owner', async () => {
   get.mockResolvedValue(envelope(operations)); mount('/overview');
   await screen.findByRole('heading', { name: 'Operational sources' });
   expect(get).toHaveBeenCalledTimes(1);
-  fireEvent.click(screen.getByRole('link', { name: 'Operations: checks, alarms and publishing' }));
   await screen.findByRole('heading', { name: 'Synthetic checks', level: 2 });
   expect(get).toHaveBeenCalledTimes(1);
 });
@@ -203,9 +237,9 @@ it('clears saved directory state after leaving and re-entering the learner works
   mount();
   await screen.findByText('learner@example.invalid');
   fireEvent.change(screen.getByLabelText('Search users'), { target: { value: 'private-search@example.invalid' } });
-  fireEvent.click(screen.getByRole('link', { name: 'Operations' }));
+  fireEvent.click(screen.getByRole('link', { name: 'System' }));
   await screen.findByRole('heading', { name: 'Synthetic checks', level: 2 });
-  fireEvent.click(screen.getByRole('link', { name: 'Learners' }));
+  fireEvent.click(screen.getByRole('link', { name: 'App users' }));
   await screen.findByText('learner@example.invalid');
   expect((screen.getByLabelText('Search users') as HTMLInputElement).value).toBe('');
   expect(screen.queryByDisplayValue('private-search@example.invalid')).toBeNull();

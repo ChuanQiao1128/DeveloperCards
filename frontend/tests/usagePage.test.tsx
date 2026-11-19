@@ -278,7 +278,7 @@ describe('UsagePage', () => {
   it('links Usage in the header as the current section', async () => {
     await mountLoaded();
     const nav = screen.getByRole('navigation', { name: 'Console sections' });
-    const link = within(nav).getByRole('link', { name: 'Usage' });
+    const link = within(nav).getByRole('link', { name: 'Analytics' });
     expect(link.getAttribute('href')).toBe('/usage');
     expect(link.getAttribute('aria-current')).toBe('page');
   });

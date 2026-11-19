@@ -50,6 +50,7 @@ export function AutomationPage() {
 
   const [searchParams, setSearchParams] = useSearchParams();
   const view = resolveAutomationView(searchParams);
+  const isEmailLog = view.tab === 'email';
 
   // Bumped by the overview's Refresh and by an eval-gate write (the effective mode may change).
   const [statusNonce, setStatusNonce] = useState(0);
@@ -60,6 +61,7 @@ export function AutomationPage() {
   const [focusOnOpen, setFocusOnOpen] = useState(false);
 
   useEffect(() => {
+    if (isEmailLog) return;
     let cancelled = false;
     const nonce = statusNonce;
     async function run() {
@@ -82,7 +84,7 @@ export function AutomationPage() {
     return () => {
       cancelled = true;
     };
-  }, [statusNonce]);
+  }, [statusNonce, isEmailLog]);
 
   // The tabs wait for the first status answer: a server without migration 034
   // gets one request, not one per tab.
@@ -112,9 +114,22 @@ export function AutomationPage() {
     setStatusNonce(n => n + 1);
   }
 
+  if (isEmailLog) {
+    return (
+      <ConsoleShell title={CONSOLE_NAME} subtitle="Notifications" {...consoleNav()}>
+        <h1 className={H1_CLASS}>Notifications</h1>
+        <div role="status" aria-live="polite" className="sr-only" data-testid="automation-live">{announcement}</div>
+        <EmailTab superAdmin={superAdmin} announce={setAnnouncement} />
+      </ConsoleShell>
+    );
+  }
+
   return (
     <ConsoleShell title={CONSOLE_NAME} subtitle="Automation" {...consoleNav()}>
-      <h1 className={H1_CLASS}>Automation</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className={H1_CLASS}>Automation</h1>
+        <Link className="inline-flex min-h-11 items-center rounded-md px-3 text-sm font-medium text-indigo-700 hover:bg-indigo-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500" to="/ledger">Automation ledger</Link>
+      </div>
 
       <div role="status" aria-live="polite" className="sr-only" data-testid="automation-live">
         {announcement}
@@ -139,7 +154,7 @@ export function AutomationPage() {
           ) : null}
 
           <nav aria-label="Automation tabs" className="flex flex-wrap gap-2">
-            {AUTOMATION_TABS.map(tab =>
+            {AUTOMATION_TABS.filter(tab => tab.id !== 'email').map(tab =>
               tab.id === view.tab ? (
                 <Link key={tab.id} to={{ search: `?tab=${tab.id}` }} className={TAB_ACTIVE_CLASS} aria-current="page">
                   {tab.label}
@@ -177,7 +192,6 @@ export function AutomationPage() {
           {view.tab === 'watch' ? (
             <WatchTab superAdmin={superAdmin} targetId={view.targetId} announce={setAnnouncement} />
           ) : null}
-          {view.tab === 'email' ? <EmailTab superAdmin={superAdmin} announce={setAnnouncement} /> : null}
         </>
       )}
     </ConsoleShell>

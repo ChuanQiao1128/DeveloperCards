@@ -66,7 +66,7 @@ function LoadFailureScreen({
       subtitle="Authoring · Cards"
       {...consoleNav()}
     >
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-semibold text-slate-800">Deck Cards</h1>
         <Link to="/" className="text-sm text-indigo-600 hover:text-indigo-800">
           ← Back to Decks
@@ -277,7 +277,7 @@ export function CardListPage() {
     <ConsoleShell
       title={CONSOLE_NAME}
       subtitle="Authoring · Cards"
-      {...consoleNav({ reviewHref: `/review?deckId=${deckId}`, qaHref: qaPageHref(deckId) })}
+      {...consoleNav()}
     >
       <div className="flex items-center justify-between">
         <div>
@@ -289,8 +289,10 @@ export function CardListPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           {deck.id === 15 && deck.slug === 'aws-saa-fundamentals' && user?.groups.some(group => group === 'editor' || group === 'super_admin') && <Link className="text-sm text-indigo-700 underline" to="/decks/release?deckId=15">Reviewed release</Link>}
+          <Link className="text-sm text-indigo-700 underline" to={qaPageHref(deckId)}>AI QA</Link>
+          <Link className="text-sm text-indigo-700 underline" to={`/review?deckId=${deckId}`}>AI draft review</Link>
           <Link to="/" className="text-sm text-slate-600 hover:text-slate-800">
             ← Back to Decks
           </Link>

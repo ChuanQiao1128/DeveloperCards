@@ -11,12 +11,11 @@
 // them only for a super_admin session.
 
 export type ConsoleNavHrefs = {
-  overviewHref?: string;
+  attentionHref?: string;
   operationsHref?: string;
   learnersHref?: string;
   decksHref?: string;
   reviewHref?: string;
-  qaHref?: string;
   reportsHref?: string;
   usageHref?: string;
   ledgerHref?: string;
@@ -29,12 +28,11 @@ export type ConsoleNavHrefs = {
 // page links the Automation console (B07 frontend-console-12); it used to be
 // passed only by the four pages of the automation area.
 export const CONSOLE_NAV: Readonly<Required<ConsoleNavHrefs>> = {
-  overviewHref: '/overview',
+  attentionHref: '/needs-attention',
   operationsHref: '/operations',
   learnersHref: '/learners',
   decksHref: '/',
   reviewHref: '/review',
-  qaHref: '/decks/qa',
   // R20 V09: learner card reports, triaged by the deck's editors.
   reportsHref: '/reports',
   // R20 V10: learner usage (DAU/WAU/MAU, retention) and publish freshness.
@@ -50,7 +48,7 @@ export function consoleNav(overrides: ConsoleNavHrefs = {}): ConsoleNavHrefs {
 }
 
 export type ConsoleSection =
-  | 'overview'
+  | 'attention'
   | 'operations'
   | 'learners'
   | 'decks'
@@ -65,8 +63,8 @@ export type ConsoleSection =
 
 /** The console section a path belongs to; the deck list and its card/deck pages are Decks. */
 export function consoleSectionFor(pathname: string): ConsoleSection | null {
-  if (pathname === '/overview') return 'overview';
-  if (pathname === '/operations') return 'operations';
+  if (pathname === '/needs-attention') return 'attention';
+  if (pathname === '/overview' || pathname === '/operations') return 'operations';
   if (pathname === '/learners' || pathname.startsWith('/learners/')) return 'learners';
   if (pathname === '/review') return 'review';
   if (pathname === '/decks/qa') return 'qa';
@@ -78,4 +76,18 @@ export function consoleSectionFor(pathname: string): ConsoleSection | null {
   if (pathname === '/admin/users') return 'adminUsers';
   if (pathname === '/' || pathname.startsWith('/decks')) return 'decks';
   return null;
+}
+
+export type ConsoleArea = 'decks' | 'attention' | 'learners' | 'usage' | 'system';
+
+const AREA_BY_SECTION: Record<ConsoleSection, ConsoleArea> = {
+  decks: 'decks', qa: 'decks',
+  attention: 'attention', review: 'attention', reports: 'attention',
+  learners: 'learners', usage: 'usage',
+  operations: 'system', automation: 'system', ledger: 'system',
+  webhooks: 'system', adminUsers: 'system',
+};
+
+export function consoleAreaFor(section: ConsoleSection | null): ConsoleArea | null {
+  return section ? AREA_BY_SECTION[section] : null;
 }

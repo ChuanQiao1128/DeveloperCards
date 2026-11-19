@@ -6,8 +6,8 @@ import { Link, useLocation } from 'react-router-dom';
 import { getSessionGeneration, subscribeSessionChanges } from '../../auth/tokenStore';
 import { useSignOut } from '../../auth/AuthContext';
 import { isSuperAdmin, readSessionUser } from '../../auth/sessionUser';
-import { consoleSectionFor } from './consoleNav';
-import type { ConsoleSection } from './consoleNav';
+import { consoleAreaFor, consoleSectionFor } from './consoleNav';
+import type { ConsoleArea, ConsoleSection } from './consoleNav';
 import { ConsoleIcon } from './ConsoleIcon';
 import { Button } from '../ui/Button';
 
@@ -38,7 +38,7 @@ type Props = {
   // An undefined href means "this session has nowhere to go here", and the
   // control is not rendered at all. That is the same three-state shape the
   // callbacks had; only the payload changed.
-  overviewHref?: string;
+  attentionHref?: string;
   operationsHref?: string;
   learnersHref?: string;
   decksHref?: string;
@@ -50,8 +50,6 @@ type Props = {
   ledgerHref?: string;
   // Not role-gated: the draft review routes decide who may act.
   reviewHref?: string;
-  // Not role-gated: the AI QA routes decide who may act.
-  qaHref?: string;
   // Not role-gated: the card report routes are RequireAdmin and deck-scoped.
   reportsHref?: string;
   // Not role-gated: the usage and freshness routes are RequireAdmin.
@@ -79,7 +77,7 @@ export function ConsoleShell({
   subtitle,
   userLabel,
   superAdmin,
-  overviewHref,
+  attentionHref,
   operationsHref,
   learnersHref,
   decksHref,
@@ -87,7 +85,6 @@ export function ConsoleShell({
   webhooksHref,
   ledgerHref,
   reviewHref,
-  qaHref,
   reportsHref,
   usageHref,
   automationHref,
@@ -115,6 +112,8 @@ export function ConsoleShell({
 
   const location = useLocation();
   const current = consoleSectionFor(location.pathname);
+  const area = consoleAreaFor(current);
+  const emailView = current === 'automation' && new URLSearchParams(location.search).get('tab') === 'email';
   const drawerRef = useRef<HTMLDialogElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const drawerId = useId();
@@ -134,46 +133,41 @@ export function ConsoleShell({
     drawerRef.current?.showModal();
     setNavigationOpen(true);
   };
-  /** aria-current and the active look for the link of the section on screen. */
-  const navProps = (section: ConsoleSection) =>
-    section === current
-      ? { className: NAV_LINK_ACTIVE_CLASS, 'aria-current': 'page' as const }
-      : { className: NAV_LINK_CLASS };
-
-  const navGroups: [string, [ConsoleSection, string, string | undefined, string?][]][] = [
-    ['Workbench', resolvedSuperAdmin ? [['overview', 'Overview', overviewHref]] : []],
-    ['Content', [
-      ['decks', 'Decks', decksHref], ['review', 'Review queue', reviewHref],
-      ['qa', 'AI QA', qaHref], ['reports', 'Reports', reportsHref],
-    ]],
-    ['Learners', resolvedSuperAdmin ? [['learners', 'Learners', learnersHref]] : []],
-    ['Automation', [
-      ['automation', 'Automation', automationHref], ['ledger', 'Automation ledger', ledgerHref],
-    ]],
-    ['Analytics', [['usage', 'Usage', usageHref]]],
-    ['System', resolvedSuperAdmin ? [
-      ['operations', 'Operations', operationsHref], ['webhooks', 'Webhooks', webhooksHref],
-      ['adminUsers', 'Admin Management', adminUsersHref, 'Manage users and permissions (super_admin only)'],
-    ] : []],
+  const operations = resolvedSuperAdmin ? operationsHref : undefined;
+  const webhooks = resolvedSuperAdmin ? webhooksHref : undefined;
+  const administrators = resolvedSuperAdmin ? adminUsersHref : undefined;
+  const publishingIssues = resolvedSuperAdmin ? attentionHref : undefined;
+  const notifications = automationHref ? `${automationHref.split('?')[0]}?tab=email` : undefined;
+  const nav: [ConsoleArea, ConsoleSection, string, string | undefined][] = [
+    ['decks', 'decks', 'Decks & publishing', decksHref],
+    ['attention', 'attention', 'Needs attention', publishingIssues ?? reportsHref ?? reviewHref],
+    ['learners', 'learners', 'App users', resolvedSuperAdmin ? learnersHref : undefined],
+    ['usage', 'usage', 'Analytics', usageHref],
+    ['system', 'operations', 'System', operations ?? automationHref ?? ledgerHref ?? webhooks ?? administrators],
   ];
-  const currentGroup = navGroups.find(([, entries]) => entries.some(([section]) => section === current));
-  const currentLabel = currentGroup?.[1].find(([section]) => section === current)?.[1];
+  const subnav: [string, string | undefined, boolean][] = area === 'attention' ? [
+    ['Publishing issues', publishingIssues, current === 'attention'],
+    ['Card feedback', reportsHref, current === 'reports'],
+    ['AI draft review', reviewHref, current === 'review'],
+  ] : area === 'system' ? [
+    ['Operations', operations, current === 'operations'],
+    ['Notifications', notifications, emailView],
+    ['Automation', automationHref, !emailView && (current === 'automation' || current === 'ledger')],
+    ['Integrations', webhooks, current === 'webhooks'],
+    ['Administrators & permissions', administrators, current === 'adminUsers'],
+  ] : [];
+  const areaLabel = nav.find(([id, , , href]) => id === area && href)?.[2];
+  const pageLabel = subtitle ?? subnav.find(([, href, active]) => href && active)?.[0] ?? areaLabel ?? title;
+  const secondary = subnav.filter(([, href]) => href);
 
   const navigation = (
-    <nav aria-label="Console sections" className="console-navigation">
-      {navGroups.map(([group, entries]) => entries.some(([, , href]) => href) && (
-        <div key={group} role="group" aria-label={`${group} navigation`} className="console-nav-group">
-          <div className="mb-2 px-3 text-xs font-semibold text-slate-500">{group}</div>
-          <div className="space-y-1">
-            {entries.map(([section, label, href, description]) => href && (
-              <Link key={section} to={href} title={description} {...navProps(section)} onClick={closeNavigation}>
-                <ConsoleIcon name={section} />
-                <span className="min-w-0 flex-1">{label}</span>
-                {section === current && <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-600" />}
-              </Link>
-            ))}
-          </div>
-        </div>
+    <nav aria-label="Console sections" className="console-navigation space-y-1">
+      {nav.map(([id, icon, label, href]) => href && (
+        <Link key={id} to={href} className={id === area ? NAV_LINK_ACTIVE_CLASS : NAV_LINK_CLASS}
+          aria-current={id === area ? (location.pathname + location.search === href ? 'page' : 'location') : undefined} onClick={closeNavigation}>
+          <ConsoleIcon name={icon} />
+          <span className="min-w-0 flex-1">{label}</span>
+        </Link>
       ))}
     </nav>
   );
@@ -225,8 +219,8 @@ export function ConsoleShell({
             </Button>
             <div className="min-w-0">
               <div className="flex min-w-0 items-center gap-2 text-sm">
-                {currentGroup && <><div className="hidden shrink-0 text-slate-500 sm:block">{currentGroup[0]}</div><ConsoleIcon name="chevron" className="hidden h-3 w-3 shrink-0 text-slate-400 sm:block" /></>}
-                <div className="truncate font-semibold text-slate-900">{subtitle ?? currentLabel ?? title}</div>
+                {areaLabel && areaLabel !== pageLabel && <><div className="hidden shrink-0 text-slate-500 sm:block">{areaLabel}</div><ConsoleIcon name="chevron" className="hidden h-3 w-3 shrink-0 text-slate-400 sm:block" /></>}
+                <div className="truncate font-semibold text-slate-900">{pageLabel}</div>
               </div>
             </div>
           </div>
@@ -237,7 +231,15 @@ export function ConsoleShell({
             </Button>
           </div>
         </header>
-        <main id="console-main" tabIndex={-1} className="console-main space-y-4">{children}</main>
+        <main id="console-main" tabIndex={-1} className="console-main space-y-4">
+          {secondary.length > 1 && <nav aria-label={`${areaLabel} pages`} className="flex flex-wrap gap-1 border-b border-slate-200">
+            {secondary.map(([label, href, active]) => <Link key={label} to={href!} aria-current={active ? (current === 'ledger' ? 'location' : 'page') : undefined}
+              className={`inline-flex min-h-11 items-center border-b-2 px-3 py-2 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500 ${active ? 'border-indigo-600 text-indigo-800' : 'border-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-950'}`}>
+              {label}
+            </Link>)}
+          </nav>}
+          {children}
+        </main>
       </div>
     </div>
   );

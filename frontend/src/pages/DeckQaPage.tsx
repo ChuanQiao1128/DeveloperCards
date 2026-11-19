@@ -540,13 +540,12 @@ export function DeckQaPage() {
     setResolveMessage({ tone: 'alert', text: res.error?.message ?? 'Failed to resolve the finding.' });
   }
 
-  const qaHref = deckId === null ? '/decks/qa' : qaPageHref(deckId, runIdParam);
 
   return (
     <ConsoleShell
       title={CONSOLE_NAME}
       subtitle="Authoring · AI QA"
-      {...consoleNav({ reviewHref: deckId === null ? '/review' : `/review?deckId=${deckId}`, qaHref })}
+      {...consoleNav()}
     >
       <div>
         <h1 className={H1_CLASS}>AI QA</h1>
@@ -556,6 +555,8 @@ export function DeckQaPage() {
             <Link to={`/decks/cards?deckId=${deck.id}`} className="text-indigo-600 underline">
               Cards
             </Link>
+            {' · '}
+            <Link to={`/review?deckId=${deck.id}`} className="text-indigo-700 underline">AI draft review</Link>
           </div>
         ) : null}
       </div>

@@ -293,12 +293,13 @@ for (const tab of TABS) {
     await signIn(page);
 
     await page.goto(`/automation?tab=${tab}`);
-    await expect(page.getByRole('heading', { level: 1, name: 'Automation', exact: true })).toBeVisible();
-    await expect(page.getByTestId('automation-mode-banner')).toBeVisible();
+    const destination = tab === 'email' ? 'Notifications' : 'Automation';
+    await expect(page.getByRole('heading', { level: 1, name: destination, exact: true })).toBeVisible();
+    await expect(page.getByTestId('automation-mode-banner')).toHaveCount(tab === 'email' ? 0 : 1);
     await expect(page.getByText(/^Loading/)).toHaveCount(0);
     // The header links the page on screen as the current section (frontend-console-12).
     await expect(
-      page.getByRole('navigation', { name: 'Console sections' }).getByRole('link', { name: 'Automation', exact: true }),
+      page.getByRole('navigation', { name: 'System pages' }).getByRole('link', { name: destination, exact: true }),
     ).toHaveAttribute('aria-current', 'page');
 
     const scan = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();

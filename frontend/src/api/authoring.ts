@@ -727,6 +727,7 @@ export async function publishDeck(
 
 export interface PublishJob {
   jobId: string;
+  deckId?: number;
   deckSlug: string;
   status: 'PENDING' | 'PROCESSING' | 'SUCCESS' | 'FAILED';
   manifestState?: 'pending' | 'delivered' | 'needs_attention' | null;
@@ -742,6 +743,21 @@ export async function fetchPublishJobs(): Promise<ApiResult<PublishJob[]>> {
     return resp.data;
   } catch (err) {
     return apiResultFromError<PublishJob[]>(err);
+  }
+}
+
+type PublishJobDetail = Pick<PublishJob, 'jobId' | 'status' | 'manifestState' | 'errorMessage'> & {
+  buildId: string;
+  manifestError?: string | null;
+  manifestAttempts?: number | null;
+};
+
+export async function fetchPublishJob(jobId: string): Promise<ApiResult<PublishJobDetail>> {
+  try {
+    const resp = await http.get<ApiResult<PublishJobDetail>>('/api/v1/authoring/publish/status', { params: { jobId } });
+    return resp.data;
+  } catch (err) {
+    return apiResultFromError<PublishJobDetail>(err);
   }
 }
 

@@ -206,7 +206,7 @@ describe('DeckBuildsPanel', () => {
     signInAsSuperAdmin();
     renderAt(<DeckEditPage />, [`/decks/edit?deckId=${DECK_ID}`]);
     await screen.findByRole('button', { name: 'Save' });
-    expect(screen.queryByRole('heading', { name: 'Builds' })).not.toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Published versions' })).not.toBeNull();
 
     cleanup();
     queryClient.clear();
@@ -214,6 +214,6 @@ describe('DeckBuildsPanel', () => {
     signInAsEditor();
     renderAt(<DeckEditPage />, [`/decks/edit?deckId=${DECK_ID}`]);
     await screen.findByRole('button', { name: 'Save' });
-    expect(screen.queryByRole('heading', { name: 'Builds' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Published versions' })).toBeNull();
   });
 });

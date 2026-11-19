@@ -86,7 +86,7 @@ const EXPECTED_HOOK_SEQUENCE = [
   'useState',
   'useState',
   'useRef',
-  'useState',
+  'useSearchParams',
   'useState',
   'useState',
   'useState',

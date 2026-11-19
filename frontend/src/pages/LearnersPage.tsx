@@ -38,7 +38,7 @@ function LearnerDirectory() {
     else setDirectory(current => ({ ...current, query: value, cursors: [undefined] }));
   }
 
-  return <ConsolePage title="User management">
+  return <ConsolePage title="App users">
     <div className="flex flex-wrap items-start justify-between gap-4">
       <p className="max-w-prose text-sm learner-copy text-slate-600">Find an App user and review their account, membership access and received learning records.</p>
       <Button variant="outline" disabled={query.isFetching} onClick={() => void query.refetch()}>{query.isFetching ? 'Refreshing…' : 'Refresh list'}</Button>

@@ -1,6 +1,7 @@
 // src/pages/DeckListPage.tsx
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { PUBLISH_JOBS_HREF } from '../features/deckList/publishJobStage';
 
 import {
   fetchAdminManifest,
@@ -173,7 +174,8 @@ export function DeckListPage() {
   const [publishJobs, setPublishJobs] = useState<PublishJob[]>([]);
   // Job id of the publish currently being timed, if any.
   const pendingPublishJobIdRef = useRef<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'decks' | 'publishJobs'>('decks');
+  const [searchParams] = useSearchParams();
+  const activeTab = superAdmin && searchParams.get('view') === 'publish-jobs' ? 'publishJobs' : 'decks';
   // Message and kind travel together: two useState calls could drift apart and
   // label a transport failure as a refusal, which gives the opposite advice.
   const [pollFailure, setPollFailure] = useState<PollFailure | null>(null);
@@ -664,7 +666,7 @@ export function DeckListPage() {
         : null
       : deckState.error;
 
-  if (initialLoading) {
+  if (activeTab === 'decks' && initialLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-100">
         <div className="text-slate-600 text-lg">Loading console…</div>
@@ -672,7 +674,7 @@ export function DeckListPage() {
     );
   }
 
-  if (fatalError) {
+  if (activeTab === 'decks' && fatalError) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-100">
         <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded shadow-sm max-w-md">
@@ -709,7 +711,7 @@ export function DeckListPage() {
         {/* Header Section */}
         <DeckConsoleHeader
           activeTab={activeTab}
-          onSelectTab={setActiveTab}
+          onSelectTab={tab => navigate(tab === 'publishJobs' ? PUBLISH_JOBS_HREF : '/')}
           superAdmin={superAdmin}
           publishJobs={publishJobs}
           onRefreshDecks={() => {
