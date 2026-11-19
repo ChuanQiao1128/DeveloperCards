@@ -232,7 +232,7 @@ describe('EditCardPage: edits the stored translation cannot follow', () => {
   it('refuses, without sending, adding Real-world usage to a translated card', async () => {
     mountEdit();
     await screen.findByTestId('card-translation-panel');
-    await userEvent.type(screen.getByLabelText('RealWorldUsage'), 'Keep the key with the team.');
+    await userEvent.type(screen.getByLabelText('Real-world usage'), 'Keep the key with the team.');
     await userEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
     expect(await alertText()).toContain(USAGE_NEEDS_MARKDOWN);
     expect(USAGE_NEEDS_MARKDOWN).toContain('USAGE_ZH:');
@@ -245,7 +245,7 @@ describe('EditCardPage: edits the stored translation cannot follow', () => {
     );
     mountEdit();
     await screen.findByTestId('card-translation-panel');
-    await userEvent.clear(screen.getByLabelText('RealWorldUsage'));
+    await userEvent.clear(screen.getByLabelText('Real-world usage'));
     await userEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
     expect(await alertText()).toContain(USAGE_NEEDS_MARKDOWN);
     expect(api.updateCard).not.toHaveBeenCalled();
@@ -258,7 +258,7 @@ describe('EditCardPage: edits the stored translation cannot follow', () => {
     api.updateCard.mockResolvedValue(ok(card({ translations: zhWithUsage, translationStatus: { 'zh-CN': 'stale' } })));
     mountEdit();
     await screen.findByTestId('card-translation-panel');
-    await userEvent.type(screen.getByLabelText('RealWorldUsage'), ' Rotate it yearly.');
+    await userEvent.type(screen.getByLabelText('Real-world usage'), ' Rotate it yearly.');
     await userEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
     await waitFor(() => expect(api.updateCard).toHaveBeenCalledTimes(1));
     expect(Object.hasOwn(api.updateCard.mock.calls[0][0] as object, 'translations')).toBe(false);
@@ -282,7 +282,7 @@ describe('EditCardPage: edits the stored translation cannot follow', () => {
       api.updateCard.mockResolvedValue(refused<Card>(code, 'The English card has a realWorldUsage, but the zh-CN translation has none.'));
       mountEdit();
       await screen.findByTestId('card-translation-panel');
-      await userEvent.type(screen.getByLabelText('RealWorldUsage'), 'Keep the key with the team.');
+      await userEvent.type(screen.getByLabelText('Real-world usage'), 'Keep the key with the team.');
       await userEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
       await waitFor(() => expect(api.updateCard).toHaveBeenCalledTimes(1));
       const text = await alertText();
@@ -332,7 +332,7 @@ describe('CardListPage: the Chinese missing / stale filter', () => {
     await userEvent.selectOptions(filter, 'zh-stale');
     await waitFor(() => expect(screen.queryByText('Q missing')).toBeNull());
     expect(screen.getByText('Q stale')).toBeTruthy();
-    expect(screen.getByTestId('card-list-visible-count').textContent).toBe('Showing 1 of 3 cards');
+    expect(screen.getByTestId('card-list-visible-count').textContent).toBe('1 of 3 cards match');
   });
 
   it('shows neither the filter nor the badges on a deck without translations', async () => {

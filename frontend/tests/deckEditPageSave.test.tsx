@@ -404,11 +404,11 @@ describe('a save the server accepted', () => {
     expect(locationText()).toBe(`/decks/edit?deckId=${DECK_ID}`);
   });
 
-  it('goes back to the list for Save & Back', async () => {
+  it('returns to this deck’s cards after saving', async () => {
     await mountLoaded();
-    await userEvent.click(screen.getByRole('button', { name: 'Save & Back' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Save & return to cards' }));
 
-    await waitFor(() => expect(locationText()).toBe('/'));
+    await waitFor(() => expect(locationText()).toBe(`/decks/cards?deckId=${DECK_ID}`));
     expect(api.updateDeck).toHaveBeenCalledTimes(1);
   });
 });
@@ -474,36 +474,34 @@ describe('while the save is in flight', () => {
   });
 });
 
-describe('Apply to totalCards', () => {
+describe('Use card count', () => {
   // previewCards is only on screen for a premium deck, so these run premium.
   async function applyWith(cards: Card[]): Promise<void> {
     api.fetchCardsByDeck.mockResolvedValue(ok(cards));
     await mountLoaded({ tier: 'premium' });
     await waitFor(() => expect(document.body.textContent).toContain(`count = ${cards.length}`));
-    await userEvent.click(screen.getByRole('button', { name: 'Apply to totalCards' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Use card count' }));
   }
 
-  it('copies the count and caps the preview at ten', async () => {
+  it('copies the count and preserves the preview count', async () => {
     await applyWith(Array.from({ length: 25 }, (_, i) => card(i + 1)));
 
     expect(input('Total Cards (full)').value).toBe('25');
-    // 10, not 25: Math.max would give 25 here, and a hard-coded 10 would give
-    // 10 in the next case too.
-    expect(input('Preview Cards (premium)').value).toBe('10');
+    expect(input('Preview Cards (premium)').value).toBe('25');
   });
 
-  it('uses the count itself when the deck is smaller than the cap', async () => {
+  it('copies the count even for a small deck', async () => {
     await applyWith([card(1), card(2), card(3)]);
 
     expect(input('Total Cards (full)').value).toBe('3');
-    expect(input('Preview Cards (premium)').value).toBe('3');
+    expect(input('Preview Cards (premium)').value).toBe('25');
   });
 
-  it('writes zeroes for an empty deck rather than leaving the boxes alone', async () => {
+  it('sets total cards to zero for an empty deck', async () => {
     await applyWith([]);
 
     expect(input('Total Cards (full)').value).toBe('0');
-    expect(input('Preview Cards (premium)').value).toBe('0');
+    expect(input('Preview Cards (premium)').value).toBe('25');
   });
 
   it('reaches the payload once applied', async () => {
@@ -512,6 +510,6 @@ describe('Apply to totalCards', () => {
 
     await waitFor(() => expect(api.updateDeck).toHaveBeenCalledTimes(1));
     expect(payload().totalCards).toBe(25);
-    expect(payload().previewCards).toBe(10);
+    expect(payload().previewCards).toBe(25);
   });
 });

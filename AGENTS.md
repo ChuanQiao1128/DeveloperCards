@@ -6,7 +6,7 @@
 - 本仓库已授权的应用／Web Console 开发任务：完成实现、必要测试和独立代码审查，修复阻断问题后，由 Agent 自动合并 PR 到 `main`，并跟进现有 CD 自动发布至 production 及发布后 smoke 验证，无需重复请求合并或发布确认。
 - GitHub `production` 环境取消 required reviewers 人工发布审批；保留仅 `main` 可部署的分支限制、CI、OIDC 身份、部署串行化、smoke 和自动回滚。人工发布审批与独立代码审查是不同环节，代码审查继续执行。
 - 此授权不自动扩大功能范围，不授权删除真实用户／业务数据、收费、公开私人资料或无关基础设施变更。AWS 卡包内容制作、发布和暂停状态继续遵循其各自的用户授权及记录。
-- 已审定卡片的小批量内容更新：使用 `/decks/release?deckId=15` 的 **Run reviewed release**，自动备份、登记既有审查、发布和核验公开 CDN；未修改 App 代码时不另发 OTA。仅对变更及受影响依赖做语义复核，其余卡的证据必须先通过精确内容绑定才能复用。
+- 已审定卡片的小批量内容更新：使用 `/decks/publish?deckId=15` 的 **Publish batch**，自动备份、登记既有审查、发布和核验公开 CDN；未修改 App 代码时不另发 OTA。仅对变更及受影响依赖做语义复核，其余卡的证据必须先通过精确内容绑定才能复用。
 - v2包内置原库存基线门禁；`publisherCodeVerification`复用真实main/成功CI及12文件校验。首次选目录自动留存（或单文件导出），一次`repair_release.py finalize`收尾并作下一批基线；`verify-baseline`只诊断。刷新先查同job，再验证保存字节，不例行重下载。
 - 发布超时或索引未同步时，查询原动作并继续相同的 releaseId／actionId／请求正文；只有任务、索引及实际下载的双语卡包均核验通过才报告完成。详见 `frontend/docs/aws-basics-release-bundle.md`。
 
@@ -235,7 +235,7 @@
 6. **精简后同步目标与题卡支撑。** 同步双语正文、`teaching`、兼容正文、私有goal／必答点及受影响题目映射。用学习者实际可见的当前卡组回到原题条件，区分直接支撑、合理机制迁移与缺口；不能继承旧长卡更宽的覆盖结论，也不能用部分支撑冒充完整解题／实施能力。设计支撑、用户认可与实际记忆／正确率分别记录。
 7. **限定条件随结论保留。** 此前5卡的典型边界：Session Manager场景已满足Agent安装及管理服务可达；跨账户角色还须信任与调用方获准AssumeRole；AdministratorAccess只用于题面已批准全面访问；团队统一授权不自动覆盖外部IdP接入及人员供应；Cognito登录令牌不等于客户端直接访问S3所需的AWS临时凭证。迁移写法，不把这些答案无条件推广至其他场景；英中条件、判断范围和颗粒度一致。
 
-**修订与发布方法**：小批量修改和受影响依赖同次独立复核；未变卡的旧证据先通过精确内容、schema／revision／order及适用规则绑定后复用。保留UID、顺序和学习记录，内容revision按现有机制更新，可能使卡片重新到期，不声称学习状态完全不变。已获该范围发布授权时，复用现有冻结包与 `/decks/release?deckId=15` 的 **Run reviewed release**；仅内容修改不另发OTA。超时查询并继续原动作，直到job、live指针、索引、公开manifest、实际下载SHA及全部双语内容一致才算完成。整包机械核验不等于整包重新语义审查，也不将旧任务恢复耗时当作新批次完整发布时间。
+**修订与发布方法**：小批量修改和受影响依赖同次独立复核；未变卡的旧证据先通过精确内容、schema／revision／order及适用规则绑定后复用。保留UID、顺序和学习记录，内容revision按现有机制更新，可能使卡片重新到期，不声称学习状态完全不变。已获该范围发布授权时，复用现有冻结包与 `/decks/publish?deckId=15` 的 **Publish batch**；仅内容修改不另发OTA。超时查询并继续原动作，直到job、live指针、索引、公开manifest、实际下载SHA及全部双语内容一致才算完成。整包机械核验不等于整包重新语义审查，也不将旧任务恢复耗时当作新批次完整发布时间。
 
 优先读取项目版 [recallsmith-card-repair-release Skill](.agents/skills/recallsmith-card-repair-release/SKILL.md)；项目版不存在时才使用本机同名Skill。具体发布契约以 [Console发布说明](frontend/docs/aws-basics-release-bundle.md) 及当前代码为准。编写或调用Skill本身不授权发布其他卡片、恢复暂停自动化或修改无关基础设施；本次只记录方法，不启动新的修卡或发布。
 

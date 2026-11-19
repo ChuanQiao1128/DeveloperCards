@@ -11,6 +11,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import userEvent from '@testing-library/user-event';
 
 import type { DeckBuildsData } from '../src/api/authoring';
@@ -68,9 +69,9 @@ const deck = {
 
 function mountPanel(): void {
   render(
-    <ConfirmDialogProvider>
+    <MemoryRouter><ConfirmDialogProvider>
       <DeckBuildsPanel deckId={DECK_ID} deckSlug={DECK_SLUG} />
-    </ConfirmDialogProvider>,
+    </ConfirmDialogProvider></MemoryRouter>,
   );
 }
 

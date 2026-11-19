@@ -5,6 +5,8 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useCreateDeck, useUpdateDeck } from '../hooks/useDecks';
 import { buildDeckBody, parseDraftVersion, DRAFT_VERSION_ERROR } from '../lib/authoringBodies';
 import { CONSOLE_NAME, DEFAULT_DECK_AUTHOR } from '../lib/brand';
+import { LINK } from '../lib/consoleOperationsView';
+import { Button } from '../components/ui/Button';
 import { ConsoleShell } from '../components/console/ConsoleShell';
 import { consoleNav } from '../components/console/consoleNav';
 
@@ -69,8 +71,8 @@ export function NewDeckPage() {
   // The write goes through react-query so that a created deck invalidates the
   // deck list rather than relying on the list refusing to cache.
   const createDeckMutation = useCreateDeck();
-  // Decks.cs POST ignores previewCards, so a Paid deck's free card count reaches
-  // the row only through a follow-up PUT after the create succeeds.
+  // The create endpoint uses the database's free tier default. Save the
+  // premium tier and preview together on the follow-up update.
   const updateDeckMutation = useUpdateDeck();
 
   const isStarter = form.deckType === 1;
@@ -130,8 +132,8 @@ export function NewDeckPage() {
     // Only a Paid deck has a preview count to get wrong: a Starter deck opens
     // every card, so a stale negative left over from switching type is not a
     // reason to refuse the submit.
-    if (!isStarter && (!Number.isFinite(form.freeCardCount) || form.freeCardCount < 0)) {
-      problems.push('Free card count must be a non-negative number.');
+    if (!isStarter && (!Number.isInteger(form.freeCardCount) || form.freeCardCount < 0 || form.freeCardCount > 2_147_483_647)) {
+      problems.push('Free card count must be a non-negative whole number within the supported range.');
     }
 
     if (problems.length > 0) {
@@ -141,6 +143,12 @@ export function NewDeckPage() {
 
     setState({ submitting: true, errors: [] });
 
+    let createdId: number | null = null;
+    const previewCards = form.freeCardCount || null;
+    const openSettings = (message: string) => navigate(`/decks/edit?deckId=${createdId}`, {
+      replace: true,
+      state: { paidSetup: { deckId: createdId, previewCards, message } },
+    });
     try {
       const result = await createDeckMutation.mutateAsync(
         buildDeckBody({
@@ -164,28 +172,27 @@ export function NewDeckPage() {
         return;
       }
 
+      createdId = result.data?.id ?? null;
       // A Paid deck carries a free card count the POST could not store, so save
       // it with a follow-up PUT before leaving. A Starter deck makes one request.
       if (form.deckType === 2 && result.data) {
         const { result: previewResult } = await updateDeckMutation.mutateAsync({
           id: result.data.id,
-          params: { previewCards: form.freeCardCount },
+          params: { tier: 'premium', previewCards },
         });
 
-        if (!previewResult.success) {
-          const message = previewResult.error?.message ?? 'unknown error';
-          setState({
-            submitting: false,
-            errors: [
-              `Deck created, but the free card count was not saved: ${message}. Set Preview Cards on the deck's Edit page.`,
-            ],
-          });
+        if (!previewResult.success || previewResult.data?.tier !== 'premium' || previewResult.data.previewCards !== previewCards) {
+          openSettings(previewResult.error?.message ?? 'The server did not confirm the requested tier and preview count.');
           return;
         }
       }
 
-      navigate('/', { replace: true });
+      navigate(createdId === null ? '/' : `/decks/cards?deckId=${createdId}`, { replace: true });
     } catch (err: unknown) {
+      if (createdId !== null) {
+        openSettings(err instanceof Error ? err.message : 'Network error');
+        return;
+      }
       setState({
         submitting: false,
         errors: [err instanceof Error ? err.message : 'Network error.'],
@@ -196,22 +203,14 @@ export function NewDeckPage() {
   return (
     <ConsoleShell
       title={CONSOLE_NAME}
-      subtitle="Authoring · New deck"
+      subtitle="New deck"
       {...consoleNav()}
     >
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold text-slate-800">New Deck</h1>
-          <p className="text-xs text-slate-500 mt-1">
-            Start a new deck &mdash; something like <span className="font-mono">js-core-basics</span>.
-          </p>
-        </div>
-        <Link to="/" className="text-sm text-indigo-600 hover:text-indigo-800">
-          ← Back to list
-        </Link>
+      <div className="space-y-3">
+        <Link to="/" className={`${LINK} text-sm`}>All decks</Link>
+        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">New Deck</h1>
       </div>
-
-      <div className="max-w-3xl mx-auto px-4 py-6">
+      <div className="max-w-3xl">
         <form
           onSubmit={handleSubmit}
           className="bg-white border border-slate-200 rounded-lg shadow-sm px-6 py-6 space-y-4"
@@ -377,8 +376,8 @@ export function NewDeckPage() {
 
               {/* freeCardCount */}
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
-                  FreeCardCount (Paid preview)
+                <label htmlFor={isStarter ? undefined : 'new-deck-preview-count'} className="block text-sm font-medium text-slate-700 mb-1">
+                  Free preview cards
                 </label>
 
                 {isStarter ? (
@@ -387,8 +386,11 @@ export function NewDeckPage() {
                   </div>
                 ) : (
                   <input
+                    id="new-deck-preview-count"
                     type="number"
                     min={0}
+                    max={2_147_483_647}
+                    aria-describedby="new-deck-preview-help"
                     className="block w-full rounded-md border border-slate-300 px-3 py-2 text-sm
                                focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                     value={form.freeCardCount}
@@ -396,6 +398,7 @@ export function NewDeckPage() {
                     aria-label="Free Card Count"
                   />
                 )}
+                {!isStarter && <p id="new-deck-preview-help" className="mt-1 text-xs text-slate-600">Use 0 for the default preview of up to 10 cards.</p>}
 
                 <p className="mt-1 text-xs text-slate-500">
                   How many cards of a Paid deck open without buying it. This is what a &ldquo;first 50 free&rdquo; trial is built on.
@@ -418,26 +421,9 @@ export function NewDeckPage() {
             />
           </div>
 
-          {/* Buttons */}
-          <div className="pt-2 flex items-center justify-between">
-            <button
-              type="button"
-              onClick={() => navigate(-1)}
-              className="text-sm text-slate-600 hover:text-slate-800"
-            >
-              Cancel
-            </button>
-
-            <button
-              type="submit"
-              disabled={state.submitting}
-              className="inline-flex items-center px-4 py-2 rounded-md text-sm font-medium
-                         bg-indigo-600 text-white hover:bg-indigo-700 active:bg-indigo-800
-                         disabled:opacity-60 disabled:cursor-not-allowed
-                         focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-            >
-              {state.submitting ? 'Creating...' : 'Create Deck'}
-            </button>
+          <div className="flex flex-wrap items-center justify-end gap-3 border-t border-slate-200 pt-4">
+            <Link to="/" className={`${LINK} text-sm`}>Cancel</Link>
+            <Button type="submit" loading={state.submitting}>{state.submitting ? 'Creating…' : 'Create Deck'}</Button>
           </div>
         </form>
       </div>

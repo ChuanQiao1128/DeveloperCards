@@ -390,7 +390,7 @@ describe('executing the plan', () => {
     expect(batchUids()).toEqual(['cs-a-001', 'cs-b-002']);
     expect(badgeStrip('created').slice(0, 3)).toEqual(['1created', '1updated', '0failed']);
 
-    expect(screen.queryByText(/step 3 of 3 · execute/)).not.toBeNull();
+    expect(screen.queryByText(/Step 3 of 3 · execute/)).not.toBeNull();
     expect(screen.queryByText('Finished')).not.toBeNull();
     expect(screen.queryByRole('button', { name: /^Retry/ })).toBeNull();
   });

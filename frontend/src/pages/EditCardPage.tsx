@@ -1,6 +1,6 @@
 // src/pages/EditCardPage.tsx
 import { useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { fetchCardById } from '../api/authoring';
 import { VERSION_CONFLICT } from '../api/errors';
 import { QueryKeys, useAppQueryClient } from '../api/queryClient';
@@ -15,6 +15,9 @@ import { buildCardBody, buildCardSource } from '../lib/authoringBodies';
 import { CONSOLE_NAME } from '../lib/brand';
 import { FORM_TRANSLATION_MIRROR_CODES, formTranslationConflict, USAGE_NEEDS_MARKDOWN } from '../lib/translationView';
 import { ConsoleShell } from '../components/console/ConsoleShell';
+import { DeckWorkspaceHeader } from '../components/console/DeckWorkspaceHeader';
+import { cardListHref } from '../lib/cardListLocation';
+import { LINK } from '../lib/consoleOperationsView';
 import { consoleNav } from '../components/console/consoleNav';
 import { getSessionGeneration } from '../auth/tokenStore';
 
@@ -56,7 +59,7 @@ function EditCardErrorScreen({ message }: { message: string }) {
         </Link>
       </div>
 
-      <div className="max-w-3xl mx-auto px-4 py-6">
+      <div className="max-w-3xl">
         <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded">
           {message}
         </div>
@@ -68,6 +71,7 @@ function EditCardErrorScreen({ message }: { message: string }) {
 export function EditCardPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { state: origin } = useLocation();
 
   const cardIdRaw = searchParams.get('cardId') ?? '';
 
@@ -204,6 +208,12 @@ export function EditCardPage() {
     }
   }
 
+  const returningToQa = origin?.qaDeckId === deck.id && typeof origin?.qaRunId === 'string' && origin.qaRunId !== '';
+  const returnHref = returningToQa
+    ? `/decks/qa?deckId=${deck.id}&runId=${encodeURIComponent(origin.qaRunId)}`
+    : cardListHref(deck.id, origin);
+  const returnState = returningToQa ? { cardListSearch: origin?.cardListSearch } : undefined;
+
   async function handleSubmit(
     values: CardFormValues,
   ): Promise<{ ok: boolean; error?: string }> {
@@ -284,32 +294,22 @@ export function EditCardPage() {
     // A successful save is not a discard: allow the navigation that follows it
     // before it fires, so the guard does not ask about the edit we just kept.
     guard.allowNextNavigation();
-    navigate(`/decks/cards?deckId=${deck.id}`, { replace: true });
+    navigate(returnHref, { replace: true, state: returnState });
     return { ok: true };
   }
 
   return (
     <ConsoleShell
       title={CONSOLE_NAME}
-      subtitle="Authoring · Edit card"
+      subtitle="Edit card"
       {...consoleNav()}
     >
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold text-slate-800">Edit Card</h1>
-          <p className="text-xs text-slate-500 mt-1">
-            {deck.title} · <span className="font-mono">{deck.slug}</span>
-          </p>
-        </div>
-        <Link
-          to={`/decks/cards?deckId=${deck.id}`}
-          className="text-sm text-indigo-600 hover:text-indigo-800"
-        >
-          ← Back to Cards
-        </Link>
+      <DeckWorkspaceHeader deck={deck} view="cards" cardListSearch={origin?.cardListSearch} />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-lg font-semibold text-slate-900">Edit Card</h2>
+        <Link to={returnHref} state={returnState} className={`${LINK} text-sm`}>{returningToQa ? 'Back to AI QA' : 'Back to Cards'}</Link>
       </div>
-
-      <div className="max-w-3xl mx-auto px-4 py-6">
+      <div className="max-w-3xl">
         {conflictCard && conflictDraft ? (
           <section aria-label="Current server copy" className="mb-6 rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
             <h2 className="font-semibold">Current server copy</h2>
@@ -341,7 +341,7 @@ export function EditCardPage() {
           deck={deck}
           initialValues={initialValues}
           onSubmit={handleSubmit}
-          onCancel={() => navigate(-1)}
+          onCancel={() => navigate(returnHref, { state: returnState })}
           onDirtyChange={setDirty}
           recoveryLabel={conflictRecoverable ? RETRY_WITH_LATEST : null}
           frontHelp={card.frontHelp}

@@ -1,14 +1,19 @@
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 
 import { useConsoleIdentity } from '../../hooks/useConsoleIdentity';
 import { LINK } from '../../lib/consoleOperationsView';
+import { cardListHref } from '../../lib/cardListLocation';
 import { hasReviewedDeckRelease } from '../../lib/deckWorkspace';
 import type { Deck } from '../../types/deck';
 
 type DeckView = 'cards' | 'publishing' | 'versions' | 'settings';
 
-export function DeckWorkspaceHeader({ deck, view }: { deck: Pick<Deck, 'id' | 'slug' | 'title'>; view: DeckView }) {
+export function DeckWorkspaceHeader({ deck, view, cardListSearch }: {
+  deck: Pick<Deck, 'id' | 'slug' | 'title'>; view: DeckView; cardListSearch?: string;
+}) {
   const identity = useConsoleIdentity();
+  const { state } = useLocation();
+  const inventory = { cardListSearch: cardListSearch ?? state?.cardListSearch };
   const query = `?deckId=${deck.id}`;
   const links: [DeckView, string, string][] = [['cards', 'Cards', '/decks/cards']];
   if (identity.allowed || (hasReviewedDeckRelease(deck) && identity.user?.groups.includes('editor'))) {
@@ -28,7 +33,8 @@ export function DeckWorkspaceHeader({ deck, view }: { deck: Pick<Deck, 'id' | 's
         {links.map(([key, label, path]) => (
           <Link
             key={key}
-            to={path + query}
+            to={key === 'cards' ? cardListHref(deck.id, inventory) : path + query}
+            state={inventory}
             aria-current={view === key ? 'page' : undefined}
             className={`inline-flex min-h-11 items-center rounded-md px-3 py-2 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${view === key ? 'bg-indigo-50 text-indigo-800' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950'}`}
           >

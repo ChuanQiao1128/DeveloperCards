@@ -1,13 +1,15 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { fetchReleaseCards, fetchReleaseAction, fetchReleaseSnapshot, sendReleaseAction } from '../api/contentRelease';
 import { readSessionUser } from '../auth/sessionUser';
 import { ConsoleShell } from '../components/console/ConsoleShell';
+import { DeckWorkspaceHeader } from '../components/console/DeckWorkspaceHeader';
 import { consoleNav } from '../components/console/consoleNav';
-import { CARD_CLASS, H1_CLASS, H2_CLASS, INPUT_CLASS } from '../components/console/consoleStyles';
+import { CARD_CLASS, H2_CLASS, INPUT_CLASS } from '../components/console/consoleStyles';
 import { Button } from '../components/ui/Button';
 import { Callout } from '../components/ui/Callout';
 import { CONSOLE_NAME } from '../lib/brand';
+import { hasReviewedDeckRelease } from '../lib/deckWorkspace';
 import { assertPublicationQuery, publicationStatus, type PublicationStatus } from '../lib/contentReleaseStatus';
 import { loadReleaseJournal, saveReleaseJournal, withReleaseJournalLock } from '../lib/releaseJournalStore';
 import { verifyReleaseDelivery, verifyStoredReleaseDelivery, waitForReleasePoll, type ReleaseDeliveryProof } from '../lib/contentReleaseDelivery';
@@ -42,21 +44,28 @@ export function PublicationStatusPanel({ status, busy, blocked, onCheck, onConti
     </Callout>;
 }
 
-export function ContentReleasePage() {
+const AWS_BASICS = { id: 15, slug: 'aws-saa-fundamentals', title: 'AWS Basics' };
+
+export function ContentReleasePage({ deck, children }: {
+  deck?: typeof AWS_BASICS;
+  children?: ReactNode;
+}) {
   const [params] = useSearchParams();
   const user = useMemo(() => readSessionUser(), []);
-  const allowed = Boolean(user?.sub && user.groups.some(group => group === 'editor' || group === 'super_admin')) && (params.get('deckId') ?? '15') === '15';
+  const releaseDeckMatches = deck ? hasReviewedDeckRelease(deck) : (params.get('deckId') ?? '15') === '15';
+  const allowed = Boolean(user?.sub && user.groups.some(group => group === 'editor' || group === 'super_admin')) && releaseDeckMatches;
   const storageKey = `aws-basics-release-v1:${user?.sub ?? 'no-session'}`;
   const [session, setSession] = useState<ReleaseSession | null>(null);
   const currentSession = useRef<ReleaseSession | null>(null);
   const artifactDirectory = useRef<ArtifactDirectory | undefined>(undefined);
   const [automaticSave, setAutomaticSave] = useState(false);
+  const mounted = useRef(false);
   const running = useRef<AbortController | null>(null);
   const [delivery, setDelivery] = useState<ReleaseDeliveryProof | null>(null);
   const journalRevision = useRef(0);
   const [loading, setLoading] = useState(allowed);
   const [bundle, setBundle] = useState<ReleaseBundle | null>(null);
-  const cardCount = session?.bundle.cards.length ?? bundle?.cards.length;
+  const activeBundle = session?.bundle ?? bundle;
   const [restoreBlocked, setRestoreBlocked] = useState(false);
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
@@ -68,10 +77,17 @@ export function ContentReleasePage() {
   const publication = publicationStatus(session, Boolean(delivery), publicationLookupFailed);
 
   const assertOwner = useCallback((current?: ReleaseSession | null) => {
-    if (running.current?.signal.aborted) throw new Error('Publication monitoring stopped.');
+    if (!mounted.current || running.current?.signal.aborted) throw new Error('Publication monitoring stopped.');
     const active = readSessionUser();
     if (!user?.sub || active?.sub !== user.sub || !active.groups.some(group => group === 'editor' || group === 'super_admin') || current && current.ownerSubject !== active.sub) throw new Error('Signed-in subject changed or journal belongs to another subject. Reopen this page under its owning account.');
   }, [user]);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      running.current?.abort();
+    };
+  }, []);
   useEffect(() => {
     if (!allowed) return;
     let cancelled = false;
@@ -106,7 +122,6 @@ export function ContentReleasePage() {
     })();
     return () => { cancelled = true; };
   }, [allowed, assertOwner, storageKey, user]);
-  useEffect(() => () => running.current?.abort(), []);
   async function owned<T>(work: () => Promise<T>, current = session): Promise<T> {
     assertOwner(current);
     const result = await work();
@@ -132,8 +147,8 @@ export function ContentReleasePage() {
     if (!allowed || loading || busyRef.current || restoreBlocked && !recovery) return;
     busyRef.current = true; setBusy(true); setError(''); setMessage('');
     try { assertOwner(); await owned(work); }
-    catch (failure) { setError(failure instanceof Error ? failure.message : String(failure)); }
-    finally { busyRef.current = false; setBusy(false); }
+    catch (failure) { if (mounted.current) setError(failure instanceof Error ? failure.message : String(failure)); }
+    finally { busyRef.current = false; if (mounted.current) setBusy(false); }
   }
   async function capture() {
     if (!bundle || currentSession.current) return;
@@ -308,73 +323,99 @@ export function ContentReleasePage() {
   }
 
   if (!allowed) return <ConsoleShell title={CONSOLE_NAME} {...consoleNav()}><Callout tone="danger" role="alert">This release page requires a signed-in Console editor or super_admin and AWS Basics deck 15. Server authorization remains authoritative.</Callout></ConsoleShell>;
-  if (loading) return <ConsoleShell title={CONSOLE_NAME} {...consoleNav()}><p role="status">Loading saved release…</p></ConsoleShell>;
-  return <ConsoleShell title={CONSOLE_NAME} subtitle="AWS Basics bilingual release" {...consoleNav()}>
-    <div className="flex flex-wrap items-center justify-between gap-3"><h1 className={H1_CLASS}>AWS Basics release{cardCount ? ` · ${cardCount} cards` : ''}</h1><Link className="text-sm text-indigo-700 underline" to="/decks/cards?deckId=15">Back to AWS Basics</Link></div>
-    <Callout tone="info">Load the immutable local bundle containing the existing model review. File checks and readback comparisons do not review content. The receipt records reviewedBy=codex and humanPerCardReview=false; the author submits batch authorization without asserting per-card human review.</Callout>
+  return <ConsoleShell title={CONSOLE_NAME} subtitle="Publishing" {...consoleNav()}>
+    <DeckWorkspaceHeader deck={deck ?? AWS_BASICS} view="publishing" />
+    {loading ? <p role="status">Loading saved release…</p> : <>
+    <section className={`${CARD_CLASS} space-y-3`} aria-labelledby="batch-heading">
+      <h2 id="batch-heading" className={H2_CLASS}>Publish a batch</h2>
+      {!session && <div className="space-y-2">
+        <label className="block text-sm font-medium" htmlFor="release-bundle">Release bundle (JSON)</label>
+        <input id="release-bundle" className={INPUT_CLASS} type="file" accept="application/json,.json" disabled={busy || restoreBlocked} onChange={event => { const file = event.target.files?.[0]; if (!file) return; setBundle(null); void run(async () => { if (file.size > 3_000_000) throw new Error('Release bundle is too large.'); setBundle(parseReleaseBundle(await owned(() => file.text()))); }); }} />
+      </div>}
+      {activeBundle && <div className="text-sm" role="status">
+        <p className="break-all font-medium">Batch {activeBundle.releaseId}</p>
+        <p className="text-slate-600">{activeBundle.cards.length} cards in the bundle</p>
+      </div>}
+      {!session?.actions.publish && <>
+        <p className="max-w-prose text-sm text-slate-600">Publishing backs up the editing deck, registers the bundle’s existing model review, and verifies the card pack on the public CDN.</p>
+        {activeBundle && <p className="max-w-prose text-sm text-slate-600">This click authorizes the whole batch. The receipt records model review only for individual cards.</p>}
+        <Button className="min-h-11" disabled={!activeBundle || busy || restoreBlocked} onClick={() => void run(completeRelease)}>Publish batch</Button>
+      </>}
+      {delivery && <div className="flex flex-wrap gap-3">
+        <Button variant="outline" disabled={busy} onClick={() => void run(startAnotherRelease)}>Start another release</Button>
+        <Button variant="outline" disabled={busy} onClick={() => void run(async () => {
+          const current = currentSession.current!;
+          const artifact = await loadDeliveryArtifact(current, () => assertOwner(current));
+          if (!artifact) throw new Error('Verified card bytes are unavailable. Continue this saved release to verify and save them.');
+          download(`${current.bundle.releaseId}-verified-artifacts.json`, releaseArtifactDownload(current, artifact));
+        })}>Download verified release artifacts</Button>
+      </div>}
+    </section>
     {publication && <PublicationStatusPanel status={publication} busy={busy} blocked={restoreBlocked}
       onCheck={() => void run(() => query('publish'))} onContinue={() => void run(continuePublication)} onVerify={() => void run(verifyExistingPublication)} />}
     {error && <Callout tone={publication?.kind === 'unknown' || publication?.kind === 'verification' ? 'warning' : 'danger'} title="Action needs attention" role="alert">{error}</Callout>}
     {message && <Callout tone="info" role="status">{message}</Callout>}
-    {supportsArtifactDirectory() && <Button variant="outline" disabled={busy || restoreBlocked} onClick={() => void run(async () => {
-      const directory = await chooseArtifactDirectory(user!.sub!, () => assertOwner(currentSession.current));
-      artifactDirectory.current = directory; setAutomaticSave(true);
-      await withReleaseJournalLock(user!.sub!, async () => {
-        const current = currentSession.current;
-        if (!current) return;
-        const stored = await loadReleaseJournal(user!.sub!); assertOwner(current);
-        if (stored?.revision !== journalRevision.current || stored.raw !== JSON.stringify(current)) throw new Error('Release changed in another tab. Reload before exporting it.');
-        const artifact = current.delivery ? await loadDeliveryArtifact(current, () => assertOwner(current)) : undefined;
-        if (current.delivery && !artifact) throw new Error('Verified bytes are unavailable. Continue this saved release before exporting it.');
-        await writeReleaseArtifacts(directory, current, () => assertOwner(current), artifact);
-      });
-      setMessage('Save folder selected. Recovery files and verified card packs will save here automatically.');
-    })}>{automaticSave ? 'Change automatic save folder' : 'Choose automatic save folder'}</Button>}
-    {(bundle || session) && !session?.actions.publish && <Button disabled={busy || restoreBlocked} onClick={() => void run(completeRelease)}>Run reviewed release</Button>}
-    {delivery && <Button variant="outline" disabled={busy} onClick={() => void run(startAnotherRelease)}>Start another release</Button>}
-    {delivery && <Button variant="outline" disabled={busy} onClick={() => void run(async () => {
-      const current = currentSession.current!;
-      const artifact = await loadDeliveryArtifact(current, () => assertOwner(current));
-      if (!artifact) throw new Error('Verified card bytes are unavailable. Continue this saved release to verify and save them.');
-      download(`${current.bundle.releaseId}-verified-artifacts.json`, releaseArtifactDownload(current, artifact));
-    })}>Download verified release artifacts</Button>}
-    {!session && <section className={`${CARD_CLASS} space-y-3`} aria-labelledby="bundle-heading">
-      <h2 id="bundle-heading" className={H2_CLASS}>1. Load bundle and capture complete editing backup</h2>
-      <label className="block text-sm" htmlFor="release-bundle">Immutable release bundle (JSON)</label>
-      <input id="release-bundle" className={INPUT_CLASS} type="file" accept="application/json,.json" disabled={busy || restoreBlocked} onChange={event => { const file = event.target.files?.[0]; if (!file) return; setBundle(null); void run(async () => { if (file.size > 3_000_000) throw new Error('Release bundle is too large.'); const loaded = parseReleaseBundle(await owned(() => file.text())); setBundle(loaded); setMessage(`Loaded ${loaded.cards.length} cards and local model PASS records. No content review was performed by this page.`); }); }} />
-      <Button disabled={!bundle || busy || restoreBlocked} onClick={() => void run(capture)}>Capture editing backup and freeze release</Button>
-    </section>}
-    <section className={`${CARD_CLASS} space-y-3`}>
-      <label className="block text-sm" htmlFor="release-recovery">Or restore a downloaded Console recovery journal</label>
-      <input id="release-recovery" className={INPUT_CLASS} type="file" accept="application/json,.json" disabled={busy} onChange={event => { const file = event.target.files?.[0]; if (!file) return; void run(async () => { if (file.size > 10_000_000) throw new Error('Recovery journal is too large.'); await save(parseReleaseSession(await owned(() => file.text()), user!.sub!), true); setRestoreBlocked(false); setDelivery(null); setQueryView(null); setPublicationLookupFailed(false); freshPublishQuery.current = false; setBundle(null); setMessage('Original backup, frozen requests and action keys restored. Query each existing action before continuing.'); }, true); }} />
-    </section>
-    {session && <>
-      <section className={`${CARD_CLASS} space-y-3`} aria-labelledby="backup-heading">
-        <h2 id="backup-heading" className={H2_CLASS}>1. Frozen release and initial backup</h2>
-        <p className="text-sm break-all">Release: {session.bundle.releaseId} · Main: {session.bundle.review.mainSHA}<br />Initial live build: {session.baseline.deck.live_build_id ?? 'none'}<br />Initial editing snapshot: {session.baseline.editingSnapshot}</p>
-        <div className="flex flex-wrap gap-3"><Button variant="outline" onClick={() => void run(async () => download(`${session.bundle.releaseId}-editing-backup.json`, session.baseline))}>Download complete editing backup</Button><Button variant="outline" onClick={() => void run(async () => download(`${session.bundle.releaseId}-console-journal.json`, session))}>Download recovery journal</Button></div>
-        <p className="text-sm text-slate-600">The exact bundle, backup and requests are saved in browser storage. Download the journal before closing it. Existing actions cannot be replaced with new keys here.</p>
+    <details open={restoreBlocked || undefined} className={`${CARD_CLASS} space-y-3`}>
+      <summary className="cursor-pointer rounded font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">Batch details &amp; recovery</summary>
+      {activeBundle && <div className="space-y-1 text-sm text-slate-600">
+        <p>Review on file · {activeBundle.review.cards.length} card records</p>
+        <p className="break-all">Model: {activeBundle.review.model} · Run: {activeBundle.review.runId}</p>
+        <p>Console validates the file and compares the saved editing cards with the bundle.</p>
+      </div>}
+      <p className="max-w-prose text-sm text-slate-600">
+        Console stores the editing backup and recovery journal in this browser. {supportsArtifactDirectory()
+          ? automaticSave ? 'It also saves copies to your selected folder.' : 'Choose a folder to keep copies outside this browser.'
+          : 'You can download a copy after the backup is captured.'}
+      </p>
+      {supportsArtifactDirectory() && <Button variant="outline" disabled={busy || restoreBlocked} onClick={() => void run(async () => {
+        const directory = await chooseArtifactDirectory(user!.sub!, () => assertOwner(currentSession.current));
+        artifactDirectory.current = directory; setAutomaticSave(true);
+        await withReleaseJournalLock(user!.sub!, async () => {
+          const current = currentSession.current;
+          if (!current) return;
+          const stored = await loadReleaseJournal(user!.sub!); assertOwner(current);
+          if (stored?.revision !== journalRevision.current || stored.raw !== JSON.stringify(current)) throw new Error('Release changed in another tab. Reload before exporting it.');
+          const artifact = current.delivery ? await loadDeliveryArtifact(current, () => assertOwner(current)) : undefined;
+          if (current.delivery && !artifact) throw new Error('Verified bytes are unavailable. Continue this saved release before exporting it.');
+          await writeReleaseArtifacts(directory, current, () => assertOwner(current), artifact);
+        });
+        setMessage('Save folder selected. Recovery files and verified card packs will save here automatically.');
+      })}>{automaticSave ? 'Change automatic save folder' : 'Choose automatic save folder'}</Button>}
+      {!session && bundle && <Button variant="outline" disabled={busy || restoreBlocked} onClick={() => void run(capture)}>Capture editing backup and freeze release</Button>}
+      <section className={`${CARD_CLASS} space-y-3`}>
+        <label className="block text-sm" htmlFor="release-recovery">Or restore a downloaded Console recovery journal</label>
+        <input id="release-recovery" className={INPUT_CLASS} type="file" accept="application/json,.json" disabled={busy} onChange={event => { const file = event.target.files?.[0]; if (!file) return; void run(async () => { if (file.size > 10_000_000) throw new Error('Recovery journal is too large.'); await save(parseReleaseSession(await owned(() => file.text()), user!.sub!), true); setRestoreBlocked(false); setDelivery(null); setQueryView(null); setPublicationLookupFailed(false); freshPublishQuery.current = false; setBundle(null); setMessage('Original backup, frozen requests and action keys restored. Query each existing action before continuing.'); }, true); }} />
       </section>
-      {(['import', 'review', 'publish'] as const).map((kind, index) => {
-        const action = session.actions[kind];
-        const reconciled = Object.values(session.actions).every(item => item.reconciled);
-        const ready = reconciled && (kind === 'import' || kind === 'review' && isConfirmedAction(session.actions.import) || kind === 'publish' && isConfirmedAction(session.actions.import) && isConfirmedAction(session.actions.review));
-        return <section key={kind} className={`${CARD_CLASS} space-y-3`} aria-labelledby={`${kind}-heading`}>
-          <h2 id={`${kind}-heading`} className={H2_CLASS}>{index + 2}. {kind === 'import' ? 'Import frozen candidate' : kind === 'review' ? 'Verify full readback and register local model evidence' : 'Publish reviewed snapshot'}</h2>
-          {action && <p className="text-sm break-all">Action: {action.actionId} · {!action.reconciled ? 'Recovery unreconciled — query before continuing' : action.outcome === 'unknown' ? 'Outcome unknown — query before retry' : 'Commit confirmed'}{action.result?.error ? ` · ${action.result.error.code}` : ''}</p>}
-          <div className="flex flex-wrap gap-3">
-            {!action && <Button disabled={busy || !ready} onClick={() => void run(() => dispatch(kind))}>{kind === 'import' ? `Import ${session.bundle.cards.length} cards` : kind === 'review' ? 'Verify and register model review' : 'Publish reviewed release'}</Button>}
-            {action && kind !== 'publish' && <Button variant="outline" disabled={busy} onClick={() => void run(() => query(kind))}>Query {kind} action</Button>}
-            {action && kind !== 'publish' && action.outcome === 'unknown' && <Button variant="outline" disabled={busy || !action.queried || !ready} onClick={() => void run(() => dispatch(kind, true))}>Retry identical {kind} request</Button>}
-          </div>
-          {kind === 'review' && <p className="text-sm text-slate-600">All English and Chinese fields, help, source, difficulty and order must match. Every local PASS must match the current server hash, schema and revision. Policy hashes come from the current snapshot.</p>}
-          {kind === 'publish' && <p className="text-sm text-slate-600">A 503 or timeout can leave a committed publish job. Query, then replay the same action if delivery is unconfirmed. Current job and live status appear below; manifestVerified remains false until external CDN verification.</p>}
-        </section>;
-      })}
-      <section className={`${CARD_CLASS} space-y-3`} aria-labelledby="verification-heading"><h2 id="verification-heading" className={H2_CLASS}>Readback and server status</h2><Button variant="outline" disabled={busy || !isConfirmedAction(session.actions.import) || !Object.values(session.actions).every(action => action.reconciled)} onClick={() => void run(async () => { const next = await owned(() => verify(session)); await save(next); setMessage(`Exact ${session.bundle.cards.length}-card readback and local model review bindings verified. No new model review was performed.`); })}>Verify current editing readback</Button><p className="text-sm">{delivery ? `manifestVerified=true · ${delivery.buildId} · ${delivery.cards} cards · ${delivery.sha256}` : 'manifestVerified=false · External CDN verification is pending.'}</p>
-        <details><summary className="cursor-pointer text-sm">{publicationLookupFailed ? 'Previous action query (not current after a failed check)' : 'Latest action query (actual jobs and live build)'}</summary><pre className="text-xs overflow-auto max-h-96 whitespace-pre-wrap break-all">{JSON.stringify(queryView ?? Object.fromEntries(Object.entries(session.actions).map(([kind, action]) => [kind, action?.query ?? action?.result])), null, 2)}</pre></details>
-        <details><summary className="cursor-pointer text-sm">Frozen complete editing backup</summary><pre className="text-xs overflow-auto max-h-96 whitespace-pre-wrap break-all">{JSON.stringify(session.baseline, null, 2)}</pre></details>
-      </section>
+      {session && <>
+        <section className={`${CARD_CLASS} space-y-3`} aria-labelledby="backup-heading">
+          <h2 id="backup-heading" className={H2_CLASS}>1. Frozen release and initial backup</h2>
+          <p className="text-sm break-all">Release: {session.bundle.releaseId} · Main: {session.bundle.review.mainSHA}<br />Initial live build: {session.baseline.deck.live_build_id ?? 'none'}<br />Initial editing snapshot: {session.baseline.editingSnapshot}</p>
+          <div className="flex flex-wrap gap-3"><Button variant="outline" onClick={() => void run(async () => download(`${session.bundle.releaseId}-editing-backup.json`, session.baseline))}>Download complete editing backup</Button><Button variant="outline" onClick={() => void run(async () => download(`${session.bundle.releaseId}-console-journal.json`, session))}>Download recovery journal</Button></div>
+          <p className="text-sm text-slate-600">The exact bundle, backup and requests are saved in browser storage. Download the journal before closing it. Existing actions cannot be replaced with new keys here.</p>
+        </section>
+        {(['import', 'review', 'publish'] as const).map((kind, index) => {
+          const action = session.actions[kind];
+          const reconciled = Object.values(session.actions).every(item => item.reconciled);
+          const ready = reconciled && (kind === 'import' || kind === 'review' && isConfirmedAction(session.actions.import) || kind === 'publish' && isConfirmedAction(session.actions.import) && isConfirmedAction(session.actions.review));
+          return <section key={kind} className={`${CARD_CLASS} space-y-3`} aria-labelledby={`${kind}-heading`}>
+            <h2 id={`${kind}-heading`} className={H2_CLASS}>{index + 2}. {kind === 'import' ? 'Import frozen candidate' : kind === 'review' ? 'Verify full readback and register local model evidence' : 'Publish reviewed snapshot'}</h2>
+            {action && <p className="text-sm break-all">Action: {action.actionId} · {!action.reconciled ? 'Recovery unreconciled — query before continuing' : action.outcome === 'unknown' ? 'Outcome unknown — query before retry' : 'Commit confirmed'}{action.result?.error ? ` · ${action.result.error.code}` : ''}</p>}
+            <div className="flex flex-wrap gap-3">
+              {!action && <Button disabled={busy || !ready} onClick={() => void run(() => dispatch(kind))}>{kind === 'import' ? `Import ${session.bundle.cards.length} cards` : kind === 'review' ? 'Verify and register model review' : 'Publish reviewed release'}</Button>}
+              {action && kind !== 'publish' && <Button variant="outline" disabled={busy} onClick={() => void run(() => query(kind))}>Query {kind} action</Button>}
+              {action && kind !== 'publish' && action.outcome === 'unknown' && <Button variant="outline" disabled={busy || !action.queried || !ready} onClick={() => void run(() => dispatch(kind, true))}>Retry identical {kind} request</Button>}
+            </div>
+            {kind === 'review' && <p className="text-sm text-slate-600">All English and Chinese fields, help, source, difficulty and order must match. Every local PASS must match the current server hash, schema and revision. Policy hashes come from the current snapshot.</p>}
+            {kind === 'publish' && <p className="text-sm text-slate-600">A 503 or timeout can leave a committed publish job. Query, then replay the same action if delivery is unconfirmed. Current job and live status appear below; manifestVerified remains false until external CDN verification.</p>}
+          </section>;
+        })}
+        <section className={`${CARD_CLASS} space-y-3`} aria-labelledby="verification-heading"><h2 id="verification-heading" className={H2_CLASS}>Readback and server status</h2><Button variant="outline" disabled={busy || !isConfirmedAction(session.actions.import) || !Object.values(session.actions).every(action => action.reconciled)} onClick={() => void run(async () => { const next = await owned(() => verify(session)); await save(next); setMessage(`Exact ${session.bundle.cards.length}-card readback and local model review bindings verified. No new model review was performed.`); })}>Verify current editing readback</Button><p className="text-sm">{delivery ? `manifestVerified=true · ${delivery.buildId} · ${delivery.cards} cards · ${delivery.sha256}` : 'manifestVerified=false · External CDN verification is pending.'}</p>
+          <details><summary className="cursor-pointer text-sm">{publicationLookupFailed ? 'Previous action query (not current after a failed check)' : 'Latest action query (actual jobs and live build)'}</summary><pre className="text-xs overflow-auto max-h-96 whitespace-pre-wrap break-all">{JSON.stringify(queryView ?? Object.fromEntries(Object.entries(session.actions).map(([kind, action]) => [kind, action?.query ?? action?.result])), null, 2)}</pre></details>
+          <details><summary className="cursor-pointer text-sm">Frozen complete editing backup</summary><pre className="text-xs overflow-auto max-h-96 whitespace-pre-wrap break-all">{JSON.stringify(session.baseline, null, 2)}</pre></details>
+        </section>
+      </>}
+    </details>
+    {children}
     </>}
   </ConsoleShell>;
 }

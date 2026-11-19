@@ -93,7 +93,7 @@ afterEach(() => {
 
 async function openPage(entry = PAGE) {
   renderAt(<DeckQaPage />, [entry]);
-  await screen.findByRole('heading', { level: 1, name: 'AI QA' });
+  await screen.findByRole('heading', { name: 'AI QA' });
   await waitFor(() => expect(qa.fetchQaStatus).toHaveBeenCalled());
   await waitFor(() => expect(screen.queryByText('Loading the publish gate…')).toBeNull());
 }
@@ -103,6 +103,19 @@ function startButton(): HTMLButtonElement {
 }
 
 describe('DeckQaPage', () => {
+  it('keeps the card inventory position when opening a QA run', async () => {
+    const cardListSearch = `deckId=${QA_DECK_ID}&q=storage&page=2`;
+    qa.listQaRuns.mockResolvedValue(runsPage([qaRun()]));
+    const router = createMemoryRouter([{ path: '*', element: <DeckQaPage /> }], {
+      initialEntries: [{ pathname: '/decks/qa', search: `?deckId=${QA_DECK_ID}`, state: { cardListSearch } }],
+    });
+    render(<RouterProvider router={router} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'View run run-1' }));
+    await waitFor(() => expect(router.state.location.search).toContain('runId=run-1'));
+    const deckPages = await screen.findByRole('navigation', { name: 'Deck pages' });
+    expect(within(deckPages).getByRole('link', { name: 'Cards' }).getAttribute('href')).toBe(`/decks/cards?${cardListSearch}`);
+  });
+
   it('offers a deck picker when no deckId is given', async () => {
     renderAt(<DeckQaPage />, ['/decks/qa']);
     expect(await screen.findByText('Choose a deck to review with AI QA.')).toBeTruthy();
@@ -144,6 +157,7 @@ describe('DeckQaPage', () => {
     expect(gate.textContent).toContain('aws-s3-storage-classes: Incorrect answer — Deep Archive is not a lifecycle target.');
 
     expect(screen.getAllByRole('heading', { level: 2 }).map(h => h.textContent)).toEqual([
+      'AI QA',
       'Publish gate',
       'Start a review',
       'Progress',
@@ -741,7 +755,7 @@ describe('DeckQaPage', () => {
     await vi.advanceTimersByTimeAsync(QA_POLL_INTERVAL_MS);
     const notice = await screen.findByTestId('qa-run-finished-clean');
     expect(notice.textContent).toContain('The review finished with no blockers');
-    expect(within(notice).getByRole('link', { name: 'Publish now from the deck list' }).getAttribute('href')).toBe('/');
+    expect(within(notice).getByRole('link', { name: 'Open deck publishing' }).getAttribute('href')).toBe(`/decks/publish?deckId=${QA_DECK_ID}`);
     cleanup();
 
     // A run that ends with a blocker says nothing of the kind.

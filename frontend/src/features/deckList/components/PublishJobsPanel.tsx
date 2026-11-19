@@ -1,34 +1,6 @@
-// src/features/deckList/components/PublishJobsPanel.tsx
-//
-// The Publish Jobs tab's table. Lifted from DeckListPage.tsx lines 775-823.
-//
-// RENAMES APPLIED:
-//   () => void loadPublishJobs()  -> onRefresh()
-//   publishJobs.length            -> jobs.length
-//   publishJobs.map               -> jobs.map
-//
-// The `activeTab === 'publishJobs' && superAdmin` gate that decides whether this
-// panel exists at all stays on the page. Pushing it in here would mean mounting
-// a component so that it can return null.
-//
-// PROVENANCE. The JSX below was moved out of src/pages/DeckListPage.tsx and was
-// byte-identical to the original apart from the renames listed above. Its
-// ORIGINAL INDENTATION IS PRESERVED ON PURPOSE, even though it looks over-deep
-// for a file this small: re-indenting would destroy the only cheap proof that
-// nothing else changed in the move. eslint has no indent rule here, so this
-// costs nothing but the look of it.
-//
-// 1.7.0 (F24, CFE-09): an Error column was added after Status so a FAILED job
-// shows its errorMessage instead of sending the owner to CloudWatch, and the
-// Job ID cell gained a title so the full id is available on hover.
-//
-// NO HOOKS, NO memo, NO useCallback. tests/deckListHookOrder.test.ts C2
-// enforces this over the whole directory. The reason is C1: the page's recorded
-// hook sequence only describes the rendered tree while the children add nothing
-// to it. It is also exactly why the older src/components/decks/DeckTable.tsx
-// could not be reused — it calls useNavigate() internally.
-
+import { Link } from 'react-router-dom';
 import type { PublishJob } from '../../../api/authoring';
+import { LINK, PANEL } from '../../../lib/consoleOperationsView';
 import { safeDateTime } from '../deckListManifest';
 import { publishJobStage } from '../publishJobStage';
 
@@ -39,59 +11,30 @@ export interface PublishJobsPanelProps {
 
 export function PublishJobsPanel({ jobs, onRefresh }: PublishJobsPanelProps) {
   return (
-          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-            <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-slate-700">Recent Publish Jobs</h3>
-              <button
-                type="button"
-                onClick={() => onRefresh()}
-                className="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
-              >
-                Refresh
-              </button>
-            </div>
-            <div className="overflow-auto">
-              {jobs.length === 0 ? (
-                <div className="px-4 py-12 text-center text-sm text-slate-500">No publish jobs yet.</div>
-              ) : (
-                <table className="min-w-full text-sm">
-                  <thead className="bg-slate-50 text-xs uppercase text-slate-500 font-medium">
-                    <tr>
-                      {['Job ID', 'Deck', 'Status', 'Error', 'Note', 'Time'].map(label => (
-                        <th key={label} className="px-4 py-3 text-left">{label}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {jobs.map(job => (
-                      <tr key={job.jobId} className="hover:bg-slate-50/60">
-                        <td className="px-4 py-3 font-mono text-[11px] text-slate-500" title={job.jobId}>{job.jobId.slice(0, 8)}...</td>
-                        <td className="px-4 py-3 font-medium text-slate-700">{job.deckSlug}</td>
-                        <td className="px-4 py-3">
-                          <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-medium ${
-                            job.status === 'SUCCESS' ? 'bg-emerald-100 text-emerald-700' :
-                            job.status === 'FAILED' ? 'bg-red-100 text-red-700' :
-                            job.status === 'PROCESSING' ? 'bg-blue-100 text-blue-700' :
-                            'bg-amber-100 text-amber-700'
-                          }`}>
-                            {publishJobStage(job)}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-xs">
-                          {job.status === 'FAILED' && job.errorMessage ? (
-                            <span data-testid="publish-job-error" title={job.errorMessage} className="text-red-700 max-w-xs break-words">{job.errorMessage}</span>
-                          ) : (
-                            '-'
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-xs text-slate-600 max-w-xs truncate">{job.note || '-'}</td>
-                        <td className="px-4 py-3 text-xs text-slate-500">{safeDateTime(job.createdAt)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          </div>
+    <section className={PANEL} aria-label="Recent publish jobs">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="font-semibold text-slate-900">Recent publish jobs</h2>
+        <button type="button" onClick={onRefresh} className={`${LINK} text-sm`}>Refresh jobs</button>
+      </div>
+      {jobs.length === 0 ? <p className="py-4 text-sm text-slate-600">No publish jobs yet.</p> : (
+        <ul className="divide-y divide-slate-200 border-t border-slate-200">
+          {jobs.map(job => (
+            <li key={job.jobId} className="flex flex-wrap items-start justify-between gap-3 py-4 text-sm">
+              <div className="min-w-0">
+                <p className="break-words font-medium text-slate-900">{job.deckTitle || job.deckSlug}</p>
+                <p className="mt-1 text-xs text-slate-600">{safeDateTime(job.createdAt)}</p>
+                <p className={`mt-1 font-medium ${job.status === 'FAILED' ? 'text-red-700'
+                  : job.status === 'SUCCESS' && job.manifestState === 'delivered' ? 'text-emerald-700' : 'text-slate-700'}`}>
+                  {job.dispatchExhausted ? 'Queue delivery needs attention' : publishJobStage(job)}
+                </p>
+                {job.errorMessage && <p data-testid="publish-job-error" className="mt-1 break-words text-xs text-slate-600">{job.errorMessage}</p>}
+                {job.note && <p className="mt-1 break-words text-xs text-slate-600">{job.note}</p>}
+              </div>
+              <Link className={`${LINK} inline-flex min-h-11 items-center`} to={`/decks/publish-jobs/${encodeURIComponent(job.jobId)}`} aria-label={`View job ${job.jobId}`}>View job</Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }

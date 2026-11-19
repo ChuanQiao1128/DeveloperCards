@@ -1,11 +1,12 @@
 // src/components/console/DeckBuildsPanel.tsx
 //
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useAppQueryClient } from '../../api/queryClient';
 import { getSessionGeneration } from '../../auth/tokenStore';
 import { useConsoleIdentity } from '../../hooks/useConsoleIdentity';
-import { formatTime } from '../../lib/consoleOperationsView';
+import { formatTime, LINK } from '../../lib/consoleOperationsView';
 import { Button } from '../ui/Button';
 import { Callout } from '../ui/Callout';
 
@@ -119,6 +120,8 @@ export function DeckBuildsPanel({ deckId, deckSlug, canRollback = true }: { deck
   }
 
   const builds = versions.data?.builds ?? [];
+  const liveBuildId = versions.data?.liveBuildId;
+  const liveOutsideRecent = liveBuildId && !builds.some(build => build.buildId === liveBuildId);
 
   return (
     <section aria-labelledby="deck-builds-heading" className="space-y-4 rounded-lg border border-slate-200 bg-white p-4">
@@ -134,6 +137,9 @@ export function DeckBuildsPanel({ deckId, deckSlug, canRollback = true }: { deck
       {versions.isError && <Callout role="alert" tone="danger">{versions.error.message}</Callout>}
       {feedback && <Callout role={feedback.kind === 'ok' ? 'status' : 'alert'} tone={feedback.kind === 'ok' ? 'success' : 'danger'}>{feedback.text}</Callout>}
 
+      {versions.isSuccess && !versions.isFetching && liveOutsideRecent && (
+        <p className="break-all text-sm text-slate-700">Selected live build <span className="font-mono font-medium">{liveBuildId}</span>. This build is older than the recent versions shown below.</p>
+      )}
       {versions.isSuccess && !versions.isFetching && (
         builds.length === 0 ? <p className="text-sm text-slate-600">No published versions yet.</p> : (
           <ul className="divide-y divide-slate-200 border-t border-slate-200">
@@ -144,8 +150,11 @@ export function DeckBuildsPanel({ deckId, deckSlug, canRollback = true }: { deck
                   <div className="text-xs text-slate-600">{formatTime(build.createdAt)}</div>
                   {build.note && <div className="mt-1 break-words text-sm text-slate-600">{build.note}</div>}
                 </div>
-                {build.isLive ? <span className="rounded-full bg-emerald-100 px-2 py-1 text-xs font-medium text-emerald-800">Live</span>
+                <div className="flex flex-wrap items-center gap-3">
+                  {build.jobId && <Link className={`${LINK} text-sm`} to={`/decks/publish-jobs/${encodeURIComponent(build.jobId)}`}>View job</Link>}
+                  {build.isLive ? <span className="rounded-full bg-emerald-100 px-2 py-1 text-xs font-medium text-emerald-800">Live</span>
                   : canRollback && <Button variant="outline" size="sm" disabled={rollingBack || versions.isFetching} onClick={() => void handleRollback(build)}>Roll back to this build</Button>}
+                </div>
               </li>
             ))}
           </ul>
