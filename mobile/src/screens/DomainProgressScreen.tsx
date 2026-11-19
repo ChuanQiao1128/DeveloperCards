@@ -5,11 +5,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import type { RootStackParamList } from '../navigation/types';
-import { getCachedDeck } from '../content/deckCache';
-import { loadDeckProgress } from '../review/storage';
-import { resolveEffectiveOwned } from '../features/gacha/draw/effectiveOwned';
-import { activeMistakes, loadMistakeBook } from '../features/gacha/mistakes/mistakeBook';
-import { computeDomainProgress, type DomainProgress } from '../features/domains/domainProgress';
+import type { DomainProgress } from '../features/domains/domainProgress';
+import { loadDomainProgress } from '../features/domains/loadDomainProgress';
 import { pickDomainPracticeUids } from '../features/domains/domainPractice';
 import { a11y } from '../theme/a11y';
 import { colors } from '../theme/colors';
@@ -33,13 +30,9 @@ type Row = { domain: DomainProgress; practiceUids: string[] };
 type Loaded = { deckTitle: string; rows: Row[] } | 'missing';
 
 async function loadRows(slug: string): Promise<Loaded> {
-  const deck = await getCachedDeck(slug);
-  if (!deck) return 'missing';
-  const now = new Date();
-  const progress = await loadDeckProgress(deck);
-  const owned = await resolveEffectiveOwned(slug, progress);
-  const mistakes = activeMistakes(await loadMistakeBook(), { deckSlug: slug, now: now.getTime() });
-  const domains = computeDomainProgress(slug, deck.Cards ?? [], progress, owned, mistakes, now);
+  const loaded = await loadDomainProgress(slug);
+  if (!loaded) return 'missing';
+  const { deck, now, progress, owned, mistakes, domains } = loaded;
   return {
     deckTitle: deck.Title,
     rows: domains.map((domain) => ({
@@ -59,7 +52,7 @@ async function loadRows(slug: string): Promise<Loaded> {
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
 export function DomainProgressScreen({ navigation, route }: Props) {
-  const slug = route.params.slug;
+  const { slug, domainKey } = route.params;
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   // A failed load keeps whatever `loaded` holds (rows from an earlier load stay on screen); only a
   // deck that resolves to null is 'missing'.
@@ -91,6 +84,8 @@ export function DomainProgressScreen({ navigation, route }: Props) {
       if (typeof unsubscribe === 'function') unsubscribe();
     };
   }, [navigation, slug]);
+
+  const rows = (loaded && loaded !== 'missing' ? loaded.rows : []).filter(({ domain }) => !domainKey || domain.key === domainKey);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -140,13 +135,13 @@ export function DomainProgressScreen({ navigation, route }: Props) {
                 <View style={styles.skeletonRow} />
               </View>
             )
-          ) : loaded === 'missing' || loaded.rows.length === 0 ? (
+          ) : rows.length === 0 ? (
             <View testID="domain-progress-empty" style={styles.card}>
               <Text style={styles.emptyTitle}>No cards here yet</Text>
               <Text style={styles.emptyBody}>Open this pack in the Library first, then come back.</Text>
             </View>
           ) : (
-            loaded.rows.map(({ domain, practiceUids }) => {
+            rows.map(({ domain, practiceUids }) => {
               const canPractice = practiceUids.length > 0;
               return (
                 <View key={domain.key} testID={`domain-row-${domain.key}`} style={styles.card}>
@@ -161,6 +156,11 @@ export function DomainProgressScreen({ navigation, route }: Props) {
                   <Text testID={`domain-counts-${domain.key}`} style={styles.counts}>
                     {`${domain.learned} of ${domain.total} learned · ${domain.mastered} mastered`}
                   </Text>
+                  {domainKey ? (
+                    <Text style={styles.counts}>
+                      {`${domain.learned - domain.mastered} learning · ${domain.total - domain.learned} unstudied`}
+                    </Text>
+                  ) : null}
                   {/* Bar only, no number: flex shares keep the learned part to learned/total. */}
                   <View
                     testID={`domain-bar-${domain.key}`}
@@ -171,14 +171,14 @@ export function DomainProgressScreen({ navigation, route }: Props) {
                     <View style={[styles.barFill, { flex: domain.learned }]} />
                     <View style={{ flex: domain.total - domain.learned }} />
                   </View>
-                  {domain.dueNow > 0 || domain.mistakes > 0 ? (
+                  {domainKey || domain.dueNow > 0 || domain.mistakes > 0 ? (
                     <View style={styles.chips}>
-                      {domain.dueNow > 0 ? (
+                      {domainKey || domain.dueNow > 0 ? (
                         <Text testID={`domain-due-${domain.key}`} style={styles.chip}>
                           {`${domain.dueNow} due`}
                         </Text>
                       ) : null}
-                      {domain.mistakes > 0 ? (
+                      {domainKey || domain.mistakes > 0 ? (
                         <Text testID={`domain-mistakes-${domain.key}`} style={styles.chip}>
                           {plural(domain.mistakes, 'mistake')}
                         </Text>

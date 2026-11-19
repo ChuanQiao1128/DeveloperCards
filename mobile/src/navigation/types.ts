@@ -31,7 +31,8 @@ export type RootStackParamList = {
   // K02: slug narrows the book to one deck; absent lists every deck.
   MistakeBook: { slug?: string } | undefined;
   // D02 (R24 §1.3): per-domain counts of one deck, with a Practice focus session per domain.
-  DomainProgress: { slug: string };
+  DomainProgress: { slug: string; domainKey?: string };
+  ReviewOverview: undefined;
   // V11: the learner's own card reports (flag features.cardReport.enabled).
   MyReports: undefined;
   More: undefined;
@@ -110,13 +111,6 @@ export type RootStackParamList = {
     /** 2026-10-17 batch open: forwarded from DrawCeremony; true when the pack has nothing left to draw. */
     packComplete?: boolean;
   };
-
-  // No `Review` entry. ReviewScreen was a second, unreachable copy of
-  // SessionCardScreen (no navigate('Review') anywhere, and the Review tab
-  // routes to 'SessionCard'); it was deleted with issue #11. The param
-  // list is removed with it on purpose -- leaving the route typed keeps
-  // navigate('Review', ...) compiling against a screen that would not
-  // mount, which is a worse failure than not compiling.
 
   // Slug / mode / limit are now optional — SessionCard falls back to
   // activeDeckSlug + sane defaults (mixed mode, limit 20). Lets the
