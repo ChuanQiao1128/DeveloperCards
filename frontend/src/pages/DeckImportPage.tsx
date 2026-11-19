@@ -10,13 +10,16 @@
 // left here is layout, the step machine, and reading a file.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useSearchParams } from 'react-router-dom';
 
 import { fetchCardsByDeck, fetchDeckById, importCardsBatch, lookupImportReceipt } from '../api/authoring';
 import { getSessionGeneration, subscribeSessionChanges } from '../auth/tokenStore';
 import { readSessionUser } from '../auth/sessionUser';
 import { createImportJournal, readImportJournal, hasPendingImport, withImportJournalLock, type ImportJournal } from '../lib/deckImportJournal';
 import { QueryKeys, useAppQueryClient } from '../api/queryClient';
+import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard';
+import { DeckWorkspaceHeader } from '../components/console/DeckWorkspaceHeader';
+import { cardListHref } from '../lib/cardListLocation';
 import { RarityDistribution } from '../components/RarityDistribution';
 import {
   formatIssue,
@@ -40,6 +43,13 @@ import { ConsoleShell } from '../components/console/ConsoleShell';
 import { consoleNav } from '../components/console/consoleNav';
 import type { Card } from '../types/card';
 import type { Deck } from '../types/deck';
+
+const LEAVE_IMPORT = {
+  title: 'Leave this import?',
+  body: 'Committed batches stay saved. Reopen this import to recover the remaining batches.',
+  destructive: true,
+  confirmLabel: 'Leave import',
+};
 
 type Step = 'input' | 'preview' | 'result';
 
@@ -124,13 +134,15 @@ function Badge({ label, count, tone }: { label: string; count: number; tone: str
 
 export function DeckImportPage() {
   const [searchParams] = useSearchParams();
+  const deckId = Number(searchParams.get('deckId'));
+  return <DeckImportWorkspace key={deckId} deckId={deckId} />;
+}
 
+function DeckImportWorkspace({ deckId }: { deckId: number }) {
   // The one place this page touches the shared cache: after a run, the card list
   // and the deck row it just changed are invalidated (see execute's finally).
   const queryClient = useAppQueryClient();
 
-  const deckIdRaw = searchParams.get('deckId') ?? '';
-  const deckId = Number(deckIdRaw);
   const invalidDeckId = !deckId || Number.isNaN(deckId) || deckId <= 0;
 
   const [deckState, setDeckState] = useState<DeckState>({
@@ -149,6 +161,7 @@ export function DeckImportPage() {
   const [previewError, setPreviewError] = useState<string | null>(null);
 
   const [running, setRunning] = useState(false);
+  const { state: origin } = useLocation();
   const [cancelling, setCancelling] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
   const [runResult, setRunResult] = useState<ImportRunResult | null>(null);
@@ -164,6 +177,8 @@ export function DeckImportPage() {
   // it. Held in a ref rather than state because pressing Cancel must not depend
   // on a re-render having landed first.
   const abortRef = useRef<AbortController | null>(null);
+  const abortRun = useCallback(() => abortRef.current?.abort(), []);
+  useUnsavedChangesGuard(running, LEAVE_IMPORT, abortRun);
 
   useEffect(() => subscribeSessionChanges(() => {
     abortRef.current?.abort();
@@ -184,20 +199,6 @@ export function DeckImportPage() {
   }, [account, deckId, invalidDeckId, sessionGeneration]);
 
   useEffect(() => () => abortRef.current?.abort(), []);
-
-  // A run writes real cards, and leaving the page mid-run abandons a partially
-  // written deck, so warn before the tab is closed or navigated away. Keyed on
-  // `running` so the guard is registered only while a batch is in flight.
-  useEffect(() => {
-    if (!running) return;
-
-    const handler = (event: BeforeUnloadEvent) => {
-      event.preventDefault();
-      event.returnValue = '';
-    };
-    window.addEventListener('beforeunload', handler);
-    return () => window.removeEventListener('beforeunload', handler);
-  }, [running]);
 
   useEffect(() => {
     if (invalidDeckId) return;
@@ -394,7 +395,7 @@ export function DeckImportPage() {
   const unconfirmedCards = runResult?.batches.filter(batch => batch.state === 'unknown').reduce((count, batch) => count + batch.cards, 0) ?? 0;
   const failedCards = runResult?.batches.filter(batch => batch.state === 'failed').reduce((count, batch) => count + batch.cards, 0) ?? 0;
 
-  const backLink = invalidDeckId ? '/' : `/decks/cards?deckId=${deckId}`;
+  const backLink = invalidDeckId ? '/' : cardListHref(deckId, origin);
 
   if (deckState.loading) {
     return (
@@ -411,7 +412,7 @@ export function DeckImportPage() {
         subtitle="Authoring · Import"
         {...consoleNav()}
       >
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-xl font-semibold text-slate-800">Import Markdown</h1>
           <Link to="/" className="text-sm text-indigo-600 hover:text-indigo-800">
             ← Back to Decks
@@ -433,13 +434,14 @@ export function DeckImportPage() {
       subtitle="Authoring · Import"
       {...consoleNav()}
     >
-      <div className="flex items-center justify-between">
+      <DeckWorkspaceHeader deck={deck} view="cards" cardListSearch={origin?.cardListSearch} />
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold text-slate-800">
             Import Markdown · <span className="font-mono text-base">{deck.slug}</span>
           </h1>
-          <p className="text-xs text-slate-500 mt-1">
-            {deck.title} · step {step === 'input' ? '1 of 3 · source' : step === 'preview' ? '2 of 3 · preview' : '3 of 3 · execute'}
+          <p className="text-sm text-slate-600 mt-1">
+            Step {step === 'input' ? '1 of 3 · source' : step === 'preview' ? '2 of 3 · preview' : '3 of 3 · execute'}
           </p>
         </div>
         {running ? (
@@ -453,7 +455,7 @@ export function DeckImportPage() {
         )}
       </div>
 
-      <div className="max-w-4xl mx-auto px-4 py-6 space-y-4">
+      <div className="max-w-4xl space-y-4">
         {recoveryError ? <div role="alert" className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded text-sm">{recoveryError}</div> : null}
         {recovery ? (
           <section aria-label="Saved import recovery" className="bg-amber-50 border border-amber-200 text-amber-900 px-4 py-3 rounded space-y-3">

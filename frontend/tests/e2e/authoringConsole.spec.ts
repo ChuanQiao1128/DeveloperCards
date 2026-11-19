@@ -45,6 +45,7 @@
 
 import { createHash } from 'node:crypto';
 import AxeBuilder from '@axe-core/playwright';
+import { releaseFixture } from '../support/contentReleaseFixtures';
 import type { Page, Route } from '@playwright/test';
 // R29 HARDEN: Playwright's test plus a fixture that fails on any CSP violation (the smoke serves the production headers).
 import { expect, test } from './cspGuard';
@@ -494,7 +495,7 @@ test('each HITL route loads its own chunk from the built bundle and renders its 
     }
     if (route.link === 'AI QA') await expect(page).toHaveURL(/\/decks\/qa\?deckId=\d+/);
     else await expect(page).toHaveURL(`http://localhost:5173${route.url}`);
-    await expect(page.getByRole('heading', { level: 1, name: route.heading, exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { level: route.link === 'AI QA' ? 2 : 1, name: route.heading, exact: true })).toBeVisible();
     await expect(page.getByText('This page did not finish loading')).toHaveCount(0);
 
     const chunk = scripts.filter(s => route.chunk.test(s.url));
@@ -832,7 +833,7 @@ test('deck workspace keeps publication and versions scoped to the selected deck'
   await page.addInitScript(([key, value]) => sessionStorage.setItem(key, value), [TOKEN_KEY, superAdminSession()]);
   await page.setViewportSize({ width: 1440, height: 920 });
   await page.goto('/');
-  await expect(page.getByRole('link', { name: 'Reviewed release', exact: true })).toHaveAttribute('href', '/decks/publish?deckId=15');
+  await expect(page.getByRole('link', { name: 'Publishing', exact: true })).toHaveAttribute('href', '/decks/publish?deckId=15');
   const deckTable = page.getByRole('table', { name: 'Decks' });
   expect((await deckTable.getByRole('columnheader', { name: 'Updated' }).boundingBox())?.height).toBeLessThan(60);
   await page.screenshot({ path: testInfo.outputPath('deck-list-desktop.png') });
@@ -892,7 +893,7 @@ test('deck workspace keeps publication and versions scoped to the selected deck'
   await page.screenshot({ path: testInfo.outputPath('deck-versions-mobile.png') });
 });
 
-test('the controlled deck keeps its reviewed release available to its editors', async ({ page }) => {
+test('AWS editors can load a batch directly in Publishing and authorize it explicitly', async ({ page }, testInfo) => {
   await stubApi(page);
   const aws = { ...DECK, id: 15, slug: 'aws-saa-fundamentals', title: 'AWS Basics' };
   await page.route('**/api/v1/authoring/decks?*', route => route.fulfill({ contentType: 'application/json', body: ok([aws]) }));
@@ -903,12 +904,79 @@ test('the controlled deck keeps its reviewed release available to its editors', 
   });
   await page.addInitScript(([key, value]) => sessionStorage.setItem(key, value), [TOKEN_KEY, editorSession()]);
   await page.goto('/decks/publish?deckId=15');
-  await expect(page.getByRole('link', { name: 'Open reviewed release' })).toHaveAttribute('href', '/decks/release?deckId=15');
+  await expect(page.getByRole('heading', { name: 'Publish a batch' })).toBeVisible();
+  const publish = page.getByRole('button', { name: 'Publish batch' });
+  await expect(publish).toBeDisabled();
+  const { bundle } = releaseFixture(5);
+  await page.getByLabel('Release bundle (JSON)').setInputFiles({
+    name: 'release-bundle.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(bundle)),
+  });
+  await expect(page.getByText('5 cards in the bundle')).toBeVisible();
+  await expect(publish).toBeEnabled();
+  await expect(page.getByText(/Review on file/)).toBeHidden();
+  await expect(page).toHaveURL('/decks/publish?deckId=15');
+  await expectNoAxeViolations(page, 'AWS publishing');
+  await page.screenshot({ path: testInfo.outputPath('aws-publishing-desktop.png') });
+  await page.setViewportSize({ width: 320, height: 820 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(320);
+  await page.screenshot({ path: testInfo.outputPath('aws-publishing-mobile.png'), fullPage: true });
   await expect(page.getByRole('button', { name: 'Publish deck' })).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'Published versions' })).toHaveCount(0);
   expect(jobsRequests).toBe(0);
 
+  await page.goto('/decks/publish?deckId=015');
+  await expect(page.getByRole('heading', { name: 'Publish a batch' })).toBeVisible();
+
   await page.goto('/decks/publish?deckId=42');
   await expect(page.getByText('Super administrator access required')).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Open reviewed release' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Publish batch' })).toHaveCount(0);
+});
+
+
+test('the card inventory preserves filters and page while an editor opens a card', async ({ page }, testInfo) => {
+  const example = Array.from({ length: 35 }, (_, i) => ({
+    ...CARD, id: 900 + i, orderInDeck: i + 1, stableUid: `storage-policy-${i + 1}`,
+    question: `How does object storage policy ${i + 1} affect access from the application?`,
+    topic: 'Storage',
+    difficulty: i === 0 ? 0 : i === 1 ? 4 : CARD.difficulty,
+  }));
+  await stubApi(page);
+  await page.route('**/api/v1/authoring/cards/page?*', route =>
+    route.fulfill({ contentType: 'application/json', body: ok({ items: example, nextCursor: null, hasMore: false }) }));
+  await page.route('**/api/v1/authoring/cards?*', route => {
+    const id = Number(new URL(route.request().url()).searchParams.get('id'));
+    return route.fulfill({ contentType: 'application/json', body: ok(example.filter(card => card.id === id)) });
+  });
+  await page.addInitScript(([key, value]) => sessionStorage.setItem(key, value), [TOKEN_KEY, editorSession()]);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(`/decks/cards?deckId=${DECK.id}`);
+  await expect(page.getByRole('table', { name: 'Cards in deck' }).getByRole('row')).toHaveCount(31);
+  await page.getByLabel('Rarity').selectOption('0');
+  await expect(page.getByText('Showing 1 of 35 cards')).toBeVisible();
+  await expect(page.getByRole('link', { name: example[0].question, exact: true })).toBeVisible();
+  await page.getByLabel('Rarity').selectOption('all');
+  await page.getByLabel('Search cards').fill('object storage');
+  await expect(page.getByText('Showing 35 of 35 cards')).toBeVisible();
+  await expectNoAxeViolations(page, 'card inventory');
+  await page.screenshot({ path: testInfo.outputPath('cards-desktop.png') });
+  await page.getByRole('button', { name: 'Next', exact: true }).click();
+  await expect(page.getByText('Page 2 of 2')).toBeVisible();
+
+  await page.setViewportSize({ width: 320, height: 820 });
+  const target = page.getByRole('link', { name: example[30].question });
+  await expect(target).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(320);
+  await page.screenshot({ path: testInfo.outputPath('cards-mobile.png'), fullPage: true });
+  await target.click();
+  await expect(page.getByRole('heading', { name: 'Edit Card' })).toBeVisible();
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect(page.getByLabel('Search cards')).toHaveValue('object storage');
+  await expect(page.getByText('Page 2 of 2')).toBeVisible();
+  await expect(target).toBeVisible();
+  const deckPages = page.getByRole('navigation', { name: 'Deck pages' });
+  await deckPages.getByRole('link', { name: 'Settings' }).click();
+  await expect(page.getByRole('heading', { name: 'Deck settings' })).toBeVisible();
+  await deckPages.getByRole('link', { name: 'Cards' }).click();
+  await expect(page.getByLabel('Search cards')).toHaveValue('object storage');
+  await expect(page.getByText('Page 2 of 2')).toBeVisible();
 });

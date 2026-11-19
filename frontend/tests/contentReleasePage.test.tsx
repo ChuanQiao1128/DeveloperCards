@@ -29,7 +29,13 @@ function reviewedSession(count = 337) {
   return fixture;
 }
 async function readSaved() { return JSON.parse((await journalStore.loadReleaseJournal(TEST_EDITOR_SUB))!.raw); }
-async function mount() { const mounted = renderAt(<ContentReleasePage />, ['/decks/release?deckId=15']); await waitFor(() => expect(screen.queryByText('Loading saved release…')).toBeNull()); return mounted; }
+async function mount() {
+  const mounted = renderAt(<ContentReleasePage />, ['/decks/release?deckId=15']);
+  await waitFor(() => expect(screen.queryByText('Loading saved release…')).toBeNull());
+  const summary = screen.queryByText('Batch details & recovery', { selector: 'summary' });
+  if (summary && !summary.closest('details')?.open) await userEvent.click(summary);
+  return mounted;
+}
 async function reconcile(user: ReturnType<typeof userEvent.setup>, session: ReleaseSession, kinds: Array<'import' | 'review'>) {
   api.fetchReleaseAction.mockImplementation(async (_release, kind: 'import' | 'review') => ok({ action: { StatusCode: 200, Body: JSON.stringify(session.actions[kind]!.result) }, receipts: [], jobs: [], liveBuildId: 'original-live', manifestVerified: false }));
   for (const kind of kinds) { await user.click(screen.getByRole('button', { name: `Query ${kind} action` })); await screen.findByText(new RegExp(`Committed ${kind} action found`)); }
@@ -44,8 +50,8 @@ describe('AWS Basics release operator flow', () => {
     api.fetchReleaseSnapshot.mockResolvedValue(ok(snapshot)); await mount();
     const file = new File([JSON.stringify(bundle)], 'reviewed.json', { type: 'application/json' });
     Object.defineProperty(file, 'text', { value: async () => JSON.stringify(bundle) });
-    await user.upload(screen.getByLabelText('Immutable release bundle (JSON)'), file);
-    await user.click(screen.getByRole('button', { name: 'Run reviewed release' }));
+    await user.upload(screen.getByLabelText('Release bundle (JSON)'), file);
+    await user.click(screen.getByRole('button', { name: 'Publish batch' }));
     await screen.findByText(/Prepared editing baseline changed/);
     expect(api.sendReleaseAction).not.toHaveBeenCalled();
     expect(await journalStore.loadReleaseJournal(TEST_EDITOR_SUB)).toBeNull();
@@ -56,7 +62,7 @@ describe('AWS Basics release operator flow', () => {
     expect(api.fetchReleaseSnapshot).not.toHaveBeenCalled();
     cleanup(); signInAsEditor();
     renderAt(<ContentReleasePage />, ['/decks/release?deckId=16']);
-    expect(screen.queryByLabelText('Immutable release bundle (JSON)')).toBeNull();
+    expect(screen.queryByLabelText('Release bundle (JSON)')).toBeNull();
   });
   it('captures and persists the entire editing backup before the first import request', async () => {
     const user = userEvent.setup(); const { bundle, snapshot } = releaseFixture();
@@ -74,7 +80,7 @@ describe('AWS Basics release operator flow', () => {
     await mount();
     const file = new File([JSON.stringify(bundle)], 'synthetic.json', { type: 'application/json' });
     Object.defineProperty(file, 'text', { value: async () => JSON.stringify(bundle) });
-    await user.upload(screen.getByLabelText('Immutable release bundle (JSON)'), file);
+    await user.upload(screen.getByLabelText('Release bundle (JSON)'), file);
     await user.click(screen.getByRole('button', { name: 'Capture editing backup and freeze release' }));
     await screen.findByRole('button', { name: 'Download complete editing backup' });
     expect(api.sendReleaseAction).not.toHaveBeenCalled();
@@ -100,8 +106,8 @@ describe('AWS Basics release operator flow', () => {
     await mount();
     const file = new File([JSON.stringify(bundle)], 'synthetic-379.json', { type: 'application/json' });
     Object.defineProperty(file, 'text', { value: async () => JSON.stringify(bundle) });
-    await user.upload(screen.getByLabelText('Immutable release bundle (JSON)'), file);
-    await screen.findByRole('heading', { name: 'AWS Basics release · 379 cards' });
+    await user.upload(screen.getByLabelText('Release bundle (JSON)'), file);
+    await screen.findByText('379 cards in the bundle');
     await user.click(screen.getByRole('button', { name: 'Capture editing backup and freeze release' }));
     await screen.findByRole('button', { name: 'Import 379 cards' });
     expect(api.sendReleaseAction).not.toHaveBeenCalled();
@@ -328,8 +334,8 @@ describe('automatic reviewed release completion', () => {
     const fixture = releaseFixture(5); const user = userEvent.setup(); publishingApi(fixture); await mount();
     const file = new File([JSON.stringify(fixture.bundle)], 'reviewed.json', { type: 'application/json' });
     Object.defineProperty(file, 'text', { value: async () => JSON.stringify(fixture.bundle) });
-    await user.upload(screen.getByLabelText('Immutable release bundle (JSON)'), file);
-    await user.click(screen.getByRole('button', { name: 'Run reviewed release' }));
+    await user.upload(screen.getByLabelText('Release bundle (JSON)'), file);
+    await user.click(screen.getByRole('button', { name: 'Publish batch' }));
     await screen.findByText(/Published and verified 5 bilingual cards/);
     expect(api.sendReleaseAction.mock.calls.map(call => call[0].kind)).toEqual(['import', 'review', 'publish']);
     expect(api.fetchReleaseCards).toHaveBeenCalledTimes(1);
@@ -339,12 +345,12 @@ describe('automatic reviewed release completion', () => {
   });
   it('queries a lost import response and continues without importing again', async () => {
     const fixture = releaseFixture(5); store(fixture.session); publishingApi(fixture, { unknownImport: true }); const user = userEvent.setup(); await mount();
-    await user.click(screen.getByRole('button', { name: 'Run reviewed release' })); await screen.findByText(/Published and verified 5 bilingual cards/);
+    await user.click(screen.getByRole('button', { name: 'Publish batch' })); await screen.findByText(/Published and verified 5 bilingual cards/);
     expect(api.sendReleaseAction.mock.calls.filter(call => call[0].kind === 'import')).toHaveLength(1);
   });
   it('clears the previous CDN proof when restoring a different incomplete release', async () => {
     const fixture = releaseFixture(5); store(fixture.session); publishingApi(fixture); const user = userEvent.setup(); await mount();
-    await user.click(screen.getByRole('button', { name: 'Run reviewed release' })); await screen.findByText(/Published and verified 5 bilingual cards/);
+    await user.click(screen.getByRole('button', { name: 'Publish batch' })); await screen.findByText(/Published and verified 5 bilingual cards/);
     const next = releaseFixture(3).session; next.bundle.releaseId = 'next-reviewed-release';
     const file = new File([JSON.stringify(next)], 'next-recovery.json', { type: 'application/json' });
     Object.defineProperty(file, 'text', { value: async () => JSON.stringify(next) });
@@ -364,25 +370,25 @@ describe('automatic reviewed release completion', () => {
     expect(JSON.stringify(fixture.session).length).toBeLessThan(5_000_000);
     store(fixture.session); publishingApi(fixture); const user = userEvent.setup(); await mount();
     expect(sessionStorage.getItem(key)).toBeNull();
-    await user.click(screen.getByRole('button', { name: 'Run reviewed release' })); await screen.findByText(/Published and verified 379 bilingual cards/, {}, { timeout: 10_000 });
+    await user.click(screen.getByRole('button', { name: 'Publish batch' })); await screen.findByText(/Published and verified 379 bilingual cards/, {}, { timeout: 10_000 });
     const persisted = (await journalStore.loadReleaseJournal(TEST_EDITOR_SUB))!;
     expect(persisted.raw.length).toBeGreaterThan(5_000_000);
     expect(JSON.parse(persisted.raw).baseline.backup).toHaveLength(770);
     await user.click(screen.getByRole('button', { name: 'Start another release' }));
-    await screen.findByLabelText('Immutable release bundle (JSON)');
+    await screen.findByLabelText('Release bundle (JSON)');
     expect((await journalStore.loadReleaseJournal(TEST_EDITOR_SUB))!.raw).toBe('');
   }, 15_000);
   it('recovers a pending index with identical publish bytes and waits for CDN verification', async () => {
     const fixture = releaseFixture(5); store(fixture.session); publishingApi(fixture, { pendingIndex: true }); const user = userEvent.setup(); await mount();
     api.verifyReleaseDelivery.mockResolvedValueOnce(null).mockResolvedValueOnce({ jobId: 'same-job', buildId: 'same-build', sha256: 'a'.repeat(64), cards: 5 });
-    await user.click(screen.getByRole('button', { name: 'Run reviewed release' })); await screen.findByText(/Published and verified 5 bilingual cards/);
+    await user.click(screen.getByRole('button', { name: 'Publish batch' })); await screen.findByText(/Published and verified 5 bilingual cards/);
     const calls = api.sendReleaseAction.mock.calls.filter(call => call[0].kind === 'publish');
     expect(calls).toHaveLength(2); expect(calls[1][0].payload).toBe(calls[0][0].payload);
     expect(api.verifyReleaseDelivery).toHaveBeenCalledTimes(2);
   });
   it('stops on exhausted index retries with the original job and journal retained', async () => {
     const fixture = releaseFixture(5); store(fixture.session); publishingApi(fixture, { attention: true }); const user = userEvent.setup(); await mount();
-    await user.click(screen.getByRole('button', { name: 'Run reviewed release' })); await screen.findByText(/Index delivery needs attention/);
+    await user.click(screen.getByRole('button', { name: 'Publish batch' })); await screen.findByText(/Index delivery needs attention/);
     expect(api.verifyReleaseDelivery).not.toHaveBeenCalled();
     expect(api.sendReleaseAction.mock.calls.filter(call => call[0].kind === 'publish')).toHaveLength(1);
     expect((await readSaved()).actions.publish.result.data.jobId).toBe('same-job');
@@ -390,15 +396,15 @@ describe('automatic reviewed release completion', () => {
   it('never records CDN success after an account transition during verification', async () => {
     const fixture = releaseFixture(5); store(fixture.session); publishingApi(fixture); const user = userEvent.setup(); await mount();
     api.verifyReleaseDelivery.mockImplementation(async () => { signInAsSuperAdmin(); return { cards: 5 }; });
-    await user.click(screen.getByRole('button', { name: 'Run reviewed release' })); await screen.findByText(/Signed-in subject changed/);
+    await user.click(screen.getByRole('button', { name: 'Publish batch' })); await screen.findByText(/Signed-in subject changed/);
     expect(screen.queryByText(/manifestVerified=true/)).toBeNull();
   });
   it('shows terminal build failure without a retry or run button and status checks never restart it', async () => {
     const fixture = releaseFixture(5); store(fixture.session); publishingApi(fixture, { failedBuild: true }); const user = userEvent.setup(); await mount();
-    await user.click(screen.getByRole('button', { name: 'Run reviewed release' }));
+    await user.click(screen.getByRole('button', { name: 'Publish batch' }));
     await screen.findByText('Publication failed');
     expect(screen.queryByRole('button', { name: 'Continue queue delivery' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Run reviewed release' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Publish batch' })).toBeNull();
     const writes = api.sendReleaseAction.mock.calls.length;
     await user.click(screen.getByRole('button', { name: 'Check publication status' }));
     expect(api.sendReleaseAction).toHaveBeenCalledTimes(writes);
@@ -406,7 +412,7 @@ describe('automatic reviewed release completion', () => {
   });
   it('shows exhausted queue delivery as needing attention without offering another publish', async () => {
     const fixture = releaseFixture(5); store(fixture.session); publishingApi(fixture, { queueAttention: true }); const user = userEvent.setup(); await mount();
-    await user.click(screen.getByRole('button', { name: 'Run reviewed release' }));
+    await user.click(screen.getByRole('button', { name: 'Publish batch' }));
     await screen.findByText('Queue delivery needs attention');
     expect(screen.queryByRole('button', { name: 'Continue queue delivery' })).toBeNull();
     expect(api.sendReleaseAction.mock.calls.filter(call => call[0].kind === 'publish')).toHaveLength(1);
@@ -414,7 +420,7 @@ describe('automatic reviewed release completion', () => {
   it('rechecks public verification without importing, reviewing or publishing again', async () => {
     const fixture = releaseFixture(5); store(fixture.session); publishingApi(fixture); const user = userEvent.setup(); await mount();
     api.verifyReleaseDelivery.mockRejectedValueOnce(new Error('Synthetic public download unavailable.'));
-    await user.click(screen.getByRole('button', { name: 'Run reviewed release' }));
+    await user.click(screen.getByRole('button', { name: 'Publish batch' }));
     await screen.findByText('Public verification incomplete');
     const writes = api.sendReleaseAction.mock.calls.length;
     const snapshots = api.fetchReleaseSnapshot.mock.calls.length;
@@ -429,7 +435,7 @@ describe('automatic reviewed release completion', () => {
   });
   it.each(['timeout', 'missing jobs', 'null job'] as const)('clears current success and forbids writes after a %s status reply', async failure => {
     const fixture = releaseFixture(5); store(fixture.session); publishingApi(fixture); const user = userEvent.setup(); await mount();
-    await user.click(screen.getByRole('button', { name: 'Run reviewed release' }));
+    await user.click(screen.getByRole('button', { name: 'Publish batch' }));
     await screen.findByText('Published and verified');
     const raw = (await journalStore.loadReleaseJournal(TEST_EDITOR_SUB))!.raw;
     const writes = api.sendReleaseAction.mock.calls.length;

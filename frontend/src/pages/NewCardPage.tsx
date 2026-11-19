@@ -1,6 +1,6 @@
 // src/pages/NewCardPage.tsx
 import { useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useCards, useCreateCard } from '../hooks/useCards';
 import { useDeck } from '../hooks/useDecks';
 import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard';
@@ -9,6 +9,9 @@ import { CardForm, type CardFormValues } from '../components/CardForm';
 import { buildCardBody, buildCardSource } from '../lib/authoringBodies';
 import { CONSOLE_NAME } from '../lib/brand';
 import { ConsoleShell } from '../components/console/ConsoleShell';
+import { DeckWorkspaceHeader } from '../components/console/DeckWorkspaceHeader';
+import { cardListHref } from '../lib/cardListLocation';
+import { LINK } from '../lib/consoleOperationsView';
 import { consoleNav } from '../components/console/consoleNav';
 
 /**
@@ -39,6 +42,7 @@ function nextOrderInDeck(existing: readonly { orderInDeck?: number | null }[]): 
 export function NewCardPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { state: origin } = useLocation();
 
   // Shared with CardListPage and EditCardPage now, and adopting it CHANGES what
   // this page does with a negative id: `?deckId=-5` used to be refused here
@@ -81,7 +85,7 @@ export function NewCardPage() {
             ← Back to Decks
           </Link>
         </div>
-        <div className="max-w-3xl mx-auto px-4 py-6">
+        <div className="max-w-3xl">
           <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded">
             Missing or invalid deckId.
           </div>
@@ -115,7 +119,7 @@ export function NewCardPage() {
             ← Back to Decks
           </Link>
         </div>
-        <div className="max-w-3xl mx-auto px-4 py-6">
+        <div className="max-w-3xl">
           <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded">
             {message}
           </div>
@@ -147,6 +151,8 @@ export function NewCardPage() {
     sourceQuote: '',
   };
 
+  const returnHref = cardListHref(deck.id, origin);
+
   async function handleSubmit(
     values: CardFormValues,
   ): Promise<{ ok: boolean; error?: string }> {
@@ -176,38 +182,29 @@ export function NewCardPage() {
     // A successful create is not a discard: allow the navigation that follows it
     // before it fires, so the guard does not ask about the card we just saved.
     guard.allowNextNavigation();
-    navigate(`/decks/cards?deckId=${deck.id}`, { replace: true });
+    navigate(returnHref, { replace: true });
     return { ok: true };
   }
 
   return (
     <ConsoleShell
       title={CONSOLE_NAME}
-      subtitle="Authoring · New card"
+      subtitle="New card"
       {...consoleNav()}
     >
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold text-slate-800">New Card</h1>
-          <p className="text-xs text-slate-500 mt-1">
-            {deck.title} · <span className="font-mono">{deck.slug}</span>
-          </p>
-        </div>
-        <Link
-          to={`/decks/cards?deckId=${deck.id}`}
-          className="text-sm text-indigo-600 hover:text-indigo-800"
-        >
-          ← Back to Cards
-        </Link>
+      <DeckWorkspaceHeader deck={deck} view="cards" cardListSearch={origin?.cardListSearch} />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-lg font-semibold text-slate-900">New Card</h2>
+        <Link to={returnHref} className={`${LINK} text-sm`}>Back to Cards</Link>
       </div>
-
-      <div className="max-w-3xl mx-auto px-4 py-6">
+      {cardsQuery.isError && <p className="text-sm text-amber-800" role="status">The existing cards could not be read. Check the order in the form before saving.</p>}
+      <div className="max-w-3xl">
         <CardForm
           mode="create"
           deck={deck}
           initialValues={initialValues}
           onSubmit={handleSubmit}
-          onCancel={() => navigate(-1)}
+          onCancel={() => navigate(returnHref)}
           onDirtyChange={setDirty}
         />
       </div>

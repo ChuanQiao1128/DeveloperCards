@@ -64,8 +64,6 @@ import { locationText, renderAt } from './support/routerProbe';
 
 const api = vi.hoisted(() => ({
   createDeck: vi.fn(),
-  // Present so a Paid create's follow-up PUT never reaches the real api layer.
-  // No case here creates a Paid deck, but the page now holds the mutation.
   updateDeck: vi.fn(),
 }));
 
@@ -122,7 +120,7 @@ function paidRadio(): HTMLInputElement {
 }
 
 function submitButton(): HTMLButtonElement {
-  return screen.getByRole('button', { name: /^(Create Deck|Creating\.\.\.)$/ }) as HTMLButtonElement;
+  return screen.getByRole('button', { name: /^(Create Deck|Creating…)$/ }) as HTMLButtonElement;
 }
 
 /** Fill the four required boxes with values that pass every guard. */
@@ -300,7 +298,7 @@ describe('the guards, all of which now report together', () => {
       'Slug is required.',
       'Author is required.',
       'Draft version must be a whole number of 1 or more.',
-      'Free card count must be a non-negative number.',
+      'Free card count must be a non-negative whole number within the supported range.',
     ]);
     expect(api.createDeck).toHaveBeenCalledTimes(0);
   });
@@ -386,7 +384,7 @@ describe('the guards, all of which now report together', () => {
     // the form's own submit event.
     submitPastConstraintValidation();
 
-    expect(await screen.findByText('Free card count must be a non-negative number.')).not.toBeNull();
+    expect(await screen.findByText('Free card count must be a non-negative whole number within the supported range.')).not.toBeNull();
     expect(api.createDeck).toHaveBeenCalledTimes(0);
   });
 
@@ -405,13 +403,29 @@ describe('the guards, all of which now report together', () => {
 });
 
 describe('a deck the server created', () => {
+  it.each([
+    [ok({ ...createdDeck, tier: 'premium', previewCards: 50 }), `/decks/cards?deckId=${createdDeck.id}`],
+    [ok({ ...createdDeck, tier: 'free', previewCards: null }), `/decks/edit?deckId=${createdDeck.id}`],
+    [refused<Deck>('UNAVAILABLE', 'Could not save paid access'), `/decks/edit?deckId=${createdDeck.id}`],
+  ])('opens the created paid deck at the appropriate destination (%#)', async (response, href) => {
+    api.updateDeck.mockResolvedValueOnce(response);
+    mount();
+    fillValid();
+    await userEvent.click(paidRadio());
+    await userEvent.click(submitButton());
+
+    await waitFor(() => expect(locationText()).toBe(href));
+    expect(api.createDeck).toHaveBeenCalledTimes(1);
+    expect(api.updateDeck).toHaveBeenCalledWith(createdDeck.id, { tier: 'premium', previewCards: 50 });
+  });
+
   it('is requested exactly once, and then the page leaves', async () => {
     mount();
     fillValid();
     await userEvent.click(submitButton());
 
     await waitFor(() => expect(api.createDeck).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(locationText()).toBe('/'));
+    await waitFor(() => expect(locationText()).toBe(`/decks/cards?deckId=${createdDeck.id}`));
   });
 
   it('sends the trimmed values', async () => {
@@ -489,25 +503,25 @@ describe('while the request is in flight', () => {
     fillValid();
     await userEvent.click(submitButton());
 
-    await waitFor(() => expect(submitButton().textContent).toBe('Creating...'));
+    await waitFor(() => expect(submitButton().textContent).toBe('Creating…'));
     expect(submitButton().disabled).toBe(true);
 
     d.resolve(ok(createdDeck));
-    await waitFor(() => expect(locationText()).toBe('/'));
+    await waitFor(() => expect(locationText()).toBe(`/decks/cards?deckId=${createdDeck.id}`));
   });
 });
 
 describe('the two ways out', () => {
-  it('sends Cancel back through history, not to a fixed path', async () => {
+  it('sends Cancel to the deck list', async () => {
     mount();
-    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    await userEvent.click(screen.getByRole('link', { name: 'Cancel' }));
 
-    expect(locationText()).toBe(PREVIOUS_PAGE);
+    expect(locationText()).toBe('/');
   });
 
-  it('sends Back to list to the deck list', async () => {
+  it('links to all decks', async () => {
     mount();
-    await userEvent.click(screen.getByRole('link', { name: '← Back to list' }));
+    await userEvent.click(screen.getByRole('link', { name: 'All decks' }));
 
     expect(locationText()).toBe('/');
   });

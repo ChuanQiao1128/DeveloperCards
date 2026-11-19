@@ -24,6 +24,7 @@ const ROUTE_TITLES: Record<string, string> = {
   '/decks/new': 'New deck',
   '/decks/edit': 'Edit deck',
   '/decks/publish': 'Publishing',
+  '/decks/release': 'Publishing',
   '/decks/versions': 'Published versions',
   '/decks/preview': 'Deck preview',
   '/decks/cards': 'Cards',

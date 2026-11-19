@@ -1,5 +1,5 @@
 import { useDeferredValue, useMemo, useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useDeck } from '../hooks/useDecks';
 import { useCards, useDeleteCard } from '../hooks/useCards';
 import { ApiFailureError, NOT_FOUND } from '../api/errors';
@@ -12,6 +12,10 @@ import { DeckWorkspaceHeader } from '../components/console/DeckWorkspaceHeader';
 import { LINK } from '../lib/consoleOperationsView';
 import { consoleNav } from '../components/console/consoleNav';
 import { RarityBadge } from '../components/RarityBadge';
+import { Button } from '../components/ui/Button';
+import { INPUT_CLASS } from '../components/console/consoleStyles';
+import { mapDifficultyToRarity } from '../gacha/rarityConfig';
+import { readCardListCriteria, writeCardListCriteria } from '../lib/cardListLocation';
 import { RarityDistribution } from '../components/RarityDistribution';
 import { ErrorBannerList } from '../components/ui/ErrorBanner';
 import { useConfirm } from '../components/ui/ConfirmDialogContext';
@@ -34,6 +38,7 @@ import type { ErrorNotice } from '../lib/errorFeed';
 // One key for the delete action: a user who retries against a server that is
 // still refusing gets the latest verdict, not a growing stack of copies.
 const ERR_DELETE_CARD = 'card.delete';
+const PAGE_SIZE = 30;
 
 /**
  * The page's one failure surface. Both the "no deckId in the URL" case and a
@@ -118,8 +123,7 @@ function TranslationBadge({ state }: { state: TranslationState }) {
 }
 
 export function CardListPage() {
-  const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   // The rule this page used to spell out inline now lives in one place, because
   // NewCardPage and EditCardPage each had their own and the three disagreed.
@@ -145,13 +149,10 @@ export function CardListPage() {
   const [errors, setErrors] = useState<ErrorNotice[]>(emptyErrorFeed);
   const confirm = useConfirm();
 
-  // Filter/sort state lives in the component only — no URL, no persistence. The
-  // search term is deferred so a fast typist never waits on a 441-row re-filter,
-  // and the visible list is memoised on exactly what filterAndSortCards reads,
-  // so a keystroke that does not change the result does not rebuild the table.
-  // These sit above every early return with the other hooks: the rules of hooks
-  // do not survive a filter bar that only exists once the cards have loaded.
-  const [criteria, setCriteria] = useState<CardListCriteria>(DEFAULT_CARD_LIST_CRITERIA);
+  const criteria = readCardListCriteria(searchParams);
+  function changeCriteria(next: CardListCriteria) {
+    setSearchParams(writeCardListCriteria(searchParams, next), { replace: true, preventScrollReset: true });
+  }
   const deferredQuery = useDeferredValue(criteria.query);
   const visibleCards = useMemo(
     () =>
@@ -275,217 +276,130 @@ export function CardListPage() {
   // zh-CN or already holds a translated card; every other deck looks as before.
   const showTranslations = deckUsesTranslations(deck, cards);
 
+  const pageCount = Math.max(1, Math.ceil(visibleCards.length / PAGE_SIZE));
+  const requestedPage = Number(searchParams.get('page'));
+  const page = Number.isSafeInteger(requestedPage) && requestedPage > 0 ? Math.min(requestedPage, pageCount) : 1;
+  const pageCards = visibleCards.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const state = { cardListSearch: searchParams.toString() };
+  const deckQueryString = `?deckId=${deck.id}`;
+
+  function changePage(next: number) {
+    const params = new URLSearchParams(searchParams);
+    if (next === 1) params.delete('page');
+    else params.set('page', String(next));
+    setSearchParams(params, { preventScrollReset: true });
+  }
+
   return (
-    <ConsoleShell
-      title={CONSOLE_NAME}
-      subtitle="Cards"
-      {...consoleNav()}
-    >
-      <DeckWorkspaceHeader deck={deck} view="cards" />
-      <div className="flex flex-wrap items-center gap-3">
-        <Link className="inline-flex min-h-11 items-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500" to={`/decks/cards/new?deckId=${deck.id}`}>New card</Link>
-        <Link className={`${LINK} text-sm`} to={`/decks/cards/import?deckId=${deck.id}`}>Import Markdown</Link>
-        <Link className={`${LINK} text-sm`} to={`/decks/preview?deckId=${deck.id}`}>Preview JSON</Link>
-        <Link className={`${LINK} text-sm`} to={qaPageHref(deckId)}>AI QA</Link>
-        <Link className={`${LINK} text-sm`} to={`/review?deckId=${deckId}`}>AI draft review</Link>
-      </div>
-
-      <div className="max-w-4xl mx-auto px-4 py-6">
-        {/* Failed deletes land here rather than in a modal dialog, so the row
-            the user was working on stays visible and clickable. */}
-        {errors.length > 0 && (
-          <div className="mb-4">
-            <ErrorBannerList
-              notices={errors}
-              onDismiss={key => setErrors(prev => clearNotice(prev, key))}
-            />
-          </div>
-        )}
-        <RarityDistribution cards={cards} />
-        <div className="bg-white rounded-lg shadow-sm border border-slate-200">
-          <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-slate-800">Card List</h2>
-            <div className="flex items-center gap-3">
-              {filtersActive ? (
-                <span data-testid="card-list-visible-count" className="text-xs text-slate-500">
-                  Showing {visibleCards.length} of {cards.length} cards
-                </span>
-              ) : null}
-              <span className="text-xs text-slate-500">{cards.length} cards</span>
+    <ConsoleShell title={CONSOLE_NAME} subtitle="Cards" {...consoleNav()}>
+      <DeckWorkspaceHeader deck={deck} view="cards" cardListSearch={state.cardListSearch} />
+      {errors.length > 0 && <ErrorBannerList notices={errors} onDismiss={key => setErrors(prev => clearNotice(prev, key))} />}
+      <section className="rounded-lg border border-slate-200 bg-white" aria-labelledby="card-inventory">
+        <div className="space-y-4 p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 id="card-inventory" className="text-lg font-semibold text-slate-900">Cards</h2>
+              <p className="text-sm text-slate-600">{cards.length} cards in this deck</p>
             </div>
+            <Link className="inline-flex min-h-11 items-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+              to={`/decks/cards/new${deckQueryString}`} state={state}>New card</Link>
           </div>
-
-          <div className="px-4 py-3 border-b border-slate-100 flex flex-wrap items-center gap-2">
-            <input
-              type="search"
-              aria-label="Search cards"
-              placeholder="Search uid, question or topic"
-              value={criteria.query}
-              onChange={e => setCriteria(prev => ({ ...prev, query: e.target.value }))}
-              className="flex-1 min-w-[12rem] text-sm px-3 py-1.5 rounded-md border border-slate-300
-                         focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-
-            <select
-              aria-label="Card type"
-              value={criteria.kind}
-              onChange={e =>
-                setCriteria(prev => ({ ...prev, kind: e.target.value as CardListCriteria['kind'] }))
-              }
-              className="text-sm px-2 py-1.5 rounded-md border border-slate-300 text-slate-700"
-            >
-              <option value="all">All types</option>
-              <option value="mcq">MCQ</option>
-              <option value="qa">Q&amp;A</option>
-            </select>
-
-            <select
-              aria-label="Difficulty"
-              value={criteria.difficulty === 'all' ? 'all' : String(criteria.difficulty)}
-              onChange={e =>
-                setCriteria(prev => ({
-                  ...prev,
-                  difficulty: e.target.value === 'all' ? 'all' : Number(e.target.value),
-                }))
-              }
-              className="text-sm px-2 py-1.5 rounded-md border border-slate-300 text-slate-700"
-            >
-              <option value="all">All difficulties</option>
-              {difficulties.map(difficulty => (
-                <option key={difficulty} value={String(difficulty)}>
-                  {difficulty}
-                </option>
-              ))}
-            </select>
-
-            {showTranslations ? (
-              <select
-                aria-label="Chinese translation"
-                value={criteria.translation}
-                onChange={e =>
-                  setCriteria(prev => ({
-                    ...prev,
-                    translation: e.target.value as CardListCriteria['translation'],
-                  }))
-                }
-                className="text-sm px-2 py-1.5 rounded-md border border-slate-300 text-slate-700"
-              >
-                <option value="all">Any translation status</option>
-                <option value="zh-missing">Chinese missing</option>
-                <option value="zh-stale">Chinese stale</option>
+          <div className="flex flex-wrap gap-3 text-sm">
+            <Link className={LINK} to={`/decks/cards/import${deckQueryString}`} state={state}>Import Markdown</Link>
+            <Link className={LINK} to={`/decks/preview${deckQueryString}`} state={state}>Preview deck</Link>
+            <Link className={LINK} to={qaPageHref(deck.id)} state={state}>AI QA</Link>
+            <Link className={LINK} to={`/review${deckQueryString}`}>AI draft review</Link>
+          </div>
+          <div className="space-y-2">
+            <label className="block text-sm font-medium" htmlFor="card-list-search">Search cards</label>
+            <input id="card-list-search" name="q" type="search" autoComplete="off" value={criteria.query}
+              onChange={event => changeCriteria({ ...criteria, query: event.target.value })}
+              className={`${INPUT_CLASS} min-h-11 max-w-xl`} placeholder="Question, topic, or card ID…" />
+          </div>
+          <div className="flex flex-wrap items-end gap-3">
+            <label className="space-y-1 text-xs font-medium text-slate-700">Type
+              <select aria-label="Card type" className={`${INPUT_CLASS} block bg-white`} value={criteria.kind}
+                onChange={event => changeCriteria({ ...criteria, kind: event.target.value as CardListCriteria['kind'] })}>
+                <option value="all">All types</option><option value="mcq">Multiple choice</option><option value="qa">Q&amp;A</option>
               </select>
-            ) : null}
-
-            <select
-              aria-label="Sort cards"
-              value={criteria.sort}
-              onChange={e =>
-                setCriteria(prev => ({ ...prev, sort: e.target.value as CardListCriteria['sort'] }))
-              }
-              className="text-sm px-2 py-1.5 rounded-md border border-slate-300 text-slate-700"
-            >
-              <option value="order">Deck order</option>
-              <option value="updated">Recently updated</option>
-              <option value="difficulty">Difficulty</option>
-            </select>
-
-            {filtersActive ? (
-              <button
-                type="button"
-                className="text-sm px-3 py-1.5 rounded-md border border-slate-300 text-slate-700 hover:bg-slate-50"
-                onClick={() => setCriteria(DEFAULT_CARD_LIST_CRITERIA)}
-              >
-                Clear filters
-              </button>
-            ) : null}
+            </label>
+            <label className="space-y-1 text-xs font-medium text-slate-700">Rarity
+              <select aria-label="Rarity" className={`${INPUT_CLASS} block bg-white`} value={criteria.difficulty}
+                onChange={event => changeCriteria({ ...criteria, difficulty: event.target.value === 'all' ? 'all' : Number(event.target.value) })}>
+                <option value="all">All rarities</option>
+                {difficulties.map(difficulty => <option key={difficulty} value={difficulty}>
+                  {difficulty === 0 ? 'Common (difficulty 0)' : mapDifficultyToRarity(difficulty)?.label ?? `Difficulty ${difficulty}`}
+                </option>)}
+              </select>
+            </label>
+            {showTranslations && <label className="space-y-1 text-xs font-medium text-slate-700">Translation
+              <select aria-label="Chinese translation" className={`${INPUT_CLASS} block bg-white`} value={criteria.translation}
+                onChange={event => changeCriteria({ ...criteria, translation: event.target.value as CardListCriteria['translation'] })}>
+                <option value="all">Any translation status</option><option value="zh-missing">Chinese missing</option><option value="zh-stale">Chinese stale</option>
+              </select>
+            </label>}
+            <label className="space-y-1 text-xs font-medium text-slate-700">Sort
+              <select aria-label="Sort cards" className={`${INPUT_CLASS} block bg-white`} value={criteria.sort}
+                onChange={event => changeCriteria({ ...criteria, sort: event.target.value as CardListCriteria['sort'] })}>
+                <option value="order">Deck order</option><option value="updated">Recently updated</option><option value="difficulty">Difficulty</option>
+              </select>
+            </label>
+            {filtersActive && <Button variant="outline" onClick={() => changeCriteria(DEFAULT_CARD_LIST_CRITERIA)}>Clear filters</Button>}
           </div>
-
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead className="bg-slate-50 border-b border-slate-200">
-                <tr>
-                  <th className="px-3 py-2 text-left font-semibold text-slate-600">Id</th>
-                  <th className="px-3 py-2 text-left font-semibold text-slate-600">StableUid</th>
-                  <th className="px-3 py-2 text-left font-semibold text-slate-600">Question</th>
-                  <th className="px-3 py-2 text-left font-semibold text-slate-600">Rarity</th>
-                  <th className="px-3 py-2 text-left font-semibold text-slate-600">Created</th>
-                  <th className="px-3 py-2 text-left font-semibold text-slate-600">Updated</th>
-                  <th className="px-3 py-2 text-left font-semibold text-slate-600">Order</th>
-                  <th className="px-3 py-2 text-left font-semibold text-slate-600">Actions</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {cards.length === 0 ? (
-                  <tr>
-                    <td colSpan={8} className="px-4 py-6 text-center text-slate-500 text-sm">
-                      No cards yet. Click &quot;New Card&quot; to add the first one.
-                    </td>
-                  </tr>
-                ) : visibleCards.length === 0 ? (
-                  <tr>
-                    <td colSpan={8} className="px-4 py-6 text-center text-slate-500 text-sm">
-                      No cards match these filters.
-                    </td>
-                  </tr>
-                ) : (
-                  visibleCards.map(card => (
-                    <tr
-                      key={card.id}
-                      className="border-b border-slate-100 hover:bg-slate-50 transition-colors"
-                    >
-                      <td className="px-3 py-2 text-slate-700 font-mono text-xs">{card.id}</td>
-                      <td className="px-3 py-2 text-slate-700 font-mono text-xs">{card.stableUid}</td>
-                      <td className="px-3 py-2 text-slate-800">{card.question}</td>
-                      <td className="px-3 py-2">
-                        <RarityBadge difficulty={card.difficulty} />
-                        {card.mcq ? <span data-testid="card-mcq-badge" className="ml-1 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border bg-slate-100 text-slate-700 border-slate-200">MCQ</span> : null}
-                        {showTranslations ? <TranslationBadge state={translationState(card)} /> : null}
-                      </td>
-                      <td className="px-3 py-2 text-slate-500 text-xs">{formatCardDate(card.createdAt)}</td>
-                      <td className="px-3 py-2 text-slate-500 text-xs">{formatCardDate(card.updatedAt)}</td>
-                      <td className="px-3 py-2 text-slate-700">{card.orderInDeck}</td>
-
-                      <td className="px-3 py-2 text-slate-700 text-xs">
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            className="px-2 py-1 rounded border border-slate-300 hover:bg-slate-50"
-                            onClick={() => navigate(`/decks/cards/edit?deckId=${deck.id}&cardId=${card.id}`)}
-                          >
-                            Edit
-                          </button>
-
-                          {superAdmin ? (
-                            <button
-                              type="button"
-                              className="px-2 py-1 rounded border border-red-200 text-red-700 hover:bg-red-50"
-                              onClick={() => void handleDelete(card.id)}
-                              title="super_admin only"
-                            >
-                              Delete
-                            </button>
-                          ) : (
-                            <span className="text-slate-400" title="Delete requires super_admin">
-                              —
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {!superAdmin ? (
-            <div className="px-4 py-3 text-xs text-slate-500 border-t border-slate-100">
-              Delete actions are restricted to <span className="font-mono">super_admin</span>.
-            </div>
-          ) : null}
         </div>
-      </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-3 border-y border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+          <div role="status">
+            {filtersActive ? <span data-testid="card-list-visible-count">Showing {visibleCards.length} of {cards.length} cards</span>
+              : <span>{visibleCards.length} cards</span>}
+          </div>
+          {pageCount > 1 && <nav aria-label="Card pages" className="flex flex-wrap items-center gap-2">
+            <Button variant="outline" size="sm" disabled={page === 1} onClick={() => changePage(page - 1)}>Previous</Button>
+            <span className="tabular-nums">Page {page} of {pageCount}</span>
+            <Button variant="outline" size="sm" disabled={page === pageCount} onClick={() => changePage(page + 1)}>Next</Button>
+          </nav>}
+        </div>
+
+        {pageCards.length === 0 ? <p className="px-4 py-6 text-sm text-slate-600">
+          {cards.length === 0 ? 'No cards yet. Use New card or Import Markdown to add cards.' : 'No cards match these filters.'}
+        </p> : (
+          <table className="w-full text-left text-sm" aria-label="Cards in deck">
+            <thead>
+              <tr className="border-b border-slate-200 text-slate-700">
+                <th scope="col" className="px-4 py-3 font-medium">Question</th>
+                <th scope="col" className="hidden px-3 py-3 font-medium lg:table-cell">Updated</th>
+                {superAdmin && <th scope="col" className="px-3 py-3 font-medium">Actions</th>}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-200">
+              {pageCards.map(card => (
+                <tr key={card.id} className="align-top hover:bg-slate-50">
+                  <td className="min-w-0 px-4 py-3">
+                    <Link className="break-words rounded font-medium text-indigo-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+                      to={`/decks/cards/edit${deckQueryString}&cardId=${card.id}`} state={state}>{card.question}</Link>
+                    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-600">
+                      <span className="tabular-nums">#{card.orderInDeck}</span>
+                      {card.topic && <span className="break-words">{card.topic}</span>}
+                      <RarityBadge difficulty={card.difficulty} />
+                      {card.mcq ? <span data-testid="card-mcq-badge" className="rounded border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-medium">MCQ</span> : null}
+                      {showTranslations && <TranslationBadge state={translationState(card)} />}
+                    </div>
+                    <p className="mt-1 break-all font-mono text-xs text-slate-500">{card.stableUid}</p>
+                  </td>
+                  <td className="hidden px-3 py-3 text-xs text-slate-600 lg:table-cell">{formatCardDate(card.updatedAt)}</td>
+                  {superAdmin && <td className="px-3 py-3">
+                    <Button variant="ghost" size="xs" className="text-red-700" onClick={() => void handleDelete(card.id)}>Delete</Button>
+                  </td>}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </section>
+      {cards.length > 0 && <details className="space-y-3 rounded-lg border border-slate-200 bg-white p-4">
+        <summary className="cursor-pointer rounded text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">Card breakdown</summary>
+        <RarityDistribution cards={cards} />
+      </details>}
     </ConsoleShell>
   );
 }

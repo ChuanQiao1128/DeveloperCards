@@ -9,6 +9,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 
 import type { Card } from '../src/types/card';
@@ -144,11 +145,12 @@ describe('the page tells the author the preview is approximate', () => {
   it('labels the page as an approximate preview', async () => {
     mountPreview();
 
-    expect(await screen.findByText('Approximate preview')).not.toBeNull();
+    expect(await screen.findByRole('heading', { name: 'Draft preview' })).not.toBeNull();
 
     const pre = document.querySelector('pre')!;
     expect(pre.textContent).toContain('"Mcq"');
 
+    await userEvent.click(screen.getByText('Draft JSON and export', { selector: 'summary' }));
     const download = await screen.findByRole('button', { name: /download deck\.json/i });
     expect((download as HTMLButtonElement).disabled).toBe(false);
   });

@@ -11,6 +11,10 @@ export function RarityBadge({ difficulty, showLabel = true }: RarityBadgeProps) 
   const baseClasses =
     'inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium border';
 
+  if (!rarity) {
+    return <span className={`${baseClasses} border-slate-200 bg-slate-50 text-slate-700`}>Difficulty {difficulty}</span>;
+  }
+
   const colorClasses = {
     common: 'bg-blue-50 text-blue-700 border-blue-200',
     rare: 'bg-purple-50 text-purple-700 border-purple-200',

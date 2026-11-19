@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { lazy, useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router-dom';
 
@@ -17,10 +17,12 @@ import { useConsoleIdentity } from '../hooks/useConsoleIdentity';
 import { useDeck, usePublishDeck } from '../hooks/useDecks';
 import { CONSOLE_NAME } from '../lib/brand';
 import { formatTime, HEADING, LINK, PANEL } from '../lib/consoleOperationsView';
-import { hasReviewedDeckRelease, REVIEWED_DECK_RELEASE_HREF } from '../lib/deckWorkspace';
+import { hasReviewedDeckRelease } from '../lib/deckWorkspace';
 import { isQaPublishGateCode, qaPageHref } from '../lib/qaGate';
 import type { ApiError } from '../types/api';
 import type { Deck } from '../types/deck';
+
+const ContentReleasePage = lazy(() => import('./ContentReleasePage').then(m => ({ default: m.ContentReleasePage })));
 
 function isInProgress(job: Pick<PublishJob, 'status' | 'manifestState'>): boolean {
   return job.status === 'PENDING' || job.status === 'PROCESSING' || (job.status === 'SUCCESS' && job.manifestState === 'pending');
@@ -66,6 +68,13 @@ export function DeckPublicationPage({ view }: { view: 'publishing' | 'versions' 
     content = <p role="status">Loading deck…</p>;
   } else {
     const deckKey = `${identity.generation}:${deckId}`;
+    if (view === 'publishing' && reviewed) {
+      return (
+        <ContentReleasePage key={deckKey} deck={deck.data}>
+          {identity.allowed && <DeckPublishing deck={deck.data} generation={identity.generation} superAdmin />}
+        </ContentReleasePage>
+      );
+    }
     content = <>
       <DeckWorkspaceHeader deck={deck.data} view={view} />
       {view === 'versions' ? (
@@ -105,7 +114,7 @@ function DeckPublishing({ deck, generation, superAdmin }: { deck: Deck; generati
       return res.data.filter(job => job.deckId == null ? job.deckSlug === deck.slug : job.deckId === deck.id).slice(0, 5);
     },
   });
-  const trackedJob = submittedJob ?? recent.data?.[0]?.jobId;
+  const trackedJob = reviewed ? undefined : submittedJob ?? recent.data?.[0]?.jobId;
   const olderJobs = recent.data?.filter(job => job.jobId !== trackedJob) ?? [];
   const status = useQuery({
     queryKey: ['deck-publishing-status', generation, deck.id, trackedJob],
@@ -177,24 +186,21 @@ function DeckPublishing({ deck, generation, superAdmin }: { deck: Deck; generati
 
   return (
     <>
-      <section className={PANEL} aria-labelledby="publish-deck-title">
-        <h2 className={HEADING} id="publish-deck-title">{reviewed ? 'Reviewed release' : 'Publish this deck'}</h2>
-        <p className="text-sm text-slate-600">{reviewed
-          ? 'Open the reviewed release to load a frozen bundle, resume a saved release, or verify delivery.'
-          : 'Publish the current editing content to the app. The server checks the deck before creating a new version.'}</p>
-        {reviewed ? <Link className={`${LINK} inline-flex min-h-11 items-center text-sm font-medium`} to={REVIEWED_DECK_RELEASE_HREF}>Open reviewed release</Link>
-          : <Button className="min-h-11"
+      {!reviewed && <section className={PANEL} aria-labelledby="publish-deck-title">
+        <h2 className={HEADING} id="publish-deck-title">Publish this deck</h2>
+        <p className="text-sm text-slate-600">Publish the current editing content to the app. The server checks the deck before creating a new version.</p>
+        <Button className="min-h-11"
             disabled={!retryAction && (statusPending || (!!trackedJob && (status.isError || mayBeRunning)))}
             loading={busy} onClick={() => void startPublish()}>
             {busy ? 'Preparing publish…' : retryAction ? 'Retry this request' : 'Publish deck'}
-          </Button>}
+        </Button>
         {feedback && !(feedback.code === 'PUBLISH_DISPATCH_UNCONFIRMED' && submittedJobAdvanced) && <Callout tone="danger" role="alert" title="Publish needs attention">
           {feedback.message}
           {feedback.qaRun?.status === 'not_started' && <p>AI QA could not start a review run. {feedback.qaRun.message ?? feedback.qaRun.code}</p>}
           {isQaPublishGateCode(feedback.code) && <p><Link className={LINK} to={qaPageHref(deck.id, feedback.runId)}>Open AI QA</Link></p>}
         </Callout>}
         {accepted && !submittedJob && <p role="status" className="text-sm text-slate-700">The server accepted the request. Check recent jobs for its status.</p>}
-      </section>
+      </section>}
 
       {superAdmin && <>
         {trackedJob && <section className={PANEL} aria-labelledby="tracked-job-title">
@@ -217,6 +223,7 @@ function DeckPublishing({ deck, generation, superAdmin }: { deck: Deck; generati
             <h2 className={HEADING} id="recent-jobs-title">Recent jobs for this deck</h2>
             <Button variant="outline" size="sm" loading={recent.isFetching} onClick={() => void recent.refetch()}>Refresh recent jobs</Button>
           </div>
+          {reviewed && <p className="text-sm text-slate-600">Refresh to check past jobs. The batch status above tracks your current release.</p>}
           {recent.isError ? <Callout role="alert" tone="warning">Could not load recent jobs.</Callout>
             : recent.isPending ? <p role="status" className="text-sm">Loading recent jobs…</p>
               : !olderJobs.length ? <p className="text-sm text-slate-600">{trackedJob ? 'No other recent jobs for this deck.' : 'No jobs for this deck in the recent publish history.'}</p>

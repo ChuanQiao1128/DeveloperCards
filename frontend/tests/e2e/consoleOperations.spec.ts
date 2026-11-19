@@ -227,5 +227,5 @@ test('publishing issues show verified stages and return to the affected deck at 
 
   await page.getByRole('link', { name: 'Open deck publishing' }).click();
   await expect(page).toHaveURL('/decks/publish?deckId=15');
-  await expect(page.getByRole('link', { name: 'Open reviewed release' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Publish a batch' })).toBeVisible();
 });

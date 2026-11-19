@@ -435,7 +435,7 @@ export function CardForm(props: CardFormProps) {
   return (
     <form
       onSubmit={handleSubmit}
-      className="bg-white border border-slate-200 rounded-lg shadow-sm px-6 py-6 space-y-4"
+      className="space-y-4 rounded-lg border border-slate-200 bg-white p-4"
     >
       {state.error && (
         // role=alert: every refusal lands here, including the review queue's
@@ -487,6 +487,28 @@ export function CardForm(props: CardFormProps) {
       </div>
 
       <CardFrontHelp help={frontHelp} />
+      {/* Explanation */}
+      <div>
+        <label htmlFor="explanation" className="block text-sm font-medium text-slate-700 mb-1">Explanation</label>
+        <textarea
+          className="block w-full rounded-md border border-slate-300 px-3 py-2 text-sm
+                     focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500
+                     min-h-[100px]"
+          id="explanation"
+          value={values.explanation}
+          aria-describedby={explanationHint ? explanationHint.id : undefined}
+          onChange={e => handleChange('explanation', e.target.value)}
+          onFocus={() => setFocusedField('explanation')}
+          onBlur={() => handleFieldBlur('explanation')}
+          placeholder="A concise but clear explanation of the answer..."
+        />
+        {explanationHint && (
+          <p id={explanationHint.id} data-card-hint="explanation" className="mt-1 text-xs text-amber-700">
+            {explanationHint.text}
+          </p>
+        )}
+      </div>
+
       {/* StableUid */}
       <div>
         <label htmlFor="stableUid" className="block text-sm font-medium text-slate-700 mb-1">
@@ -521,28 +543,6 @@ export function CardForm(props: CardFormProps) {
             ? 'This stable ID is fixed. It is how the card is known everywhere: review progress files under it and imports reconcile against it. Changing it would discard every study record this card has and start it over as a new card.'
             : 'Unique within this deck. Generated from the Question, and yours to adjust.'}
         </p>
-      </div>
-
-      {/* Explanation */}
-      <div>
-        <label htmlFor="explanation" className="block text-sm font-medium text-slate-700 mb-1">Explanation</label>
-        <textarea
-          className="block w-full rounded-md border border-slate-300 px-3 py-2 text-sm
-                     focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500
-                     min-h-[100px]"
-          id="explanation"
-          value={values.explanation}
-          aria-describedby={explanationHint ? explanationHint.id : undefined}
-          onChange={e => handleChange('explanation', e.target.value)}
-          onFocus={() => setFocusedField('explanation')}
-          onBlur={() => handleFieldBlur('explanation')}
-          placeholder="A concise but clear explanation of the answer..."
-        />
-        {explanationHint && (
-          <p id={explanationHint.id} data-card-hint="explanation" className="mt-1 text-xs text-amber-700">
-            {explanationHint.text}
-          </p>
-        )}
       </div>
 
       {/* Topic */}
@@ -718,7 +718,7 @@ export function CardForm(props: CardFormProps) {
 
         {/* RealWorldUsage */}
       <div>
-        <label htmlFor="realWorldUsage" className="block text-sm font-medium text-slate-700 mb-1">RealWorldUsage</label>
+        <label htmlFor="realWorldUsage" className="block text-sm font-medium text-slate-700 mb-1">Real-world usage</label>
         <textarea
           className="block w-full rounded-md border border-slate-300 px-3 py-2 text-sm
                      focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500

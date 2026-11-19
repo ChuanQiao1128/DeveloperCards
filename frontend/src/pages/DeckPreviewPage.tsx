@@ -2,7 +2,7 @@ import { CardFrontHelp } from '../components/CardFrontHelp';
 // src/pages/DeckPreviewPage.tsx
 
 import { useMemo, useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { useCards } from '../hooks/useCards';
 import { useDeck } from '../hooks/useDecks';
 import {
@@ -13,6 +13,11 @@ import {
 } from '../lib/deckExportPreview';
 import { cardFace, deckUsesTranslations, type DisplayLang } from '../lib/translationView';
 import { CONSOLE_NAME } from '../lib/brand';
+import { DeckWorkspaceHeader } from '../components/console/DeckWorkspaceHeader';
+import { Button } from '../components/ui/Button';
+import { INPUT_CLASS } from '../components/console/consoleStyles';
+import { cardListHref } from '../lib/cardListLocation';
+import { LINK } from '../lib/consoleOperationsView';
 import { ConsoleShell } from '../components/console/ConsoleShell';
 import { consoleNav } from '../components/console/consoleNav';
 
@@ -96,7 +101,7 @@ function PreviewCardFace({ card, lang }: { card: DeckExportPreviewCard; lang: Di
 
 export function DeckPreviewPage() {
   const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
+  const { state: origin } = useLocation();
 
   const deckIdRaw = searchParams.get('deckId') ?? '';
   const deckId = Number(deckIdRaw);
@@ -111,6 +116,8 @@ export function DeckPreviewPage() {
 
   const [copied, setCopied] = useState<string | null>(null);
   const [lang, setLang] = useState<DisplayLang>('en');
+  const [previewSearch, setPreviewSearch] = useState('');
+  const [previewLimit, setPreviewLimit] = useState(20);
 
   const deck = deckQuery.data ?? null;
   // Memoised so the empty-list fallback is a stable reference: exportModel's
@@ -179,42 +186,93 @@ export function DeckPreviewPage() {
   const showLangToggle = deckUsesTranslations(deck, cards);
   const shownLang: DisplayLang = showLangToggle ? lang : 'en';
 
+  const search = previewSearch.trim().toLowerCase();
+  const matchingCards = (exportModel?.Cards ?? []).filter(card =>
+    `${card.StableUid} ${card.Question} ${card.Translations?.['zh-CN']?.question ?? ''}`.toLowerCase().includes(search)
+  );
+
   return (
     <ConsoleShell
       title={CONSOLE_NAME}
-      subtitle="Authoring · Preview"
+      subtitle="Draft preview"
       {...consoleNav()}
     >
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold text-slate-800">Deck Preview</h1>
-          <p className="text-xs text-slate-500 mt-1">
-            {deck.title} · <span className="font-mono">{deck.slug}</span> · {deck.locale}
-          </p>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            className="text-sm text-slate-600 hover:text-slate-800"
-            onClick={() => navigate(-1)}
-          >
-            ← Back
-          </button>
-          <Link to="/" className="text-sm text-indigo-600 hover:text-indigo-800">
-            Decks
-          </Link>
-        </div>
+      <DeckWorkspaceHeader deck={deck} view="cards" cardListSearch={origin?.cardListSearch} />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-lg font-semibold text-slate-900">Draft preview</h2>
+        <Link className={`${LINK} text-sm`} to={cardListHref(deck.id, origin)}>Back to Cards</Link>
       </div>
-
-      <div className="max-w-4xl mx-auto px-4 py-6 space-y-4">
-        <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-900">
-          <div className="font-semibold">Approximate preview</div>
-          <p className="mt-1">
-            Built in this browser from the deck and its cards. The published deck.json is produced by the publish worker: its Version is the build id (shown here as 0.0.0), and other details can differ.
-          </p>
+      <div className="max-w-4xl space-y-4">
+        <div className="bg-white border border-slate-200 rounded-lg shadow-sm p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold text-slate-800">Card preview</h2>
+            {showLangToggle ? (
+              <div role="group" aria-label="Card language" className="inline-flex rounded-md border border-slate-300 overflow-hidden text-xs">
+                {(['en', 'zh-CN'] as const).map(option => (
+                  <button
+                    key={option}
+                    type="button"
+                    aria-pressed={shownLang === option}
+                    data-testid={`preview-lang-${option}`}
+                    className={`px-3 py-1 ${shownLang === option ? 'bg-indigo-600 text-white' : 'bg-white text-slate-700 hover:bg-slate-50'}`}
+                    onClick={() => setLang(option)}
+                  >
+                    {option === 'en' ? 'English' : 'Chinese'}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
+          {exportModel && exportModel.Cards.length > 0 ? <>
+            <label className="mt-3 block space-y-1 text-sm">Find a card
+              <input className={INPUT_CLASS} type="search" value={previewSearch}
+                onChange={event => { setPreviewSearch(event.target.value); setPreviewLimit(20); }} />
+            </label>
+            <ul className="mt-2">
+              {matchingCards.slice(0, previewLimit).map(card => (
+                <PreviewCardFace key={card.StableUid} card={card} lang={shownLang} />
+              ))}
+            </ul>
+            {matchingCards.length === 0 && <p className="mt-2 text-sm text-slate-600">No cards match this search.</p>}
+            {matchingCards.length > previewLimit && <Button variant="outline" className="mt-3" onClick={() => setPreviewLimit(limit => limit + 20)}>Show more cards</Button>}
+          </> : (
+            <p className="mt-2 text-sm text-slate-500">No live cards.</p>
+          )}
         </div>
 
+        <div className="bg-white border border-slate-200 rounded-lg shadow-sm p-4">
+          <h2 className="text-sm font-semibold text-slate-800">Validation (mobile-compatible)</h2>
+
+          {errors.length === 0 ? (
+            <div className="mt-2 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-3 py-2">
+              ✅ No blocking errors.
+            </div>
+          ) : (
+            <div className="mt-2 bg-red-50 border border-red-200 rounded px-3 py-2">
+              <div className="text-sm font-semibold text-red-800">Blocking errors</div>
+              <ul className="mt-1 text-sm text-red-800 list-disc pl-5">
+                {errors.map(e => (
+                  <li key={e}>{e}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {warnings.length > 0 ? (
+            <div className="mt-3 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+              <div className="text-sm font-semibold text-amber-900">Warnings</div>
+              <ul className="mt-1 text-sm text-amber-900 list-disc pl-5">
+                {warnings.map(w => (
+                  <li key={w}>{w}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </div>
+
+        <details className="space-y-3 rounded-lg border border-slate-200 bg-white p-4">
+          <summary className="cursor-pointer rounded font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">Draft JSON and export</summary>
+          <p className="text-sm text-slate-600">This export uses the current draft. Publishing assigns the build version.</p>
         <div className="bg-white border border-slate-200 rounded-lg shadow-sm p-4">
           <div className="flex flex-wrap items-center gap-3 text-sm">
             <span className="px-2 py-0.5 rounded bg-slate-100 border border-slate-200 font-mono">
@@ -282,73 +340,8 @@ export function DeckPreviewPage() {
           </div>
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-lg shadow-sm p-4">
-          <h2 className="text-sm font-semibold text-slate-800">Validation (mobile-compatible)</h2>
-
-          {errors.length === 0 ? (
-            <div className="mt-2 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-3 py-2">
-              ✅ No blocking errors.
-            </div>
-          ) : (
-            <div className="mt-2 bg-red-50 border border-red-200 rounded px-3 py-2">
-              <div className="text-sm font-semibold text-red-800">Blocking errors</div>
-              <ul className="mt-1 text-sm text-red-800 list-disc pl-5">
-                {errors.map(e => (
-                  <li key={e}>{e}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {warnings.length > 0 ? (
-            <div className="mt-3 bg-amber-50 border border-amber-200 rounded px-3 py-2">
-              <div className="text-sm font-semibold text-amber-900">Warnings</div>
-              <ul className="mt-1 text-sm text-amber-900 list-disc pl-5">
-                {warnings.map(w => (
-                  <li key={w}>{w}</li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
-        </div>
-
-        <div className="bg-white border border-slate-200 rounded-lg shadow-sm p-4">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-sm font-semibold text-slate-800">Cards as the app shows them</h2>
-            {showLangToggle ? (
-              <div role="group" aria-label="Card language" className="inline-flex rounded-md border border-slate-300 overflow-hidden text-xs">
-                {(['en', 'zh-CN'] as const).map(option => (
-                  <button
-                    key={option}
-                    type="button"
-                    aria-pressed={shownLang === option}
-                    data-testid={`preview-lang-${option}`}
-                    className={`px-3 py-1 ${shownLang === option ? 'bg-indigo-600 text-white' : 'bg-white text-slate-700 hover:bg-slate-50'}`}
-                    onClick={() => setLang(option)}
-                  >
-                    {option === 'en' ? 'English' : 'Chinese'}
-                  </button>
-                ))}
-              </div>
-            ) : null}
-          </div>
-          {exportModel && exportModel.Cards.length > 0 ? (
-            <ul className="mt-2 max-h-[32rem] overflow-y-auto">
-              {exportModel.Cards.map(card => (
-                <PreviewCardFace key={card.StableUid} card={card} lang={shownLang} />
-              ))}
-            </ul>
-          ) : (
-            <p className="mt-2 text-sm text-slate-500">No live cards.</p>
-          )}
-        </div>
-
-        <div className="bg-white border border-slate-200 rounded-lg shadow-sm p-4">
-          <h2 className="text-sm font-semibold text-slate-800">Approximate deck.json</h2>
-          <pre className="mt-2 text-xs bg-slate-950 text-slate-100 rounded p-3 overflow-auto">
-            {exportJson}
-          </pre>
-        </div>
+          <pre className="max-h-96 overflow-auto rounded bg-slate-950 p-3 text-xs text-slate-100">{exportJson}</pre>
+        </details>
       </div>
     </ConsoleShell>
   );

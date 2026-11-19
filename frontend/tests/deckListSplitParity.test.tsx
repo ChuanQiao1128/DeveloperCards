@@ -279,10 +279,8 @@ const B1: Record<string, Baseline> = {
   emptyWithNoQuery: { hash: '81c888700c80397c7919ec7034e84d42e443b2470ee39159943f4ee883bf80c8', bytes: 15027 },
   // The three banners/panels that only appear in one state each.
   manifestErrorBanner: { hash: '4fda3b0430376aabf7f8800f9e7859287ab205a6d2814e662965fdbd1bf098f9', bytes: 21215 },
-  // F24 (2026-09-26): the Publish Jobs table gained an Error column after Status
-  // (CFE-09) and a title on the Job ID cell, so this scenario's markup grew by
-  // 99 B. No other scenario renders that table, so only this hash moved.
-  publishJobsTab: { hash: '2555d43b267dbe3fada772d0b6c244db848bd35f8e3aba294ab58d6887c555c7', bytes: 13872 },
+  // Publishing history now uses responsive job rows with links to the job details.
+  publishJobsTab: { hash: 'e193cfe984c9f4ea7064bc9cc247177da2a2414d534e14951073ab66826a3281', bytes: 13638 },
   pollFailureBanner: { hash: 'f2e3a619dbb4dfa5d2dcda59833a1604c2438562528b463a7ab94bfabab4d96c', bytes: 21623 },
   // A row mid-publish, so the pending markup is inside a hash too.
   publishingRow: { hash: 'd8715f4d26593089c5d027d872b74463350f6c669be7adcfe46f60c67e00200b', bytes: 20754 },

@@ -54,7 +54,7 @@ python3 tools/aws_cards/repair_release.py prepare-manual REQUEST.json OUTPUT
 
 有一次定向补审时repair指向其原始目录。授权文件须保留非空userRequest及humanPerCardReview:false；构包器不生成用户授权或人审声明。输出目录必须不存在，失败目录保留；无模型调用或生产写入。
 
-Console 载入 v2 `release-bundle.json` 后执行一次 **Run reviewed release**。首次可选择自动保存目录；以后复用该目录和登录权限。Console 自动核对包内 `expectedBaseline`，保存完整备份，再导入、一次全量回读、登记已有审查、发布及 CDN 核验。基线变化在导入前停止；不重新捕获当前状态来覆盖并发修改。`verify-baseline` 仅用于诊断，不再例行人工执行。
+Console 载入 v2 `release-bundle.json` 后执行一次 **Publish batch**。首次可选择自动保存目录；以后复用该目录和登录权限。Console 自动核对包内 `expectedBaseline`，保存完整备份，再导入、一次全量回读、登记已有审查、发布及 CDN 核验。基线变化在导入前停止；不重新捕获当前状态来覆盖并发修改。`verify-baseline` 仅用于诊断，不再例行人工执行。
 
 完成后，使用自动保存的本批子目录（或 **Download verified release artifacts** 的单文件）统一收尾：
 

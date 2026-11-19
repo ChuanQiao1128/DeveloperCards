@@ -103,7 +103,7 @@ export function DeckRowsTable({
                   <td className="px-3 py-3">
                     <div className="flex flex-wrap items-center gap-2">
                       {hasReviewedDeckRelease(row) ? (
-                        <Link className={DECK_LINK} to={`/decks/publish?deckId=${row.id}`}>Reviewed release</Link>
+                        <Link className={DECK_LINK} to={`/decks/publish?deckId=${row.id}`}>Publishing</Link>
                       ) : (
                         <button
                           type="button"

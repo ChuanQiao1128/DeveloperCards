@@ -391,8 +391,8 @@ describe('the card count is a separate, optional request', () => {
     expect(input('Title *').value).toBe('C# Fundamentals!');
 
     // Recorded: the amber branch replaces the whole count block, so the
-    // super-admin "Apply to totalCards" shortcut disappears with it.
-    expect(screen.queryByRole('button', { name: 'Apply to totalCards' })).toBeNull();
+    // super-admin "Use card count" shortcut disappears with it.
+    expect(screen.queryByRole('button', { name: 'Use card count' })).toBeNull();
   });
 });
 
@@ -438,11 +438,11 @@ describe('what an editor may touch', () => {
     expect(input('Total Cards (full)').disabled).toBe(true);
   });
 
-  it('does not offer the Apply to totalCards shortcut', async () => {
+  it('does not offer the Use card count shortcut', async () => {
     await mountLoaded();
     await waitFor(() => expect(document.body.textContent).toContain('count = 3'));
 
-    expect(screen.queryByRole('button', { name: 'Apply to totalCards' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Use card count' })).toBeNull();
   });
 
   it('says why the manifest block is read-only', async () => {
@@ -453,7 +453,7 @@ describe('what an editor may touch', () => {
   it('still offers Save, because the content fields are editable', async () => {
     await mountLoaded();
     expect(screen.queryByRole('button', { name: 'Save' })).not.toBeNull();
-    expect(screen.queryByRole('button', { name: 'Save & Back' })).not.toBeNull();
+    expect(screen.queryByRole('button', { name: 'Save & return to cards' })).not.toBeNull();
   });
 });
 
@@ -468,11 +468,11 @@ describe('what a super admin may touch', () => {
     expect(input('Total Cards (full)').disabled).toBe(false);
   });
 
-  it('offers the Apply to totalCards shortcut and drops the read-only badge', async () => {
+  it('offers the Use card count shortcut and drops the read-only badge', async () => {
     await mountLoaded();
     await waitFor(() => expect(document.body.textContent).toContain('count = 3'));
 
-    expect(screen.queryByRole('button', { name: 'Apply to totalCards' })).not.toBeNull();
+    expect(screen.queryByRole('button', { name: 'Use card count' })).not.toBeNull();
     expect(screen.queryByText('super_admin only')).toBeNull();
   });
 

@@ -149,7 +149,7 @@ describe('what the page shows for a failure it might recover from', () => {
     // The proof is the second request plus the page recovering, not the button
     // existing: a button that renders and refetches nothing looks identical.
     await waitFor(() => expect(api.fetchDeckById).toHaveBeenCalledTimes(2));
-    expect(await screen.findByText('Card List')).not.toBeNull();
+    expect(await screen.findByRole('heading', { name: 'Cards', level: 2 })).not.toBeNull();
   });
 
   it('offers it for a cards failure too, since the deck was fine', async () => {

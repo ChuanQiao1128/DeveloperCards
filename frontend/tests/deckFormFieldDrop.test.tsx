@@ -157,27 +157,20 @@ describe('D1 NewDeckPage sends every field it collects', () => {
     await fillEverything();
     await userEvent.click(screen.getByRole('button', { name: 'Create Deck' }));
 
-    // Decks.cs POST ignores previewCards, so the collected count reaches the row
-    // only through this follow-up PUT once the create returns the new id.
+    // Save tier and count together because preview cards require premium access.
     await waitFor(() => expect(api.updateDeck).toHaveBeenCalledTimes(1));
     expect(api.updateDeck.mock.calls[0][0]).toBe(deck.id);
-    expect(api.updateDeck.mock.calls[0][1]).toStrictEqual({ previewCards: 7 });
+    expect(api.updateDeck.mock.calls[0][1]).toStrictEqual({ tier: 'premium', previewCards: 7 });
   });
 
-  it('stays on the page and says so when the free card count cannot be saved', async () => {
+  it('opens settings for the already created deck when the preview count could not be saved', async () => {
     api.updateDeck.mockResolvedValue(refused<Deck>('CONFLICT', 'preview write refused'));
     await fillEverything();
     await userEvent.click(screen.getByRole('button', { name: 'Create Deck' }));
 
     await waitFor(() => expect(api.updateDeck).toHaveBeenCalledTimes(1));
-    // The deck exists, so the message must say so and point at the Edit page
-    // rather than pretend the whole create failed.
-    expect(
-      await screen.findByText(
-        content => content.startsWith('Deck created, but the free card count was not saved'),
-      ),
-    ).not.toBeNull();
-    expect(locationText()).toBe('/decks/new');
+    await waitFor(() => expect(locationText()).toBe(`/decks/edit?deckId=${DECK_ID}`));
+    expect(api.createDeck).toHaveBeenCalledTimes(1);
   });
 });
 

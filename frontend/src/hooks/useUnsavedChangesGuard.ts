@@ -13,7 +13,7 @@
 
 import { useCallback, useEffect, useRef } from 'react';
 import { useBlocker } from 'react-router-dom';
-import { useConfirm } from '../components/ui/ConfirmDialogContext';
+import { useConfirm, type ConfirmOptions } from '../components/ui/ConfirmDialogContext';
 
 /**
  * Guards a page against discarding unsaved edits.
@@ -24,7 +24,14 @@ import { useConfirm } from '../components/ui/ConfirmDialogContext';
  *   already confirmed itself), so that navigation does not trip the guard. It
  *   lets exactly one navigation through.
  */
-export function useUnsavedChangesGuard(dirty: boolean): { allowNextNavigation: () => void } {
+const DISCARD_EDITS: ConfirmOptions = {
+  title: 'Discard unsaved changes?',
+  body: 'Your edits on this page have not been saved.',
+  destructive: true,
+  confirmLabel: 'Discard changes',
+};
+
+export function useUnsavedChangesGuard(dirty: boolean, options = DISCARD_EDITS, onDiscard?: () => void): { allowNextNavigation: () => void } {
   const confirm = useConfirm();
 
   // Set true for the one navigation that follows a successful save; read inside
@@ -63,20 +70,17 @@ export function useUnsavedChangesGuard(dirty: boolean): { allowNextNavigation: (
   useEffect(() => {
     if (blocker.state !== 'blocked') return;
     let active = true;
-    void confirm({
-      title: 'Discard unsaved changes?',
-      body: 'Your edits on this page have not been saved.',
-      destructive: true,
-      confirmLabel: 'Discard changes',
-    }).then(discard => {
+    void confirm(options).then(discard => {
       if (!active) return;
-      if (discard) blocker.proceed();
-      else blocker.reset();
+      if (discard) {
+        onDiscard?.();
+        blocker.proceed();
+      } else blocker.reset();
     });
     return () => {
       active = false;
     };
-  }, [blocker, confirm]);
+  }, [blocker, confirm, options, onDiscard]);
 
   const allowNextNavigation = useCallback(() => {
     allowRef.current = true;

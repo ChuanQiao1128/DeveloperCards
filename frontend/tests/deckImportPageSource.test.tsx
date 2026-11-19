@@ -464,7 +464,7 @@ describe('the preview button', () => {
     await user.click(previewButton());
 
     expect(await screen.findByText(CARDS_REFUSAL)).not.toBeNull();
-    expect(screen.queryByText(/step 1 of 3 · source/)).not.toBeNull();
+    expect(screen.queryByText(/Step 1 of 3 · source/)).not.toBeNull();
     expect(screen.queryByText('2 · Preview')).toBeNull();
     expect(screen.queryByText('Cards in this document')).toBeNull();
   });

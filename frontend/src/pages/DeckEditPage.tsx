@@ -1,6 +1,6 @@
 // src/pages/DeckEditPage.tsx
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 
 import { QueryKeys, useAppQueryClient } from '../api/queryClient';
 import { useCards } from '../hooks/useCards';
@@ -8,6 +8,7 @@ import { useDeck, useUpdateDeck } from '../hooks/useDecks';
 import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard';
 import { buildDeckBody, parseDraftVersion, DRAFT_VERSION_ERROR } from '../lib/authoringBodies';
 import { CONSOLE_NAME } from '../lib/brand';
+import { cardListHref } from '../lib/cardListLocation';
 
 import type { DeckAvailability, DeckTier } from '../types/deck';
 
@@ -74,6 +75,7 @@ function deckLoadMessage(err: unknown): string {
 
 export function DeckEditPage() {
   const navigate = useNavigate();
+  const { state: origin } = useLocation();
   const [sp] = useSearchParams();
 
   const user = useMemo(() => readSessionUser(), []);
@@ -88,6 +90,9 @@ export function DeckEditPage() {
   // fetch entirely.
   const invalidDeckId = !Number.isFinite(deckId) || deckId <= 0;
   const queryDeckId = invalidDeckId ? Number.NaN : deckId;
+  const paidSetup = superAdmin && origin?.paidSetup?.deckId === deckId ? origin.paidSetup as {
+    previewCards: number | null; message: string;
+  } : null;
 
   // The deck and its card count both come through the shared cache. The cards
   // read is gated on a loaded deck, so it stays downstream of the deck fetch the
@@ -171,13 +176,13 @@ export function DeckEditPage() {
 
       translationZh: Array.isArray(found.translationLocales) && found.translationLocales.includes('zh-CN'),
     };
-    setForm(loaded);
-    // Same snapshot as the form starts on, so the page is clean until edited.
+    setForm(paidSetup ? { ...loaded, tier: 'premium', previewCards: toStr(paidSetup.previewCards) } : loaded);
+    // The server snapshot stays authoritative for the unsaved changes guard.
     setSavedForm(loaded);
     setSaveError(null);
     setSaveOk(null);
     setReadyFor(found.id);
-  }, [deckQuery.data]);
+  }, [deckQuery.data, paidSetup]);
 
   // Dirty once the deck has loaded and a field diverges from the last-saved
   // snapshot. Declared above every early return, as the rules of hooks require.
@@ -265,7 +270,7 @@ export function DeckEditPage() {
       // before it fires, so the guard does not ask about what we just kept.
       if (goBackAfter) {
         guard.allowNextNavigation();
-        navigate('/', { replace: true });
+        navigate(cardListHref(loadedDeck.id, origin), { replace: true });
       }
     } catch (err: unknown) {
       setSaveError(err instanceof Error ? err.message : 'Network error.');
@@ -280,7 +285,6 @@ export function DeckEditPage() {
     setForm(prev => ({
       ...prev,
       totalCards: String(count),
-      previewCards: String(Math.min(10, count)),
     }));
   }
 
@@ -341,6 +345,10 @@ export function DeckEditPage() {
       {...consoleNav()}
     >
       <DeckWorkspaceHeader deck={deck} view="settings" />
+      {paidSetup && !saveOk && <div className="rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900" role="status">
+        <p className="font-medium">Deck created. Finish setting up paid access.</p>
+        <p className="mt-1">{paidSetup.message} The requested tier and preview count are filled in below. Save settings to apply them.</p>
+      </div>}
       <div className="bg-white border border-slate-200 rounded-lg p-4">
         <h2 className="text-lg font-semibold text-slate-900">Deck settings</h2>
 
@@ -361,9 +369,9 @@ export function DeckEditPage() {
                   type="button"
                   className="ml-3 text-xs px-2 py-1 rounded border border-slate-300 text-slate-700 hover:bg-white"
                   onClick={applySuggestedCounts}
-                  title="Set totalCards=cardCount (and previewCards=min(10,cardCount))"
+                  title="Copy the actual number of cards into Total Cards"
                 >
-                  Apply to totalCards
+                  Use card count
                 </button>
               ) : null}
             </div>
@@ -601,7 +609,7 @@ export function DeckEditPage() {
             className="text-sm px-4 py-2 rounded border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-60 disabled:cursor-not-allowed"
             onClick={() => void onSave(true)}
           >
-            {saving ? 'Saving…' : 'Save & Back'}
+            {saving ? 'Saving…' : 'Save & return to cards'}
           </button>
         </div>
 

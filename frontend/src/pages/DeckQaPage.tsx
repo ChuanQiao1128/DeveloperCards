@@ -15,7 +15,7 @@
 // pushed embeddings are ≥ 0.90 cosine) with the embeddings status; see
 // src/features/qa/SemanticDuplicatesPanel.tsx.
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useSearchParams } from 'react-router-dom';
 
 import { fetchCardsByDeck, fetchDeckById, fetchDecks } from '../api/authoring';
 import {
@@ -26,6 +26,9 @@ import {
   startQaRun,
 } from '../api/qa';
 import type { QaFinding, QaRun, QaRunDetail, QaScope, QaStatus } from '../api/qa';
+import { useConsoleIdentity } from '../hooks/useConsoleIdentity';
+import { hasReviewedDeckRelease } from '../lib/deckWorkspace';
+import { DeckWorkspaceHeader } from '../components/console/DeckWorkspaceHeader';
 import { ConsoleShell } from '../components/console/ConsoleShell';
 import { consoleNav } from '../components/console/consoleNav';
 import { Badge } from '../components/ui/Badge';
@@ -168,6 +171,8 @@ function cardEditHref(deckId: number, cardId: number): string {
 
 export function DeckQaPage() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const identity = useConsoleIdentity();
+  const { state: origin } = useLocation();
   const deckId = parseDeckId(searchParams.get('deckId'));
   const runIdParam = searchParams.get('runId') || null;
 
@@ -370,6 +375,7 @@ export function DeckQaPage() {
   }, []);
 
   const deck = deckState.forDeckId === deckId ? deckState.deck : null;
+  const canPublish = identity.allowed || Boolean(deck && hasReviewedDeckRelease(deck) && identity.user?.groups.includes('editor'));
   const deckError = deckState.forDeckId === deckId ? deckState.error : null;
   const cards = useMemo(
     () => (cardsState.forDeckId === deckId ? cardsState.cards : []),
@@ -410,7 +416,7 @@ export function DeckQaPage() {
   function showRun(runId: string) {
     if (deckId === null) return;
     setResolveMessage(null);
-    setSearchParams({ deckId: String(deckId), runId });
+    setSearchParams({ deckId: String(deckId), runId }, { state: { cardListSearch: origin?.cardListSearch } });
   }
 
   function chooseScope(next: QaScope) {
@@ -544,20 +550,14 @@ export function DeckQaPage() {
   return (
     <ConsoleShell
       title={CONSOLE_NAME}
-      subtitle="Authoring · AI QA"
+      subtitle="AI QA"
       {...consoleNav()}
     >
+      {deck && <DeckWorkspaceHeader deck={deck} view="cards" cardListSearch={origin?.cardListSearch} />}
       <div>
-        <h1 className={H1_CLASS}>AI QA</h1>
+        {deck ? <h2 className={H1_CLASS}>AI QA</h2> : <h1 className={H1_CLASS}>AI QA</h1>}
         {deck ? (
-          <div className="text-xs text-slate-600 mt-0.5">
-            {deck.title} · <span className="font-mono">{deck.slug}</span> ·{' '}
-            <Link to={`/decks/cards?deckId=${deck.id}`} className="text-indigo-600 underline">
-              Cards
-            </Link>
-            {' · '}
-            <Link to={`/review?deckId=${deck.id}`} className="text-indigo-700 underline">AI draft review</Link>
-          </div>
+          <Link to={`/review?deckId=${deck.id}`} className="text-sm text-indigo-700 underline">AI draft review</Link>
         ) : null}
       </div>
 
@@ -807,9 +807,7 @@ export function DeckQaPage() {
               <div className="mt-2" data-testid="qa-run-finished-clean">
                 <Callout tone="success" title="The review finished with no blockers">
                   AI QA no longer blocks publishing this deck.{' '}
-                  <Link to="/" className="underline">
-                    Publish now from the deck list
-                  </Link>
+                  {canPublish && <Link to={`/decks/publish?deckId=${deckId}`} className="underline">Open deck publishing</Link>}
                 </Callout>
               </div>
             ) : null}
@@ -895,7 +893,7 @@ export function DeckQaPage() {
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       <Badge tone={VERDICT_BADGES[group.verdict].tone}>{VERDICT_BADGES[group.verdict].label}</Badge>
-                      <Link to={cardEditHref(deckId, group.cardId)} className="text-xs text-indigo-600 hover:underline">
+                      <Link to={cardEditHref(deckId, group.cardId)} state={{ qaDeckId: deckId, qaRunId: shownRunId, cardListSearch: origin?.cardListSearch }} className="text-xs text-indigo-600 hover:underline">
                         Edit card
                       </Link>
                     </div>
