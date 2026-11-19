@@ -178,7 +178,7 @@ public static class Notifications
   /// <see cref="NeverSentAfterMinutes"/> was never handed to SQS (the process died after the insert) and is sent now
   /// (R18C, backend-design-9/automation-17). Returns how many were sent. Never throws.
   /// </summary>
-  internal static async Task<int> ResendAsync(NpgsqlConnection conn, int max, CancellationToken ct = default, string? subkind = null)
+  internal static async Task<int> ResendAsync(NpgsqlConnection conn, int max, CancellationToken ct = default)
   {
     try
     {
@@ -186,14 +186,13 @@ public static class Notifications
         $"""
         select notification_id, kind, subkind, subject, body_text, mode
         from automation_notifications
-        where attempts < $1 and (($4::text is null and subkind is distinct from 'content_publish_failure')
-              or ($4::text is not null and kind='exception' and subkind=$4))
+        where attempts < $1 and subkind is distinct from 'content_publish_failure' 
           and (status = 'enqueue_failed'
                or (status = 'queued' and attempts = 0 and created_at < now() - make_interval(mins => $3)))
         order by created_at, id
         limit $2
         """,
-        [MaxSendAttempts, max, NeverSentAfterMinutes, subkind], ct);
+        [MaxSendAttempts, max, NeverSentAfterMinutes], ct);
       var resent = 0;
       foreach (var row in rows)
       {
@@ -298,6 +297,9 @@ public static class Notifications
       using var doc = Validation.ParseJsonBody(req);
       if (doc is null) return res.BadRequest("BAD_REQUEST", "Invalid JSON body");
       var body = AutomationBody.Object(doc.RootElement);
+      if (body.TryGetProperty("operation", out var operation) && operation.ValueKind == JsonValueKind.String && operation.GetString() == "prepare-content-publish")
+        return await ContentPublishAlerts.HandlePrepare(req, res);
+
 
       if (!body.TryGetProperty("v", out var ver) || ver.ValueKind != JsonValueKind.Number || !ver.TryGetInt32(out var version) || version != 1)
       {

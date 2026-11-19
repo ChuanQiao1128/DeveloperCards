@@ -297,3 +297,7 @@ test_ssm_to_env_skips_console_sentry_dsn() {
 test_ssm_to_env_skips_console_sentry_dsn
 
 echo "merge-env tests OK"
+
+# Worker failure events use public config; mail credentials remain in the notifier.
+out="$(pick_keys '{"AUTOMATION_NOTIFY_QUEUE_URL":"queue","CONTENT_PUBLISH_ALERTS_SINCE":"2026-11-19T01:00:00Z","NOTIFIER_SECRET":"excluded"}' "$WORKER_FILE_KEYS")"
+jq -e '. == {"AUTOMATION_NOTIFY_QUEUE_URL":"queue","CONTENT_PUBLISH_ALERTS_SINCE":"2026-11-19T01:00:00Z"}' <<<"$out" >/dev/null || fail "worker notification event config projection"

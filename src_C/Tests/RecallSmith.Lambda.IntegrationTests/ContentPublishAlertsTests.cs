@@ -1,5 +1,10 @@
 using System.Text.Json;
 using RecallSmith.Lambda.Common;
+using RecallSmith.Lambda.Db;
+using RecallSmith.Lambda.Worker.Services;
+using RecallSmith.Lambda.Worker.Repositories;
+using RecallSmith.Lambda.Worker.S3;
+using Amazon.SQS.Model;
 using RecallSmith.Lambda.Vpc.Automation;
 
 namespace RecallSmith.Lambda.IntegrationTests;
@@ -10,8 +15,12 @@ public class ContentPublishAlertsTests(PostgresFixture db) : IAsyncLifetime
 {
   private readonly List<string> _jobs=[];
   private string? _savedSince, _savedMaintenance;
+  private Func<SendMessageRequest,Task>? _savedEventSend;
+  private readonly List<SendMessageRequest> _events=[];
   public Task InitializeAsync()
   {
+    _savedEventSend=ContentPublishFailureEvents.TestSendSeam;
+    ContentPublishFailureEvents.TestSendSeam=r=>{_events.Add(r);return Task.CompletedTask;};
     _savedSince=Environment.GetEnvironmentVariable(ContentPublishAlerts.SinceEnv);
     _savedMaintenance=Environment.GetEnvironmentVariable("BASELINE_MAINTENANCE_ENABLED");
     return Task.CompletedTask;
@@ -21,6 +30,7 @@ public class ContentPublishAlertsTests(PostgresFixture db) : IAsyncLifetime
     try {foreach(var job in _jobs) await db.QueryAsync("delete from automation_notifications where dedupe_key like 'content-publish:'||$1||':%'",job);}
     finally
     {
+      ContentPublishFailureEvents.TestSendSeam=_savedEventSend;
       Environment.SetEnvironmentVariable(ContentPublishAlerts.SinceEnv,_savedSince);
       Environment.SetEnvironmentVariable("BASELINE_MAINTENANCE_ENABLED",_savedMaintenance);
     }
@@ -55,161 +65,182 @@ public class ContentPublishAlertsTests(PostgresFixture db) : IAsyncLifetime
     }
     return (deck, job);
   }
-  private async Task<int> Sweep() { await using var conn = await db.OpenAsync(); return await ContentPublishAlerts.SweepAsync(conn, "off"); }
+  private async Task<JsonElement> Prepare(string job,string stage)
+  {
+    await using var conn=await db.OpenAsync();
+    return JsonSerializer.SerializeToElement(await ContentPublishAlerts.PrepareAsync(conn,job,stage));
+  }
 
   [Theory]
   [InlineData("build")]
   [InlineData("dispatch")]
   [InlineData("manifest")]
-  public async Task FinalProblem_OffMode_QueuesOneBoundAlertWithoutAIOrWebhook(string stage)
+  public async Task Event_PreparesOnlyItsExactJob_OffModeWithOneLogicalIdentity(string stage)
   {
-    await using var scope = new A04Kit.Scope(AutomationMode.Off); await Enable(scope);
-    var (deck,job) = await Job(stage);
-    Assert.Equal(1,await Sweep()); Assert.Equal(0,await Sweep());
-    var message=JsonDocument.Parse(Assert.Single(scope.NotifySent).MessageBody).RootElement;
-    Assert.Equal("exception",message.GetProperty("kind").GetString());
-    Assert.Equal(ContentPublishAlerts.Subkind,message.GetProperty("subkind").GetString());
-    Assert.Equal("off",message.GetProperty("mode").GetString());
-    var body=message.GetProperty("text").GetString()!;
-    Assert.Contains(job,body); Assert.Contains("Stage: "+stage,body); Assert.Contains("synthetic-release-",body);
-    Assert.DoesNotContain("secret diagnostic",body); Assert.Empty(scope.WebhookSent); Assert.Empty(scope.QaSent); Assert.Empty(scope.PublishSent);
-    Assert.Equal("off",Environment.GetEnvironmentVariable(AutomationMode.EnvName));
-    Assert.Equal(1L,await db.ScalarAsync("select count(*) from automation_notifications where dedupe_key=$1",$"content-publish:{job}:{stage}"));
-    Assert.Equal(0L,await db.ScalarAsync("select count(*) from cards where deck_id=$1",deck));
+    await using var scope=new A04Kit.Scope(AutomationMode.Off);await Enable(scope);
+    var (_,job)=await Job(stage);await Job(stage);
+    var prepared=await Prepare(job,stage);var mail=prepared.GetProperty("notification");
+    Assert.Equal(ContentPublishAlerts.Subkind,mail.GetProperty("subkind").GetString());
+    Assert.Equal("off",mail.GetProperty("mode").GetString());
+    var text=mail.GetProperty("text").GetString()!;
+    Assert.Contains(job,text);Assert.Contains("Stage: "+stage,text);Assert.DoesNotContain("secret diagnostic",text);
+    var repeated=await Prepare(job,stage);
+    Assert.Equal(mail.GetProperty("notificationId").GetString(),repeated.GetProperty("notification").GetProperty("notificationId").GetString());
+    Assert.Equal(1L,await db.ScalarAsync("select count(*) from automation_notifications where dedupe_key like 'content-publish:%' and dedupe_key=$1",$"content-publish:{job}:{stage}"));
+    Assert.Empty(scope.NotifySent);Assert.Empty(scope.QaSent);Assert.Empty(scope.PublishSent);Assert.Empty(scope.WebhookSent);
   }
 
   [Fact]
-  public async Task Tick_OffWithoutMaintenance_StillNotifiesOnlyControlledReleaseFailures()
+  public async Task Tick_DoesNotSearchForOrSendPublicationAlerts()
   {
     await using var scope=new A04Kit.Scope(AutomationMode.Off);await Enable(scope);scope.Set("BASELINE_MAINTENANCE_ENABLED","0");
     var (_,job)=await Job("build");
-    var request=A04Kit.SignedRequest(A04Kit.TickPath,new {v=1,tickId=Guid.NewGuid(),job="tick"});
-    var response=await AutomationTick.HandleTick(request,new Res(request.TraceId));
-    Assert.Equal(200,response.StatusCode);Assert.Contains(job,Assert.Single(scope.NotifySent).MessageBody);
-    Assert.Empty(scope.PublishSent);Assert.Empty(scope.QaSent);
+    var req=A04Kit.SignedRequest(A04Kit.TickPath,new {v=1,tickId=Guid.NewGuid(),job="tick"});
+    Assert.Equal(200,(await AutomationTick.HandleTick(req,new Res(req.TraceId))).StatusCode);
+    Assert.Empty(_events);Assert.Empty(scope.NotifySent);
+    Assert.Equal(0L,await db.ScalarAsync("select count(*) from automation_notifications where dedupe_key=$1",$"content-publish:{job}:build"));
   }
 
   [Fact]
-  public async Task ConcurrentSweeps_UseOneDurableNotification()
+  public async Task BuildFailure_AndFailedReplay_EmitImmediatelyWithoutRebuilding()
   {
     await using var scope=new A04Kit.Scope(AutomationMode.Off);await Enable(scope);
     var (_,job)=await Job("build");
-    await Task.WhenAll(Sweep(),Sweep());
-    Assert.Single(scope.NotifySent);
-    Assert.Equal(1L,await db.ScalarAsync("select count(*) from automation_notifications where dedupe_key=$1",$"content-publish:{job}:build"));
+    var processor=new PublishJobProcessor(new JobRepository(),new S3DeckUploader());
+    await processor.FailAsync(job,"synthetic error");await processor.ProcessAsync(job);
+    Assert.Equal(2,_events.Count);
+    Assert.All(_events,e=>{Assert.Equal(0,e.DelaySeconds);Assert.Contains(job,e.MessageBody);Assert.Contains("build",e.MessageBody);});
+    Assert.Equal("FAILED",await db.ScalarAsync("select status from deck_publishes where job_id=$1",job));
   }
 
   [Fact]
-  public async Task EnqueueFailure_RetriesExistingNotification_WithoutResendingAcknowledgedQueueMessage()
+  public async Task FailedReplay_DoesNotAcknowledgeLostEvent()
   {
-    await using var scope=new A04Kit.Scope(AutomationMode.Off);await Enable(scope);
-    var (_,job)=await Job("manifest");scope.FailNotify=true;Assert.Equal(0,await Sweep());
-    var key=$"content-publish:{job}:manifest";
-    Assert.Equal("enqueue_failed",await db.ScalarAsync("select status from automation_notifications where dedupe_key=$1",key));
-    scope.FailNotify=false;Assert.Equal(1,await Sweep());Assert.Equal(0,await Sweep());Assert.Single(scope.NotifySent);
-    Assert.Equal(2,await db.ScalarAsync("select attempts from automation_notifications where dedupe_key=$1",key));
+    await using var scope=new A04Kit.Scope(AutomationMode.Off);await Enable(scope);var (_,job)=await Job("build");
+    ContentPublishFailureEvents.TestSendSeam=_=>throw new TimeoutException("synthetic outage");
+    var processor=new PublishJobProcessor(new JobRepository(),new S3DeckUploader());
+    await Assert.ThrowsAsync<TimeoutException>(()=>processor.ProcessAsync(job));
+  }
+
+  [Theory]
+  [InlineData("dispatch")]
+  [InlineData("manifest")]
+  public async Task FinalLease_RequestsQueueRetryInsteadOfDroppingEvent(string stage)
+  {
+    await using var scope=new A04Kit.Scope(AutomationMode.Off);await Enable(scope);var (_,job)=await Job(stage);
+    var table=stage=="dispatch"?"publish_dispatch":"publish_manifest_delivery";
+    await db.QueryAsync($"update {table} set lease_until=now()+interval '1 minute' where job_id=$1",job);
+    if(stage=="manifest")await db.QueryAsync("update publish_manifest_delivery set state='pending' where job_id=$1",job);
+    await Assert.ThrowsAsync<InvalidOperationException>(()=>Prepare(job,stage));
+    await db.QueryAsync($"update {table} set lease_until=null where job_id=$1",job);
+    Assert.True((await Prepare(job,stage)).TryGetProperty("notification",out _));
   }
 
   [Fact]
-  public async Task NeverSentRow_IsRecovered_WhileOrdinaryAutomationRemainsOff()
+  public async Task FinalDispatch_IsArmedBeforeClaim_AndStillChecksAfterUncertainSend()
   {
-    await using var scope=new A04Kit.Scope(AutomationMode.Off);await Enable(scope);
-    var (_,job)=await Job("build");await Sweep();scope.NotifySent.Clear();
-    await db.QueryAsync("update automation_notifications set attempts=0,status='queued',created_at=now()-interval '11 minutes' where dedupe_key=$1",$"content-publish:{job}:build");
-    Assert.Equal(1,await Sweep());Assert.Single(scope.NotifySent);
+    await using var scope=new A04Kit.Scope(AutomationMode.Off);await Enable(scope);var (_,job)=await Job("dispatch");
+    await db.QueryAsync("update publish_dispatch set attempts=4,actor_superadmin=true where job_id=$1",job);
+    await using var conn=await db.OpenAsync();
+    Assert.False(await PublishDelivery.Dispatch(conn,job,_=>{
+      Assert.Equal(60,Assert.Single(_events).DelaySeconds);throw new TimeoutException("uncertain publish enqueue");
+    }));
+    Assert.Equal(5,await db.ScalarAsync("select attempts from publish_dispatch where job_id=$1",job));
+    await Assert.ThrowsAsync<InvalidOperationException>(()=>Prepare(job,"dispatch"));
+    await db.QueryAsync("update publish_dispatch set lease_until=null where job_id=$1",job);
+    Assert.True((await Prepare(job,"dispatch")).TryGetProperty("notification",out _));
+  }
+
+  [Theory]
+  [InlineData("dispatch")]
+  [InlineData("manifest")]
+  public async Task CannotClaimFinalAttemptUntilWakeupIsDurable(string stage)
+  {
+    await using var scope=new A04Kit.Scope(AutomationMode.Off);await Enable(scope);var (_,job)=await Job(stage);
+    var table=stage=="dispatch"?"publish_dispatch":"publish_manifest_delivery";
+    await db.QueryAsync($"update {table} set attempts=4 where job_id=$1",job);
+    if(stage=="dispatch")await db.QueryAsync("update publish_dispatch set actor_superadmin=true where job_id=$1",job);
+    else await db.QueryAsync("update publish_manifest_delivery set state='pending' where job_id=$1",job);
+    ContentPublishFailureEvents.TestSendSeam=_=>throw new TimeoutException("queue down");
+    await using var conn=await db.OpenAsync();var executed=false;
+    await Assert.ThrowsAsync<TimeoutException>(async()=>{
+      if(stage=="dispatch")await PublishDelivery.Dispatch(conn,job,_=>{executed=true;return Task.CompletedTask;});
+      else await PublishDelivery.DeliverManifest(conn,job,()=>{executed=true;return Task.CompletedTask;});
+    });
+    Assert.False(executed);Assert.Equal(4,await db.ScalarAsync($"select attempts from {table} where job_id=$1",job));
   }
 
   [Fact]
-  public async Task OrdinaryOldSupersededAndStillRetryingJobs_DoNotAlert()
+  public async Task FinalManifest_PreArmsCrashGuard_AndEmitsImmediateKnownFailure()
+  {
+    await using var scope=new A04Kit.Scope(AutomationMode.Off);await Enable(scope);var (_,job)=await Job("manifest");
+    await db.QueryAsync("update publish_manifest_delivery set attempts=4,state='pending' where job_id=$1",job);
+    await using var conn=await db.OpenAsync();
+    await PublishDelivery.DeliverManifest(conn,job,()=>{
+      Assert.Equal(90,Assert.Single(_events).DelaySeconds);throw new InvalidOperationException("synthetic index failure");
+    });
+    Assert.Equal(2,_events.Count);Assert.Equal(0,_events[1].DelaySeconds);
+    Assert.True((await Prepare(job,"manifest")).TryGetProperty("notification",out _));
+  }
+
+  [Fact]
+  public async Task DeliveredOldSupersededAndUnreviewedEventsAreIgnored()
   {
     await using var scope=new A04Kit.Scope(AutomationMode.Off);await Enable(scope);
-    await Job("build",reviewed:false);
+    var ordinary=await Job("build",false);Assert.True((await Prepare(ordinary.Job,"build")).GetProperty("skip").GetBoolean());
     var old=await Job("build");await db.QueryAsync("update deck_publishes set created_at=now()-interval '1 day' where job_id=$1",old.Job);
+    Assert.True((await Prepare(old.Job,"build")).GetProperty("skip").GetBoolean());
     var superseded=await Job("build");await db.QueryAsync("update decks set release_generation=1 where id=$1",superseded.Deck);
-    var cancelled=await Job("build");await db.QueryAsync("update deck_publishes set error_message='RELEASE_SUPERSEDED' where job_id=$1",cancelled.Job);
+    Assert.True((await Prepare(superseded.Job,"build")).GetProperty("skip").GetBoolean());
+    var delivered=await Job("dispatch");await db.QueryAsync("update publish_dispatch set delivered_at=now() where job_id=$1",delivered.Job);
+    Assert.True((await Prepare(delivered.Job,"dispatch")).GetProperty("skip").GetBoolean());
     var retrying=await Job("dispatch");await db.QueryAsync("update publish_dispatch set attempts=4 where job_id=$1",retrying.Job);
-    var accepted=await Job("dispatch");await db.QueryAsync("update publish_dispatch set delivered_at=now() where job_id=$1",accepted.Job);
-    var leased=await Job("dispatch");await db.QueryAsync("update publish_dispatch set lease_until=now()+interval '1 minute' where job_id=$1",leased.Job);
-    var delivered=await Job("manifest");await db.QueryAsync("update publish_manifest_delivery set state='delivered' where job_id=$1",delivered.Job);
-    Assert.Equal(0,await Sweep());Assert.Empty(scope.NotifySent);
+    await Assert.ThrowsAsync<InvalidOperationException>(()=>Prepare(retrying.Job,"dispatch"));
   }
 
   [Fact]
-  public async Task ConcurrentResends_ClaimOneOperationalSweep()
+  public async Task SentEventSkipsAndFailedEventGoesToNotifyDlq()
   {
-    await using var scope=new A04Kit.Scope(AutomationMode.Off);await Enable(scope);
-    await Job("build");scope.FailNotify=true;await Sweep();scope.FailNotify=false;
-    var entered=new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-    var release=new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-    var sends=0;
-    Notifications.TestSendSeam=async _=>{Interlocked.Increment(ref sends);entered.TrySetResult();await release.Task;};
-    var first=Sweep();
-    try {await entered.Task.WaitAsync(TimeSpan.FromSeconds(2));Assert.Equal(0,await Sweep().WaitAsync(TimeSpan.FromSeconds(2)));}
-    finally {release.TrySetResult();await first;}
-    Assert.Equal(1,sends);
-  }
-
-  [Fact]
-  public async Task SlowDatabaseQuery_IsCancelled_AndReleasesSweepLock()
-  {
-    await using var scope=new A04Kit.Scope(AutomationMode.Off);await Enable(scope);await Job("build");
-    await using var blocker=await db.OpenAsync();await using var tx=await blocker.BeginTransactionAsync();
-    await new Npgsql.NpgsqlCommand("lock table deck_publishes in access exclusive mode",blocker,tx).ExecuteNonQueryAsync();
-    await using var conn=await db.OpenAsync();using var cancel=new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
-    var watch=System.Diagnostics.Stopwatch.StartNew();
-    try {Assert.Equal(0,await ContentPublishAlerts.SweepAsync(conn,"off",cancel.Token));Assert.True(watch.Elapsed<TimeSpan.FromSeconds(3));}
-    finally {await tx.RollbackAsync();}
-    Assert.Empty(scope.NotifySent);Assert.Equal(1,await Sweep());
-  }
-
-  [Fact]
-  public async Task OrdinaryResender_LeavesOperationalRowsToTheirLockedSweep()
-  {
-    await using var scope=new A04Kit.Scope(AutomationMode.Off);await Enable(scope);await Job("build");scope.FailNotify=true;await Sweep();scope.FailNotify=false;
-    await using var conn=await db.OpenAsync();await Notifications.ResendAsync(conn,5);
-    Assert.DoesNotContain(scope.NotifySent,m=>m.MessageBody.Contains(ContentPublishAlerts.Subkind));scope.NotifySent.Clear();
-    Assert.Equal(1,await Sweep());
-  }
-
-  [Fact]
-  public async Task ManifestWithLiveLeaseOrAnotherLiveBuild_IsNotFinal()
-  {
-    await using var scope=new A04Kit.Scope(AutomationMode.Off);await Enable(scope);
-    var leased=await Job("manifest");await db.QueryAsync("update publish_manifest_delivery set state='pending',lease_until=now()+interval '1 minute' where job_id=$1",leased.Job);
-    var old=await Job("manifest");await db.QueryAsync("update decks set live_build_id='another-live-build' where id=$1",old.Deck);
-    Assert.Equal(0,await Sweep());Assert.Empty(scope.NotifySent);
-  }
-
-  [Fact]
-  public async Task SendCancelledAtDeadline_PersistsUnconfirmedStateForSameIdentityRetry()
-  {
-    await using var scope=new A04Kit.Scope(AutomationMode.Off);await Enable(scope);var (_,job)=await Job("build");
-    var original=Notifications.TestSendSeam;using var cancel=new CancellationTokenSource();
-    Notifications.TestSendSeam=_=>{cancel.Cancel();return Task.FromException(new OperationCanceledException(cancel.Token));};
-    await using(var conn=await db.OpenAsync()) await ContentPublishAlerts.SweepAsync(conn,"off",cancel.Token);
+    await using var scope=new A04Kit.Scope(AutomationMode.Off);await Enable(scope);var (_,job)=await Job("build");await Prepare(job,"build");
     var key=$"content-publish:{job}:build";
-    var row=Assert.Single(await db.QueryAsync("select notification_id,status,error_code from automation_notifications where dedupe_key=$1",key));
-    Assert.Equal("enqueue_failed",row["status"]);Assert.Equal("ENQUEUE_UNCONFIRMED",row["error_code"]);
-    Notifications.TestSendSeam=original;Assert.Equal(1,await Sweep());
-    Assert.Contains(row["notification_id"]!.ToString()!,Assert.Single(scope.NotifySent).MessageBody);
+    await db.QueryAsync("update automation_notifications set status='sent' where dedupe_key=$1",key);
+    Assert.True((await Prepare(job,"build")).GetProperty("skip").GetBoolean());
+    await db.QueryAsync("update automation_notifications set status='failed' where dedupe_key=$1",key);
+    Assert.True((await Prepare(job,"build")).GetProperty("failed").GetBoolean());
+  }
+  [Fact]
+  public async Task EarlyGuardEventIsRetriedBeforeFinalClaim()
+  {
+    await using var scope=new A04Kit.Scope(AutomationMode.Off);await Enable(scope);var (_,job)=await Job("dispatch");
+    await db.QueryAsync("update publish_dispatch set attempts=4,actor_superadmin=true where job_id=$1",job);
+    ContentPublishFailureEvents.TestSendSeam=async _=>await Assert.ThrowsAsync<InvalidOperationException>(()=>Prepare(job,"dispatch"));
+    await using var conn=await db.OpenAsync();
+    Assert.False(await PublishDelivery.Dispatch(conn,job,_=>throw new TimeoutException("synthetic uncertainty")));
+    await db.QueryAsync("update publish_dispatch set lease_until=null where job_id=$1",job);
+    Assert.True((await Prepare(job,"dispatch")).TryGetProperty("notification",out _));
   }
 
   [Fact]
-  public async Task SuccessfulResendAtDeadline_IsAcknowledgedAndNotSentAgain()
+  public async Task OrphanReapCannotCommitFailureWhenWakeupCannotBeQueued()
+  {
+    await using var scope=new A04Kit.Scope(AutomationMode.Off);await Enable(scope);var (_,job)=await Job("dispatch");
+    await db.QueryAsync("update deck_publishes set created_at=now()-interval '11 minutes' where job_id=$1",job);
+    ContentPublishFailureEvents.TestSendSeam=_=>throw new TimeoutException("queue unavailable");
+    await using var conn=await db.OpenAsync();
+    await Assert.ThrowsAsync<TimeoutException>(()=>RecallSmith.Lambda.Vpc.Authoring.PublishReaper.ReapOrphansAsync(conn));
+    Assert.Equal("PENDING",await db.ScalarAsync("select status from deck_publishes where job_id=$1",job));
+  }
+
+  [Fact]
+  public async Task PreparationRouteRequiresSignatureAndUsesExistingCallback()
   {
     await using var scope=new A04Kit.Scope(AutomationMode.Off);await Enable(scope);var (_,job)=await Job("build");
-    scope.FailNotify=true;await Sweep();scope.FailNotify=false;using var cancel=new CancellationTokenSource();var sends=0;
-    Notifications.TestSendSeam=_=>{Interlocked.Increment(ref sends);cancel.Cancel();return Task.CompletedTask;};
-    await using(var conn=await db.OpenAsync()) await ContentPublishAlerts.SweepAsync(conn,"off",cancel.Token);
-    Assert.Equal("queued",await db.ScalarAsync("select status from automation_notifications where dedupe_key=$1",$"content-publish:{job}:build"));
-    Assert.Equal(0,await Sweep());Assert.Equal(1,sends);
+    const string path="/api/internal/automation/notifications/report";
+    var request=A04Kit.SignedRequest(path,new {v=1,operation="prepare-content-publish",jobId=job,stage="build"});
+    var result=await Notifications.HandleReport(request,new Res(request.TraceId));
+    Assert.Equal(200,result.StatusCode);Assert.Contains("notificationId",result.Body);
+    var unsigned=new LambdaRequest(JsonSerializer.SerializeToElement(new {rawPath=path,requestContext=new {http=new {method="POST"}},body=JsonSerializer.Serialize(new {v=1,operation="prepare-content-publish",jobId=job,stage="build"})}));
+    Assert.Equal(403,(await Notifications.HandleReport(unsigned,new Res(unsigned.TraceId))).StatusCode);
   }
 
-  [Fact]
-  public async Task MissingOrInvalidActivation_DoesNotSendHistoricalProblems()
-  {
-    await using var scope=new A04Kit.Scope(AutomationMode.Off);await Job("build");
-    foreach(var value in new string?[]{null,"invalid"}) {scope.Set(ContentPublishAlerts.SinceEnv,value);Assert.Equal(0,await Sweep());}
-    Assert.Empty(scope.NotifySent);
-  }
 }

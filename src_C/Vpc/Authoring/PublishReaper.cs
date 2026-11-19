@@ -36,9 +36,15 @@ public static class PublishReaper
     select 'PROCESSING' as was, job_id from q
     """;
 
-  public static Task<ReapResult> ReapOrphansAsync(NpgsqlConnection conn) => ReapOrphansAsync(conn, null);
+  public static async Task<ReapResult> ReapOrphansAsync(NpgsqlConnection conn)
+  {
+    await using var tx = await conn.BeginTransactionAsync(RecallSmith.Lambda.Common.RequestBudget.Token);
+    var result = await ReapOrphansAsync(conn, tx);
+    await tx.CommitAsync(RecallSmith.Lambda.Common.RequestBudget.Token);
+    return result;
+  }
 
-  public static async Task<ReapResult> ReapOrphansAsync(NpgsqlConnection conn, NpgsqlTransaction? tx)
+  public static async Task<ReapResult> ReapOrphansAsync(NpgsqlConnection conn, NpgsqlTransaction tx)
   {
     var rows = await DbUtil.QueryAsync(conn, tx, ReapSql, []);
 
@@ -54,6 +60,8 @@ public static class PublishReaper
       if (!string.IsNullOrEmpty(jobId)) jobIds.Add(jobId);
     }
 
+    // If wake-up delivery fails the transaction rolls back, so the original reap remains retryable.
+    foreach (var job in jobIds) await ContentPublishFailureEvents.EnqueueAsync(job, "build", 30);
     return new ReapResult(pending, processing, jobIds.ToArray());
   }
 

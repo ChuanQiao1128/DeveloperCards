@@ -112,12 +112,7 @@ public static class AutomationTick
       if (mode.LiveBlockedReason == AutomationMode.ServerNotReady) return RunnerRoutes.NotReady(res);
       if (mode.Effective == AutomationMode.Off)
       {
-        // AI stays off; operational publish alerts have a separate explicit activation cutoff.
-        if (!BaselineMaintenance.Enabled)
-        {
-          actions.Alerts += await ContentPublishAlerts.SweepAsync(conn, mode.Effective);
-          return Answer(res, tickId, mode, "off", actions, sink);
-        }
+        if (!BaselineMaintenance.Enabled) return Answer(res, tickId, mode, "off", actions, sink);
         var maintenanceLock = await DbUtil.ExecuteScalarAsync(conn,null,"select pg_try_advisory_lock($1)",[LockKey]) is true;
         if (!maintenanceLock) return Answer(res,tickId,mode,"locked",actions,sink);
         try { return res.Ok(new { tickId, effectiveMode=mode.Effective, maintenance=await BaselineMaintenance.Run(conn,Budget,BaselineMaintenance.RecoveryEnabled) }); }
