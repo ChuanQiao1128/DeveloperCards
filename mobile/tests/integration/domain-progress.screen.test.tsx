@@ -44,8 +44,10 @@ vi.mock('../../src/content/deckCache', () => ({
 }));
 
 vi.mock('../../src/review/storage', () => ({
+  captureProgressUserSub: vi.fn(async () => 'anon'),
   loadDeckProgress: vi.fn(async () => fixtures.progress),
 }));
+vi.mock('../../src/sync/progressSync', () => ({ applyCachedRemoteProgress: vi.fn(async () => 0) }));
 
 vi.mock('../../src/features/gacha/draw/effectiveOwned', () => ({
   resolveEffectiveOwned: vi.fn(async () => fixtures.owned),
@@ -66,6 +68,10 @@ import {
 import type { CardExport, DeckExport } from '../../src/types/deckExport';
 import type { CardProgress } from '../../src/review/model';
 import type { MistakeEntry } from '../../src/features/gacha/mistakes/mistakeBook';
+import { invalidateAuthSession } from '../../src/auth/sessionBoundary';
+import { getCachedDeck } from '../../src/content/deckCache';
+import { loadDomainProgress } from '../../src/features/domains/loadDomainProgress';
+import { loadDeckProgress } from '../../src/review/storage';
 
 const DAY = 86_400_000;
 const NOW = Date.now();
@@ -142,7 +148,7 @@ function allText(tree: renderer.ReactTestRenderer): string {
   return textOf(tree.root);
 }
 
-async function renderScreen(slug = 'aws-saa-c03', navigate = vi.fn()) {
+async function renderScreen(slug = 'aws-saa-c03', navigate = vi.fn(), domainKey?: string) {
   let tree!: renderer.ReactTestRenderer;
   const focusListeners: Array<() => void> = [];
   const unsubscribe = vi.fn();
@@ -158,7 +164,7 @@ async function renderScreen(slug = 'aws-saa-c03', navigate = vi.fn()) {
     tree = renderer.create(
       <DomainProgressScreen
         navigation={navigation as any}
-        route={{ key: 'dp', name: 'DomainProgress', params: { slug } } as any}
+        route={{ key: 'dp', name: 'DomainProgress', params: { slug, domainKey } } as any}
       />,
     );
   });
@@ -218,6 +224,28 @@ describe('DomainProgressScreen', () => {
     // The untagged card is grouped under "Other", which has no exam weight.
     expect(textOf(byTestID(tree, 'domain-row-other')[0])).toContain('Other');
     expect(byTestID(tree, 'domain-weight-other')).toHaveLength(0);
+  });
+
+  it('shows only the tapped domain and starts its existing practice queue', async () => {
+    const { tree, navigate } = await renderScreen('aws-saa-c03', vi.fn(), 'd1');
+    expect(byTestID(tree, 'domain-row-d2')).toHaveLength(0);
+    expect(allText(tree)).toContain('2 learning · 1 unstudied');
+    expect(allText(tree)).toContain('30% of the exam');
+    act(() => byTestID(tree, 'domain-practice-d1')[0].props.onPress());
+    expect(navigate).toHaveBeenCalledWith('SessionCard', {
+      slug: 'aws-saa-c03',
+      focusUids: ['s1', 's2', 's3'],
+    });
+  });
+
+  it('does not reconcile progress if the account changes during the deck read', async () => {
+    vi.mocked(loadDeckProgress).mockClear();
+    vi.mocked(getCachedDeck).mockImplementationOnce(async () => {
+      invalidateAuthSession();
+      return fixtures.deck;
+    });
+    await expect(loadDomainProgress('aws-saa-c03')).rejects.toThrow('Account changed');
+    expect(loadDeckProgress).not.toHaveBeenCalled();
   });
 
   it('never prints a percentage about the learner', async () => {

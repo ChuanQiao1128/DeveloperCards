@@ -82,7 +82,7 @@ import { getAuthSessionGeneration } from '../auth/sessionBoundary';
 import { buildPrerequisiteLabels } from '../features/gacha/components/prerequisiteLabels';
 import { resetSessionStore, useSessionStore } from '../features/gacha/session/sessionStore';
 import { captureSessionNavigation, restoreSessionNavigation, type SessionNavigation } from '../features/gacha/session/sessionNavigation';
-import { checkpointDate, checkpointProgressStamp, clearSessionCheckpoint, loadSessionCheckpoint, saveSessionCheckpoint } from '../features/gacha/session/sessionCheckpoint';
+import { checkpointDate, checkpointProgressStamp, clearSessionCheckpoint, loadSessionCheckpoint, saveSessionCheckpoint, studyCheckpointContext } from '../features/gacha/session/sessionCheckpoint';
 import { useScrollToTopOnChange } from '../features/gacha/session/useScrollToTopOnChange';
 import SessionProgressHeader from '../features/gacha/components/SessionProgressHeader';
 import RatingBar from '../features/gacha/components/RatingBar';
@@ -358,7 +358,7 @@ export function SessionCardScreen({ navigation, route }: Props) {
   const deckTranslations = useDeckTranslations(deck?.Slug ?? slug, deck?.Version ?? null);
   const prerequisiteLabels = useMemo(() => buildPrerequisiteLabels(deck?.Cards ?? [], cardLang === 'zh-CN' ? 'zh-CN' : undefined), [deck, cardLang]);
   const prerequisiteReturn = useRef<{ generation: number; sessionId: string | null; context: string } | null>(null);
-  const studyContext = JSON.stringify([slug, mode, previewLimit, focusKey, routeLimit, isPremiumUser]);
+  const studyContext = studyCheckpointContext({ slug, mode, previewLimit, focusKey, routeLimit, isPremiumUser });
   useEffect(() => {
     const owner = checkpointOwner.current;
     if (loading || reviewing || !deck || !current || !owner || owner.generation !== getAuthSessionGeneration()) return;

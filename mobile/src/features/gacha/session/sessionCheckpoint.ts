@@ -6,6 +6,7 @@ import type { ReviewRating } from '../../../review/model';
 import type { OwnedGate } from '../contracts';
 import type { McqRunState } from '../mcq/mcqRotation';
 import type { useSessionStore } from './sessionStore';
+import type { StudyMode } from '../../../navigation/types';
 
 type SessionState = ReturnType<typeof useSessionStore.getState>;
 export type McqCheckpoint = {
@@ -53,6 +54,19 @@ async function serialized<T>(key: string, action: () => Promise<T>): Promise<T> 
 
 export function checkpointDate(now = new Date()): string {
   return `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
+}
+
+export function studyCheckpointContext({
+  slug, isPremiumUser, mode = 'mixed', previewLimit = 0, focusKey = '', routeLimit,
+}: {
+  slug: string | null;
+  isPremiumUser: boolean;
+  mode?: StudyMode;
+  previewLimit?: number;
+  focusKey?: string;
+  routeLimit?: number;
+}): string {
+  return JSON.stringify([slug, mode, previewLimit, focusKey, routeLimit, isPremiumUser]);
 }
 
 /** Compare every scheduler field and the current ownership gate before resuming. */

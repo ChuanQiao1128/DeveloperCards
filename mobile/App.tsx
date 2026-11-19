@@ -37,6 +37,7 @@ import CeremonyTuningScreen from './src/screens/dev/CeremonyTuning';
 import DrawCeremonyScreen from './src/screens/DrawCeremonyScreen';
 import DrawResultScreen from './src/screens/DrawResultScreen';
 import SessionCardScreen from './src/screens/SessionCardScreen';
+import ReviewOverviewScreen from './src/screens/ReviewOverviewScreen';
 import DrawScreen from './src/screens/DrawScreen';
 import SessionSummaryScreen from './src/screens/SessionSummaryScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
@@ -265,6 +266,7 @@ function App() {
         <Stack.Screen name="CardWalkthrough" component={CardWalkthroughScreen} />
         <Stack.Screen name="MistakeBook" component={MistakeBookScreen} />
         <Stack.Screen name="DomainProgress" component={DomainProgressScreen} />
+        <Stack.Screen name="ReviewOverview" component={ReviewOverviewScreen} />
         <Stack.Screen name="MyReports" component={MyReportsScreen} />
         <Stack.Screen name="More" component={MoreScreen} />
         <Stack.Screen name="Profile" component={ProfileScreen} />
