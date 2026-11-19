@@ -520,7 +520,8 @@ public static class AutoPublisher
         else if (status is "PENDING" or "PROCESSING" && row["stuck"] is true)
         {
           // The same statement as the publish reaper, for this job only; a job that moved meanwhile is left alone.
-          var reaped = await DbUtil.QueryAsync(conn, null,
+          await using var reapTx = await conn.BeginTransactionAsync(ct);
+          var reaped = await DbUtil.QueryAsync(conn, reapTx,
             """
             update deck_publishes set status = 'FAILED', error_message = $2, updated_at = now()
             where job_id = $1 and status in ('PENDING', 'PROCESSING') and updated_at < now() - make_interval(mins => $3)
@@ -528,6 +529,8 @@ public static class AutoPublisher
             """, [jobId, StuckJobError, StuckJobMinutes]);
           if (reaped.Count == 0) continue;
           (status, error) = ("FAILED", StuckJobError);
+          await ContentPublishFailureEvents.EnqueueAsync(jobId, "build", 30);
+          await reapTx.CommitAsync(ct);
           Log.Event("warn", new { tag = "automation", reason = "auto_publish_job_stuck", publishId, deckId, jobId, status = row["job_status"] });
           AutomationFailures.Record();
         }

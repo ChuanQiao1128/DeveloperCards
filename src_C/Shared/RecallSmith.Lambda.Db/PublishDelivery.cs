@@ -66,15 +66,26 @@ public static class PublishDelivery
   /// <returns>null when no claim, true on confirmed send, false on uncertain response.</returns>
   public static async Task<bool?> Dispatch(NpgsqlConnection conn, string jobId, Func<string, Task> send)
   {
+    // Arm the final attempt before its claim: a crash after the claim must still have a wake-up.
+    var armed = ContentPublishFailureEvents.Since is null;
+    if (!armed && await DbUtil.ExecuteScalarAsync(conn, null, $"""
+      select exists(select 1 from publish_dispatch s join deck_publishes p using(job_id) join decks d on d.id=p.deck_id
+        where s.job_id=$1 and p.status='PENDING' and s.attempts=4 and s.next_attempt_at<=clock_timestamp()
+          and (s.lease_until is null or s.lease_until<clock_timestamp()) and {Authorized})
+      """, [jobId]) is true)
+    {
+      await ContentPublishFailureEvents.EnqueueAsync(jobId, "dispatch", 60);
+      armed = true;
+    }
     var token = Guid.NewGuid().ToString();
     var rows = await DbUtil.QueryAsync(conn, null, $"""
       update publish_dispatch s set lease_token=$2,lease_until=clock_timestamp()+interval '30 seconds',attempts=s.attempts+1
       from deck_publishes p join decks d on d.id=p.deck_id
-      where s.job_id=$1 and p.job_id=s.job_id and p.status='PENDING' and s.attempts<5
+      where s.job_id=$1 and p.job_id=s.job_id and p.status='PENDING' and (s.attempts<4 or (s.attempts=4 and $3))
         and s.next_attempt_at<=clock_timestamp() and (s.lease_until is null or s.lease_until<clock_timestamp())
         and {Authorized}
       returning p.job_id,p.deck_id,p.published_by_admin_sub,p.note
-      """, [jobId, token]);
+      """, [jobId, token, armed]);
     if (rows.Count == 0) return null;
     var row = rows[0];
     try
@@ -130,13 +141,22 @@ public static class PublishDelivery
       select job_id from deck_publishes where job_id=$1 and status='SUCCESS'
       on conflict do nothing
       """,[jobId]);
+    var armed = ContentPublishFailureEvents.Since is null;
+    if (!armed && await DbUtil.ExecuteScalarAsync(conn, null, """
+      select exists(select 1 from publish_manifest_delivery where job_id=$1 and state='pending' and attempts=4
+        and next_attempt_at<=clock_timestamp() and (lease_until is null or lease_until<clock_timestamp()))
+      """, [jobId]) is true)
+    {
+      await ContentPublishFailureEvents.EnqueueAsync(jobId, "manifest", 90);
+      armed = true;
+    }
     var token = Guid.NewGuid().ToString();
     var rows = await DbUtil.QueryAsync(conn, null, """
       update publish_manifest_delivery m set lease_token=$2,lease_until=clock_timestamp()+interval '60 seconds',attempts=m.attempts+1
       from deck_publishes p where p.job_id=m.job_id and m.job_id=$1 and p.status='SUCCESS' and m.state='pending'
-        and m.attempts<5 and m.next_attempt_at<=clock_timestamp() and (m.lease_until is null or m.lease_until<clock_timestamp())
+        and (m.attempts<4 or (m.attempts=4 and $3)) and m.next_attempt_at<=clock_timestamp() and (m.lease_until is null or m.lease_until<clock_timestamp())
       returning m.job_id
-      """, [jobId, token]);
+      """, [jobId, token, armed]);
     if (rows.Count == 0)
     {
       await DbUtil.ExecuteAsync(conn,null,"update publish_manifest_delivery set state='needs_attention' where job_id=$1 and state='pending' and attempts>=5 and (lease_until is null or lease_until<clock_timestamp())",[jobId]);
@@ -160,6 +180,9 @@ public static class PublishDelivery
         where job_id=$1 and lease_token=$2
         """, [jobId, token, ex.Message[..Math.Min(ex.Message.Length, 400)]]);
     }
+    if (await DbUtil.ExecuteScalarAsync(conn, null,
+        "select state='needs_attention' from publish_manifest_delivery where job_id=$1", [jobId]) is true)
+      await ContentPublishFailureEvents.EnqueueAsync(jobId, "manifest");
     return true;
   }
 

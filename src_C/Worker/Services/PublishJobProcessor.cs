@@ -51,6 +51,7 @@ public class PublishJobProcessor : IPublishJobProcessor, IReplayOutcome, IPublis
         // replay is its only second chance (automation-1): both side effects are idempotent (the outbox
         // rows staged with the SUCCESS commit are sent once, the ledger row is keyed on the job).
         if (row is { Status: "SUCCESS" }) await AfterPublishSucceededAsync(row);
+        if (row is { Status: "FAILED" }) await ContentPublishFailureEvents.EnqueueAsync(jobId, "build");
         // No replay emits good; only SUCCESS retains the conservative final manifest-failure bad event.
         LastCallReplayOutcome = row is { Status: "SUCCESS" }
           ? PublishReplayOutcome.Succeeded : PublishReplayOutcome.FailedOrAbsent;
@@ -190,6 +191,7 @@ public class PublishJobProcessor : IPublishJobProcessor, IReplayOutcome, IPublis
   public async Task FailAsync(string jobId, string errorMessage)
   {
     await _jobRepository.FailJobAsync(jobId, errorMessage);
+    await ContentPublishFailureEvents.EnqueueAsync(jobId, "build");
 
     try
     {
