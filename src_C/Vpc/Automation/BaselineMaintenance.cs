@@ -39,6 +39,12 @@ public static class BaselineMaintenance
         Log.Event("warn", new { tag="maintenance", step=name, error=ex.Message });
       }
     }
+    if (ContentPublishAlerts.Since is not null)
+      await Step("content_publish_alerts", async () =>
+      {
+        var mode = await AutomationMode.EffectiveAsync(conn);
+        await ContentPublishAlerts.SweepAsync(conn, mode.Effective, deadline.Token);
+      });
     var durable = !Stop() && await PublishDelivery.Ready(conn);
     var dispatch = 0; var manifest = 0;
     if (recover && durable)
