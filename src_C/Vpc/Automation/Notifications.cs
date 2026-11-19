@@ -62,8 +62,8 @@ public static class Notifications
   // ---------------------------------------------------------------------------------------------
 
   /// <summary>
-  /// Logs <paramref name="request"/> and sends it to the notifier queue. <c>off</c> sends nothing but a <c>test</c>
-  /// email (null, nothing written). A <c>dedupe_key</c> that exists returns that row without sending. An empty queue
+  /// Logs <paramref name="request"/> and sends it to the notifier queue. <c>off</c> permits operational content alerts and a <c>test</c>
+  /// email; other off-mode requests write nothing. A <c>dedupe_key</c> that exists returns that row without sending. An empty queue
   /// URL or a failed send leaves the row <c>enqueue_failed</c> (the tick resends it). A newly logged <c>exception</c>
   /// row also emits the <c>automation.exception</c> webhook. Never throws; null when nothing could be logged.
   /// </summary>
@@ -75,7 +75,7 @@ public static class Notifications
   {
     try
     {
-      if (request.Mode == AutomationMode.Off && request.Kind != "test") return null;
+      if (request.Mode == AutomationMode.Off && request.Kind != "test" && !ContentPublishAlerts.IsOperational(request.Kind, request.Subkind)) return null;
 
       var subject = EmailTemplates.Cap(EmailTemplates.OneLine(request.Email.Subject), EmailTemplates.MaxSubjectLength);
       var inserted = await DbUtil.QueryAsync(conn, null,
@@ -85,11 +85,11 @@ public static class Notifications
         on conflict (dedupe_key) do nothing
         returning notification_id
         """,
-        [notificationId, request.Kind, request.Subkind, request.DedupeKey, subject, request.Email.BodyText, request.Mode, request.RunId]);
+        [notificationId, request.Kind, request.Subkind, request.DedupeKey, subject, request.Email.BodyText, request.Mode, request.RunId], ct);
       if (inserted.Count == 0)
       {
         var existing = await DbUtil.QueryAsync(conn, null,
-          "select notification_id, status from automation_notifications where dedupe_key = $1", [request.DedupeKey]);
+          "select notification_id, status from automation_notifications where dedupe_key = $1", [request.DedupeKey], ct);
         if (existing.Count == 0) return null;
         return new NotificationResult((Guid)existing[0]["notification_id"]!, (string)existing[0]["status"]!, false);
       }
@@ -104,7 +104,7 @@ public static class Notifications
       }
       finally
       {
-        if (request.Kind == "exception")
+        if (request.Kind == "exception" && !ContentPublishAlerts.IsOperational(request.Kind, request.Subkind))
         {
           await WebhookEvents.EnqueueAsync(conn, "automation.exception", new
           {
@@ -178,7 +178,7 @@ public static class Notifications
   /// <see cref="NeverSentAfterMinutes"/> was never handed to SQS (the process died after the insert) and is sent now
   /// (R18C, backend-design-9/automation-17). Returns how many were sent. Never throws.
   /// </summary>
-  internal static async Task<int> ResendAsync(NpgsqlConnection conn, int max, CancellationToken ct = default)
+  internal static async Task<int> ResendAsync(NpgsqlConnection conn, int max, CancellationToken ct = default, string? subkind = null)
   {
     try
     {
@@ -186,13 +186,14 @@ public static class Notifications
         $"""
         select notification_id, kind, subkind, subject, body_text, mode
         from automation_notifications
-        where attempts < $1
+        where attempts < $1 and (($4::text is null and subkind is distinct from 'content_publish_failure')
+              or ($4::text is not null and kind='exception' and subkind=$4))
           and (status = 'enqueue_failed'
                or (status = 'queued' and attempts = 0 and created_at < now() - make_interval(mins => $3)))
         order by created_at, id
         limit $2
         """,
-        [MaxSendAttempts, max, NeverSentAfterMinutes]);
+        [MaxSendAttempts, max, NeverSentAfterMinutes, subkind], ct);
       var resent = 0;
       foreach (var row in rows)
       {
@@ -227,47 +228,54 @@ public static class Notifications
         set status = 'enqueue_failed', error_code = 'NOTIFY_NOT_CONFIGURED', error = $2, attempts = attempts + 1, updated_at = now()
         where notification_id = $1 and status in ('queued', 'enqueue_failed')
         """,
-        [notificationId, $"{AutomationEnv.NotifyQueueUrlEnv} is not set"]);
+        [notificationId, $"{AutomationEnv.NotifyQueueUrlEnv} is not set"], ct);
       RouteMetrics.EmitGauge(EnqueueFailuresMetric, 1);
       Log.Event("warn", new { tag = "automation", outcome = "notification_enqueue_failed", notificationId, kind, errorCode = NotifyNotConfigured });
       return "enqueue_failed";
     }
 
-    await DbUtil.ExecuteAsync(conn, null,
-      "update automation_notifications set attempts = attempts + 1, updated_at = now() where notification_id = $1", [notificationId]);
     var request = new SendMessageRequest { QueueUrl = queueUrl, MessageBody = MessageBody(notificationId, kind, subkind, subject, text, mode) };
     try
     {
-      if (TestSendSeam is not null) await TestSendSeam(request);
+      await DbUtil.ExecuteAsync(conn, null,
+        "update automation_notifications set attempts = attempts + 1, updated_at = now() where notification_id = $1", [notificationId], ct);
+      ct.ThrowIfCancellationRequested();
+      if (TestSendSeam is not null) await TestSendSeam(request).WaitAsync(RecallSmith.Lambda.Common.RequestBudget.Combine(ct));
       else await SQS().SendMessageAsync(request, RecallSmith.Lambda.Common.RequestBudget.Combine(ct));
     }
     catch (Exception ex)
     {
-      var error = ex.Message.Length <= 500 ? ex.Message : ex.Message[..500];
-      await DbUtil.ExecuteAsync(conn, null,
-        """
-        update automation_notifications
-        set status = 'enqueue_failed', error_code = 'ENQUEUE_FAILED', error = $2, updated_at = now()
-        where notification_id = $1 and status in ('queued', 'enqueue_failed')
-        """,
-        [notificationId, error]);
+      var uncertain = ex is OperationCanceledException or TimeoutException;
+      var code = uncertain ? "ENQUEUE_UNCONFIRMED" : "ENQUEUE_FAILED";
+      var error = uncertain ? "SQS acceptance was not confirmed; retry with the same notification identity." :
+        ex.Message.Length <= 500 ? ex.Message : ex.Message[..500];
+      await SaveQueueOutcomeAsync(conn, notificationId, "enqueue_failed", code, error);
       RouteMetrics.EmitGauge(EnqueueFailuresMetric, 1);
-      Log.Event("warn", new { tag = "automation", outcome = "notification_enqueue_failed", notificationId, kind, error });
+      Log.Event("warn", new { tag = "automation", outcome = "notification_enqueue_failed", notificationId, kind, errorCode = code });
       return "enqueue_failed";
     }
 
-    await DbUtil.ExecuteAsync(conn, null,
-      """
-      update automation_notifications
-      set status = 'queued', error_code = null, error = null, updated_at = now()
-      where notification_id = $1 and status in ('queued', 'enqueue_failed')
-      """,
-      [notificationId]);
+    await SaveQueueOutcomeAsync(conn, notificationId, "queued", null, null);
     Log.Event("info", new { tag = "automation", outcome = "notification_enqueued", notificationId, kind });
     return "queued";
   }
 
   private const string NotifyNotConfigured = "NOTIFY_NOT_CONFIGURED";
+
+  private static async Task SaveQueueOutcomeAsync(NpgsqlConnection conn, Guid id, string status, string? code, string? error)
+  {
+    // The send may finish at the request deadline; its outcome must still replace the retryable state.
+    using var cleanup = new CancellationTokenSource(TimeSpan.FromSeconds(1));
+    await using var command = new NpgsqlCommand("""
+      update automation_notifications set status=@status,error_code=@code,error=@error,updated_at=now()
+      where notification_id=@id and status in ('queued','enqueue_failed')
+      """, conn) { CommandTimeout = 1 };
+    command.Parameters.AddWithValue("status", status);
+    command.Parameters.AddWithValue("code", (object?)code ?? DBNull.Value);
+    command.Parameters.AddWithValue("error", (object?)error ?? DBNull.Value);
+    command.Parameters.AddWithValue("id", id);
+    await command.ExecuteNonQueryAsync(cleanup.Token);
+  }
 
   internal static string ConsoleBaseUrl()
   {

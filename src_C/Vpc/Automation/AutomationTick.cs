@@ -14,7 +14,7 @@ namespace RecallSmith.Lambda.Vpc.Automation;
 /// <c>POST /api/internal/automation/tick</c> (R18A A04, contract A00 §12.6): the housekeeping that keeps the automated
 /// flow moving, called by the notifier Lambda every 15 minutes (<c>job: "tick"</c>) and on Monday 08:00 NZ
 /// (<c>job: "digest"</c>). The tick steps are single-flight through a session advisory lock (the digest, deduped per
-/// day, runs whether or not a tick holds it); effective <c>off</c> does nothing; every
+/// day, runs whether or not a tick holds it); effective <c>off</c> permits only explicitly enabled operational alerts/maintenance; every
 /// step, and every item of a step's loop, checks the time budget first and leaves the rest for the next tick (the tick
 /// then lists <see cref="BudgetExhausted"/> in <c>failedSteps</c>). Each step is idempotent, so a crashed or skipped tick
 /// is caught up by the next one. A failing step, or a failure a step swallows, emits <c>AutomationStepFailures</c> and
@@ -112,8 +112,12 @@ public static class AutomationTick
       if (mode.LiveBlockedReason == AutomationMode.ServerNotReady) return RunnerRoutes.NotReady(res);
       if (mode.Effective == AutomationMode.Off)
       {
-        // Preserve the historical zero-work default. The notifier body cannot opt into manual work.
-        if (!BaselineMaintenance.Enabled) return Answer(res, tickId, mode, "off", actions, sink);
+        // AI stays off; operational publish alerts have a separate explicit activation cutoff.
+        if (!BaselineMaintenance.Enabled)
+        {
+          actions.Alerts += await ContentPublishAlerts.SweepAsync(conn, mode.Effective);
+          return Answer(res, tickId, mode, "off", actions, sink);
+        }
         var maintenanceLock = await DbUtil.ExecuteScalarAsync(conn,null,"select pg_try_advisory_lock($1)",[LockKey]) is true;
         if (!maintenanceLock) return Answer(res,tickId,mode,"locked",actions,sink);
         try { return res.Ok(new { tickId, effectiveMode=mode.Effective, maintenance=await BaselineMaintenance.Run(conn,Budget,BaselineMaintenance.RecoveryEnabled) }); }

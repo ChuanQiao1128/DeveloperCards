@@ -52,7 +52,9 @@ Reviewer可在同轮给出精确的删除补丁，仅删除重复话语或题面
 
 ## 仅在授权范围发布
 
-日常五卡顺序与流程缩减以 [`docs/delivery/card-content-release-workflow.md`](../../../docs/delivery/card-content-release-workflow.md) 为入口：聊天定稿 → 一次独立审查与 JSON 校验 → 冻结内容就绪 → 用户“发布” → 当前基线／主干契约／备份预检 → 一次 Console 自动发布与 CDN 核验 → 保存回执。聊天已定稿不另派作者；规则、证据、自评或正文变化只核对失效卡与受影响依赖。七项标准合并在同次审查，不拆成七轮。用户可见稿发生变化须给用户看受影响稿；已有相同冻结批次发布授权不重复询问。
+日常五卡顺序与流程缩减以 [`docs/delivery/card-content-release-workflow.md`](../../../docs/delivery/card-content-release-workflow.md) 为入口：第一步为五张人工定稿（冻结前一次必要独立核对）与冻结；第二步为用户授权后一次自动预检/构包（冻结包一致性含范围和已有记录绑定＋发布数据格式），随后沿用Console自动发布/CDN核验及回执。聊天已定稿不另派作者；规则、证据、自评或正文变化只核对失效卡与受影响依赖。七项标准合并在同次审查，不拆成七轮。用户可见稿发生变化须给用户看受影响稿；已有相同冻结批次发布授权不重复询问。
+
+第二步只执行一次`repair_release.py prepare-manual REQUEST.json OUTPUT`，复用第一步已通过且与实际正文/证据/规则匹配的核对记录，不调用模型、不另加人工确认或联网预检；实时库存由Console导入前核对。`run --manual-patch`属于第一步，不在第二步重跑。成功按真实`preflight.json`简报变化/未变数量；失败定位问题，正文或事实问题回第一步，只处理受影响卡和依赖，不自动补PASS。
 
 canonical JSON 是发布真源，阅读 Markdown 不作为发布中转；使用真实 Console JSON 解析校验。人工稿使用 `repair_batch.py run ... --manual-patch FINAL.patch.json` 和 `repair_release.py prepare-manual`，保留真实来源、实际审查和原范围，不伪造作者。`mainSHA` 绑定实际已验证的发布代码 main 提交，完整正文及实际证明另按哈希归档，Git 内容归档独立完成。代码/规则/契约变化先按正常门禁合入验证，未变版本复用验证记录；不可把未归档正文声称为已在 main。首次选目录后自动保存；不支持时一次导出完整文件。
 

@@ -9,19 +9,20 @@ public static class DbUtil
     NpgsqlConnection conn,
     NpgsqlTransaction? tx,
     string sql,
-    IReadOnlyList<object?> parameters)
+    IReadOnlyList<object?> parameters, CancellationToken ct = default)
   {
+    var token = RequestBudget.Combine(ct);
     await using var cmd = CreateCommand(conn, tx, sql, parameters);
-    await using var reader = await cmd.ExecuteReaderAsync(RequestBudget.Token);
+    await using var reader = await cmd.ExecuteReaderAsync(token);
 
     var rows = new List<Dictionary<string, object?>>();
-    while (await reader.ReadAsync(RequestBudget.Token))
+    while (await reader.ReadAsync(token))
     {
       var row = new Dictionary<string, object?>(StringComparer.Ordinal);
       for (var i = 0; i < reader.FieldCount; i++)
       {
         var name = reader.GetName(i);
-        row[name] = await reader.IsDBNullAsync(i, RequestBudget.Token) ? null : reader.GetValue(i);
+        row[name] = await reader.IsDBNullAsync(i, token) ? null : reader.GetValue(i);
       }
       rows.Add(row);
     }
@@ -33,20 +34,22 @@ public static class DbUtil
     NpgsqlConnection conn,
     NpgsqlTransaction? tx,
     string sql,
-    IReadOnlyList<object?> parameters)
+    IReadOnlyList<object?> parameters, CancellationToken ct = default)
   {
+    var token = RequestBudget.Combine(ct);
     await using var cmd = CreateCommand(conn, tx, sql, parameters);
-    return await cmd.ExecuteNonQueryAsync(RequestBudget.Token);
+    return await cmd.ExecuteNonQueryAsync(token);
   }
 
   public static async Task<object?> ExecuteScalarAsync(
     NpgsqlConnection conn,
     NpgsqlTransaction? tx,
     string sql,
-    IReadOnlyList<object?> parameters)
+    IReadOnlyList<object?> parameters, CancellationToken ct = default)
   {
+    var token = RequestBudget.Combine(ct);
     await using var cmd = CreateCommand(conn, tx, sql, parameters);
-    var r = await cmd.ExecuteScalarAsync(RequestBudget.Token);
+    var r = await cmd.ExecuteScalarAsync(token);
     return r is DBNull ? null : r;
   }
 

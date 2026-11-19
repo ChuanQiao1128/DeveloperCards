@@ -603,6 +603,25 @@ public static class EmailTemplates
     return Render(mode, subject, summary, needs, done, details, console);
   }
 
+  public static RenderedEmail ContentPublishFailure(string mode, string slug, string releaseId, string jobId,
+    string buildId, string stage, string attempts, string consoleUrl)
+  {
+    var reason = stage switch
+    {
+      "dispatch" => "Queue dispatch retries exhausted; the card build has not started.",
+      "manifest" => "The card build succeeded, but public index delivery needs attention.",
+      _ => "The card build failed. Inspect the job diagnostics for the specific error."
+    };
+    return Render(mode, $"Action needed: content publication {OneLine(releaseId)}",
+      reason,
+      [$"- inspect this job and repair the failed stage — {consoleUrl}"],
+      ["- the frozen content and existing review remain available; no automatic content rewrite was started"],
+      [$"Deck: {OneLine(slug)}", $"Release: {OneLine(releaseId)}", $"Job: {OneLine(jobId)}",
+        $"Build: {OneLine(buildId)}", $"Stage: {OneLine(stage)}", $"Attempts: {OneLine(attempts)}",
+        "This is an operational content-release alert; it does not enable AI automation.",
+        "A FAILED job is terminal. A new attempt must be explicitly linked and revalidated; blindly redriving DLQ messages does not restart it."], consoleUrl);
+  }
+
   /// <summary>The super_admin's test email (sent in every mode).</summary>
   public static RenderedEmail Test(string mode, string consoleBaseUrl) => Render(mode, "Test email",
     "This is a test email from the DeveloperCards automation; the notifier path works.",
