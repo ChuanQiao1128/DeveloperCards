@@ -2,6 +2,7 @@
 """Prepare a Console release from frozen card reviews; never publish or run a model."""
 import argparse
 import copy
+import fcntl
 from datetime import datetime, timedelta, timezone
 import hashlib
 import json
@@ -17,6 +18,8 @@ from urllib.parse import urlparse
 
 import repair_batch as batch
 import repair_cards as cards
+
+SESSION_STATE_PATH = batch.PROJECT / 'docs/delivery/session-state.json'
 
 PUBLISHER_CODE_FILES = (
     'tools/aws_cards/repair_batch.py', 'tools/aws_cards/repair_release.py', 'tools/aws_cards/repair_cards.py',
@@ -448,6 +451,59 @@ def finalize(folder, artifact_dir):
         return _finalize_frozen(folder, frozen)
 
 
+def update_session_state(update):
+    """All local session-state writers must use this advisory lock and atomic replace."""
+    state_path = SESSION_STATE_PATH
+    with state_path.with_suffix('.publication.lock').open('a') as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        original = state_path.read_bytes(); state = json.loads(original)
+        require(isinstance(state, dict), 'Invalid session state')
+        update(state)
+        if state == json.loads(original):
+            return
+        encoded = (json.dumps(state, ensure_ascii=False, indent=2) + '\n').encode()
+        with tempfile.NamedTemporaryFile(dir=state_path.parent, delete=False) as temp:
+            staged = Path(temp.name)
+            try:
+                os.fchmod(temp.fileno(), state_path.stat().st_mode & 0o777)
+                temp.write(encoded); temp.flush(); os.fsync(temp.fileno())
+                require(state_path.read_bytes() == original, 'Session state changed during registration; retry the same finalize')
+                os.replace(staged, state_path)
+            finally:
+                staged.unlink(missing_ok=True)
+
+
+def register_publication(folder, receipt, previous_build):
+    """Advance the local handoff only from this release's predecessor."""
+    def update(state):
+        require(isinstance(state, dict) and all(isinstance(state.get(k), dict) for k in
+                ['lastPublication', 'dailyRepairWorkflow', 'cardPublicationWorkflow']), 'Incomplete session state; retain the existing record')
+        current = state['lastPublication']
+        require(current['status'] == 'PUBLISHED_AND_VERIFIED', 'Current publication is not verified')
+        registered = state['cardPublicationWorkflow'].get('lastFinalizedPublication', {})
+        require(isinstance(registered, dict), 'Invalid finalized-publication record')
+        require(state.get('buildId', current['buildId']) == current['buildId'] and
+                state['dailyRepairWorkflow'].get('latestContentBuild', current['buildId']) == current['buildId'] and
+                registered.get('buildId', current['buildId']) == current['buildId'],
+                'Session publication pointers disagree; inspect before registering')
+        same_build = current['buildId'] == receipt['buildId']
+        identity = ['releaseId', 'buildId', 'jobId', 'sha256', 'bundleSha256']
+        require(not registered or all(registered.get(k) == current.get(k) for k in identity),
+                'Finalized-publication record has conflicting bindings')
+        if same_build:
+            require(all(current.get(k) == receipt[k] for k in identity), 'Registered publication has conflicting bindings')
+        else:
+            require(current['buildId'] == previous_build, 'Current baseline is not this release\'s predecessor; do not replace a newer registration')
+        publication = {**(current if same_build else {}), **receipt,
+                       'totalCards': receipt['cards'], 'publicationDirectory': str(folder)}
+        state.update(publication='PUBLISHED_AND_VERIFIED', buildId=receipt['buildId'], lastPublication=publication)
+        state['dailyRepairWorkflow'].update(latestContentBuild=receipt['buildId'], latestPublicationDirectory=str(folder))
+        state['cardPublicationWorkflow']['lastFinalizedPublication'] = {
+            **{k: publication[k] for k in [*identity, 'verifiedAt', 'totalCards', 'publicationDirectory']},
+            'receiptPath': str(folder / 'publication-verification.json')}
+    update_session_state(update)
+
+
 def _finalize_frozen(folder, artifact_dir):
     prepared = cards.read(folder / 'preflight.json'); bundle = cards.read(folder / 'release-bundle.json')
     require(prepared['status'] == 'EXACT_BINDINGS_VERIFIED' and
@@ -483,8 +539,13 @@ def _finalize_frozen(folder, artifact_dir):
     save_once('after-deck.json', raw)
     save_once('console-journal-final.json', (artifact_dir / 'console-journal.json').read_bytes())
     save_once('publication-verification.json', (json.dumps(receipt, ensure_ascii=False, indent=2) + '\n').encode())
+    handoff = {'status': 'REGISTERED', 'path': str(SESSION_STATE_PATH)}
+    try:
+        register_publication(folder, receipt, journal['baseline']['deck']['live_build_id'])
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        handoff.update(status='PENDING', message='发布已核验，接续记录待完成；排查登记错误后重跑同一 finalize，不重新发布。', error=str(error))
     return {'status': 'PUBLISHED_AND_VERIFIED', 'releaseId': bundle['releaseId'], 'buildId': proof['buildId'],
-            'cards': proof['cards'], 'nextBaseline': str(folder), 'newNetworkRequests': 0}
+            'cards': proof['cards'], 'nextBaseline': str(folder), 'newNetworkRequests': 0, 'handoff': handoff}
 
 
 if __name__ == '__main__':
@@ -495,6 +556,9 @@ if __name__ == '__main__':
     verify = commands.add_parser('verify-baseline'); verify.add_argument('folder', type=Path); verify.add_argument('backup', type=Path)
     finish = commands.add_parser('finalize'); finish.add_argument('folder', type=Path); finish.add_argument('artifacts', type=Path)
     args = parser.parse_args()
-    print(json.dumps(prepare(args.request, args.output, args.command == 'prepare-manual') if args.command in {'prepare', 'prepare-manual'}
-                     else finalize(args.folder, args.artifacts) if args.command == 'finalize'
-                     else verify_baseline(args.folder, args.backup), ensure_ascii=False))
+    result = (prepare(args.request, args.output, args.command == 'prepare-manual') if args.command in {'prepare', 'prepare-manual'}
+              else finalize(args.folder, args.artifacts) if args.command == 'finalize'
+              else verify_baseline(args.folder, args.backup))
+    print(json.dumps(result, ensure_ascii=False))
+    if result.get('handoff', {}).get('status') == 'PENDING':
+        sys.exit(1)

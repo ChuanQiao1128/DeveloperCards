@@ -98,6 +98,9 @@ dispatch/manifest在领取第5次尝试前先将延迟事件交给SQS（60/90秒
 7. **一次回读与持久证明。** 全卡回读2次降为1次，完整snapshot 6次降为3次。最终proof和真实CDN字节按owner/release/bundle保存；刷新先查原动作并核对当前job/build/live，再复验缓存字节，无需重复下载。
 8. **一次选目录与统一收尾。** 支持的浏览器自动保存四份文件；owner Web Lock涵盖journal CAS及文件写入，避免旧标签逆序覆盖。其他浏览器导出一个完整文件。`finalize`先冻结原字节再校验，不重复网络或模型调用；成功目录直接作下一批基线。
 
+接续记录由`finalize`在全部本地收尾校验通过后登记。`handoff.status=REGISTERED`才表示接续完成；`PENDING`仍保留发布已核验结果并返回退出码1，排查后重跑同一命令补登记。所有会话对`session-state.json`的写入，包括工作流维护，必须经`repair_release.update_session_state`在同一协作锁内读取、合并和原子替换，不直接编辑JSON。写前比较只补充检测，不保证拦住绕过锁协议的任意外部编辑。
+9. **收尾后自动登记接续。** `finalize`完成文件校验及保存后，在本地文件锁内核对当前登记版本是本批原基线（或已登记同一发布），原子更新`session-state.json`中的本批回执、build、下一批目录及`cardPublicationWorkflow.lastFinalizedPublication`。保留其他会话字段，旧批次不能覆盖新指针。登记失败仍报告发布已核验，另标`handoff.status=PENDING`并以退出码1提示接续记录待完成；排查后重跑同一收尾命令补登记，不重新发布。相同登记重跑保持原字节。
+
 启用后的默认顺序：**五张人工定稿（冻结前完成一次必要核对）→ 冻结内容就绪 → 用户“发布” → 一次自动预检/构包 → Console自动备份、导入、发布/CDN核验 → 回执及手机拉取；Git归档另行完成。** 用户明确要求本批先合并再发布时遵从其顺序。
 
 ## 本轮验收边界

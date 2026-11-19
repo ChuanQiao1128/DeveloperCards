@@ -36,6 +36,17 @@ def record(folder, packet, output, role):
 
 
 class ReleaseTests(unittest.TestCase):
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory(); self.addCleanup(temporary.cleanup)
+        self.state_path = Path(temporary.name) / 'session-state.json'
+        batch.write(self.state_path, {'publication': 'PUBLISHED_AND_VERIFIED', 'buildId': 'original-live',
+            'lastPublication': {'status': 'PUBLISHED_AND_VERIFIED', 'buildId': 'original-live'},
+            'dailyRepairWorkflow': {'latestContentBuild': 'original-live', 'nextBatchSelection': 'await_user'},
+            'cardPublicationWorkflow': {'publicationStatusUI': {'status': 'DELIVERED_AND_VERIFIED'}},
+            'unrelated': {'preserve': True}})
+        patcher = patch.object(release, 'SESSION_STATE_PATH', self.state_path)
+        patcher.start(); self.addCleanup(patcher.stop)
+
     def completed_fixture(self, root):
         program = '''
 import {createRequire} from 'node:module';
@@ -73,10 +84,141 @@ console.log(JSON.stringify({bundle,session,deckRaw}));
             prepared, artifacts = self.completed_fixture(Path(tmp))
             result = release.finalize(prepared, artifacts)
             self.assertEqual(result['newNetworkRequests'], 0)
+            self.assertEqual(result['handoff']['status'], 'REGISTERED')
+            state = cards.read(self.state_path); original = self.state_path.read_bytes()
+            self.assertEqual(state['lastPublication']['releaseId'], result['releaseId'])
+            self.assertEqual(state['buildId'], result['buildId'])
+            self.assertEqual(state['dailyRepairWorkflow']['latestPublicationDirectory'], str(prepared.resolve()))
+            self.assertEqual(state['cardPublicationWorkflow']['lastFinalizedPublication']['receiptPath'], str(prepared.resolve() / 'publication-verification.json'))
+            self.assertTrue(state['unrelated']['preserve'])
+            self.assertEqual(state['dailyRepairWorkflow']['nextBatchSelection'], 'await_user')
+            self.assertEqual(state['cardPublicationWorkflow']['publicationStatusUI']['status'], 'DELIVERED_AND_VERIFIED')
             self.assertEqual(release.finalize(prepared, artifacts), result)
+            self.assertEqual(self.state_path.read_bytes(), original)
             self.assertEqual((prepared / 'after-deck.json').read_bytes(), (artifacts / 'after-deck.json').read_bytes())
             (artifacts / 'after-deck.json').write_text('{}')
             with self.assertRaisesRegex(ValueError, 'CDN bytes changed'): release.finalize(prepared, artifacts)
+            self.assertEqual(self.state_path.read_bytes(), original)
+
+    def test_registration_failure_preserves_verified_release_and_retry_only_registers(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            prepared, artifacts = self.completed_fixture(Path(tmp)); original = self.state_path.read_bytes()
+            with patch.object(release.os, 'replace', side_effect=OSError('synthetic disk failure')):
+                result = release.finalize(prepared, artifacts)
+            self.assertEqual(result['status'], 'PUBLISHED_AND_VERIFIED')
+            self.assertEqual(result['handoff']['status'], 'PENDING')
+            self.assertIn('接续记录待完成', result['handoff']['message'])
+            self.assertEqual(self.state_path.read_bytes(), original)
+            saved = {p.name: p.read_bytes() for p in prepared.iterdir() if p.is_file()}
+            with patch.object(batch, 'urlopen', side_effect=AssertionError('no network')):
+                result = release.finalize(prepared, artifacts)
+            self.assertEqual(result['handoff']['status'], 'REGISTERED')
+            self.assertEqual(saved, {p.name: p.read_bytes() for p in prepared.iterdir() if p.is_file()})
+
+    def test_registration_rejects_later_or_conflicting_baselines_and_busy_lock(self):
+        receipt = {'status': 'PUBLISHED_AND_VERIFIED', 'releaseId': 'release', 'buildId': 'new-build',
+                   'jobId': 'job', 'sha256': 'a'*64, 'bundleSha256': 'b'*64, 'verifiedAt': '2099-01-01T00:00:00Z', 'cards': 2}
+        folder = self.state_path.parent / 'prepared'
+        for current_build in ['newer-build', 'sibling-build']:
+            state = cards.read(self.state_path)
+            state['lastPublication']['buildId'] = state['buildId'] = state['dailyRepairWorkflow']['latestContentBuild'] = current_build
+            batch.write(self.state_path, state); original = self.state_path.read_bytes()
+            with self.assertRaisesRegex(ValueError, 'predecessor'):
+                release.register_publication(folder, receipt, 'original-live')
+            self.assertEqual(self.state_path.read_bytes(), original)
+        state['lastPublication'] = receipt.copy()
+        state['buildId'] = state['dailyRepairWorkflow']['latestContentBuild'] = receipt['buildId']
+        state['lastPublication']['sha256'] = 'c'*64
+        batch.write(self.state_path, state); original = self.state_path.read_bytes()
+        with self.assertRaisesRegex(ValueError, 'conflicting bindings'):
+            release.register_publication(folder, receipt, 'original-live')
+        self.assertEqual(self.state_path.read_bytes(), original)
+        with self.state_path.with_suffix('.publication.lock').open('a') as lock:
+            release.fcntl.flock(lock, release.fcntl.LOCK_EX | release.fcntl.LOCK_NB)
+            with self.assertRaises(BlockingIOError): release.register_publication(folder, receipt, 'original-live')
+
+    def test_registration_pending_does_not_clobber_missing_malformed_or_inconsistent_state(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            prepared, artifacts = self.completed_fixture(Path(tmp))
+            valid = self.state_path.read_bytes()
+            for raw in [None, b'{', b'[]', b'{"lastPublication":{}}', valid.replace(b'"latestContentBuild": "original-live"', b'"latestContentBuild": "newer-build"')]:
+                if raw is None: self.state_path.unlink()
+                else: self.state_path.write_bytes(raw)
+                result = release.finalize(prepared, artifacts)
+                self.assertEqual(result['status'], 'PUBLISHED_AND_VERIFIED')
+                self.assertEqual(result['handoff']['status'], 'PENDING')
+                self.assertEqual(self.state_path.read_bytes() if self.state_path.exists() else None, raw)
+            self.state_path.write_bytes(valid)
+            self.assertEqual(release.finalize(prepared, artifacts)['handoff']['status'], 'REGISTERED')
+
+    def test_conflicting_finalized_identity_stays_pending_without_overwrite(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            prepared, artifacts = self.completed_fixture(Path(tmp))
+            release.finalize(prepared, artifacts); valid = cards.read(self.state_path)
+            for key in ['releaseId', 'jobId', 'sha256', 'bundleSha256']:
+                state = copy.deepcopy(valid)
+                state['cardPublicationWorkflow']['lastFinalizedPublication'][key] = 'conflicting'
+                batch.write(self.state_path, state); original = self.state_path.read_bytes()
+                result = release.finalize(prepared, artifacts)
+                self.assertEqual(result['handoff']['status'], 'PENDING')
+                self.assertIn('conflicting bindings', result['handoff']['error'])
+                self.assertEqual(self.state_path.read_bytes(), original)
+
+    def test_workflow_maintenance_uses_the_same_lock_and_preserves_publication(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            prepared, artifacts = self.completed_fixture(Path(tmp)); replace = release.os.replace
+            def maintenance(state): state['authorization'] = {'automaticPublication': False, 'note': 'new maintenance value'}
+            blocked = []
+            def replacing(*args):
+                try: release.update_session_state(maintenance)
+                except BlockingIOError: blocked.append(True)
+                return replace(*args)
+            with patch.object(release.os, 'replace', side_effect=replacing):
+                self.assertEqual(release.finalize(prepared, artifacts)['handoff']['status'], 'REGISTERED')
+            self.assertEqual(blocked, [True])
+            release.update_session_state(maintenance)
+            release.finalize(prepared, artifacts)
+            state = cards.read(self.state_path)
+            self.assertEqual(state['authorization']['note'], 'new maintenance value')
+            self.assertFalse(state['authorization']['automaticPublication'])
+            self.assertEqual(state['lastPublication']['buildId'], 'synthetic-build')
+
+    def test_external_edit_detected_before_replace_is_preserved_for_retry(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            prepared, artifacts = self.completed_fixture(Path(tmp))
+            original = self.state_path.read_bytes()
+            release.finalize(prepared, artifacts)
+            self.state_path.write_bytes(original)
+            def edit_before_compare(*args):
+                state = cards.read(self.state_path); state['externalNote'] = 'retain this edit'
+                batch.write(self.state_path, state)
+            with patch.object(release.os, 'fsync', side_effect=edit_before_compare):
+                result = release.finalize(prepared, artifacts)
+            self.assertEqual(result['handoff']['status'], 'PENDING')
+            self.assertEqual(cards.read(self.state_path)['externalNote'], 'retain this edit')
+            self.assertEqual(release.finalize(prepared, artifacts)['handoff']['status'], 'REGISTERED')
+            self.assertEqual(cards.read(self.state_path)['externalNote'], 'retain this edit')
+
+    def test_cli_pending_returns_verified_json_and_nonzero_exit(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            prepared, artifacts = self.completed_fixture(Path(tmp))
+            program = ('import runpy, sys; '
+                       'import repair_batch; from pathlib import Path; '
+                       'sys.argv = sys.argv[1:]; '
+                       'repair_batch.PROJECT = Path(sys.argv.pop(1)); '
+                       'runpy.run_path(sys.argv[0], run_name="__main__")')
+            # The isolated project has no session-state, while its parser uses the actual source tree.
+            isolated = Path(tmp) / 'project'; (isolated / 'tools').mkdir(parents=True)
+            (isolated / 'tools/aws_cards').symlink_to(batch.PROJECT / 'tools/aws_cards', target_is_directory=True)
+            (isolated / 'frontend').symlink_to(batch.PROJECT / 'frontend', target_is_directory=True)
+            raw = release.subprocess.run([release.sys.executable, '-c', program, str(batch.PROJECT / 'tools/aws_cards/repair_release.py'),
+                str(isolated), 'finalize', str(prepared), str(artifacts)], cwd=batch.PROJECT / 'tools/aws_cards',
+                capture_output=True, text=True, timeout=40)
+            self.assertEqual(raw.returncode, 1, raw.stderr)
+            self.assertTrue(raw.stdout, raw.stderr)
+            result = json.loads(raw.stdout)
+            self.assertEqual(result['status'], 'PUBLISHED_AND_VERIFIED')
+            self.assertEqual(result['handoff']['status'], 'PENDING')
 
     def test_closeout_validates_and_copies_the_same_frozen_journal_bytes(self):
         with tempfile.TemporaryDirectory() as tmp:

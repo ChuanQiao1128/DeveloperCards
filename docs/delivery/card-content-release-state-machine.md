@@ -31,12 +31,18 @@
 | Unreconciled且有proof | 原动作与job确认 | Verified | 核对当前job/build/live及缓存字节；完整匹配则不再下载 |
 | Verified | 换目录/导出 | Verified | 保存同bundle、journal确认时间、proof和原CDN字节 |
 | Verified | finalize | Finalized | 冻结4文件后验证；零网络/模型调用，同字节幂等 |
+| Finalized | 登记成功 | Finalized + Registered | 当前接续版本必须是原基线或同一发布；同步回执与基线指针，原子更新session-state |
+| Finalized | 登记失败 | Finalized + Pending | 发布已核验及收尾文件保留；命令退出码1，排查后重跑同一finalize，只补登记 |
 
 不变量：owner和实际bearer必须一致；baseline/live、bundle、logical key、payload不可重基或替换；全量UID/顺序/hash/schema/revision/双语绑定保持；过期凭证不授权新写入。已完成历史收尾可接受已过期原凭证，但必须有完整匹配的完成journal，不能据此重新发布。所有恢复动作先查询；job SUCCESS单独不构成公开交付成功。
 
 非法转移：v1新capture、基线变化后导入、未确认import就review、未确认review就publish、未查询就重放、换key绕过错误、异主或截断备份、失配receipt/proof/字节、旧标签覆盖新journal、不同收尾结果覆盖旧归档。全部停止，保留原记录。
 
 持久化：owner scoped IDB journal CAS；proof/原字节绑定owner/release/canonical bundle；支持时owner Web Lock跨CAS及目录写入。四文件逐个原生提交，非整组事务，partial结果由finalize拒绝。完成目录按owner/release哈希命名；外部目录句柄需浏览器持续授权，缺能力时使用单文件导出。finalize临时冻结原字节，逐文件原子禁止覆盖写入。
+
+接续登记使用`session-state.publication.lock`串行化比较和原子替换；不按核验时间推断发布先后。只更新本批内容回执和接续指针，不变更代码交付、下一批选择、自动化授权或手机安装状态。未知、损坏或相互矛盾的当前指针保留原字节并停止登记；同一发布必须匹配release/job/build/内容及bundle哈希。登记失败不是发布失败，不授权再次发布。
+
+锁协议适用于所有接续记录写入方：工作流维护同样调用`repair_release.update_session_state`，在锁内读取、合并、原子替换。禁止直接覆盖JSON；占锁停止并稍后重试。协作锁不能约束绕过协议的任意外部编辑器，写前字节比较仅补充检测。
 
 回归清单：正常3动作；基线变化；超时/503/队列未知；重复与非法事件；刷新/上传恢复；ACTION_NOT_FOUND原字节重放；身份切换；存储失败；多标签CAS/保存锁；缓存字节失配；确认时间不同；完成换目录；导出→finalize；篡改/部分文件；相同结果幂等及源文件并发变化。单元测试与真实浏览器合成API演练分别记录，不充当生产或语义审查证明。
 
