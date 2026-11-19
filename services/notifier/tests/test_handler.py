@@ -420,3 +420,53 @@ class TestR18bFixes:
         out = capsys.readouterr().out
         assert metric_names(out) == ["NotificationsSent"]
         assert "report_failed" not in [line.get("event") for line in log_lines(out)]
+
+
+def publish_event(stage="build"):
+    return {"v": 1, "eventType": "content_publish_failure", "jobId": "synthetic-release-job", "stage": stage}
+
+
+def test_publish_failure_event_prepares_exact_job_then_uses_existing_ses_and_report(env):
+    mail = message(kind="exception", subkind=handler.CONTENT_PUBLISH_EVENT, mode="off", subject="[DeveloperCards] Publication failed")
+    env.core.prepare_data = {"notification": mail}
+    env.stub.add_response("send_email", {"MessageId": "ses-content"}, expected_params(subject=mail["subject"], kind="exception", mode="off"))
+    result = handler.lambda_handler(sqs(record(publish_event())), Context())
+    env.stub.assert_no_pending_responses()
+    assert result == {"batchItemFailures": []}
+    prepare = [r for r in env.core.requests if r.json().get("operation") == "prepare-content-publish"]
+    assert len(prepare) == 1
+    assert prepare[0].json() == {"v": 1, "operation": "prepare-content-publish", "jobId": "synthetic-release-job", "stage": "build"}
+    assert verify_signature(prepare[0], (SECRET,))
+    assert env.core.reports()[0]["status"] == "sent"
+
+
+@pytest.mark.parametrize("status", [409, 503])
+def test_publish_failure_prepare_errors_retain_sqs_event(env, status):
+    env.core.prepare_status = status
+    assert handler.lambda_handler(sqs(record(publish_event())), Context()) == {"batchItemFailures": [{"itemIdentifier": "sqs-1"}]}
+    assert env.core.reports() == []
+
+
+def test_resolved_or_sent_publish_event_is_acknowledged_without_ses(env):
+    env.core.prepare_data = {"skip": True}
+    assert handler.lambda_handler(sqs(record(publish_event("dispatch"))), Context()) == {"batchItemFailures": []}
+    assert env.core.reports() == []
+
+
+def test_permanent_publish_mail_failure_is_preserved_for_notify_dlq(env):
+    mail = message(kind="exception", subkind=handler.CONTENT_PUBLISH_EVENT, mode="off")
+    env.core.prepare_data = {"notification": mail}
+    env.stub.add_client_error("send_email", service_error_code="MessageRejected", service_message="synthetic rejection", http_status_code=400)
+    assert handler.lambda_handler(sqs(record(publish_event(), receive=5)), Context()) == {"batchItemFailures": [{"itemIdentifier": "sqs-1"}]}
+    assert env.core.reports()[0]["status"] == "failed"
+    env.core.prepare_data = {"failed": True}
+    assert handler.lambda_handler(sqs(record(publish_event(), receive=6)), Context()) == {"batchItemFailures": [{"itemIdentifier": "sqs-1"}]}
+    assert len(env.core.reports()) == 1
+
+
+@pytest.mark.parametrize("overrides", [{"jobId": ""}, {"stage": "bogus"}, {"v": True}])
+def test_malformed_publish_event_is_not_silently_lost(env, overrides):
+    event = publish_event()
+    event.update(overrides)
+    assert handler.lambda_handler(sqs(record(event)), Context()) == {"batchItemFailures": [{"itemIdentifier": "sqs-1"}]}
+    assert env.core.requests == []

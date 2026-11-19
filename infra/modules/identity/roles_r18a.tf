@@ -120,7 +120,7 @@ resource "aws_iam_role_policy" "automation_scheduler" {
   })
 }
 
-# Only core-vpc enqueues rendered emails; the worker gets nothing.
+# Core renders emails; the worker may enqueue job/stage failure wake-ups to the same queue.
 resource "aws_iam_role_policy" "core_vpc_notify_send" {
   name = "developercards-core-vpc-notify-send"
   role = aws_iam_role.core_vpc.id
@@ -130,6 +130,20 @@ resource "aws_iam_role_policy" "core_vpc_notify_send" {
       Sid      = "SqsSendNotify"
       Effect   = "Allow"
       Action   = ["sqs:SendMessage", "sqs:GetQueueAttributes"]
+      Resource = [local.notify_queue_arn]
+    }]
+  })
+}
+
+resource "aws_iam_role_policy" "worker_notify_send" {
+  name = "developercards-worker-notify-send"
+  role = aws_iam_role.worker.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Sid      = "SqsSendNotifyEvent"
+      Effect   = "Allow"
+      Action   = ["sqs:SendMessage"]
       Resource = [local.notify_queue_arn]
     }]
   })
