@@ -212,6 +212,6 @@ describe('the console shell is everywhere and owns sign-out', () => {
     expect(await screen.findByRole('heading', { name: 'New Card' })).not.toBeNull();
     // The shell's controls the page never used to have.
     expect(screen.getByRole('button', { name: 'Sign out' })).not.toBeNull();
-    expect(screen.getByRole('link', { name: 'Decks' })).not.toBeNull();
+    expect(screen.getByRole('link', { name: 'Decks & publishing' })).not.toBeNull();
   });
 });

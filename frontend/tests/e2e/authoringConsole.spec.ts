@@ -418,8 +418,19 @@ async function stubHitlApi(page: Page): Promise<{ seen: string[]; unexpected: st
     if (path === '/api/v1/admin/decks') return body(ok({ items: [], nextCursor: null, hasMore: false }));
     if (path === '/api/v1/admin/manifest') return body(ok(MANIFEST));
     if (path === '/api/v1/authoring/publish/jobs') return body(ok([]));
-    // Review queue and AI QA without a deck: the deck picker.
+    // Review and QA keep the selected deck when following the contextual link.
     if (path === '/api/v1/authoring/decks') return body(ok([DECK]));
+    if (path === '/api/v1/authoring/cards/page') return body(ok({ items: [], nextCursor: null, hasMore: false }));
+    if (path === '/api/v1/authoring/drafts' || path === '/api/v1/authoring/qa/runs') return body(ok({ items: [], nextCursor: null }));
+    if (path === '/api/v1/authoring/qa/status') return body(ok({
+      enabled: false, required: false, changedCards: 0, reviewedCurrent: 0, missing: [], openBlockers: [], wouldBlock: false,
+      limits: { maxCards: 200, dailyUsdCap: 10, spentTodayUsd: 0, reservedTodayUsd: 0, estUsdPerCard: 0 },
+    }));
+    if (path === '/api/v1/admin/card-embeddings/status') return body(ok({ engine: 'vector', cards: 1, embedded: 1, stale: 0 }));
+    if (path === `/api/v1/admin/decks/${DECK.id}/semantic-duplicates`) return body(ok({ engine: 'vector', minCosine: 0.9, pairs: [] }));
+    // The ledger link remains reachable when automation status is unavailable.
+    if (path === '/api/v1/admin/operations/overview' || path === '/api/v1/admin/automation/status')
+      return body(JSON.stringify({ success: false, data: null, error: { code: 'SERVER_NOT_READY_AUTOMATION' } }));
     // Automation ledger.
     if (path === '/api/v1/admin/automation/ledger') return body(ok(LEDGER_REPORT));
     if (path === '/api/v1/admin/automation/baselines') return body(ok({ items: [] }));
@@ -461,10 +472,10 @@ test('each HITL route loads its own chunk from the built bundle and renders its 
   await expect(nav).toBeVisible();
 
   const routes = [
-    { link: 'Review queue', url: '/review', heading: 'Review queue', chunk: /ReviewQueuePage-.*\.js$/ },
-    { link: 'AI QA', url: '/decks/qa', heading: 'AI QA', chunk: /DeckQaPage-.*\.js$/ },
-    { link: 'Automation ledger', url: '/ledger', heading: 'Automation ledger', chunk: /LedgerPage-.*\.js$/ },
-    { link: 'Webhooks', url: '/admin/webhooks', heading: 'Webhooks', chunk: /WebhooksPage-.*\.js$/ },
+    { via: ['Needs attention'], link: 'AI draft review', url: '/review', heading: 'AI draft review', chunk: /ReviewQueuePage-.*\.js$/ },
+    { via: [], link: 'AI QA', url: '/decks/qa', heading: 'AI QA', chunk: /DeckQaPage-.*\.js$/ },
+    { via: ['System', 'Automation'], link: 'Automation ledger', url: '/ledger', heading: 'Automation ledger', chunk: /LedgerPage-.*\.js$/ },
+    { via: ['System'], link: 'Integrations', url: '/admin/webhooks', heading: 'Webhooks', chunk: /WebhooksPage-.*\.js$/ },
   ];
 
   // None of the four is in the first-load closure, so each assertion below
@@ -474,8 +485,15 @@ test('each HITL route loads its own chunk from the built bundle and renders its 
   }
 
   for (const route of routes) {
-    await page.getByRole('navigation', { name: 'Console sections' }).getByRole('link', { name: route.link, exact: true }).click();
-    await expect(page).toHaveURL(`http://localhost:5173${route.url}`);
+    for (const name of route.via) await page.getByRole('link', { name, exact: true }).click();
+    if (route.link === 'AI QA') {
+      await page.locator(`a[href="/review?deckId=${DECK.id}"]`).click();
+      await page.getByRole('link', { name: 'AI QA', exact: true }).click();
+    } else {
+      await page.getByRole('link', { name: route.link, exact: true }).click();
+    }
+    if (route.link === 'AI QA') await expect(page).toHaveURL(/\/decks\/qa\?deckId=\d+/);
+    else await expect(page).toHaveURL(`http://localhost:5173${route.url}`);
     await expect(page.getByRole('heading', { level: 1, name: route.heading, exact: true })).toBeVisible();
     await expect(page.getByText('This page did not finish loading')).toHaveCount(0);
 
@@ -494,9 +512,11 @@ test('each HITL route loads its own chunk from the built bundle and renders its 
       `${route.link}: axe violations`,
     ).toEqual([]);
     // The header marks this page as the current section (frontend-console-27).
+    const area = route.url === '/review' ? 'Needs attention'
+      : route.link === 'AI QA' ? 'Decks & publishing' : 'System';
     await expect(
-      page.getByRole('navigation', { name: 'Console sections' }).getByRole('link', { name: route.link, exact: true }),
-    ).toHaveAttribute('aria-current', 'page');
+      page.getByRole('navigation', { name: 'Console sections' }).getByRole('link', { name: area, exact: true }),
+    ).toHaveAttribute('aria-current', 'location');
   }
 
   expect(api.seen).toContain('/api/v1/admin/automation/baselines');

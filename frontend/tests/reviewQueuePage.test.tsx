@@ -107,7 +107,7 @@ describe('ReviewQueuePage', () => {
   it('offers a deck picker when no deckId is given', async () => {
     renderAt(<ReviewQueuePage />, ['/review']);
 
-    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Review queue');
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('AI draft review');
     expect(screen.getByText('Choose a deck to review its AI drafts.')).toBeTruthy();
     const link = await screen.findByRole('link', { name: /AWS Solutions Architect Associate/ });
     expect(link.getAttribute('href')).toBe('/review?deckId=7');
@@ -427,8 +427,8 @@ describe('ReviewQueuePage', () => {
     expect(confirmSpy).not.toHaveBeenCalled();
   });
 
-  it('names the route Review queue and links it from the shell', () => {
-    expect(documentTitleFor('/review')).toBe('Review queue · DeveloperCards Console');
+  it('names the AI draft route and preserves its deck-scoped destination', () => {
+    expect(documentTitleFor('/review')).toBe('AI draft review · DeveloperCards Console');
 
     function shell(href?: string) {
       return render(
@@ -441,7 +441,7 @@ describe('ReviewQueuePage', () => {
     }
 
     shell('/review?deckId=7');
-    const link = screen.getByRole('link', { name: 'Review queue' });
+    const link = screen.getByRole('link', { name: 'Needs attention' });
     expect(link.getAttribute('href')).toBe('/review?deckId=7');
     expect(link.tagName).toBe('A');
     expect(link.getAttribute('aria-current')).toBe('page');
@@ -449,7 +449,7 @@ describe('ReviewQueuePage', () => {
     cleanup();
 
     shell(undefined);
-    expect(screen.queryByRole('link', { name: 'Review queue' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Needs attention' })).toBeNull();
   });
 
   it('guards unsaved edits against header links, reload and the status filter (frontend-console-19)', async () => {

@@ -584,17 +584,19 @@ export function ReviewQueuePage() {
   return (
     <ConsoleShell
       title={CONSOLE_NAME}
-      subtitle="Authoring · Review queue"
-      {...consoleNav({ reviewHref, qaHref: deckId === null ? '/decks/qa' : qaPageHref(deckId) })}
+      subtitle="AI draft review"
+      {...consoleNav({ reviewHref })}
     >
       <div>
-        <h1 className={H1_CLASS}>Review queue</h1>
+        <h1 className={H1_CLASS}>AI draft review</h1>
         {deck ? (
           <div className="text-xs text-slate-600 mt-0.5">
             {deck.title} · <span className="font-mono">{deck.slug}</span> ·{' '}
             <Link to={`/decks/cards?deckId=${deck.id}`} className="text-indigo-600 underline">
               Cards
             </Link>
+            {' · '}
+            <Link to={qaPageHref(deck.id)} className="text-indigo-700 underline">AI QA</Link>
           </div>
         ) : null}
       </div>

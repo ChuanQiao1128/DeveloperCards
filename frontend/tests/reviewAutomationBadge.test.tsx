@@ -213,11 +213,11 @@ describe('review queue automation', () => {
     expect(normalizeDraftSummary({ draftId: 41 })?.automation).toBeNull();
   });
 
-  it('links the Automation page from the review queue header', async () => {
+  it('offers the System area from the review queue header', async () => {
     await openReview();
 
     const nav = screen.getByRole('navigation', { name: 'Console sections' });
-    const link = within(nav).getByRole('link', { name: 'Automation' });
-    expect(link.getAttribute('href')).toBe('/automation');
+    const link = within(nav).getByRole('link', { name: 'System' });
+    expect(link.getAttribute('href')).toBe('/operations');
   });
 });

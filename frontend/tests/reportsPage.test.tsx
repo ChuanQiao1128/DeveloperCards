@@ -112,7 +112,7 @@ afterEach(() => {
 
 describe('ReportsPage', () => {
   it('is a named console section with its own tab title', () => {
-    expect(documentTitleFor('/reports')).toBe('Card reports · DeveloperCards Console');
+    expect(documentTitleFor('/reports')).toBe('Card feedback · DeveloperCards Console');
     expect(consoleSectionFor('/reports')).toBe('reports');
   });
 
@@ -120,9 +120,9 @@ describe('ReportsPage', () => {
     await mountLoaded();
     expect(api.listCardReports).toHaveBeenCalledWith({ status: 'open', deckId: null, cursor: null });
 
-    expect(screen.getByRole('heading', { level: 1, name: 'Card reports' })).toBeTruthy();
-    const nav = screen.getByRole('navigation', { name: 'Console sections' });
-    expect(within(nav).getByRole('link', { name: 'Reports' }).getAttribute('aria-current')).toBe('page');
+    expect(screen.getByRole('heading', { level: 1, name: 'Card feedback' })).toBeTruthy();
+    const nav = screen.getByRole('navigation', { name: 'Needs attention pages' });
+    expect(within(nav).getByRole('link', { name: 'Card feedback' }).getAttribute('aria-current')).toBe('page');
 
     const table = screen.getByRole('table', { name: 'Card reports' });
     const headers = within(table)

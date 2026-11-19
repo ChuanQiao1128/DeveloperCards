@@ -252,8 +252,8 @@ export function ReportsPage() {
   const noteHelpId = 'reports-resolve-note-help';
 
   return (
-    <ConsoleShell title={CONSOLE_NAME} subtitle="Card reports" {...consoleNav()}>
-      <h1 className={H1_CLASS}>Card reports</h1>
+    <ConsoleShell title={CONSOLE_NAME} subtitle="Card feedback" {...consoleNav()}>
+      <h1 className={H1_CLASS}>Card feedback</h1>
       <p className="text-sm text-slate-600">
         Problems learners reported on published cards, signed in or not. Fix the card in the editor, then resolve the
         report.

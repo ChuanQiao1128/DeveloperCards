@@ -134,11 +134,11 @@ describe('AutomationPage', () => {
 
     mountAt('/automation');
     await screen.findByTestId('automation-mode-banner');
-    const nav = screen.getByRole('navigation', { name: 'Console sections' });
+    const nav = screen.getByRole('navigation', { name: 'System pages' });
     const link = within(nav).getByRole('link', { name: 'Automation' });
     expect(link.getAttribute('href')).toBe('/automation');
     expect(link.getAttribute('aria-current')).toBe('page');
-    expect(within(nav).getByRole('link', { name: 'Automation ledger' }).getAttribute('aria-current')).toBeNull();
+    expect(screen.getByRole('link', { name: 'Automation ledger' }).getAttribute('href')).toBe('/ledger');
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Automation');
   });
 
@@ -172,8 +172,10 @@ describe('AutomationPage', () => {
   it('opens the tab a deep link names', async () => {
     mountAt('/automation?tab=email');
     await waitFor(() => expect(api.listNotifications).toHaveBeenCalledWith({ kind: undefined, status: undefined, limit: 50 }));
-    const tabs = screen.getByRole('navigation', { name: 'Automation tabs' });
-    expect(within(tabs).getByRole('link', { name: 'Email log' }).getAttribute('aria-current')).toBe('page');
+    const tabs = screen.getByRole('navigation', { name: 'System pages' });
+    expect(within(tabs).getByRole('link', { name: 'Notifications' }).getAttribute('aria-current')).toBe('page');
+    expect(screen.queryByTestId('automation-mode-banner')).toBeNull();
+    expect(api.fetchAutomationStatus).not.toHaveBeenCalled();
     expect(await screen.findByText(notificationFixture().subject)).toBeTruthy();
     expect(api.listAutomationRuns).not.toHaveBeenCalled();
     cleanup();
@@ -244,7 +246,8 @@ describe('AutomationPage', () => {
     signInAsEditor();
     for (const tab of ['overview', 'runs', 'decisions', 'queue', 'watch', 'email']) {
       mountAt(`/automation?tab=${tab}`);
-      await screen.findByTestId('automation-mode-banner');
+      if (tab === 'email') await screen.findByRole('heading', { name: 'Notifications' });
+      else await screen.findByTestId('automation-mode-banner');
       await settle();
       await settle();
       for (const name of MUTATING) {

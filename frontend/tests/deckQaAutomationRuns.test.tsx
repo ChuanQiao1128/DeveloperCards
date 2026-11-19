@@ -125,7 +125,7 @@ describe('AI QA runs started by the automation', () => {
     const recheckRow = within(section).getByRole('button', { name: 'View run run-r' }).closest('tr') as HTMLElement;
     expect(within(mirrorRow).getByTestId('qa-run-origin').textContent).toBe('Automation — auto-accepted draft');
     expect(within(recheckRow).getByTestId('qa-run-origin').textContent).toBe('Automation — source re-check');
-    expect(screen.getByRole('link', { name: 'Automation' }).getAttribute('href')).toBe('/automation');
+    expect(screen.getByRole('link', { name: 'AI draft review' }).getAttribute('href')).toBe('/review?deckId=7');
   });
 
   it('leaves a human run unlabelled', async () => {

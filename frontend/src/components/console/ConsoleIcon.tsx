@@ -3,7 +3,7 @@ import type { ConsoleSection } from './consoleNav';
 type IconName = ConsoleSection | 'menu' | 'close' | 'signOut' | 'chevron';
 
 const paths: Record<IconName, string> = {
-  overview: 'M3 3h7v7H3z M14 3h7v7h-7z M3 14h7v7H3z M14 14h7v7h-7z',
+  attention: 'M4 4h16l2 12v4H2v-4z M2 16h6l2 2h4l2-2h6',
   decks: 'M4 4h12v14H4z M8 21h12V7 M7 8h6 M7 12h6',
   review: 'M9 4H5v17h14V4h-4 M9 3h6v4H9z M8 14l3 3 5-6',
   qa: 'M8 3h8 M10 3v6l-6 10a1 1 0 0 0 1 2h14a1 1 0 0 0 1-2L14 9V3 M8 14h8',

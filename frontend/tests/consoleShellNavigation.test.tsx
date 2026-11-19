@@ -58,11 +58,11 @@ describe('responsive console navigation', () => {
   it('keeps real destination links, closes on navigation and updates the active section', () => {
     mount();
     const { drawer, trigger } = openDrawer();
-    const review = within(drawer).getByRole('link', { name: 'Review queue' });
-    expect(review.getAttribute('href')).toBe('/review');
+    const review = within(drawer).getByRole('link', { name: 'Needs attention' });
+    expect(review.getAttribute('href')).toBe('/needs-attention');
     fireEvent.click(review);
     expect(screen.queryByRole('dialog')).toBeNull();
-    expect(screen.getByRole('link', { name: 'Review queue' }).getAttribute('aria-current')).toBe('page');
+    expect(screen.getByRole('link', { name: 'Needs attention' }).getAttribute('aria-current')).toBe('page');
     expect(document.activeElement).toBe(trigger);
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
     expect(screen.getByRole('link', { name: 'Skip to content' }).getAttribute('href')).toBe('#console-main');
@@ -71,12 +71,10 @@ describe('responsive console navigation', () => {
   it('removes privileged links from the open drawer when the current session becomes an editor', () => {
     mount();
     const { drawer } = openDrawer();
-    expect(within(drawer).getByRole('link', { name: 'Admin Management' })).toBeTruthy();
+    expect(within(drawer).getByRole('link', { name: 'App users' })).toBeTruthy();
     act(() => { signInAsEditor(); });
-    for (const name of ['Overview', 'Operations', 'Learners', 'Webhooks', 'Admin Management']) {
-      expect(within(drawer).queryByRole('link', { name })).toBeNull();
-    }
-    expect(within(drawer).getByRole('link', { name: 'Review queue' })).toBeTruthy();
-    expect(within(drawer).queryByRole('group', { name: 'System navigation' })).toBeNull();
+    expect(within(drawer).queryByRole('link', { name: 'App users' })).toBeNull();
+    expect(within(drawer).getByRole('link', { name: 'Needs attention' }).getAttribute('href')).toBe('/reports');
+    expect(within(drawer).getByRole('link', { name: 'System' }).getAttribute('href')).toBe('/automation');
   });
 });

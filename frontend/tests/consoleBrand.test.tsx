@@ -108,8 +108,8 @@ describe('one console name', () => {
     expect(documentTitleFor('/decks/cards/new')).toBe('New card · DeveloperCards Console');
     expect(documentTitleFor('/decks/cards/edit')).toBe('Edit card · DeveloperCards Console');
     expect(documentTitleFor('/decks/cards/import')).toBe('Import cards · DeveloperCards Console');
-    expect(documentTitleFor('/admin/users')).toBe('Users & permissions · DeveloperCards Console');
-    expect(documentTitleFor('/learners')).toBe('User management · DeveloperCards Console');
+    expect(documentTitleFor('/admin/users')).toBe('Administrators & permissions · DeveloperCards Console');
+    expect(documentTitleFor('/learners')).toBe('App users · DeveloperCards Console');
     expect(documentTitleFor('/learners/observed-1')).toBe('User profile · DeveloperCards Console');
     // A trailing slash names the same page.
     expect(documentTitleFor('/decks/new/')).toBe('New deck · DeveloperCards Console');

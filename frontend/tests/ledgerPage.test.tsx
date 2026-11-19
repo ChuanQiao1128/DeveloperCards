@@ -393,7 +393,7 @@ describe('LedgerPage', () => {
     expect(screen.getByText('Only a super_admin can change baselines.')).toBeTruthy();
     expect(within(screen.getByTestId('ledger-baselines-table')).getByText('AI QA review')).toBeTruthy();
     expect(screen.queryByRole('link', { name: 'Admin Management' })).toBeNull();
-    expect(screen.getByRole('link', { name: 'Automation ledger' }).getAttribute('href')).toBe('/ledger');
+    expect(screen.getByRole('link', { name: 'Automation' }).getAttribute('href')).toBe('/automation');
   });
 
   it('checks the date range before asking the server', async () => {
@@ -564,7 +564,7 @@ describe('LedgerPage', () => {
     expect(text).toContain('A rejected AI draft is not a defect caught');
   });
 
-  it('names the route Automation ledger and links it from the shell', () => {
+  it('names the ledger route and places it in System', () => {
     expect(documentTitleFor('/ledger')).toBe('Automation ledger · DeveloperCards Console');
 
     function shell(href?: string) {
@@ -578,7 +578,7 @@ describe('LedgerPage', () => {
     }
 
     shell('/ledger');
-    const link = screen.getByRole('link', { name: 'Automation ledger' });
+    const link = screen.getByRole('link', { name: 'System' });
     expect(link.getAttribute('href')).toBe('/ledger');
     expect(link.tagName).toBe('A');
     expect(link.getAttribute('aria-current')).toBe('page');
@@ -586,7 +586,7 @@ describe('LedgerPage', () => {
     cleanup();
 
     shell(undefined);
-    expect(screen.queryByRole('link', { name: 'Automation ledger' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'System' })).toBeNull();
   });
 
   it('splits hours saved into live and inferred history, and measured and default baselines (automation-11)', async () => {
