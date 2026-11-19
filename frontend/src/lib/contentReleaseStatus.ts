@@ -47,8 +47,10 @@ export function publicationStatus(session: ReleaseSession | null, verified: bool
   if (job.manifestState === 'needs_attention') return { ...current, kind: 'attention', tone: 'warning', title: 'Index delivery needs attention',
     description: 'The card build is ready, but index delivery retries are exhausted. Public availability has not been verified.' };
   if (job.cdnVerificationState === 'needs_attention') return { ...current, kind: 'attention', tone: 'warning', title: 'CDN verification needs attention',
-    description: 'The background verifier exhausted its attempts. The existing build and its diagnostics are retained.' };
-  if (job.status === 'SUCCESS' && job.cdnVerificationState && !verified) return {
+    description: job.cdnVerificationError === 'CDN_RECEIPT_OVERDUE'
+      ? 'The server has not received the verification result. Inspect the notification queue for this job.'
+      : 'The background verifier exhausted its attempts. The existing build and its diagnostics are retained.' };
+  if (job.status === 'SUCCESS' && job.manifestState === 'delivered' && job.cdnVerificationState && !verified) return {
     ...current, kind: 'background_verification', tone: 'info', title: 'Background CDN verification',
     description: 'The server continues this check after you close the page. Check publication status for the saved receipt.',
   };

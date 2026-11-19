@@ -101,6 +101,7 @@ public sealed class ContentReleaseTests(PostgresFixture db)
   [InlineData("superseded")]
   [InlineData("queue unavailable")]
   [InlineData("bad CDN bytes")]
+  [InlineData("receipt overdue")]
   public async Task ReviewedArtifact_CanBeVerifiedByTheBackgroundCallback(string scenario)
   {
     const string queueEnv = "AUTOMATION_NOTIFY_QUEUE_URL";
@@ -154,14 +155,23 @@ public sealed class ContentReleaseTests(PostgresFixture db)
       Vpc.Authoring.Publish.TestControlledManifestRebuild = _ => Task.CompletedTask;
       var prepared = JsonSerializer.SerializeToElement(await ContentCdnVerification.PrepareAsync(conn, jid));
       Assert.Equal(build, prepared.GetProperty("buildId").GetString());
+      var rows = await DbUtil.QueryAsync(conn, null, "select job_id from deck_publishes where job_id=$1", [jid]);
+      if (scenario == "receipt overdue")
+      {
+        await DbUtil.ExecuteAsync(conn, null, """
+          update publish_cdn_verification set requested_at=clock_timestamp()-interval '21 minutes' where job_id=$1
+          """, [jid]);
+        await PublishCdnVerification.AnnotateAsync(conn, rows);
+        Assert.Equal("needs_attention", rows[0]["cdnVerificationState"]);
+        Assert.Equal("CDN_RECEIPT_OVERDUE", rows[0]["cdnVerificationError"]);
+      }
       if (scenario == "superseded")
         await DbUtil.ExecuteAsync(conn, null, "update decks set release_generation=release_generation+1 where id=$1", [id]);
       var result = JsonSerializer.SerializeToElement(await ContentCdnVerification.RecordAsync(conn, jid,
         JsonSerializer.SerializeToElement(new { buildId = build, sha256 = sha, failure = scenario == "bad CDN bytes" ? "HASH_MISMATCH" : null })));
       Assert.True(result.GetProperty(scenario == "superseded" ? "skip" : "recorded").GetBoolean());
-      var rows = await DbUtil.QueryAsync(conn, null, "select job_id from deck_publishes where job_id=$1", [jid]);
       await PublishCdnVerification.AnnotateAsync(conn, rows);
-      Assert.Equal(scenario switch { "verified" => "verified", "bad CDN bytes" => "needs_attention", _ => "pending" }, rows[0]["cdnVerificationState"]);
+      Assert.Equal(scenario switch { "verified" or "receipt overdue" => "verified", "bad CDN bytes" => "needs_attention", _ => "pending" }, rows[0]["cdnVerificationState"]);
       Assert.Equal(scenario == "bad CDN bytes", alert);
       if (scenario == "verified")
         Assert.True(JsonSerializer.SerializeToElement(await ContentCdnVerification.PrepareAsync(conn, jid)).GetProperty("skip").GetBoolean());

@@ -30,7 +30,7 @@ internal static class MigrationDiagnostics
         ('user_draw_meta'),('user_wallet'),('user_deck_wallet'),('user_premium_state'),
         ('rc_webhook_events'),('card_reports'),('revenuecat_deletions'),('account_deletions'),
         ('decks'),('cards'),('deck_publishes'),('content_review_receipts'),('content_review_revocations'),
-        ('content_rollback_actions'),('publish_dispatch'),('publish_manifest_delivery'),('card_embeddings')) v(name)
+        ('content_rollback_actions'),('publish_dispatch'),('publish_manifest_delivery'),('publish_cdn_verification'),('card_embeddings')) v(name)
       left join pg_class c on c.oid=to_regclass('public.'||v.name) order by v.name
       """, []);
     var functions = await QueryAsync(conn, null, """

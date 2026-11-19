@@ -5,6 +5,8 @@ namespace RecallSmith.Lambda.Db;
 public static class PublishCdnVerification
 {
   public const string EventType = "content_cdn_verification";
+  // Initial delay plus the five receives on the existing notify queue normally fit within 15 minutes.
+  private const string ReceiptOverdue = "CDN_RECEIPT_OVERDUE";
 
   public static async Task<bool> ReadyAsync(NpgsqlConnection conn, NpgsqlTransaction? tx = null) =>
     await DbUtil.ExecuteScalarAsync(conn, tx, "select to_regclass('public.publish_cdn_verification') is not null", []) is true;
@@ -25,7 +27,10 @@ public static class PublishCdnVerification
   public static async Task WakeAsync(NpgsqlConnection conn, NpgsqlTransaction tx, string jobId)
   {
     if (await ReadyAsync(conn, tx) &&
-        await DbUtil.ExecuteScalarAsync(conn, tx, "select exists(select 1 from publish_cdn_verification where job_id=$1)", [jobId]) is true)
+        await DbUtil.ExecuteAsync(conn, tx, """
+          update publish_cdn_verification set requested_at=clock_timestamp()
+          where job_id=$1 and requested_at is null
+          """, [jobId]) == 1)
       await ContentPublishFailureEvents.EnqueueEventAsync(jobId, EventType, "verification", 75);
   }
 
@@ -33,9 +38,11 @@ public static class PublishCdnVerification
   {
     if (jobs.Count == 0 || !await ReadyAsync(conn)) return;
     var rows = await DbUtil.QueryAsync(conn, null, """
-      select job_id,sha256,card_count,verified_at,failure_code
+      select job_id,sha256,card_count,verified_at,
+        coalesce(failure_code,case when requested_at < clock_timestamp() - interval '20 minutes'
+          and verified_at is null then $2 end) as failure_code
       from publish_cdn_verification where job_id=any($1::varchar[])
-      """, [jobs.Select(row => (string)(row.GetValueOrDefault("jobId") ?? row["job_id"])!).ToArray()]);
+      """, [jobs.Select(row => (string)(row.GetValueOrDefault("jobId") ?? row["job_id"])!).ToArray(), ReceiptOverdue]);
     var byId = rows.ToDictionary(row => (string)row["job_id"]!);
     foreach (var job in jobs)
     {
