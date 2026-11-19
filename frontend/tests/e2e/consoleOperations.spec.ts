@@ -207,8 +207,8 @@ test('publishing issues show verified stages and return to the affected deck at 
   await page.getByRole('link', { name: 'Needs attention', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Publishing issues', level: 1 })).toBeVisible();
   await expect(page.getByText('Build failed', { exact: true })).toBeVisible();
-  await expect(page.getByText('Failed · 2026-11-19 09:12:00 UTC')).toBeVisible();
-  await expect(page.getByText('Submitted · 2026-11-19 09:10:00 UTC')).toBeVisible();
+  await expect(page.getByText('Failed · 19 Nov 2026, 22:12:00 NZDT')).toBeVisible();
+  await expect(page.getByText('Submitted · 19 Nov 2026, 22:10:00 NZDT')).toBeVisible();
   await expect(page.getByText('Still queued')).toHaveCount(0);
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
   await page.screenshot({ path: testInfo.outputPath('publishing-issues-desktop.png') });

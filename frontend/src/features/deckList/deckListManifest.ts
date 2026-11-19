@@ -52,13 +52,6 @@ export type ManifestMeta = {
   deckCount?: number;
 };
 
-export function safeDateTime(value: unknown): string {
-  if (value === undefined || value === null || value === '') return '—';
-  const d = new Date(value as string | number | Date);
-  if (Number.isNaN(d.getTime())) return '—';
-  return d.toLocaleString();
-}
-
 export function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null;
 }

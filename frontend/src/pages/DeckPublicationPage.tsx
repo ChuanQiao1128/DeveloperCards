@@ -16,7 +16,8 @@ import { PUBLISH_JOBS_HREF, publishJobStage } from '../features/deckList/publish
 import { useConsoleIdentity } from '../hooks/useConsoleIdentity';
 import { useDeck, usePublishDeck } from '../hooks/useDecks';
 import { CONSOLE_NAME } from '../lib/brand';
-import { formatTime, HEADING, LINK, PANEL } from '../lib/consoleOperationsView';
+import { HEADING, LINK, PANEL } from '../lib/consoleOperationsView';
+import { formatDeckTime } from '../lib/deckTime';
 import { hasReviewedDeckRelease } from '../lib/deckWorkspace';
 import { isQaPublishGateCode, qaPageHref } from '../lib/qaGate';
 import type { ApiError } from '../types/api';
@@ -231,7 +232,7 @@ function DeckPublishing({ deck, generation, superAdmin }: { deck: Deck; generati
                   {olderJobs.map(job => <li className="flex flex-wrap items-center justify-between gap-2 py-3 text-sm" key={job.jobId}>
                     <div>
                       <p className="font-medium">{jobLabel(job)}</p>
-                      <p className="text-slate-600">{formatTime(String(new Date(job.createdAt)))}</p>
+                      <p className="text-slate-600">{formatDeckTime(job.createdAt, 'Unknown')}</p>
                     </div>
                     <Link className={LINK} to={jobHref(job.jobId)} aria-label={`View job ${job.jobId}`}>View job</Link>
                   </li>)}

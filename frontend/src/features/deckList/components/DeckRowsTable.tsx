@@ -1,10 +1,10 @@
 // src/features/deckList/components/DeckRowsTable.tsx
 //
 import { Link } from 'react-router-dom';
+import { formatDeckTime } from '../../../lib/deckTime';
 import { hasReviewedDeckRelease } from '../../../lib/deckWorkspace';
 import { isStarterLike } from '../deckListPagination';
 import type { DeckStatus } from '../deckListPagination';
-import { safeDateTime } from '../deckListManifest';
 import type { ConsoleDeckRow } from '../deckListRows';
 
 const DECK_LINK = 'rounded text-left break-words font-semibold text-indigo-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500';
@@ -98,12 +98,12 @@ export function DeckRowsTable({
                 <td className="hidden px-4 py-3 tabular-nums md:table-cell">{row.cardCount}</td>
                 <td className="hidden px-4 py-3 lg:table-cell">{typeBadge(isStarterLike(row.deckType, row.tier) ? 1 : 2)}</td>
                 <td className="hidden whitespace-nowrap px-3 py-3 md:table-cell">{statusBadge(row.status)}</td>
-                <td className="hidden whitespace-nowrap px-4 py-3 text-xs text-slate-600 lg:table-cell">{safeDateTime(row.updatedAt)}</td>
+                <td className="hidden whitespace-nowrap px-4 py-3 text-xs text-slate-600 lg:table-cell">{formatDeckTime(row.updatedAt)}</td>
                 {superAdmin && (
                   <td className="px-3 py-3">
                     <div className="flex flex-wrap items-center gap-2">
                       {hasReviewedDeckRelease(row) ? (
-                        <Link className={DECK_LINK} to={`/decks/publish?deckId=${row.id}`}>Publishing</Link>
+                        <Link className={DECK_LINK} to={`/decks/publish?deckId=${row.id}`}>Open publishing</Link>
                       ) : (
                         <button
                           type="button"

@@ -115,7 +115,7 @@ describe('DeckBuildsPanel', () => {
 
     await screen.findByText('b-old');
     // The live build wears a badge and offers no action.
-    expect(screen.queryByText('Live')).not.toBeNull();
+    expect(screen.getByText('Current version')).toBeTruthy();
     // Exactly one rollback button — for the one non-live build.
     expect(screen.getAllByRole('button', { name: 'Roll back to this build' }).length).toBe(1);
   });
@@ -139,7 +139,7 @@ describe('DeckBuildsPanel', () => {
 
     await waitFor(() => expect(api.rollbackDeck).toHaveBeenCalledTimes(1));
     expect(api.rollbackDeck).toHaveBeenCalledWith(DECK_ID, 'b-old');
-    await screen.findByText('Rolled back. Live build is now b-old.');
+    await screen.findByText('Rolled back. The current version is now b-old.');
   });
 
   it('leaves the live build alone when the rollback is cancelled', async () => {

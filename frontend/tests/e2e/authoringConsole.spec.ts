@@ -833,8 +833,9 @@ test('deck workspace keeps publication and versions scoped to the selected deck'
   await page.addInitScript(([key, value]) => sessionStorage.setItem(key, value), [TOKEN_KEY, superAdminSession()]);
   await page.setViewportSize({ width: 1440, height: 920 });
   await page.goto('/');
-  await expect(page.getByRole('link', { name: 'Publishing', exact: true })).toHaveAttribute('href', '/decks/publish?deckId=15');
+  await expect(page.getByRole('link', { name: 'Open publishing', exact: true })).toHaveAttribute('href', '/decks/publish?deckId=15');
   const deckTable = page.getByRole('table', { name: 'Decks' });
+  await expect(deckTable.getByRole('row', { name: /AWS Basics/ }).getByText('19 Nov 2026, 13:00:00 NZDT')).toBeVisible();
   expect((await deckTable.getByRole('columnheader', { name: 'Updated' }).boundingBox())?.height).toBeLessThan(60);
   await page.screenshot({ path: testInfo.outputPath('deck-list-desktop.png') });
   await page.setViewportSize({ width: 320, height: 780 });
@@ -856,7 +857,7 @@ test('deck workspace keeps publication and versions scoped to the selected deck'
   await expect(title).toHaveValue('Unsaved deck title');
   await nav.getByRole('link', { name: 'Published versions' }).click();
   await page.getByRole('alertdialog').getByRole('button', { name: 'Discard changes' }).click();
-  await expect(page.getByRole('listitem').filter({ hasText: 'v1' }).getByText('Live')).toBeVisible();
+  await expect(page.getByRole('listitem').filter({ hasText: 'v1' }).getByText('Current version')).toBeVisible();
   await nav.getByRole('link', { name: 'Publishing' }).click();
   await expect(page.getByText('No jobs for this deck in the recent publish history.')).toBeVisible();
   await page.getByRole('button', { name: 'Publish deck' }).click();
@@ -884,8 +885,10 @@ test('deck workspace keeps publication and versions scoped to the selected deck'
   expect(requests[3]).toEqual(requests[2]);
 
   await nav.getByRole('link', { name: 'Published versions' }).click();
-  await expect(page.getByRole('listitem').filter({ hasText: 'v2' }).getByText('Live')).toBeVisible();
-  await expect(page.getByRole('listitem').filter({ hasText: 'v1' }).getByText('Live')).toHaveCount(0);
+  const currentVersion = page.getByRole('listitem').filter({ hasText: 'v2' });
+  await expect(currentVersion.getByText('Current version')).toBeVisible();
+  await expect(currentVersion.getByText('19 Nov 2026, 22:58:00 NZDT')).toBeVisible();
+  await expect(page.getByRole('listitem').filter({ hasText: 'v1' }).getByText('Current version')).toHaveCount(0);
   await page.setViewportSize({ width: 320, height: 780 });
   await expect(nav.getByRole('link', { name: 'Published versions' })).toHaveAttribute('aria-current', 'page');
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(320);
