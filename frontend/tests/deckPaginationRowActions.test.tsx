@@ -120,13 +120,13 @@ async function clickRowAction(slug: string, label: string): Promise<void> {
   );
   expect(row, `no row for ${slug}`).not.toBeUndefined();
 
-  const button = Array.from((row as HTMLElement).querySelectorAll('button')).find(
+  const button = Array.from((row as HTMLElement).querySelectorAll('a, button')).find(
     b => (b.textContent ?? '').trim() === label,
   );
-  expect(button, `no ${label} button in the ${slug} row`).not.toBeUndefined();
+  expect(button, `no ${label} action in the ${slug} row`).not.toBeUndefined();
 
   await act(async () => {
-    fireEvent.click(button as HTMLButtonElement);
+    fireEvent.click(button as HTMLElement);
   });
   await settle();
 }
@@ -174,7 +174,7 @@ describe('a paginated row with no id resolves one through the slug', () => {
     await mountConsole();
     expect(locationText()).toBe('/');
 
-    await clickRowAction('deck-1', 'Cards');
+    await clickRowAction('deck-1', 'Title deck-1');
 
     expect(api.fetchDeckBySlug).toHaveBeenCalledTimes(1);
     expect(api.fetchDeckBySlug.mock.calls[0][0]).toBe('deck-1');
@@ -184,14 +184,12 @@ describe('a paginated row with no id resolves one through the slug', () => {
   it('T3b: a second action on the same row reuses the cache and asks nothing', async () => {
     await mountConsole();
 
-    await clickRowAction('deck-1', 'Cards');
+    await clickRowAction('deck-1', 'Title deck-1');
     expect(api.fetchDeckBySlug).toHaveBeenCalledTimes(1);
 
-    await clickRowAction('deck-1', 'Edit');
+    await clickRowAction('deck-1', 'Title deck-1');
 
-    expect(locationText()).toBe('/decks/edit?deckId=7');
-    // Still one. resolvedIdsRef is the whole reason a deck with twelve row
-    // actions costs one lookup rather than twelve.
+    expect(locationText()).toBe('/decks/cards?deckId=7');
     expect(api.fetchDeckBySlug).toHaveBeenCalledTimes(1);
   });
 });
@@ -202,7 +200,7 @@ describe('a paginated row that already carries an id skips the lookup', () => {
     api.fetchDeckBySlug.mockResolvedValue(ok({ id: 9, slug: 'deck-2', title: 'Title deck-2' } as Deck));
 
     await mountConsole();
-    await clickRowAction('deck-2', 'Cards');
+    await clickRowAction('deck-2', 'Title deck-2');
 
     // The control for T3a: without it, "resolves through the slug" would also
     // be satisfied by a page that ignores the id the server sent.
@@ -217,7 +215,7 @@ describe('a lookup that fails says so and stays put', () => {
     api.fetchDeckBySlug.mockResolvedValue(refused<Deck>('NOT_FOUND', 'Deck not found'));
 
     await mountConsole();
-    await clickRowAction('deck-1', 'Cards');
+    await clickRowAction('deck-1', 'Title deck-1');
 
     const alerts = screen.getAllByRole('alert');
     expect(alerts.length).toBeGreaterThan(0);
@@ -226,53 +224,12 @@ describe('a lookup that fails says so and stays put', () => {
     );
     expect(locationText()).toBe('/');
 
-    await clickRowAction('deck-1', 'Cards');
+    await clickRowAction('deck-1', 'Title deck-1');
 
     // Nothing was cached, so the second press is a real second attempt. If the
     // NaN had been written into resolvedIdsRef, this would be 1 and the row
     // would be permanently dead for the rest of the session.
     expect(api.fetchDeckBySlug).toHaveBeenCalledTimes(2);
     expect(locationText()).toBe('/');
-  });
-});
-
-// ---------------------------------------------------------------------------
-// N1/N2 — the two navigation targets the T3 block never exercised.
-//
-// T3a-T3d above all press "Cards" or "Edit", so the `to` lambdas they cover are
-// the ones on the two links in the Actions cell. Two more call sites pass their
-// own lambda and were never pressed by any test: the card-count button in the
-// Cards column (which navigates to the SAME place as the "Cards" link, so a
-// wrong target there is invisible from the Actions cell) and Preview, which is
-// the only route of the four that no other control reaches at all.
-//
-// Appended rather than folded into the T3 cases on purpose: those four are
-// about resolveDeckId's caching and failure behaviour, and adding a navigation
-// target to them would blur what each one is evidence for.
-// ---------------------------------------------------------------------------
-
-describe('the two row targets no other case presses', () => {
-  beforeEach(() => {
-    api.fetchAdminDecksPage.mockResolvedValue(ok(onePage([item('deck-3', 12)])));
-  });
-
-  it('N1: the card-count button opens that deck’s cards', async () => {
-    await mountConsole();
-    expect(locationText()).toBe('/');
-
-    // The button is labelled with the count itself — `totalCards: 3` from the
-    // item() helper above — which is why it is pressed by that name here.
-    await clickRowAction('deck-3', '3');
-
-    expect(locationText()).toBe('/decks/cards?deckId=12');
-    expect(api.fetchDeckBySlug).not.toHaveBeenCalled();
-  });
-
-  it('N2: Preview opens that deck’s preview', async () => {
-    await mountConsole();
-
-    await clickRowAction('deck-3', 'Preview');
-
-    expect(locationText()).toBe('/decks/preview?deckId=12');
   });
 });

@@ -156,13 +156,8 @@ export function usePublishDeck() {
 
   return useMutation(
     {
-      // publishDeck also takes an optional note, and this deliberately does not
-      // forward one: nothing in the console collects a note, so a `note`
-      // variable here would be a parameter no caller can fill. It would also
-      // change the call from publishDeck(id) to publishDeck(id, undefined),
-      // which is a different call as far as every assertion about this
-      // function's arguments is concerned.
-      mutationFn: async ({ id }: { id: number }) => publishDeck(id),
+      mutationFn: async ({ id, actionId }: { id: number; actionId?: string }) =>
+        actionId ? publishDeck(id, undefined, actionId) : publishDeck(id),
       onSuccess: result => {
         if (!result.success) return;
         void queryClient.invalidateQueries({ queryKey: QueryKeys.decks() });

@@ -8,6 +8,8 @@ import { qaPageHref } from '../lib/qaGate';
 import { isSuperAdmin, readSessionUser } from '../auth/sessionUser';
 import { CONSOLE_NAME } from '../lib/brand';
 import { ConsoleShell } from '../components/console/ConsoleShell';
+import { DeckWorkspaceHeader } from '../components/console/DeckWorkspaceHeader';
+import { LINK } from '../lib/consoleOperationsView';
 import { consoleNav } from '../components/console/consoleNav';
 import { RarityBadge } from '../components/RarityBadge';
 import { RarityDistribution } from '../components/RarityDistribution';
@@ -73,7 +75,7 @@ function LoadFailureScreen({
         </Link>
       </div>
 
-      <div className="max-w-4xl mx-auto px-4 py-6">
+      <div className="space-y-4">
         <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded">
           <div className="font-semibold mb-1">Failed to load cards</div>
           <div className="text-sm">{message}</div>
@@ -276,55 +278,16 @@ export function CardListPage() {
   return (
     <ConsoleShell
       title={CONSOLE_NAME}
-      subtitle="Authoring · Cards"
+      subtitle="Cards"
       {...consoleNav()}
     >
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold text-slate-800">
-            Cards · <span className="font-mono text-base">{deck.slug}</span>
-          </h1>
-          <p className="text-xs text-slate-500 mt-1">
-            {deck.title} · {deck.locale} · {deck.deckType === 1 ? 'Starter Deck' : 'Paid Deck'}
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-3">
-          {deck.id === 15 && deck.slug === 'aws-saa-fundamentals' && user?.groups.some(group => group === 'editor' || group === 'super_admin') && <Link className="text-sm text-indigo-700 underline" to="/decks/release?deckId=15">Reviewed release</Link>}
-          <Link className="text-sm text-indigo-700 underline" to={qaPageHref(deckId)}>AI QA</Link>
-          <Link className="text-sm text-indigo-700 underline" to={`/review?deckId=${deckId}`}>AI draft review</Link>
-          <Link to="/" className="text-sm text-slate-600 hover:text-slate-800">
-            ← Back to Decks
-          </Link>
-
-            <button
-              type="button"
-              className="text-sm px-3 py-1.5 rounded-md border border-slate-300 text-slate-700 hover:bg-slate-50"
-              onClick={() => navigate(`/decks/preview?deckId=${deck.id}`)}
-              title="Preview mobile DeckExport JSON"
-            >
-              Preview JSON
-            </button>
-
-            <button
-              type="button"
-              className="text-sm px-3 py-1.5 rounded-md border border-slate-300 text-slate-700 hover:bg-slate-50"
-              onClick={() => navigate(`/decks/cards/import?deckId=${deck.id}`)}
-              title="Paste or load a markdown deck document and reconcile it against this deck"
-            >
-              Import Markdown
-            </button>
-
-            <button
-              type="button"
-              className="inline-flex items-center px-3 py-1.5 rounded-md text-sm font-medium
-                         bg-indigo-600 text-white hover:bg-indigo-700 active:bg-indigo-800
-                         focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-              onClick={() => navigate(`/decks/cards/new?deckId=${deck.id}`)}
-            >
-              + New Card
-            </button>
-          </div>
+      <DeckWorkspaceHeader deck={deck} view="cards" />
+      <div className="flex flex-wrap items-center gap-3">
+        <Link className="inline-flex min-h-11 items-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500" to={`/decks/cards/new?deckId=${deck.id}`}>New card</Link>
+        <Link className={`${LINK} text-sm`} to={`/decks/cards/import?deckId=${deck.id}`}>Import Markdown</Link>
+        <Link className={`${LINK} text-sm`} to={`/decks/preview?deckId=${deck.id}`}>Preview JSON</Link>
+        <Link className={`${LINK} text-sm`} to={qaPageHref(deckId)}>AI QA</Link>
+        <Link className={`${LINK} text-sm`} to={`/review?deckId=${deckId}`}>AI draft review</Link>
       </div>
 
       <div className="max-w-4xl mx-auto px-4 py-6">

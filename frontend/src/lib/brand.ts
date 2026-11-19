@@ -23,6 +23,8 @@ const ROUTE_TITLES: Record<string, string> = {
   '/': 'Decks',
   '/decks/new': 'New deck',
   '/decks/edit': 'Edit deck',
+  '/decks/publish': 'Publishing',
+  '/decks/versions': 'Published versions',
   '/decks/preview': 'Deck preview',
   '/decks/cards': 'Cards',
   '/decks/cards/new': 'New card',

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 //
-// The super-admin builds panel: lazy list, typed-confirm rollback, and the two
+// The super-admin builds panel: version list, typed-confirm rollback, and the two
 // all-decks maintenance actions. The panel is mounted inside the real
 // ConfirmDialogProvider (not the window.confirm fallback), so the phrase input
 // on the rollback dialog is genuinely exercised — the whole point of spending a
@@ -38,7 +38,7 @@ vi.mock('../src/api/authoring', async importOriginal => {
 });
 
 const { DeckBuildsPanel } = await import('../src/components/console/DeckBuildsPanel');
-const { DeckEditPage } = await import('../src/pages/DeckEditPage');
+const { DeckPublicationPage } = await import('../src/pages/DeckPublicationPage');
 
 const DECK_ID = 7;
 const DECK_SLUG = 'aws-deck';
@@ -99,23 +99,18 @@ afterEach(() => {
 });
 
 describe('DeckBuildsPanel', () => {
-  it('loads builds only when asked', async () => {
+  it('loads versions when opened and can refresh them', async () => {
     mountPanel();
-    // Nothing on mount: the DeckEditPage characterization tests spread the real
-    // api module and a mount-time request would add a live call to every one.
-    expect(api.fetchDeckBuilds).not.toHaveBeenCalled();
-
-    await userEvent.click(screen.getByRole('button', { name: 'Show builds' }));
-
-    await waitFor(() => expect(api.fetchDeckBuilds).toHaveBeenCalledTimes(1));
+    await screen.findByText('b-new');
+    expect(api.fetchDeckBuilds).toHaveBeenCalledTimes(1);
     expect(api.fetchDeckBuilds).toHaveBeenCalledWith(DECK_ID);
-    // After a load the button re-labels for a refresh.
-    await screen.findByRole('button', { name: 'Refresh builds' });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Refresh versions' }));
+    await waitFor(() => expect(api.fetchDeckBuilds).toHaveBeenCalledTimes(2));
   });
 
   it('marks the live build and offers rollback only for the others', async () => {
     mountPanel();
-    await userEvent.click(screen.getByRole('button', { name: 'Show builds' }));
 
     await screen.findByText('b-old');
     // The live build wears a badge and offers no action.
@@ -126,7 +121,6 @@ describe('DeckBuildsPanel', () => {
 
   it('rolls back only after the deck slug is typed', async () => {
     mountPanel();
-    await userEvent.click(screen.getByRole('button', { name: 'Show builds' }));
     await screen.findByText('b-old');
 
     await userEvent.click(screen.getByRole('button', { name: 'Roll back to this build' }));
@@ -149,7 +143,6 @@ describe('DeckBuildsPanel', () => {
 
   it('leaves the live build alone when the rollback is cancelled', async () => {
     mountPanel();
-    await userEvent.click(screen.getByRole('button', { name: 'Show builds' }));
     await screen.findByText('b-old');
 
     await userEvent.click(screen.getByRole('button', { name: 'Roll back to this build' }));
@@ -163,6 +156,7 @@ describe('DeckBuildsPanel', () => {
 
   it('rebuilds the manifest and reports the deck count', async () => {
     mountPanel();
+    await userEvent.click(screen.getByText('Maintenance for all decks'));
     await userEvent.click(screen.getByRole('button', { name: 'Rebuild manifest' }));
 
     const dialog = await screen.findByRole('dialog');
@@ -175,6 +169,7 @@ describe('DeckBuildsPanel', () => {
   it('reaps stuck jobs and reports what it reaped', async () => {
     // First a healthy system: nothing to reap.
     mountPanel();
+    await userEvent.click(screen.getByText('Maintenance for all decks'));
     await userEvent.click(screen.getByRole('button', { name: 'Reap stuck jobs' }));
     let dialog = await screen.findByRole('dialog');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Reap' }));
@@ -197,23 +192,22 @@ describe('DeckBuildsPanel', () => {
     // the ApiResult message is shown, not a hard-coded guess.
     api.fetchDeckBuilds.mockResolvedValue(refused('SERVER_ERROR', 'Builds are unavailable right now.'));
     mountPanel();
-    await userEvent.click(screen.getByRole('button', { name: 'Show builds' }));
 
     await screen.findByText('Builds are unavailable right now.');
   });
 
-  it('appears on DeckEditPage for a super_admin and not for an editor', async () => {
-    signInAsSuperAdmin();
-    renderAt(<DeckEditPage />, [`/decks/edit?deckId=${DECK_ID}`]);
-    await screen.findByRole('button', { name: 'Save' });
-    expect(screen.queryByRole('heading', { name: 'Published versions' })).not.toBeNull();
+  it('renders the dedicated version route only for a super_admin', async () => {
+    renderAt(<DeckPublicationPage view="versions" />, [`/decks/versions?deckId=${DECK_ID}`]);
+    await screen.findByText('b-new');
+    expect(screen.getByRole('heading', { name: 'Published versions' })).not.toBeNull();
 
     cleanup();
     queryClient.clear();
+    api.fetchDeckBuilds.mockClear();
 
     signInAsEditor();
-    renderAt(<DeckEditPage />, [`/decks/edit?deckId=${DECK_ID}`]);
-    await screen.findByRole('button', { name: 'Save' });
-    expect(screen.queryByRole('heading', { name: 'Published versions' })).toBeNull();
+    renderAt(<DeckPublicationPage view="versions" />, [`/decks/versions?deckId=${DECK_ID}`]);
+    expect(await screen.findByText('Super administrator access required')).not.toBeNull();
+    expect(api.fetchDeckBuilds).not.toHaveBeenCalled();
   });
 });

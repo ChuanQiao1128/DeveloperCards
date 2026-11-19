@@ -15,7 +15,7 @@ import { readSessionUser, isSuperAdmin } from '../auth/sessionUser';
 
 import { ConsoleShell } from '../components/console/ConsoleShell';
 import { consoleNav } from '../components/console/consoleNav';
-import { DeckBuildsPanel } from '../components/console/DeckBuildsPanel';
+import { DeckWorkspaceHeader } from '../components/console/DeckWorkspaceHeader';
 
 type FormState = {
   // base fields
@@ -331,7 +331,7 @@ export function DeckEditPage() {
   return (
     <ConsoleShell
       title={CONSOLE_NAME}
-      subtitle="Authoring · Edit Deck"
+      subtitle="Settings"
       userLabel={
         user
           ? `${user.email ?? user.username ?? 'Signed in'}${superAdmin ? ' · super_admin' : ' · editor'}`
@@ -340,32 +340,9 @@ export function DeckEditPage() {
       superAdmin={superAdmin}
       {...consoleNav()}
     >
-      <div className="bg-white border border-slate-200 rounded-lg shadow-sm p-4">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div>
-            <div className="text-sm text-slate-500">Deck</div>
-            <div className="text-lg font-semibold text-slate-900">{deck.title}</div>
-            <div className="text-xs text-slate-500 font-mono">{deck.slug}</div>
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              className="text-xs px-3 py-1.5 rounded border border-slate-300 text-slate-700 hover:bg-slate-50"
-              onClick={() => navigate(`/decks/cards?deckId=${deck.id}`)}
-            >
-              View Cards
-            </button>
-
-            <button
-              type="button"
-              className="text-xs px-3 py-1.5 rounded border border-slate-300 text-slate-700 hover:bg-slate-50"
-              onClick={() => navigate('/')}
-            >
-              Back
-            </button>
-          </div>
-        </div>
+      <DeckWorkspaceHeader deck={deck} view="settings" />
+      <div className="bg-white border border-slate-200 rounded-lg p-4">
+        <h2 className="text-lg font-semibold text-slate-900">Deck settings</h2>
 
         {/* Cards count */}
         <div className="mt-4 bg-slate-50 border border-slate-200 rounded-lg p-3">
@@ -630,7 +607,6 @@ export function DeckEditPage() {
 
       </div>
 
-      {superAdmin ? <DeckBuildsPanel deckId={deck.id} deckSlug={deck.slug} /> : null}
     </ConsoleShell>
   );
 }

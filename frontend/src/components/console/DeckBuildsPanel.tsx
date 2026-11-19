@@ -1,13 +1,13 @@
 // src/components/console/DeckBuildsPanel.tsx
 //
-// The super-admin builds panel on DeckEditPage. It lists a deck's SUCCESS builds
-// (fetched only when asked, so the page's characterization tests do not gain a
-// mount-time network call), lets a super admin roll the live pointer back to an
-// older build behind a typed confirmation, and exposes the two all-decks
-// maintenance actions — rebuild manifest, reap stuck jobs — that until now only
-// existed as a curl-with-a-JWT during an incident.
-
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useAppQueryClient } from '../../api/queryClient';
+import { getSessionGeneration } from '../../auth/tokenStore';
+import { useConsoleIdentity } from '../../hooks/useConsoleIdentity';
+import { formatTime } from '../../lib/consoleOperationsView';
+import { Button } from '../ui/Button';
+import { Callout } from '../ui/Callout';
 
 import { useConfirm } from '../ui/ConfirmDialogContext';
 import {
@@ -16,7 +16,6 @@ import {
   rebuildManifest,
   reapStuckPublishJobs,
   type DeckBuild,
-  type DeckBuildsData,
   type DeckRollbackResult,
   type ManifestRebuildResult,
   type PublishReapResult,
@@ -24,38 +23,31 @@ import {
 
 type Feedback = { kind: 'ok' | 'err'; text: string };
 
-export function DeckBuildsPanel({ deckId, deckSlug }: { deckId: number; deckSlug: string }) {
+export function DeckBuildsPanel({ deckId, deckSlug, canRollback = true }: { deckId: number; deckSlug: string; canRollback?: boolean }) {
   // useConfirm falls back to window.confirm when no provider is above it, but the
   // real app (and this panel's tests) mount it inside ConfirmDialogProvider, so
   // the typed phrase below is actually enforced.
   const confirm = useConfirm();
 
-  const [data, setData] = useState<DeckBuildsData | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [listError, setListError] = useState<string | null>(null);
+  const identity = useConsoleIdentity();
+  const versions = useQuery({
+    queryKey: ['deck-versions', identity.generation, deckId],
+    enabled: identity.allowed,
+    refetchOnMount: 'always',
+    queryFn: async () => {
+      const res = await fetchDeckBuilds(deckId);
+      if (!res.success || !res.data) throw new Error(res.error?.message ?? 'Could not load versions.');
+      return res.data;
+    },
+  }, useAppQueryClient());
   const [feedback, setFeedback] = useState<Feedback | null>(null);
 
-  // One in-flight action at a time per button. The rollback key is the build id
-  // so only the row being rolled back is disabled, not every row.
-  const [rollingBack, setRollingBack] = useState<string | null>(null);
+  const [rollingBack, setRollingBack] = useState(false);
   const [rebuilding, setRebuilding] = useState(false);
   const [reaping, setReaping] = useState(false);
 
-  const loaded = data !== null;
-
-  async function loadBuilds(): Promise<void> {
-    setLoading(true);
-    setListError(null);
-    const res = await fetchDeckBuilds(deckId);
-    setLoading(false);
-    if (!res.success || !res.data) {
-      setListError(res.error?.message ?? 'Failed to load builds.');
-      return;
-    }
-    setData(res.data);
-  }
-
   async function handleRollback(build: DeckBuild): Promise<void> {
+    if (!canRollback) return;
     // This action spends a confirmPhrase — the friction reserved for the one bar
     // ConfirmDialogContext.ts draws around "other people's data" — because a
     // rollback changes what every app user downloads on their next manifest
@@ -67,19 +59,19 @@ export function DeckBuildsPanel({ deckId, deckSlug }: { deckId: number; deckSlug
       confirmLabel: 'Roll back',
       confirmPhrase: deckSlug,
     });
-    if (!okToGo) return;
+    if (!okToGo || !identity.allowed || getSessionGeneration() !== identity.generation) return;
 
-    setRollingBack(build.buildId);
+    setRollingBack(true);
     setFeedback(null);
     const res = await rollbackDeck(deckId, build.buildId);
-    setRollingBack(null);
+    setRollingBack(false);
     if (!res.success || !res.data) {
       setFeedback({ kind: 'err', text: res.error?.message ?? 'Rollback failed.' });
       return;
     }
     const result: DeckRollbackResult = res.data;
     setFeedback({ kind: 'ok', text: `Rolled back. Live build is now ${result.liveBuildId}.` });
-    await loadBuilds();
+    await versions.refetch();
   }
 
   async function handleRebuild(): Promise<void> {
@@ -88,7 +80,7 @@ export function DeckBuildsPanel({ deckId, deckSlug }: { deckId: number; deckSlug
       body: 'Regenerates the manifest every app reads, from the current database state.',
       confirmLabel: 'Rebuild',
     });
-    if (!okToGo) return;
+    if (!okToGo || !identity.allowed || getSessionGeneration() !== identity.generation) return;
 
     setRebuilding(true);
     setFeedback(null);
@@ -108,7 +100,7 @@ export function DeckBuildsPanel({ deckId, deckSlug }: { deckId: number; deckSlug
       body: 'Fails PENDING jobs older than 10 minutes and PROCESSING jobs idle for 30 minutes, so their decks can be published again.',
       confirmLabel: 'Reap',
     });
-    if (!okToGo) return;
+    if (!okToGo || !identity.allowed || getSessionGeneration() !== identity.generation) return;
 
     setReaping(true);
     setFeedback(null);
@@ -126,101 +118,48 @@ export function DeckBuildsPanel({ deckId, deckSlug }: { deckId: number; deckSlug
     setFeedback({ kind: 'ok', text });
   }
 
-  const builds = data?.builds ?? [];
+  const builds = versions.data?.builds ?? [];
 
   return (
-    <section
-      aria-labelledby="deck-builds-heading"
-      className="mt-6 bg-white border border-slate-200 rounded-lg shadow-sm p-4"
-    >
-      <h2 id="deck-builds-heading" className="text-lg font-semibold text-slate-900">
-        Published versions
-      </h2>
-      <p className="text-sm text-slate-600 mt-1">
-        Recent successful publishes of this deck. Rolling back points the app at an older version and rebuilds the manifest.
-      </p>
-
-      <div className="mt-3">
-        <button
-          type="button"
-          disabled={loading}
-          className="text-sm px-3 py-1.5 rounded border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-60 disabled:cursor-not-allowed"
-          onClick={() => void loadBuilds()}
-        >
-          {loaded ? 'Refresh builds' : 'Show builds'}
-        </button>
+    <section aria-labelledby="deck-builds-heading" className="space-y-4 rounded-lg border border-slate-200 bg-white p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 id="deck-builds-heading" className="text-lg font-semibold text-slate-900">Published versions</h2>
+          <p className="mt-1 text-sm text-slate-600">Recent successful publishes. Live marks the version selected for distribution.</p>
+        </div>
+        <Button variant="outline" size="sm" loading={versions.isFetching} onClick={() => void versions.refetch()}>Refresh versions</Button>
       </div>
 
-      {loading ? <div className="mt-3 text-sm text-slate-600">Loading builds…</div> : null}
+      {versions.isFetching && <p role="status" className="text-sm text-slate-600">Loading versions…</p>}
+      {versions.isError && <Callout role="alert" tone="danger">{versions.error.message}</Callout>}
+      {feedback && <Callout role={feedback.kind === 'ok' ? 'status' : 'alert'} tone={feedback.kind === 'ok' ? 'success' : 'danger'}>{feedback.text}</Callout>}
 
-      {listError ? (
-        <div className="mt-3 bg-red-50 border border-red-200 text-red-800 px-3 py-2 rounded text-sm">{listError}</div>
-      ) : null}
-
-      {feedback ? (
-        <div
-          className={
-            feedback.kind === 'ok'
-              ? 'mt-3 bg-green-50 border border-green-200 text-green-800 px-3 py-2 rounded text-sm'
-              : 'mt-3 bg-red-50 border border-red-200 text-red-800 px-3 py-2 rounded text-sm'
-          }
-        >
-          {feedback.text}
-        </div>
-      ) : null}
-
-      {loaded && !loading ? (
-        builds.length === 0 ? (
-          <div className="mt-3 text-sm text-slate-600">No successful builds yet.</div>
-        ) : (
-          <ul className="mt-3 divide-y divide-slate-100 border border-slate-100 rounded-md">
-            {builds.map((build: DeckBuild) => (
-              <li key={build.buildId} className="flex items-center justify-between gap-3 px-3 py-2">
+      {versions.isSuccess && !versions.isFetching && (
+        builds.length === 0 ? <p className="text-sm text-slate-600">No published versions yet.</p> : (
+          <ul className="divide-y divide-slate-200 border-t border-slate-200">
+            {builds.map(build => (
+              <li key={build.buildId} className="flex flex-wrap items-center justify-between gap-3 py-3">
                 <div className="min-w-0">
-                  <div className="text-sm font-mono text-slate-900 truncate">{build.buildId}</div>
-                  <div className="text-xs text-slate-500">{build.createdAt}</div>
-                  {build.note ? <div className="text-xs text-slate-600 mt-0.5">{build.note}</div> : null}
+                  <div className="break-all font-mono text-sm text-slate-900">{build.buildId}</div>
+                  <div className="text-xs text-slate-600">{formatTime(build.createdAt)}</div>
+                  {build.note && <div className="mt-1 break-words text-sm text-slate-600">{build.note}</div>}
                 </div>
-
-                {build.isLive ? (
-                  <span className="text-xs px-2 py-1 rounded bg-green-100 text-green-800 font-medium">Live</span>
-                ) : (
-                  <button
-                    type="button"
-                    disabled={rollingBack === build.buildId}
-                    className="text-xs px-3 py-1.5 rounded border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-60 disabled:cursor-not-allowed"
-                    onClick={() => void handleRollback(build)}
-                  >
-                    Roll back to this build
-                  </button>
-                )}
+                {build.isLive ? <span className="rounded-full bg-emerald-100 px-2 py-1 text-xs font-medium text-emerald-800">Live</span>
+                  : canRollback && <Button variant="outline" size="sm" disabled={rollingBack || versions.isFetching} onClick={() => void handleRollback(build)}>Roll back to this build</Button>}
               </li>
             ))}
           </ul>
         )
-      ) : null}
+      )}
+      {!canRollback && <p className="text-sm text-slate-600">This deck uses a controlled rollback procedure.</p>}
 
-      <div className="mt-6 border-t border-slate-100 pt-4">
-        <h3 className="text-sm font-semibold text-slate-900">Maintenance (all decks)</h3>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <button
-            type="button"
-            disabled={rebuilding}
-            className="text-sm px-3 py-1.5 rounded border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-60 disabled:cursor-not-allowed"
-            onClick={() => void handleRebuild()}
-          >
-            Rebuild manifest
-          </button>
-          <button
-            type="button"
-            disabled={reaping}
-            className="text-sm px-3 py-1.5 rounded border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-60 disabled:cursor-not-allowed"
-            onClick={() => void handleReap()}
-          >
-            Reap stuck jobs
-          </button>
+      <details className="border-t border-slate-200 pt-2">
+        <summary className="cursor-pointer rounded py-2 text-sm font-medium text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">Maintenance for all decks</summary>
+        <div className="mt-2 flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" loading={rebuilding} onClick={() => void handleRebuild()}>Rebuild manifest</Button>
+          <Button variant="outline" size="sm" loading={reaping} onClick={() => void handleReap()}>Reap stuck jobs</Button>
         </div>
-      </div>
+      </details>
     </section>
   );
 }
