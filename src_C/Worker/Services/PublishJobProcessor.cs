@@ -115,7 +115,11 @@ public class PublishJobProcessor : IPublishJobProcessor, IReplayOutcome, IPublis
       deckData.Version = job.BuildId;
     }
 
-    if (job.DeckSlug == "aws-saa-fundamentals") await ValidateReleaseJob(jobId);
+    if (job.DeckSlug == "aws-saa-fundamentals")
+    {
+      await ValidateReleaseJob(jobId);
+      deckData.VerifyReviewedContent = true;
+    }
 
     // Step 4: 外部系统调用 (S3)
     var uploadResult = await _s3Uploader.UploadAsync(job.S3Key, deckData);
@@ -126,10 +130,14 @@ public class PublishJobProcessor : IPublishJobProcessor, IReplayOutcome, IPublis
     {
       await using var uploadConn = await Pg.OpenConnectionOrNullAsync();
       if (uploadConn is null) throw new InvalidOperationException("Failed to record reviewed build integrity");
-      var recorded = await DbUtil.ExecuteAsync(uploadConn, null,
+      await using var tx = await uploadConn.BeginTransactionAsync();
+      var recorded = await DbUtil.ExecuteAsync(uploadConn, tx,
         "update deck_publishes set content_sha256=$2,content_bytes=$3 where job_id=$1 and status='PROCESSING'",
         [jobId, uploadResult.Sha256, uploadResult.Bytes]);
       if (recorded != 1) throw new BusinessException("RELEASE_GENERATION_CANCELLED: upload did not commit a live build");
+      if (uploadResult.ReviewedContentVerified)
+        await PublishCdnVerification.StageAsync(uploadConn, tx, jobId, uploadResult.Sha256, deckData.Cards.Count);
+      await tx.CommitAsync();
     }
 
     // Step 4.5: 内容分发 v3 附加产物（chunked package / delta patch / DB 元数据）

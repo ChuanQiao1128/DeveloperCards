@@ -20,12 +20,17 @@ public static class ContentPublishFailureEvents
   public static async Task EnqueueAsync(string jobId, string stage, int delaySeconds = 0)
   {
     if (Since is null) return;
+    await EnqueueEventAsync(jobId, EventType, stage, delaySeconds);
+  }
+
+  internal static async Task EnqueueEventAsync(string jobId, string eventType, string stage, int delaySeconds)
+  {
     var queue = Environment.GetEnvironmentVariable("AUTOMATION_NOTIFY_QUEUE_URL");
     try
     {
       if (string.IsNullOrWhiteSpace(queue)) throw new InvalidOperationException("Missing AUTOMATION_NOTIFY_QUEUE_URL");
       var request = new SendMessageRequest { QueueUrl = queue, DelaySeconds = delaySeconds,
-        MessageBody = JsonSerializer.Serialize(new { v = 1, eventType = EventType, jobId, stage }) };
+        MessageBody = JsonSerializer.Serialize(new { v = 1, eventType, jobId, stage }) };
       using var deadline = CancellationTokenSource.CreateLinkedTokenSource(RequestBudget.Token);
       deadline.CancelAfter(TimeSpan.FromSeconds(5));
       if (TestSendSeam is { } send) await send(request).WaitAsync(deadline.Token);

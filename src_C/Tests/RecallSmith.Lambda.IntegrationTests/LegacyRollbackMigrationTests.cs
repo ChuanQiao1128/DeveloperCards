@@ -3,6 +3,7 @@ using Npgsql;
 using RecallSmith.Lambda.Common;
 using RecallSmith.Lambda.Vpc.Db;
 using DbUtil = RecallSmith.Lambda.Db.DbUtil;
+using PublishCdnVerification = RecallSmith.Lambda.Db.PublishCdnVerification;
 
 namespace RecallSmith.Lambda.IntegrationTests;
 
@@ -134,7 +135,7 @@ public sealed class LegacyRollbackMigrationTests(PostgresFixture db)
   });
 
   [Fact]
-  public Task ProductionRunner_UpgradesRealLegacy51Through61_WithoutPrivilegedInstaller() => WithLegacyOwner(async (app, admin) =>
+  public Task ProductionRunner_UpgradesRealLegacy51Through62_WithoutPrivilegedInstaller() => WithLegacyOwner(async (app, admin) =>
   {
     await PostgresFixture.ApplyMigrationsAsync(app, 51);
     foreach (var path in Directory.EnumerateFiles(MigrationDir, "*.sql"))
@@ -144,11 +145,12 @@ public sealed class LegacyRollbackMigrationTests(PostgresFixture db)
     }
     var dry = await Migrate.RunMigrationsAsync(app, new Res("legacy-plan"), true, null, null, null);
     var plan = JsonDocument.Parse(dry.Body).RootElement.GetProperty("data");
-    Assert.Equal(new[] { 52, 53, 55, 56, 57, 58, 59, 60, 61 }, plan.GetProperty("pending").EnumerateArray().Select(x => x.GetProperty("version").GetInt32()));
+    Assert.Equal(new[] { 52, 53, 55, 56, 57, 58, 59, 60, 61, 62 }, plan.GetProperty("pending").EnumerateArray().Select(x => x.GetProperty("version").GetInt32()));
     var applied = await Migrate.RunMigrationsAsync(app, new Res("legacy-upgrade"), false, null, "local-test", "local-test");
     Assert.Equal(200, applied.StatusCode);
-    Assert.Equal(9, JsonDocument.Parse(applied.Body).RootElement.GetProperty("data").GetProperty("appliedCount").GetInt32());
-    Assert.Equal(61, await Scalar(app, "select max(version) from schema_migrations"));
+    Assert.Equal(10, JsonDocument.Parse(applied.Body).RootElement.GetProperty("data").GetProperty("appliedCount").GetInt32());
+    Assert.Equal(62, await Scalar(app, "select max(version) from schema_migrations"));
+    Assert.True(await PublishCdnVerification.ReadyAsync(app));
     Assert.Equal(8L, await Scalar(app, "select count(*) from schema_migrations where version in (52,53,55,56,57,58,59,60)"));
     var diagnostics = Json(await MigrationDiagnostics.ReadAsync(app));
     Assert.Equal("developercards_app", diagnostics.GetProperty("session").GetProperty("currentUser").GetString());

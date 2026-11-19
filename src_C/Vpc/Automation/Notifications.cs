@@ -299,6 +299,8 @@ public static class Notifications
       var body = AutomationBody.Object(doc.RootElement);
       if (body.TryGetProperty("operation", out var operation) && operation.ValueKind == JsonValueKind.String && operation.GetString() == "prepare-content-publish")
         return await ContentPublishAlerts.HandlePrepare(req, res);
+      if (operation.ValueKind == JsonValueKind.String && operation.GetString() is ContentCdnVerification.Prepare or ContentCdnVerification.Report)
+        return await ContentCdnVerification.HandleAsync(body, operation.GetString()!, res);
 
 
       if (!body.TryGetProperty("v", out var ver) || ver.ValueKind != JsonValueKind.Number || !ver.TryGetInt32(out var version) || version != 1)

@@ -34,6 +34,9 @@ public static class ContentPublishAlerts
     var row = rows[0];
     var dispatchAttempts = Convert.ToInt32(row["dispatch_attempts"]);
     var manifestAttempts = Convert.ToInt32(row["manifest_attempts"]);
+    var cdnFailed = stage == "verification" && await PublishCdnVerification.ReadyAsync(conn) &&
+      await DbUtil.ExecuteScalarAsync(conn, null,
+        "select exists(select 1 from publish_cdn_verification where job_id=$1 and failure_code is not null)", [jobId]) is true;
     // A guard is queued before the last claim. A stalled producer may not have claimed it yet.
     if ((stage == "dispatch" && (string)row["status"]! == "PENDING" && dispatchAttempts == 4 && row["delivered_at"] is null) ||
         (stage == "manifest" && (string)row["status"]! == "SUCCESS" && row["current_live"] is true &&
@@ -45,6 +48,7 @@ public static class ContentPublishAlerts
       "dispatch" => (string)row["status"]! == "PENDING" && dispatchAttempts >= 5 && row["delivered_at"] is null,
       "manifest" => (string)row["status"]! == "SUCCESS" && row["current_live"] is true &&
         (row["state"] as string == "needs_attention" || (row["state"] as string == "pending" && manifestAttempts >= 5)),
+      "verification" => (string)row["status"]! == "SUCCESS" && row["current_live"] is true && cdnFailed,
       _ => false
     };
     if (!final) return new { skip = true };
@@ -53,7 +57,7 @@ public static class ContentPublishAlerts
       throw new InvalidOperationException("The final delivery attempt is still leased; retry this event.");
     var mode = (await AutomationMode.EffectiveAsync(conn)).Effective;
     var url = Notifications.ConsoleBaseUrl().TrimEnd('/') + "/decks/cards?deckId=" + row["deck_id"];
-    var attempts = stage == "build" ? "See job diagnostics" : (stage == "dispatch" ? dispatchAttempts : manifestAttempts).ToString();
+    var attempts = stage is "build" or "verification" ? "See job diagnostics" : (stage == "dispatch" ? dispatchAttempts : manifestAttempts).ToString();
     var email = EmailTemplates.ContentPublishFailure(mode, (string)row["deck_slug"]!, (string)row["release_id"]!,
       jobId, (string)row["build_id"]!, stage, attempts, url);
     var key = $"content-publish:{jobId}:{stage}";
@@ -86,7 +90,7 @@ public static class ContentPublishAlerts
         throw new ValidationError("v must be 1", "v");
       var job = AutomationBody.OptionalString(body, "jobId", 200);
       if (string.IsNullOrWhiteSpace(job)) throw new ValidationError("jobId is required", "jobId");
-      var stage = AutomationBody.RequiredEnum(body, "stage", ["build", "dispatch", "manifest"]);
+      var stage = AutomationBody.RequiredEnum(body, "stage", ["build", "dispatch", "manifest", "verification"]);
       await using var conn = await Pg.OpenConnectionOrNullAsync();
       if (conn is null) return Helpers.ConfigError(res, "Missing database configuration");
       return res.Ok(await PrepareAsync(conn, job, stage));

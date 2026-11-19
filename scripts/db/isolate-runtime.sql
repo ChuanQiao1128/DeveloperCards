@@ -61,6 +61,12 @@ grant select, insert, update, delete on
 grant select, insert on admin_audit, ai_review_events, automation_decision_events,
  content_release_actions, content_review_receipts, content_review_revocations, account_deletions to developercards_app;
 grant select on schema_migrations, content_rollback_actions to developercards_app;
+do $$
+begin
+ if to_regclass('public.publish_cdn_verification') is not null then
+   grant select,insert,update on public.publish_cdn_verification to developercards_app;
+ end if;
+end $$;
 grant execute on function content_release_rollback(bigint,text,text,text,text,text,text) to developercards_app;
 grant execute on function content_editing_snapshot(bigint) to developercards_app;
 -- Existing optional search/embedding endpoints retain their extension operations.

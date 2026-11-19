@@ -31,6 +31,7 @@ public sealed class S3UploadResult
 {
   public string Sha256 { get; set; } = string.Empty;
   public long Bytes { get; set; }
+  public bool ReviewedContentVerified { get; init; }
 }
 
 /// <summary>
@@ -38,6 +39,8 @@ public sealed class S3UploadResult
 /// </summary>
 public class DeckExportData
 {
+  internal bool VerifyReviewedContent { get; set; }
+
   public string Slug { get; set; } = string.Empty;
   public string Title { get; set; } = string.Empty;
   public string Locale { get; set; } = "en-US";
