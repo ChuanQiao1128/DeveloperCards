@@ -138,6 +138,8 @@ class FakeCore:
 
     def __init__(self, start: Callable[[Responder], LocalServer]) -> None:
         self.secrets: tuple[str, ...] = (SECRET,)
+        self.prepare_status = 200
+        self.prepare_data: dict[str, Any] = {"skip": True}
         self.report_status = 200
         # Statuses for the next report calls, in order, before report_status applies again.
         self.report_script: list[int] = []
@@ -169,6 +171,10 @@ class FakeCore:
             if self.rc_report_status != 200:
                 return self.rc_report_status, headers, error_envelope("SERVER_ERROR")
             return 200, headers, envelope({"deleted": 0, "retried": 0, "unknown": 0})
+        if req.path == "/api/internal/automation/notifications/report" and body.get("operation") == "prepare-content-publish":
+            if self.prepare_status != 200:
+                return self.prepare_status, headers, error_envelope("SERVER_ERROR")
+            return 200, headers, envelope(self.prepare_data)
         if req.path == "/api/internal/automation/notifications/report":
             status = self.report_script.pop(0) if self.report_script else self.report_status
             if status != 200:
@@ -185,7 +191,7 @@ class FakeCore:
         return self.server.requests
 
     def reports(self) -> list[dict[str, Any]]:
-        return [r.json() for r in self.requests if r.path == "/api/internal/automation/notifications/report"]
+        return [r.json() for r in self.requests if r.path == "/api/internal/automation/notifications/report" and r.json().get("operation") != "prepare-content-publish"]
 
     def rc_gets(self) -> list[Captured]:
         return [r for r in self.requests if r.method == "GET"]

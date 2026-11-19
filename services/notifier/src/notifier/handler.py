@@ -24,6 +24,8 @@ TAG = "notifier"
 
 # The notify queue's redrive maxReceiveCount (A10): the fifth receive is the last one.
 MAX_RECEIVES = 5
+CONTENT_PUBLISH_EVENT = "content_publish_failure"
+PREPARE_CONTENT_PUBLISH_PATH = REPORT_PATH
 
 KINDS = ("exception", "batch_summary", "weekly_digest", "source_changed", "test")
 MODES = ("off", "dry_run", "live")
@@ -211,6 +213,36 @@ def _handle_record(settings: Settings, record: Mapping[str, Any], context: Any) 
     attempt = max(_receive_count(record), 1)
     msg, notification_id = parse_message(record.get("body"))
     secret = get_secret(settings.internal_secret_ssm_name)
+    try:
+        wakeup = json.loads(record.get("body", ""))
+    except (TypeError, ValueError):
+        wakeup = None
+    if isinstance(wakeup, dict) and wakeup.get("eventType") == CONTENT_PUBLISH_EVENT:
+        job, stage = wakeup.get("jobId"), wakeup.get("stage")
+        if (type(wakeup.get("v")) is not int or wakeup["v"] != 1
+                or not isinstance(job, str) or not 1 <= len(job) <= 200
+                or stage not in ("build", "dispatch", "manifest")):
+            log("error", TAG, event="content_publish_event_invalid")
+            return False
+        if secret is None:
+            log("error", TAG, event="internal_secret_missing")
+            return False
+        prepared = _client(settings, secret).post(
+            PREPARE_CONTENT_PUBLISH_PATH, {"v": 1, "operation": "prepare-content-publish", "jobId": job, "stage": stage}, retry_pauses=()
+        )
+        if not prepared.ok:
+            log("warn", TAG, event="content_publish_prepare_retry", jobId=job, stage=stage, status=prepared.status)
+            return False
+        data = prepared.data or {}
+        if data.get("skip") is True:
+            log("info", TAG, event="content_publish_event_skipped", jobId=job, stage=stage)
+            return True
+        if data.get("failed") is True:
+            return False  # Preserve the failed event for the notify DLQ, without sending SES again.
+        msg, notification_id = parse_message(json.dumps(data.get("notification")))
+        if msg is None or msg["kind"] != "exception" or msg["subkind"] != CONTENT_PUBLISH_EVENT:
+            log("error", TAG, event="content_publish_prepare_invalid", jobId=job, stage=stage)
+            return False
 
     if msg is None:
         log("warn", TAG, event="bad_message", notificationId=notification_id, attempt=attempt)
@@ -273,7 +305,7 @@ def _handle_record(settings: Settings, record: Mapping[str, Any], context: Any) 
             error_code=RECIPIENT_UNSET,
             error=ERROR_TEXTS[RECIPIENT_UNSET],
         )
-        return True
+        return msg["subkind"] != CONTENT_PUBLISH_EVENT
 
     result = ses.send(
         ses_client(),
@@ -319,7 +351,7 @@ def _handle_record(settings: Settings, record: Mapping[str, Any], context: Any) 
         error_code=result.error_code,
         error=result.error,
     )
-    return True
+    return msg["subkind"] != CONTENT_PUBLISH_EVENT
 
 
 def _trace_header(record: object) -> object:
