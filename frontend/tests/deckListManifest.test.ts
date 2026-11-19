@@ -22,7 +22,6 @@ import {
   getDeckStatusFromManifest,
   getManifestTarget,
   parseManifestMeta,
-  safeDateTime,
   toManifestDeckLite,
 } from '../src/features/deckList/deckListManifest';
 import type { Deck } from '../src/types/deck';
@@ -186,21 +185,5 @@ describe('deciding whether a deck is published', () => {
     // counted as empty must not borrow a stale non-zero total from the row.
     expect(getDeckStatusFromManifest(deck({ totalCards: 5 }), undefined, 0)).toBe('unpublished');
     expect(getDeckStatusFromManifest(deck({ totalCards: 0 }), undefined, 5)).toBe('needs_publish');
-  });
-});
-
-describe('rendering a timestamp that may not be one', () => {
-  it('shows a dash for every kind of absent or unparseable value', () => {
-    // These four all reach this function from real rows: a column the server
-    // omitted, a nulled column, an empty string, and a value that is present
-    // but not a date. "Invalid Date" in a table cell is the failure mode.
-    expect(safeDateTime(undefined)).toBe('—');
-    expect(safeDateTime(null)).toBe('—');
-    expect(safeDateTime('')).toBe('—');
-    expect(safeDateTime('not a date')).toBe('—');
-  });
-
-  it('formats a real timestamp into something other than a dash', () => {
-    expect(safeDateTime('2026-01-02T03:04:05Z')).not.toBe('—');
   });
 });

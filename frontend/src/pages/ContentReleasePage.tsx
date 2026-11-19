@@ -9,6 +9,7 @@ import { CARD_CLASS, H2_CLASS, INPUT_CLASS } from '../components/console/console
 import { Button } from '../components/ui/Button';
 import { Callout } from '../components/ui/Callout';
 import { CONSOLE_NAME } from '../lib/brand';
+import { formatDeckTime } from '../lib/deckTime';
 import { hasReviewedDeckRelease } from '../lib/deckWorkspace';
 import { assertPublicationQuery, publicationStatus, type PublicationStatus } from '../lib/contentReleaseStatus';
 import { loadReleaseJournal, saveReleaseJournal, withReleaseJournalLock } from '../lib/releaseJournalStore';
@@ -33,7 +34,7 @@ export function PublicationStatusPanel({ status, busy, blocked, onCheck, onConti
 }) {
   return <Callout tone={status.tone} title={status.title} role={status.tone === 'danger' ? 'alert' : 'status'}>
       <p>{status.description}</p>
-      {status.nextAttemptAt && <p className="mt-2">Next retry no earlier than {status.nextAttemptAt.replace('T', ' ').replace('.000Z', ' UTC')}</p>}
+      {status.nextAttemptAt && <p className="mt-2">Next retry no earlier than {formatDeckTime(status.nextAttemptAt, 'unknown')}</p>}
       {status.liveBuildId !== undefined && <p className="mt-2 break-all">Current server live build: {status.liveBuildId ?? 'none'}. Phone availability requires public verification.</p>}
       <p className="mt-2">Your frozen content and recovery journal are retained.</p>
       <div className="mt-3 flex flex-wrap gap-3">

@@ -7,7 +7,8 @@ import { Button } from '../components/ui/Button';
 import { Callout } from '../components/ui/Callout';
 import { PUBLISH_JOBS_HREF, publishJobStage } from '../features/deckList/publishJobStage';
 import { useConsoleIdentity } from '../hooks/useConsoleIdentity';
-import { formatTime, HEADING, LINK, PANEL } from '../lib/consoleOperationsView';
+import { HEADING, LINK, PANEL } from '../lib/consoleOperationsView';
+import { formatDeckTime } from '../lib/deckTime';
 
 const INACTIVE_RELEASES = new Set(['RELEASE_SUPERSEDED', 'RELEASE_ROLLED_BACK', 'REVIEW_REVOKED']);
 const ISSUE_LABELS = {
@@ -40,18 +41,13 @@ function recentIssues(jobs: PublishJob[]) {
   });
 }
 
-function jobTime(value: string | number | null | undefined): string {
-  const date = new Date(value ?? '');
-  return Number.isFinite(date.getTime()) ? formatTime(date.toISOString()) : 'Unknown';
-}
-
 function issueTime(job: Partial<Pick<PublishJob, 'createdAt' | 'updatedAt'>>, issue: JobIssue | null): [string, string] {
   if (issue === 'build' || issue === 'timeout') {
-    const failedAt = jobTime(job.updatedAt);
+    const failedAt = formatDeckTime(job.updatedAt, 'Unknown');
     if (failedAt !== 'Unknown') return ['Failed', failedAt];
   }
   // Delivery states do not have a recorded failure timestamp.
-  return ['Submitted', jobTime(job.createdAt)];
+  return ['Submitted', formatDeckTime(job.createdAt, 'Unknown')];
 }
 
 function IssueBadge({ issue }: { issue: JobIssue }) {

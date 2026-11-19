@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import type { PublishJob } from '../../../api/authoring';
 import { LINK, PANEL } from '../../../lib/consoleOperationsView';
-import { safeDateTime } from '../deckListManifest';
+import { formatDeckTime } from '../../../lib/deckTime';
 import { publishJobStage } from '../publishJobStage';
 
 export interface PublishJobsPanelProps {
@@ -22,7 +22,7 @@ export function PublishJobsPanel({ jobs, onRefresh }: PublishJobsPanelProps) {
             <li key={job.jobId} className="flex flex-wrap items-start justify-between gap-3 py-4 text-sm">
               <div className="min-w-0">
                 <p className="break-words font-medium text-slate-900">{job.deckTitle || job.deckSlug}</p>
-                <p className="mt-1 text-xs text-slate-600">{safeDateTime(job.createdAt)}</p>
+                <p className="mt-1 text-xs text-slate-600">{formatDeckTime(job.createdAt)}</p>
                 <p className={`mt-1 font-medium ${job.status === 'FAILED' ? 'text-red-700'
                   : job.status === 'SUCCESS' && job.manifestState === 'delivered' ? 'text-emerald-700' : 'text-slate-700'}`}>
                   {job.dispatchExhausted ? 'Queue delivery needs attention' : publishJobStage(job)}

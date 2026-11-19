@@ -56,8 +56,8 @@ it('shows only recent actionable attempts and opens the exact job independently 
   expect(screen.queryByText('retired-version')).toBeNull();
   expect(screen.getByText('Queue delivery needs attention')).toBeTruthy();
   expect(screen.getByText('Job timed out')).toBeTruthy();
-  expect(screen.getByText('Failed · 2026-11-19 11:25:00 UTC')).toBeTruthy();
-  expect(screen.getByText('Submitted · 2026-11-19 11:20:00 UTC')).toBeTruthy();
+  expect(screen.getByText('Failed · 20 Nov 2026, 00:25:00 NZDT')).toBeTruthy();
+  expect(screen.getByText('Submitted · 20 Nov 2026, 00:20:00 NZDT')).toBeTruthy();
   fireEvent.click(screen.getByRole('link', { name: 'View publish job for Search cards' }));
   expect(await screen.findByText('Index update timed out')).toBeTruthy();
   expect(screen.getByText('saved-build')).toBeTruthy();

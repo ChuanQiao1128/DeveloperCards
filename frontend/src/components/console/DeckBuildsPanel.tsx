@@ -6,7 +6,8 @@ import { useQuery } from '@tanstack/react-query';
 import { useAppQueryClient } from '../../api/queryClient';
 import { getSessionGeneration } from '../../auth/tokenStore';
 import { useConsoleIdentity } from '../../hooks/useConsoleIdentity';
-import { formatTime, LINK } from '../../lib/consoleOperationsView';
+import { LINK } from '../../lib/consoleOperationsView';
+import { formatDeckTime } from '../../lib/deckTime';
 import { Button } from '../ui/Button';
 import { Callout } from '../ui/Callout';
 
@@ -71,7 +72,7 @@ export function DeckBuildsPanel({ deckId, deckSlug, canRollback = true }: { deck
       return;
     }
     const result: DeckRollbackResult = res.data;
-    setFeedback({ kind: 'ok', text: `Rolled back. Live build is now ${result.liveBuildId}.` });
+    setFeedback({ kind: 'ok', text: `Rolled back. The current version is now ${result.liveBuildId}.` });
     await versions.refetch();
   }
 
@@ -128,7 +129,7 @@ export function DeckBuildsPanel({ deckId, deckSlug, canRollback = true }: { deck
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 id="deck-builds-heading" className="text-lg font-semibold text-slate-900">Published versions</h2>
-          <p className="mt-1 text-sm text-slate-600">Recent successful publishes. Live marks the version selected for distribution.</p>
+          <p className="mt-1 text-sm text-slate-600">The current version is the card pack the app is set to download.</p>
         </div>
         <Button variant="outline" size="sm" loading={versions.isFetching} onClick={() => void versions.refetch()}>Refresh versions</Button>
       </div>
@@ -138,7 +139,7 @@ export function DeckBuildsPanel({ deckId, deckSlug, canRollback = true }: { deck
       {feedback && <Callout role={feedback.kind === 'ok' ? 'status' : 'alert'} tone={feedback.kind === 'ok' ? 'success' : 'danger'}>{feedback.text}</Callout>}
 
       {versions.isSuccess && !versions.isFetching && liveOutsideRecent && (
-        <p className="break-all text-sm text-slate-700">Selected live build <span className="font-mono font-medium">{liveBuildId}</span>. This build is older than the recent versions shown below.</p>
+        <p className="break-all text-sm text-slate-700">Current version <span className="font-mono font-medium">{liveBuildId}</span> is older than the recent versions shown below.</p>
       )}
       {versions.isSuccess && !versions.isFetching && (
         builds.length === 0 ? <p className="text-sm text-slate-600">No published versions yet.</p> : (
@@ -146,14 +147,16 @@ export function DeckBuildsPanel({ deckId, deckSlug, canRollback = true }: { deck
             {builds.map(build => (
               <li key={build.buildId} className="flex flex-wrap items-center justify-between gap-3 py-3">
                 <div className="min-w-0">
-                  <div className="break-all font-mono text-sm text-slate-900">{build.buildId}</div>
-                  <div className="text-xs text-slate-600">{formatTime(build.createdAt)}</div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="break-all font-mono text-sm text-slate-900">{build.buildId}</div>
+                    {build.isLive && <span className="rounded-full bg-emerald-100 px-2 py-1 text-xs font-medium text-emerald-800">Current version</span>}
+                  </div>
+                  <div className="text-xs text-slate-600">{formatDeckTime(build.createdAt, 'Unknown')}</div>
                   {build.note && <div className="mt-1 break-words text-sm text-slate-600">{build.note}</div>}
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
                   {build.jobId && <Link className={`${LINK} text-sm`} to={`/decks/publish-jobs/${encodeURIComponent(build.jobId)}`}>View job</Link>}
-                  {build.isLive ? <span className="rounded-full bg-emerald-100 px-2 py-1 text-xs font-medium text-emerald-800">Live</span>
-                  : canRollback && <Button variant="outline" size="sm" disabled={rollingBack || versions.isFetching} onClick={() => void handleRollback(build)}>Roll back to this build</Button>}
+                  {!build.isLive && canRollback && <Button variant="outline" size="sm" disabled={rollingBack || versions.isFetching} onClick={() => void handleRollback(build)}>Roll back to this build</Button>}
                 </div>
               </li>
             ))}
