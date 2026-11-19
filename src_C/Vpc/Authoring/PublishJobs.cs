@@ -34,12 +34,16 @@ public static class PublishJobs
         p.status,
         p.note,
         p.error_message as "errorMessage",
-        p.created_at as "createdAt"
-      from deck_publishes p
+        p.created_at as "createdAt",
+        p.updated_at as "updatedAt",
+        d.title as "deckTitle",
+        coalesce(d.is_deleted = 0, false) as "deckAvailable",
+        coalesce(p.build_id = d.live_build_id, false) as "buildIsLive"
+      from deck_publishes p left join decks d on d.id = p.deck_id
       where p.job_id is not null
         and ($1::boolean or exists (select 1 from admin_deck_permissions a
                                     where a.deck_id = p.deck_id and a.admin_sub = $2 and a.can_read = 1))
-      order by p.created_at desc
+      order by p.created_at desc, p.id desc
       limit 100;
       """;
 

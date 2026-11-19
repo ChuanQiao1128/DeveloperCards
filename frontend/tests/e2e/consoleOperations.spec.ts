@@ -179,3 +179,53 @@ test('console shell keeps five desktop areas and traps mobile navigation focus',
   }
   expect(fixture.unexpected).toEqual([]);
 });
+
+test('publishing issues show verified stages and return to the affected deck at 320 px', async ({ page }, testInfo) => {
+  await setup(page);
+  const deck = { id: 15, slug: 'aws-saa-fundamentals', title: 'AWS Basics', author: 'Fixture', locale: 'en-US', deckType: 1, version: 1 };
+  const index = { jobId: 'index-job', deckId: 15, deckSlug: deck.slug, deckTitle: deck.title,
+    deckAvailable: true, status: 'SUCCESS', manifestState: 'needs_attention', createdAt: '2026-11-19T09:10:00Z',
+    buildId: 'build-aws-15', manifestError: 'The download index could not be updated.', manifestAttempts: 5 };
+  const requestedJobs: string[] = [];
+  await page.route('**/api/v1/authoring/publish/jobs', route => route.fulfill({ json: envelope([
+    { jobId: 'queued-job', deckId: 42, deckSlug: 'queued-cards', deckTitle: 'Still queued', status: 'PENDING', dispatchExhausted: false },
+    { jobId: 'build-job', deckId: 31, deckSlug: 'network-cards', deckTitle: 'Networking', status: 'FAILED', updatedAt: '2026-11-19T09:12:00Z' },
+    index,
+  ]).data }));
+  await page.route('**/api/v1/authoring/publish/status?*', route => {
+    const jobId = new URL(route.request().url()).searchParams.get('jobId');
+    requestedJobs.push(jobId ?? '');
+    return route.fulfill({ json: envelope(index).data });
+  });
+  await page.route('**/api/v1/authoring/decks?*', route => {
+    expect(new URL(route.request().url()).searchParams.get('id')).toBe('15');
+    return route.fulfill({ json: envelope([deck]).data });
+  });
+
+  await page.setViewportSize({ width: 1440, height: 780 });
+  await page.goto('/operations');
+  await page.getByRole('link', { name: 'Needs attention', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Publishing issues', level: 1 })).toBeVisible();
+  await expect(page.getByText('Build failed', { exact: true })).toBeVisible();
+  await expect(page.getByText('Failed · 2026-11-19 09:12:00 UTC')).toBeVisible();
+  await expect(page.getByText('Submitted · 2026-11-19 09:10:00 UTC')).toBeVisible();
+  await expect(page.getByText('Still queued')).toHaveCount(0);
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  await page.screenshot({ path: testInfo.outputPath('publishing-issues-desktop.png') });
+
+  await page.setViewportSize({ width: 320, height: 820 });
+  const open = page.getByRole('link', { name: 'View publish job for AWS Basics' });
+  await open.focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('heading', { name: 'AWS Basics' })).toBeVisible();
+  await expect(page.getByText('The download index could not be updated.')).toBeVisible();
+  await expect(page.getByText('build-aws-15')).toBeVisible();
+  expect(requestedJobs).toEqual(['index-job']);
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBe(320);
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  await page.screenshot({ path: testInfo.outputPath('publish-job-narrow.png'), fullPage: true });
+
+  await page.getByRole('link', { name: 'Open deck publishing' }).click();
+  await expect(page).toHaveURL('/decks/publish?deckId=15');
+  await expect(page.getByRole('link', { name: 'Open reviewed release' })).toBeVisible();
+});

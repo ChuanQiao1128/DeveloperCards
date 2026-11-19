@@ -7,20 +7,59 @@ import { Button } from '../components/ui/Button';
 import { Callout } from '../components/ui/Callout';
 import { PUBLISH_JOBS_HREF, publishJobStage } from '../features/deckList/publishJobStage';
 import { useConsoleIdentity } from '../hooks/useConsoleIdentity';
-import { HEADING, LINK, PANEL } from '../lib/consoleOperationsView';
+import { formatTime, HEADING, LINK, PANEL } from '../lib/consoleOperationsView';
 
 const INACTIVE_RELEASES = new Set(['RELEASE_SUPERSEDED', 'RELEASE_ROLLED_BACK', 'REVIEW_REVOKED']);
+const ISSUE_LABELS = {
+  dispatch: 'Queue delivery needs attention',
+  build: 'Build failed',
+  timeout: 'Job timed out',
+  index: 'Index delivery needs attention',
+};
+type JobIssue = keyof typeof ISSUE_LABELS;
+type IssueEvidence = Pick<PublishJob, 'status' | 'errorMessage' | 'manifestState' | 'dispatchExhausted' | 'buildIsLive'>;
+
+function issueFor(job: IssueEvidence): JobIssue | null {
+  if (job.status === 'FAILED' && !INACTIVE_RELEASES.has(job.errorMessage ?? '')) {
+    return job.errorMessage === 'orphaned: no worker pickup' ? 'timeout' : 'build';
+  }
+  if (job.status === 'PENDING' && job.dispatchExhausted) return 'dispatch';
+  if (job.status === 'SUCCESS' && job.manifestState === 'needs_attention' && job.buildIsLive !== false) return 'index';
+  return null;
+}
 
 function recentIssues(jobs: PublishJob[]) {
   const seen = new Set<number | string>();
-  return jobs.filter(job => {
-    // The jobs API returns the newest attempt first. A later attempt replaces the older issue.
+  return jobs.flatMap(job => {
+    // The recent jobs API is newest first. A later attempt replaces an older issue.
     const deck = job.deckId ?? job.deckSlug;
-    if (seen.has(deck)) return false;
+    if (seen.has(deck)) return [];
     seen.add(deck);
-    return (job.status === 'FAILED' && !INACTIVE_RELEASES.has(job.errorMessage ?? '')) ||
-      (job.status === 'SUCCESS' && job.manifestState === 'needs_attention');
+    const issue = issueFor(job);
+    return issue && job.deckAvailable !== false ? [{ job, issue }] : [];
   });
+}
+
+function jobTime(value: string | number | null | undefined): string {
+  const date = new Date(value ?? '');
+  return Number.isFinite(date.getTime()) ? formatTime(date.toISOString()) : 'Unknown';
+}
+
+function issueTime(job: Partial<Pick<PublishJob, 'createdAt' | 'updatedAt'>>, issue: JobIssue | null): [string, string] {
+  if (issue === 'build' || issue === 'timeout') {
+    const failedAt = jobTime(job.updatedAt);
+    if (failedAt !== 'Unknown') return ['Failed', failedAt];
+  }
+  // Delivery states do not have a recorded failure timestamp.
+  return ['Submitted', jobTime(job.createdAt)];
+}
+
+function IssueBadge({ issue }: { issue: JobIssue }) {
+  return (
+    <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${issue === 'build' || issue === 'timeout' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-900'}`}>
+      {ISSUE_LABELS[issue]}
+    </span>
+  );
 }
 
 export function NeedsAttentionPage() {
@@ -38,28 +77,35 @@ export function NeedsAttentionPage() {
   });
 
   return (
-    <ConsolePage title="Needs attention">
-      <section className={PANEL}>
+    <ConsolePage title="Publishing issues">
+      <section className={PANEL} aria-label="Recent publishing issues">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className={HEADING}>Publishing issues</h2>
-            <p className="mt-1 text-sm text-slate-600">Failures and index delivery issues on the latest recorded attempt per deck. Check the job before taking action.</p>
-          </div>
-          <Button variant="outline" loading={query.isFetching} onClick={() => void query.refetch()}>Refresh</Button>
+          <p className="text-sm text-slate-600">Latest attempt per deck from the 100 most recent publish jobs.</p>
+          <Button variant="outline" loading={query.isFetching} onClick={() => void query.refetch()}>Refresh issues</Button>
         </div>
-        {query.isPending ? <p role="status" className="mt-3 text-sm">Loading publishing issues…</p>
-          : query.error ? <div className="mt-3"><Callout tone="danger" role="alert">Could not load publishing issues. Try refreshing.</Callout></div>
-            : query.data.length === 0 ? <p className="mt-3 text-sm text-slate-600">No issues in the latest attempts.</p>
-              : <ul className="mt-3 divide-y divide-slate-200 border-t border-slate-200">
-                {query.data.map(job => <li key={job.jobId} className="flex flex-wrap items-center justify-between gap-3 py-3">
-                  <div className="min-w-0 text-sm">
-                    <p className="font-semibold text-slate-900">{job.deckSlug}</p>
-                    <p className="text-slate-600">{publishJobStage(job)}</p>
-                  </div>
-                  <Link className={LINK} to={`/decks/publish-jobs/${encodeURIComponent(job.jobId)}`} aria-label={`View publish job for ${job.deckSlug}`}>View publish job</Link>
-                </li>)}
+        {query.isPending ? <p role="status" className="text-sm">Loading publishing issues…</p>
+          : query.isError ? <Callout tone="danger" role="alert">Could not load publishing issues. Refresh to try again.</Callout>
+            : query.data.length === 0 ? <p className="text-sm text-slate-600">No publishing issues in the latest attempts.</p>
+              : <ul className="divide-y divide-slate-200 border-t border-slate-200">
+                {query.data.map(({ job, issue }) => {
+                  const [timeLabel, time] = issueTime(job, issue);
+                  return <li key={job.jobId} className="grid items-start gap-3 py-4 text-sm sm:grid-cols-3">
+                    <div className="min-w-0">
+                      <p className="break-words font-semibold text-slate-900">{job.deckTitle || job.deckSlug}</p>
+                      {job.deckTitle && job.deckTitle !== job.deckSlug && <p className="break-all font-mono text-xs text-slate-600">{job.deckSlug}</p>}
+                    </div>
+                    <div className="space-y-1">
+                      <IssueBadge issue={issue} />
+                      <p className="text-xs tabular-nums text-slate-600">{timeLabel} · {time}</p>
+                    </div>
+                    <div className="sm:text-right">
+                      <Link className={`${LINK} inline-flex min-h-11 items-center`} to={`/decks/publish-jobs/${encodeURIComponent(job.jobId)}`}
+                        aria-label={`View publish job for ${job.deckTitle || job.deckSlug}`}>View publish job</Link>
+                    </div>
+                  </li>;
+                })}
               </ul>}
-        <Link className={`mt-3 inline-block text-sm ${LINK}`} to={PUBLISH_JOBS_HREF}>All publish jobs</Link>
+        <Link className={`${LINK} inline-block text-sm`} to={PUBLISH_JOBS_HREF}>All publish jobs</Link>
       </section>
     </ConsolePage>
   );
@@ -79,29 +125,43 @@ export function PublishJobDetailPage() {
       return result.data;
     },
   });
+  const job = query.isSuccess ? query.data : null;
+  const issue = job && issueFor(job);
+  const historicalIndexIssue = job?.status === 'SUCCESS' && job.manifestState === 'needs_attention' && job.buildIsLive === false;
+  const deckId = job?.deckId;
+  const canOpenDeck = job?.deckAvailable !== false && typeof deckId === 'number' && Number.isSafeInteger(deckId) && deckId > 0;
 
   return (
     <ConsolePage title="Publish job">
       <nav className="flex flex-wrap gap-4 text-sm" aria-label="Publish job navigation">
+        <Link to="/needs-attention" className={LINK}>Back to publishing issues</Link>
         <Link to={PUBLISH_JOBS_HREF} className={LINK}>All publish jobs</Link>
-        <Link to="/needs-attention" className={LINK}>Publishing issues</Link>
       </nav>
       <section className={PANEL} aria-label="Publish job status">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-          <h2 className={HEADING}>Job status</h2>
-          <Button variant="outline" loading={query.isFetching} onClick={() => void query.refetch()}>Refresh</Button>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className={`${HEADING} break-words`}>{job?.deckTitle || job?.deckSlug || 'Job status'}</h2>
+            {job?.deckTitle && job.deckSlug && job.deckTitle !== job.deckSlug && <p className="break-all font-mono text-xs text-slate-600">{job.deckSlug}</p>}
+          </div>
+          <Button variant="outline" loading={query.isFetching} onClick={() => void query.refetch()}>Refresh status</Button>
         </div>
-        {query.isPending ? <p role="status" className="text-sm">Loading publish job…</p>
-          : query.error ? <Callout tone="danger" role="alert">Could not load this publish job. Check the job ID and try again.</Callout>
-            : <Fields items={[
-              ['Job ID', query.data.jobId],
-              ['Build ID', query.data.buildId],
-              ['Status', publishJobStage(query.data)],
-              ...(query.data.errorMessage ? [['Error', query.data.errorMessage] as [string, string]] : []),
-              ...(query.data.manifestError ? [['Index error', query.data.manifestError] as [string, string]] : []),
-              ...(query.data.manifestAttempts != null ? [['Index attempts', query.data.manifestAttempts] as [string, number]] : []),
-            ]} />}
-        <p className="mt-3 text-sm text-slate-600">Job status describes the server build and index. Use the saved release to verify the public card pack.</p>
+        {query.isPending && <p role="status" className="text-sm">Loading publish job…</p>}
+        {query.isError && <Callout tone="danger" role="alert">Could not load this publish job. Check the job ID and refresh.</Callout>}
+        {job && <>
+          {issue ? <IssueBadge issue={issue} /> : <p className="text-sm font-medium">{historicalIndexIssue ? 'Historical index delivery failure' : publishJobStage(job)}</p>}
+          <Fields items={[
+            ['Job ID', job.jobId],
+            ['Build ID', job.buildId],
+            issueTime(job, issue),
+            ...(issue === 'dispatch' && job.dispatchAttempts != null ? [['Queue attempts', job.dispatchAttempts] as [string, number]] : []),
+            ...(job.manifestAttempts != null ? [['Index attempts', job.manifestAttempts] as [string, number]] : []),
+          ]} />
+          {job.errorMessage && <Callout tone="danger" title="Job error"><p className="break-words">{job.errorMessage}</p></Callout>}
+          {job.manifestError && <Callout tone="warning" title="Index error"><p className="break-words">{job.manifestError}</p></Callout>}
+          {issue === 'dispatch' && <p className="text-sm text-slate-600">Queue delivery could not be confirmed.</p>}
+          {canOpenDeck && <Link className={`${LINK} inline-flex min-h-11 items-center text-sm font-medium`} to={`/decks/publish?deckId=${deckId}`}>Open deck publishing</Link>}
+          {job.deckAvailable === false && <p className="text-sm text-slate-600">This deck is no longer available.</p>}
+        </>}
       </section>
     </ConsolePage>
   );

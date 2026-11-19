@@ -28,11 +28,18 @@ public static class PublishStatus
     const string sql = """
       select
         p.job_id as "jobId",
+        p.deck_id as "deckId",
+        p.deck_slug as "deckSlug",
         p.status,
         p.build_id as "buildId",
         p.s3_key as "s3Key",
-        p.error_message as "errorMessage"
-      from deck_publishes p
+        p.error_message as "errorMessage",
+        p.created_at as "createdAt",
+        p.updated_at as "updatedAt",
+        d.title as "deckTitle",
+        coalesce(d.is_deleted = 0, false) as "deckAvailable",
+        coalesce(p.build_id = d.live_build_id, false) as "buildIsLive"
+      from deck_publishes p left join decks d on d.id = p.deck_id
       where p.job_id = $1
         and ($2::boolean or exists (select 1 from admin_deck_permissions a
                                     where a.deck_id = p.deck_id and a.admin_sub = $3 and a.can_read = 1))

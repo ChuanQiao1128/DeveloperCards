@@ -738,12 +738,17 @@ export interface PublishJob {
   jobId: string;
   deckId?: number;
   deckSlug: string;
+  deckTitle?: string | null;
+  deckAvailable?: boolean;
+  buildIsLive?: boolean;
   status: 'PENDING' | 'PROCESSING' | 'SUCCESS' | 'FAILED';
   manifestState?: 'pending' | 'delivered' | 'needs_attention' | null;
   recoveryDurable?: boolean;
+  dispatchExhausted?: boolean;
   note?: string;
   errorMessage?: string;
-  createdAt: number;
+  createdAt: number | string;
+  updatedAt?: number | string | null;
 }
 
 export async function fetchPublishJobs(): Promise<ApiResult<PublishJob[]>> {
@@ -755,8 +760,10 @@ export async function fetchPublishJobs(): Promise<ApiResult<PublishJob[]>> {
   }
 }
 
-type PublishJobDetail = Pick<PublishJob, 'jobId' | 'status' | 'manifestState' | 'errorMessage'> & {
+type PublishJobDetail = Pick<PublishJob, 'jobId' | 'status' | 'manifestState' | 'errorMessage' | 'dispatchExhausted' | 'buildIsLive' | 'updatedAt'>
+  & Partial<Pick<PublishJob, 'deckId' | 'deckSlug' | 'deckTitle' | 'deckAvailable' | 'createdAt'>> & {
   buildId: string;
+  dispatchAttempts?: number | null;
   manifestError?: string | null;
   manifestAttempts?: number | null;
 };

@@ -18,11 +18,14 @@ public static class PublishDelivery
     var stages=ready && rows.Count>0 ? await DbUtil.QueryAsync(conn,null,"""
       select p.job_id,s.job_id is not null as durable,m.state,m.attempts,m.next_attempt_at,m.lease_until,m.last_error,
         s.next_attempt_at as dispatch_next_attempt_at,s.lease_until as dispatch_lease_until,
+        s.attempts as dispatch_attempts,
+        coalesce(p.status='PENDING' and s.attempts >= $2 and s.delivered_at is null
+          and (s.lease_until is null or s.lease_until <= statement_timestamp()), false) as dispatch_exhausted,
         case when p.status<>'PENDING' then 'closed' when s.attempts>=5 then 'needs_attention'
           when s.delivered_at is not null then 'delivered' else 'pending' end as dispatch_state
       from deck_publishes p left join publish_dispatch s using(job_id) left join publish_manifest_delivery m using(job_id)
       where p.job_id=any($1::varchar[])
-      """,[rows.Select(r=>(string)(r.GetValueOrDefault("jobId")??r["job_id"])!).ToArray()]) : [];
+      """,[rows.Select(r=>(string)(r.GetValueOrDefault("jobId")??r["job_id"])!).ToArray(),MaxAttempts]) : [];
     var byId=stages.ToDictionary(r=>(string)r["job_id"]!);
     foreach(var row in rows)
     {
@@ -30,6 +33,8 @@ public static class PublishDelivery
       row["recoveryDurable"]=stage?["durable"] is true;
       row["manifestState"]=stage?["state"];
       row["dispatchState"]=stage?["dispatch_state"];
+      row["dispatchExhausted"]=stage?["dispatch_exhausted"] is true;
+      row["dispatchAttempts"]=stage?["dispatch_attempts"];
       row["manifestAttempts"]=stage?["attempts"];
       row["manifestNextAttemptAt"]=stage?["next_attempt_at"];
       row["manifestLeaseUntil"]=stage?["lease_until"];
