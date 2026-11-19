@@ -952,11 +952,11 @@ test('the card inventory preserves filters and page while an editor opens a card
   await page.goto(`/decks/cards?deckId=${DECK.id}`);
   await expect(page.getByRole('table', { name: 'Cards in deck' }).getByRole('row')).toHaveCount(31);
   await page.getByLabel('Rarity').selectOption('0');
-  await expect(page.getByText('Showing 1 of 35 cards')).toBeVisible();
+  await expect(page.getByText('1 of 35 cards match')).toBeVisible();
   await expect(page.getByRole('link', { name: example[0].question, exact: true })).toBeVisible();
   await page.getByLabel('Rarity').selectOption('all');
   await page.getByLabel('Search cards').fill('object storage');
-  await expect(page.getByText('Showing 35 of 35 cards')).toBeVisible();
+  await expect(page.getByText('35 of 35 cards match')).toBeVisible();
   await expectNoAxeViolations(page, 'card inventory');
   await page.screenshot({ path: testInfo.outputPath('cards-desktop.png') });
   await page.getByRole('button', { name: 'Next', exact: true }).click();

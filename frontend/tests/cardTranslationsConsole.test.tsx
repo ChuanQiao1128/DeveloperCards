@@ -332,7 +332,7 @@ describe('CardListPage: the Chinese missing / stale filter', () => {
     await userEvent.selectOptions(filter, 'zh-stale');
     await waitFor(() => expect(screen.queryByText('Q missing')).toBeNull());
     expect(screen.getByText('Q stale')).toBeTruthy();
-    expect(screen.getByTestId('card-list-visible-count').textContent).toBe('Showing 1 of 3 cards');
+    expect(screen.getByTestId('card-list-visible-count').textContent).toBe('1 of 3 cards match');
   });
 
   it('shows neither the filter nor the badges on a deck without translations', async () => {

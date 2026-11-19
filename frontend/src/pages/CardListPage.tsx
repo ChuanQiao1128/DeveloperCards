@@ -316,14 +316,14 @@ export function CardListPage() {
               onChange={event => changeCriteria({ ...criteria, query: event.target.value })}
               className={`${INPUT_CLASS} min-h-11 max-w-xl`} placeholder="Question, topic, or card ID…" />
           </div>
-          <div className="flex flex-wrap items-end gap-3">
-            <label className="space-y-1 text-xs font-medium text-slate-700">Type
+          <div className="grid grid-cols-2 items-end gap-3 sm:flex sm:flex-wrap">
+            <label className="min-w-0 space-y-1 text-xs font-medium text-slate-700">Type
               <select aria-label="Card type" className={`${INPUT_CLASS} block bg-white`} value={criteria.kind}
                 onChange={event => changeCriteria({ ...criteria, kind: event.target.value as CardListCriteria['kind'] })}>
                 <option value="all">All types</option><option value="mcq">Multiple choice</option><option value="qa">Q&amp;A</option>
               </select>
             </label>
-            <label className="space-y-1 text-xs font-medium text-slate-700">Rarity
+            <label className="min-w-0 space-y-1 text-xs font-medium text-slate-700">Rarity
               <select aria-label="Rarity" className={`${INPUT_CLASS} block bg-white`} value={criteria.difficulty}
                 onChange={event => changeCriteria({ ...criteria, difficulty: event.target.value === 'all' ? 'all' : Number(event.target.value) })}>
                 <option value="all">All rarities</option>
@@ -332,13 +332,13 @@ export function CardListPage() {
                 </option>)}
               </select>
             </label>
-            {showTranslations && <label className="space-y-1 text-xs font-medium text-slate-700">Translation
+            {showTranslations && <label className="min-w-0 space-y-1 text-xs font-medium text-slate-700">Translation
               <select aria-label="Chinese translation" className={`${INPUT_CLASS} block bg-white`} value={criteria.translation}
                 onChange={event => changeCriteria({ ...criteria, translation: event.target.value as CardListCriteria['translation'] })}>
                 <option value="all">Any translation status</option><option value="zh-missing">Chinese missing</option><option value="zh-stale">Chinese stale</option>
               </select>
             </label>}
-            <label className="space-y-1 text-xs font-medium text-slate-700">Sort
+            <label className="min-w-0 space-y-1 text-xs font-medium text-slate-700">Sort
               <select aria-label="Sort cards" className={`${INPUT_CLASS} block bg-white`} value={criteria.sort}
                 onChange={event => changeCriteria({ ...criteria, sort: event.target.value as CardListCriteria['sort'] })}>
                 <option value="order">Deck order</option><option value="updated">Recently updated</option><option value="difficulty">Difficulty</option>
@@ -350,7 +350,7 @@ export function CardListPage() {
 
         <div className="flex flex-wrap items-center justify-between gap-3 border-y border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
           <div role="status">
-            {filtersActive ? <span data-testid="card-list-visible-count">Showing {visibleCards.length} of {cards.length} cards</span>
+            {filtersActive ? <span data-testid="card-list-visible-count">{visibleCards.length} of {cards.length} cards match</span>
               : <span>{visibleCards.length} cards</span>}
           </div>
           {pageCount > 1 && <nav aria-label="Card pages" className="flex flex-wrap items-center gap-2">

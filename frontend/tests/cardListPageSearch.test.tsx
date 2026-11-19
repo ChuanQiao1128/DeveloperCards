@@ -116,7 +116,7 @@ describe('the filter bar narrows the card list', () => {
 
     await waitFor(() =>
       expect(screen.getByTestId('card-list-visible-count').textContent).toBe(
-        'Showing 1 of 2 cards',
+        '1 of 2 cards match',
       ),
     );
   });
