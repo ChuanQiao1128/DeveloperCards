@@ -2,6 +2,7 @@
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>ConsoleS2.DbBootstrap</AssemblyName><GenerateRuntimeConfigurationFiles>true</GenerateRuntimeConfigurationFiles>
+    <MigrationDirectory>../../../../src_C/Vpc/Db/Migrations</MigrationDirectory>
   </PropertyGroup>
   <ItemGroup><Compile Remove="tests/**/*.cs" /></ItemGroup>
   <ItemGroup>
@@ -10,7 +11,16 @@
     <PackageReference Include="Npgsql" Version="10.0.0" />
     <Compile Include="../../../../src_C/Shared/RecallSmith.Lambda.Db/PgConnectionSecurity.cs" Link="PgConnectionSecurity.cs" />
     <None Include="../../../../src_C/Shared/RecallSmith.Lambda.Db/Certificates/ap-southeast-2-bundle.pem" Link="Certificates/ap-southeast-2-bundle.pem" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
-    <EmbeddedResource Include="../../../../src_C/Vpc/Db/Migrations/*.sql" LogicalName="Migrations.%(Filename)%(Extension)" />
+    <!-- The isolated Console S2 fixture is frozen at schema 061. -->
+    <EmbeddedResource Include="$(MigrationDirectory)/00?_*.sql;
+                               $(MigrationDirectory)/01?_*.sql;
+                               $(MigrationDirectory)/02?_*.sql;
+                               $(MigrationDirectory)/03?_*.sql;
+                               $(MigrationDirectory)/04?_*.sql;
+                               $(MigrationDirectory)/05?_*.sql;
+                               $(MigrationDirectory)/060_*.sql;
+                               $(MigrationDirectory)/061_*.sql"
+                      LogicalName="Migrations.%(Filename)%(Extension)" />
     <EmbeddedResource Include="../../../../src_C/OperationsObserver/Backlog.sql" LogicalName="Backlog.sql" />
   </ItemGroup>
 </Project>
