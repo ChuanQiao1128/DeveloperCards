@@ -174,8 +174,46 @@ public class PublishScopeAndLiveBuildTests
       PublishStatus.HandlePublishStatus);
 
     Assert.Equal(200, status);
-    Assert.Equal(jobId, doc.RootElement.GetProperty("data").GetProperty("jobId").GetString());
+    var job = doc.RootElement.GetProperty("data");
+    Assert.Equal(jobId, job.GetProperty("jobId").GetString());
+    Assert.Equal(deckId, job.GetProperty("deckId").GetInt64());
+    Assert.Equal(slug, job.GetProperty("deckSlug").GetString());
+    Assert.Equal("deck " + slug, job.GetProperty("deckTitle").GetString());
+    Assert.True(job.GetProperty("deckAvailable").GetBoolean());
+    Assert.NotEqual(default, job.GetProperty("createdAt").GetDateTimeOffset());
+    Assert.NotEqual(default, job.GetProperty("updatedAt").GetDateTimeOffset());
     doc.Dispose();
+  }
+
+  [Theory]
+  [InlineData(4, false, false, false)]
+  [InlineData(5, true, false, false)]
+  [InlineData(5, false, true, false)]
+  [InlineData(5, false, false, true)]
+  public async Task Jobs_DispatchExhausted_RequiresUnconfirmedDeliveryAndExpiredLease(
+    int attempts, bool delivered, bool leased, bool exhausted)
+  {
+    await using var conn = await _db.OpenAsync();
+    var slug = Slug("dispatch");
+    var deckId = await SeedDeckAsync(conn, slug);
+    var jobId = await SeedPublishAsync(conn, deckId, slug, "b-dispatch", "PENDING");
+    await DbUtil.ExecuteAsync(conn, null, """
+      insert into publish_dispatch(job_id, deck_id, attempts, delivered_at, lease_until)
+      values ($1, $2, $3, case when $4 then now() end,
+        case when $5 then now() + interval '1 hour' else now() - interval '1 hour' end)
+      """, [jobId, deckId, attempts, delivered, leased]);
+
+    var (status, doc) = await InvokeAsync(
+      Event("/api/v1/authoring/publish/jobs", "GET", NewSub(), new[] { "super_admin" }, null),
+      PublishJobs.HandleFetchPublishJobs);
+    using (doc)
+    {
+      Assert.Equal(200, status);
+      var job = Assert.Single(doc.RootElement.GetProperty("data").EnumerateArray(),
+        row => row.GetProperty("jobId").GetString() == jobId);
+      Assert.Equal(exhausted, job.GetProperty("dispatchExhausted").GetBoolean());
+      Assert.Equal(attempts, job.GetProperty("dispatchAttempts").GetInt32());
+    }
   }
 
   // ---- AdminDecks liveBuildId -----------------------------------------------------------------

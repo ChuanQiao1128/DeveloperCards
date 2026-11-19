@@ -34,34 +34,53 @@ it('shows only recent actionable attempts and opens the exact job independently 
     { jobId: 'old-failure', deckId: 1, deckSlug: 'old-name', status: 'FAILED' },
     { jobId: 'working', deckId: 2, deckSlug: 'still-building', status: 'PROCESSING' },
     { jobId: 'rolled-back', deckId: 3, deckSlug: 'rolled-back', status: 'FAILED', errorMessage: 'RELEASE_ROLLED_BACK' },
-    { jobId: 'build-failed', deckId: 4, deckSlug: 'failed-build', status: 'FAILED' },
-    { jobId: 'index-failed', deckId: 5, deckSlug: 'failed-index', status: 'SUCCESS', manifestState: 'needs_attention' },
+    { jobId: 'build-failed', deckId: 4, deckSlug: 'failed-build', status: 'FAILED', updatedAt: '2026-11-19T11:25:00Z' },
+    { jobId: 'index-failed', deckId: 5, deckSlug: 'failed-index', deckTitle: 'Search cards', status: 'SUCCESS',
+      manifestState: 'needs_attention', createdAt: '2026-11-19T11:20:00Z' },
+    { jobId: 'dispatch-failed', deckId: 6, deckSlug: 'failed-dispatch', status: 'PENDING', dispatchExhausted: true },
+    { jobId: 'dispatch-working', deckId: 7, deckSlug: 'still-queued', status: 'PENDING', dispatchExhausted: false },
+    { jobId: 'reaped-job', deckId: 9, deckSlug: 'timed-out', status: 'FAILED', errorMessage: 'orphaned: no worker pickup' },
+    { jobId: 'rolled-back-index', deckId: 10, deckSlug: 'retired-version', status: 'SUCCESS',
+      manifestState: 'needs_attention', buildIsLive: false },
+    { jobId: 'deleted-deck', deckId: 8, deckSlug: 'deleted-deck', status: 'FAILED', deckAvailable: false },
   ])).mockResolvedValueOnce(envelope({
-    jobId: 'index-failed', buildId: 'saved-build', status: 'SUCCESS', manifestState: 'needs_attention',
-    manifestError: 'Index update timed out', manifestAttempts: 5,
+    jobId: 'index-failed', deckId: 5, deckSlug: 'failed-index', deckTitle: 'Search cards', deckAvailable: true,
+    buildId: 'saved-build', status: 'SUCCESS', manifestState: 'needs_attention',
+    createdAt: '2026-11-19T11:20:00Z', manifestError: 'Index update timed out', manifestAttempts: 5,
   }));
   mount('/needs-attention');
-  expect(await screen.findAllByRole('link', { name: /^View publish job for/ })).toHaveLength(2);
+  expect(await screen.findAllByRole('link', { name: /^View publish job for/ })).toHaveLength(4);
   expect(screen.queryByText('old-name')).toBeNull();
-  fireEvent.click(screen.getByRole('link', { name: 'View publish job for failed-index' }));
+  expect(screen.queryByText('still-queued')).toBeNull();
+  expect(screen.queryByText('deleted-deck')).toBeNull();
+  expect(screen.queryByText('retired-version')).toBeNull();
+  expect(screen.getByText('Queue delivery needs attention')).toBeTruthy();
+  expect(screen.getByText('Job timed out')).toBeTruthy();
+  expect(screen.getByText('Failed · 2026-11-19 11:25:00 UTC')).toBeTruthy();
+  expect(screen.getByText('Submitted · 2026-11-19 11:20:00 UTC')).toBeTruthy();
+  fireEvent.click(screen.getByRole('link', { name: 'View publish job for Search cards' }));
   expect(await screen.findByText('Index update timed out')).toBeTruthy();
   expect(screen.getByText('saved-build')).toBeTruthy();
+  expect(screen.getByRole('link', { name: 'Open deck publishing' }).getAttribute('href')).toBe('/decks/publish?deckId=5');
   expect(get.mock.calls.map(([url]) => url)).toEqual(['/api/v1/authoring/publish/jobs', '/api/v1/authoring/publish/status']);
   expect(get.mock.calls.at(-1)?.[1].params).toEqual({ jobId: 'index-failed' });
   expect(screen.getByRole('link', { name: 'All publish jobs' }).getAttribute('href')).toBe('/?view=publish-jobs');
 });
 
-it('shows older directly linked jobs and rejects a mismatched job on refresh', async () => {
-  get.mockResolvedValueOnce(envelope({ jobId: 'older-job', buildId: 'older-build', status: 'FAILED' }))
-    .mockResolvedValueOnce(envelope({ jobId: 'another-job', buildId: 'another-build', status: 'SUCCESS' }));
-  mount('/decks/publish-jobs/older-job');
+it('uses only the exact job response for the deck link and hides it after a mismatched refresh', async () => {
+  get.mockResolvedValueOnce(envelope({ jobId: 'older-job', deckId: 17, deckSlug: 'right-deck', buildId: 'older-build', status: 'FAILED' }))
+    .mockResolvedValueOnce(envelope({ jobId: 'another-job', deckId: 25, buildId: 'another-build', status: 'SUCCESS' }));
+  mount('/decks/publish-jobs/older-job?deckId=99');
   await screen.findByText('older-build');
-  fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+  expect(screen.getByRole('link', { name: 'Open deck publishing' }).getAttribute('href')).toBe('/decks/publish?deckId=17');
+  fireEvent.click(screen.getByRole('button', { name: 'Refresh status' }));
   await screen.findByRole('alert');
   expect(screen.queryByText('another-build')).toBeNull();
   expect(screen.queryByText('older-build')).toBeNull();
+  expect(screen.queryByRole('link', { name: 'Open deck publishing' })).toBeNull();
   expect(get.mock.calls.every(([url]) => url === '/api/v1/authoring/publish/status')).toBe(true);
 });
+
 it('shows loading, observed directory semantics, literal search, empty state and server cursor paging', async () => {
   let resolve!: (value: unknown) => void;
   get.mockImplementationOnce(() => new Promise(done => { resolve = done; }));
