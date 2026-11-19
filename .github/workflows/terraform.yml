@@ -67,6 +67,10 @@ on:
         description: 'Recover content verification headers only (targeted apply; full drift is not checked)'
         type: boolean
         default: false
+      content_publish_notify_only:
+        description: 'Apply only the approved worker notify queue send policy (full drift is not checked)'
+        type: boolean
+        default: false
 
 # Read-only by default; only the two infra-prod jobs can mint an OIDC token.
 permissions:
@@ -88,7 +92,7 @@ env:
 jobs:
   select:
     name: select (no AWS)
-    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || inputs.console_mfa_only || inputs.content_headers_only)
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || inputs.console_mfa_only || inputs.content_headers_only || inputs.content_publish_notify_only)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -126,13 +130,18 @@ jobs:
           BEFORE: ${{ github.event.before }}
           CONSOLE_MFA_ONLY: ${{ github.event_name == 'workflow_dispatch' && inputs.console_mfa_only }}
           CONTENT_HEADERS_ONLY: ${{ github.event_name == 'workflow_dispatch' && inputs.content_headers_only }}
+          CONTENT_PUBLISH_NOTIFY_ONLY: ${{ github.event_name == 'workflow_dispatch' && inputs.content_publish_notify_only }}
         run: |
           set -euo pipefail
           {
             echo "### Terraform: \`$GITHUB_SHA\`"
             echo
           } >> "$GITHUB_STEP_SUMMARY"
-          if [ "$CONSOLE_MFA_ONLY" = true ] && [ "$CONTENT_HEADERS_ONLY" = true ]; then
+          selected=0
+          for mode in "$CONSOLE_MFA_ONLY" "$CONTENT_HEADERS_ONLY" "${CONTENT_PUBLISH_NOTIFY_ONLY:-false}"; do
+            if [ "$mode" = true ]; then selected=$((selected + 1)); fi
+          done
+          if [ "$selected" -gt 1 ]; then
             echo '::error::select only one recovery mode'
             exit 1
           fi
@@ -151,6 +160,14 @@ jobs:
               echo 'Content verification response headers targeted scope only; full production drift is not checked.'
               echo 'Only fixed content bucket CORS, distribution headers and Console CSP may change.'
               echo 'Allow file: docs/delivery/content-release-recovery-20261118/CDN-VERIFY.plan-allow.json'
+            } >> "$GITHUB_STEP_SUMMARY"
+          elif [ "${CONTENT_PUBLISH_NOTIFY_ONLY:-false}" = true ]; then
+            echo 'apply=true' >> "$GITHUB_OUTPUT"
+            echo 'allow=docs/delivery/publish-failure-events.plan-allow.json' >> "$GITHUB_OUTPUT"
+            {
+              echo 'Worker notify send policy targeted scope only; full production drift is not checked.'
+              echo 'Only the approved SendMessage policy on the existing notify queue may be created.'
+              echo 'Allow file: docs/delivery/publish-failure-events.plan-allow.json'
             } >> "$GITHUB_STEP_SUMMARY"
           else
             python3 infra/scripts/tf-pipeline.py select --before "$BEFORE" --after "$GITHUB_SHA" \
@@ -180,6 +197,7 @@ jobs:
       ALLOW: ${{ needs.select.outputs.allow }}
       CONSOLE_MFA_ONLY: ${{ github.event_name == 'workflow_dispatch' && inputs.console_mfa_only }}
       CONTENT_HEADERS_ONLY: ${{ github.event_name == 'workflow_dispatch' && inputs.content_headers_only }}
+      CONTENT_PUBLISH_NOTIFY_ONLY: ${{ github.event_name == 'workflow_dispatch' && inputs.content_publish_notify_only }}
       # The one root variable without a default (infra/envs/prod/variables.tf, sensitive). Environment secret.
       TF_VAR_alert_email: ${{ secrets.TF_VAR_ALERT_EMAIL }}
     steps:
@@ -205,7 +223,11 @@ jobs:
       - name: preflight (no credentials yet)
         run: |
           set -euo pipefail
-          if [ "$CONSOLE_MFA_ONLY" = true ] && [ "$CONTENT_HEADERS_ONLY" = true ]; then
+          selected=0
+          for mode in "$CONSOLE_MFA_ONLY" "$CONTENT_HEADERS_ONLY" "${CONTENT_PUBLISH_NOTIFY_ONLY:-false}"; do
+            if [ "$mode" = true ]; then selected=$((selected + 1)); fi
+          done
+          if [ "$selected" -gt 1 ]; then
             echo '::error::select only one recovery mode'
             exit 1
           fi
@@ -258,6 +280,8 @@ jobs:
               '-target=module.edge.aws_cloudfront_distribution.content'
               '-target=module.edge.aws_cloudfront_response_headers_policy.security["console"]'
             )
+          elif [ "${CONTENT_PUBLISH_NOTIFY_ONLY:-false}" = true ]; then
+            targets=('-target=module.identity.aws_iam_role_policy.worker_notify_send')
           fi
           terraform -chdir=infra/envs/prod plan -input=false -no-color -lock-timeout=10m \
             ${targets[@]+"${targets[@]}"} -out="$RUNNER_TEMP/tf/apply.tfplan" > "$RUNNER_TEMP/tf/plan.log" 2>&1
@@ -279,7 +303,7 @@ jobs:
           fi
           # A recovery retry may already be applied; only a genuinely empty guarded plan skips the allow-list.
           # MFA recovery still verifies the existing pool identity and values above.
-          if [ -n "$ALLOW" ] && ! { { [ "$CONSOLE_MFA_ONLY" = true ] || [ "$CONTENT_HEADERS_ONLY" = true ]; } && [ "$NEEDED" = false ]; }; then
+          if [ -n "$ALLOW" ] && ! { { [ "$CONSOLE_MFA_ONLY" = true ] || [ "$CONTENT_HEADERS_ONLY" = true ] || [ "${CONTENT_PUBLISH_NOTIFY_ONLY:-false}" = true ]; } && [ "$NEEDED" = false ]; }; then
             python3 infra/scripts/check-plan.py --plan "$RUNNER_TEMP/tf/plan.json" --allow "$RUNNER_TEMP/tf/allow.json" \
               --summary > "$RUNNER_TEMP/tf/gate.txt" 2>&1 || rc=$?
           else
@@ -310,6 +334,8 @@ jobs:
               '-target=module.edge.aws_cloudfront_distribution.content'
               '-target=module.edge.aws_cloudfront_response_headers_policy.security["console"]'
             )
+          elif [ "${CONTENT_PUBLISH_NOTIFY_ONLY:-false}" = true ]; then
+            targets=('-target=module.identity.aws_iam_role_policy.worker_notify_send')
           fi
           terraform -chdir=infra/envs/prod plan -input=false -no-color -lock-timeout=10m \
             ${targets[@]+"${targets[@]}"} -out="$RUNNER_TEMP/tf/second.tfplan" > "$RUNNER_TEMP/tf/second.log" 2>&1 || exit 1
@@ -321,6 +347,9 @@ jobs:
           fi
           if [ "$CONTENT_HEADERS_ONLY" = true ]; then
             echo 'Content verification response headers targeted scope only; full production drift is not checked.'
+          fi
+          if [ "${CONTENT_PUBLISH_NOTIFY_ONLY:-false}" = true ]; then
+            echo 'Worker notify send policy targeted scope only; full production drift is not checked.'
           fi
           rc=0
           python3 infra/scripts/check-plan.py --plan "$RUNNER_TEMP/tf/second.json" > "$RUNNER_TEMP/tf/second.txt" 2>&1 || rc=$?
@@ -430,6 +459,10 @@ jobs:
               echo "Content header cache refresh: ${INVALIDATION:-not run}"
               echo
             fi
+            if [ "${CONTENT_PUBLISH_NOTIFY_ONLY:-false}" = true ]; then
+              echo 'Worker notify send policy targeted scope only; full production drift is not checked.'
+              echo
+            fi
             echo "- allow file: $allow_line"
             echo "- guard (break-glass refusal): ${GUARD:-not run}; plan gate (check-plan.py): ${GATE:-not run}"
             echo "- apply: $applied"
@@ -454,7 +487,7 @@ jobs:
 
   plan:
     name: plan only (infra-prod)
-    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && !inputs.console_mfa_only && !inputs.content_headers_only
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && !inputs.console_mfa_only && !inputs.content_headers_only && !inputs.content_publish_notify_only
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment:

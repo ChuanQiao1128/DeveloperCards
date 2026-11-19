@@ -886,12 +886,12 @@ class WorkflowFactsTest(unittest.TestCase):
             self.assertIn("TF_VAR_alert_email: ${{ secrets.TF_VAR_ALERT_EMAIL }}", self.jobs[name])
         self.assertNotIn("developercards-gha-prod", self.text)
         self.assertNotIn("configure-aws-credentials", self.jobs["select"])
-        self.assertIn("if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && !inputs.console_mfa_only && !inputs.content_headers_only", self.jobs["plan"])
+        self.assertIn("if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && !inputs.console_mfa_only && !inputs.content_headers_only && !inputs.content_publish_notify_only", self.jobs["plan"])
 
     def test_console_recovery_is_explicit_and_main_only(self):
         self.assertIn("console_mfa_only:\n        description:", self.text)
         self.assertIn("        type: boolean\n        default: false", self.text)
-        self.assertIn("if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || inputs.console_mfa_only || inputs.content_headers_only)",
+        self.assertIn("if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || inputs.console_mfa_only || inputs.content_headers_only || inputs.content_publish_notify_only)",
                       self.jobs["select"])
         self.assertIn("CONSOLE_MFA_ONLY: ${{ github.event_name == 'workflow_dispatch' && inputs.console_mfa_only }}",
                       self.jobs["apply"])
@@ -1515,7 +1515,7 @@ class StepBodyTest(unittest.TestCase):
             handle.write(step_body(self.jobs[job], name))
         full = {"PATH": self.bin + os.pathsep + os.environ["PATH"], "RUNNER_TEMP": self.runner_temp,
                 "GITHUB_STEP_SUMMARY": self.summary, "GITHUB_SHA": "a" * 40, "GITHUB_RUN_ID": "11",
-                "GITHUB_RUN_ATTEMPT": "2", "STUB_LOG": self.log, "ALLOW": "", "CONSOLE_MFA_ONLY": "false", "CONTENT_HEADERS_ONLY": "false", "NEEDED": "true",
+                "GITHUB_RUN_ATTEMPT": "2", "STUB_LOG": self.log, "ALLOW": "", "CONSOLE_MFA_ONLY": "false", "CONTENT_HEADERS_ONLY": "false", "CONTENT_PUBLISH_NOTIFY_ONLY": "false", "NEEDED": "true",
                 "GITHUB_OUTPUT": os.path.join(self.tmp, "outputs"), "TF_VAR_alert_email": "x@example.invalid"}
         full.update(env)
         proc = subprocess.run(["bash", "--noprofile", "--norc", "-eo", "pipefail", script], cwd=self.work, env=full,
@@ -1585,6 +1585,45 @@ class StepBodyTest(unittest.TestCase):
             self.assertNotIn("console-mfa-check", self.read(self.log))
             if "second" in name:
                 self.assertIn("full production drift is not checked", out)
+
+    def test_worker_notify_scope_is_literal_and_same_in_both_plans(self):
+        for name in ("plan to a saved file (never printed)", "the second plan must be empty"):
+            open(self.log, "w").close()
+            rc, out = self.run_step("apply", name, CONTENT_PUBLISH_NOTIFY_ONLY="true", STUB_PYTHON="empty")
+            self.assertEqual(rc, 0, out)
+            plans = [line for line in self.read(self.log).splitlines() if " plan " in line]
+            self.assertEqual(len(plans), 1)
+            targets = [arg for arg in plans[0].split() if arg.startswith("-target=")]
+            self.assertEqual(targets, ['-target=module.identity.aws_iam_role_policy.worker_notify_send'])
+            if "second" in name:
+                self.assertIn("full production drift is not checked", out)
+
+    def test_worker_notify_selection_and_all_mode_conflicts(self):
+        rc, out = self.run_step("select", "pick this push's allow files", CONTENT_PUBLISH_NOTIFY_ONLY="true")
+        self.assertEqual(rc, 0, out)
+        self.assertEqual(self.read(os.path.join(self.tmp, "outputs")),
+                         "apply=true\nallow=docs/delivery/publish-failure-events.plan-allow.json\n")
+        self.assertIn("Worker notify send policy targeted scope only", self.read(self.summary))
+        for other in ("CONSOLE_MFA_ONLY", "CONTENT_HEADERS_ONLY"):
+            for job, name in (("select", "pick this push's allow files"), ("apply", "preflight (no credentials yet)")):
+                open(self.log, "w").close()
+                rc, out = self.run_step(job, name, **{"CONTENT_PUBLISH_NOTIFY_ONLY": "true", other: "true"})
+                self.assertEqual(rc, 1, out)
+                self.assertIn("select only one recovery mode", out)
+                self.assertEqual(self.read(self.log), "")
+
+    def test_worker_notify_empty_retry_still_requires_empty_plan(self):
+        for needed in ("true", "false"):
+            open(self.log, "w").close()
+            rc, out = self.run_step("apply", "the plan must match the allow-list (check-plan.py)",
+                                    CONTENT_PUBLISH_NOTIFY_ONLY="true", NEEDED=needed, STUB_PYTHON="empty",
+                                    ALLOW="docs/delivery/publish-failure-events.plan-allow.json")
+            self.assertEqual(rc, 0, out)
+            self.assertEqual(" --allow " in self.read(self.log), needed == "true")
+        rc, out = self.run_step("apply", "the plan must match the allow-list (check-plan.py)",
+                                CONTENT_PUBLISH_NOTIFY_ONLY="true", NEEDED="false", STUB_PYTHON="fail")
+        self.assertEqual(rc, 1, out)
+        self.assertIn("PLAN VIOLATION", out)
 
     def test_content_recovery_selection_and_mutual_exclusion(self):
         rc, out = self.run_step("select", "pick this push's allow files", CONTENT_HEADERS_ONLY="true")
