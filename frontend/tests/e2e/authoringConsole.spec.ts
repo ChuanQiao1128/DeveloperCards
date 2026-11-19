@@ -794,7 +794,7 @@ test('deck workspace keeps publication and versions scoped to the selected deck'
 
   await stubApi(page);
   await page.route('**/api/v1/admin/decks?*', route => reply(route, {
-    items: [DECK, otherDeck].map(deck => ({ ...deck, latestBuildId: 'v1', updatedAtMs: Date.UTC(2026, 10, 19) })),
+    items: [DECK, otherDeck].map(deck => ({ ...deck, latestBuildId: deck.id === DECK.id ? 'v1' : null, updatedAtMs: Date.UTC(2026, 10, 19) })),
     hasMore: false, nextCursor: null,
   }));
   await page.route('**/api/v1/authoring/qa/status?*', route => reply(route, { enabled: false }));
@@ -837,7 +837,10 @@ test('deck workspace keeps publication and versions scoped to the selected deck'
   expect((await deckTable.getByRole('columnheader', { name: 'Updated' }).boundingBox())?.height).toBeLessThan(60);
   await page.screenshot({ path: testInfo.outputPath('deck-list-desktop.png') });
   await page.setViewportSize({ width: 320, height: 780 });
-  expect(await deckTable.evaluate(table => table.scrollWidth <= table.parentElement!.clientWidth)).toBe(true);
+  await expect.poll(() => deckTable.evaluate(table => table.scrollWidth <= table.parentElement!.clientWidth)).toBe(true);
+  const awsRow = deckTable.getByRole('row', { name: /AWS Basics/ });
+  await expect(awsRow.getByText('Needs Publish', { exact: true }).filter({ visible: true })).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath('deck-list-mobile.png') });
   await page.setViewportSize({ width: 1440, height: 920 });
   await page.getByRole('link', { name: DECK.title, exact: true }).click();
 

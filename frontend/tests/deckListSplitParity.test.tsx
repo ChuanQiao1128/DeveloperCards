@@ -268,24 +268,24 @@ interface Baseline {
 // loading, fatal errors, render counts, and row-projection counts are unchanged.
 const B1: Record<string, Baseline> = {
   // The three reachable role/mode cells.
-  superAdminPaginated: { hash: 'f456ab182b6c64b425ed27863ab2d6e0db93af16c5182aabbd566786884a7c29', bytes: 20129 },
-  superAdminLegacyFallback: { hash: '807943c2eb1b646cebaf54301fae535115692f3d390538f800ff277d1708ad0f', bytes: 20360 },
-  editorLegacy: { hash: '3eeb4a2c2bf8282946fc0e14d35bbe014e86428a885a06f1756c37a9ef92ccb0', bytes: 15346 },
+  superAdminPaginated: { hash: '9e0fb36d7b9d73c3a00c1f82bec6f9127d6d9aa80aa62f24093a61ad56ff5357', bytes: 20738 },
+  superAdminLegacyFallback: { hash: 'b63f6893a7045eed11d9562af0dbbb128ce89b58d56d47d6a932ad506d7c1ae8', bytes: 20963 },
+  editorLegacy: { hash: '81ad527b790c7a04e1695cbbee53292cf8d2f9b71d8dccfc33020466a7a946ff', bytes: 15949 },
   // The two early returns, which never reach the main tree at all.
   initialLoading: { hash: 'da5e91db42c7895c31e1fba36b34c6aaeb456d4ef2efde3a425f5b5066a52974', bytes: 147 },
   fatalErrorRetry: { hash: '22809bb57f98a29737e080c405194d891a62ee389911aae33891f12b55c1c396', bytes: 421 },
   // Search and filter empty states remain distinct.
-  emptySearchResult: { hash: '29d8f2e089112871e1c3518eafe6d1e67d8551e8a9e819737ae01724e30d7d15', bytes: 15016 },
-  emptyWithNoQuery: { hash: '92791e00923af3940144b5cdd88c984dc25fe12e0cb2fa52de11f82ac07aa480', bytes: 15006 },
+  emptySearchResult: { hash: '715c392388d399f871d983db0b1b3747b4535466117ae4251dd37c051228b2e8', bytes: 15037 },
+  emptyWithNoQuery: { hash: '81c888700c80397c7919ec7034e84d42e443b2470ee39159943f4ee883bf80c8', bytes: 15027 },
   // The three banners/panels that only appear in one state each.
-  manifestErrorBanner: { hash: 'f20c685c02df13aaed2680a68ec42373cfd06af24613ccb0cda09cb096e70fe1', bytes: 20612 },
+  manifestErrorBanner: { hash: '4fda3b0430376aabf7f8800f9e7859287ab205a6d2814e662965fdbd1bf098f9', bytes: 21215 },
   // F24 (2026-09-26): the Publish Jobs table gained an Error column after Status
   // (CFE-09) and a title on the Job ID cell, so this scenario's markup grew by
   // 99 B. No other scenario renders that table, so only this hash moved.
   publishJobsTab: { hash: '2555d43b267dbe3fada772d0b6c244db848bd35f8e3aba294ab58d6887c555c7', bytes: 13872 },
-  pollFailureBanner: { hash: 'ee60d1e453d683dff6451aa7d780cb66b178ae10e1a560b8a4f8dbb7fbacfeaf', bytes: 21014 },
+  pollFailureBanner: { hash: 'f2e3a619dbb4dfa5d2dcda59833a1604c2438562528b463a7ab94bfabab4d96c', bytes: 21623 },
   // A row mid-publish, so the pending markup is inside a hash too.
-  publishingRow: { hash: '3e9f3869613afb362c0a203817b2ca6d26918406439019f592c8c49e817ab344', bytes: 20145 },
+  publishingRow: { hash: 'd8715f4d26593089c5d027d872b74463350f6c669be7adcfe46f60c67e00200b', bytes: 20754 },
 };
 
 // B2: one Profiler onRender entry per commit of the profiled subtree.

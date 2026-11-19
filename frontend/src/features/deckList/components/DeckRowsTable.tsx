@@ -60,7 +60,7 @@ export function DeckRowsTable({
             <th className="px-4 py-3" scope="col">Deck</th>
             <th className="hidden px-4 py-3 md:table-cell" scope="col">Cards</th>
             <th className="hidden px-4 py-3 lg:table-cell" scope="col">Type</th>
-            <th className="px-3 py-3" scope="col">Status</th>
+            <th className="hidden px-3 py-3 md:table-cell" scope="col">Status</th>
             <th className="hidden px-4 py-3 lg:table-cell" scope="col">Updated</th>
             {superAdmin && <th className="px-4 py-3" scope="col">Actions</th>}
           </tr>
@@ -92,11 +92,12 @@ export function DeckRowsTable({
                   </div>
                   <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-600 md:hidden">
                     <span>{row.cardCount} cards</span>
+                    {statusBadge(row.status)}
                   </div>
                 </td>
                 <td className="hidden px-4 py-3 tabular-nums md:table-cell">{row.cardCount}</td>
                 <td className="hidden px-4 py-3 lg:table-cell">{typeBadge(isStarterLike(row.deckType, row.tier) ? 1 : 2)}</td>
-                <td className="whitespace-nowrap px-3 py-3">{statusBadge(row.status)}</td>
+                <td className="hidden whitespace-nowrap px-3 py-3 md:table-cell">{statusBadge(row.status)}</td>
                 <td className="hidden whitespace-nowrap px-4 py-3 text-xs text-slate-600 lg:table-cell">{safeDateTime(row.updatedAt)}</td>
                 {superAdmin && (
                   <td className="px-3 py-3">
