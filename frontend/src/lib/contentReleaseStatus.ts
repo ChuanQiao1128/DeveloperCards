@@ -46,7 +46,7 @@ export function publicationStatus(session: ReleaseSession | null, verified: bool
     description: 'Queue delivery retries are exhausted. The original job is retained; this page cannot start a replacement job.' };
   if (job.manifestState === 'needs_attention') return { ...current, kind: 'attention', tone: 'warning', title: 'Index delivery needs attention',
     description: 'The card build is ready, but index delivery retries are exhausted. Public availability has not been verified.' };
-  if (job.cdnVerificationState === 'needs_attention') return { ...current, kind: 'attention', tone: 'warning', title: 'CDN verification needs attention',
+  if (job.manifestState === 'delivered' && job.cdnVerificationState === 'needs_attention') return { ...current, kind: 'attention', tone: 'warning', title: 'CDN verification needs attention',
     description: job.cdnVerificationError === 'CDN_RECEIPT_OVERDUE'
       ? 'The server has not received the verification result. Inspect the notification queue for this job.'
       : 'The background verifier exhausted its attempts. The existing build and its diagnostics are retained.' };

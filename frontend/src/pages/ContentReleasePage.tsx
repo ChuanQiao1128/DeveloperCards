@@ -324,7 +324,7 @@ export function ContentReleasePage({ deck, children }: {
         if (job?.status === 'SUCCESS' && action.query?.liveBuildId !== job.build_id) throw new Error('Another release changed the live build. Publication verification stopped.');
         if (job?.status === 'PENDING' && job.dispatchState === 'needs_attention') { setError('Queue delivery retries are exhausted. The original job and journal are retained.'); return; }
         if (job?.manifestState === 'needs_attention') { setError(job.manifestError ?? 'Index delivery retry limit reached. The original job and journal are retained.'); return; }
-        if (job?.cdnVerificationState === 'needs_attention') { setError(job.cdnVerificationError ?? 'CDN verification needs attention.'); return; }
+        if (job?.manifestState === 'delivered' && job.cdnVerificationState === 'needs_attention') { setError(job.cdnVerificationError ?? 'CDN verification needs attention.'); return; }
         if (job?.status === 'SUCCESS' && job.manifestState === 'delivered') {
           if (await verifyPublicCards(current, controller.signal)) return;
           setMessage(job.cdnVerificationState ? 'The server is verifying this release on the public CDN. It will continue if you close this page.' :

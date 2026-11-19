@@ -47,6 +47,13 @@ describe('publication status uses current evidence and stage-specific actions', 
     session.actions.publish!.query!.jobs[0].manifestState = 'delivered';
     expect(publicationStatus(session, false)?.kind).toBe('background_verification');
   });
+  it('prioritizes index recovery even when the background receipt is overdue', () => {
+    const session = queried('SUCCESS', { manifestState: 'pending', cdnVerificationState: 'needs_attention',
+      cdnVerificationError: 'CDN_RECEIPT_OVERDUE' });
+    expect(publicationStatus(session, false)).toMatchObject({ kind: 'index', continueLabel: 'Continue index delivery' });
+    session.actions.publish!.query!.jobs[0].manifestState = 'delivered';
+    expect(publicationStatus(session, false)).toMatchObject({ kind: 'attention', title: 'CDN verification needs attention' });
+  });
   it('does not claim success or offer replay after the current live version changes', () => {
     const session = queried('SUCCESS', { manifestState: 'delivered' }); session.actions.publish!.query!.liveBuildId = 'another-build';
     expect(publicationStatus(session, true)?.kind).toBe('superseded');
