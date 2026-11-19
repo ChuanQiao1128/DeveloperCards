@@ -64,4 +64,10 @@ python3 tools/aws_cards/repair_release.py finalize OUTPUT ARTIFACT_DIRECTORY_OR_
 
 `finalize` 校验已完成的原 journal、同一 bundle/job/build/hash 和保存的真实 CDN 字节，保留全部双语内容、revision 及回执，输出可作下一批 `priorRelease` 的目录。不调用模型、不重复下载；相同字节重试幂等，不覆盖不同结果。
 
+全部收尾文件保存通过后，同一命令自动更新 `docs/delivery/session-state.json`：登记本批实际回执、build 与基线目录，并同步 `dailyRepairWorkflow` 的内容指针和 `cardPublicationWorkflow.lastFinalizedPublication`。仅允许当前登记版本是本批原基线，或已经登记完全相同的发布身份；旧批次、冲突身份和不一致的指针不能覆盖新记录。文件锁串行化登记，临时文件校验后原子替换，其他会话字段保留；相同输入重跑不改写已一致的记录。
+
+返回 `handoff.status=REGISTERED` 表示接续登记也完成；若文件缺失、损坏、占锁、写入失败或版本冲突，返回的发布状态仍为 `PUBLISHED_AND_VERIFIED`，但 `handoff.status=PENDING`，命令退出码为1并说明“发布已核验，接续记录待完成”。先定向排查，再重跑原 `finalize` 补登记；不重新导入、发布或下载，不把未知基线自动初始化为当前版本。
+
+工作流维护及其他会话写入同一`session-state.json`时也必须通过`repair_release.update_session_state`的同一协作锁。不要直接编辑、覆盖JSON或在锁外先读后写；占锁先停止，稍后重读合并。锁不强制约束任意外部编辑器，写入前比对不构成跨进程原子CAS。
+
 `publisherCodeVerification` 由实际 GitHub main 文件与成功 required checks 形成，发布器消费它并比较本机12个关键文件的SHA；改动或缺少成功检查时不能复用。正常内容批次复用未变代码的缓存，代码/规则/契约变化先合入验证。恢复沿用同一 releaseId/actionId/正文/job/build，先查后续。普通内容走内容CDN；App代码变化才安排兼容OTA。
