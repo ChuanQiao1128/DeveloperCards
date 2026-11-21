@@ -1,0 +1,127 @@
+{
+  "method": "BM25-style lexical candidates only; missing judgments require full159 fallback",
+  "candidates": {
+    "3": [
+      "aws-rb2-20261107-pack-nc05",
+      "aws-rb2-20261107-pack-aws-rb2-domain1-normal-batch08-20261105-s3-account-public-access-guardrail",
+      "aws-rb2-20261107-pack-cmp-m09",
+      "aws-rb2-20261107-pack-ca10",
+      "aws-rb2-20261107-pack-cmp-m05",
+      "aws-rb2-20261107-pack-xa025",
+      "aws-rb2-20261107-pack-xa046",
+      "aws-rb2-20261107-pack-gsc-023",
+      "aws-rb2-20261107-pack-xb042",
+      "aws-rb2-20261107-pack-cc23",
+      "aws-rb2-20261107-pack-gsc-029",
+      "aws-rb2-20261107-pack-xb021"
+    ],
+    "200": [
+      "aws-rb2-20261107-pack-xb020",
+      "aws-rb2-20261107-pack-xa053",
+      "aws-rb2-20261107-pack-ca13",
+      "aws-rb2-20261107-pack-cb10",
+      "aws-rb2-20261107-pack-ca19",
+      "aws-rb2-20261107-pack-cb13",
+      "aws-rb2-20261107-pack-xa021",
+      "aws-rb2-20261107-pack-cc17",
+      "aws-rb2-20261107-pack-xb011",
+      "aws-rb2-20261107-pack-xb003",
+      "aws-rb2-20261107-pack-xa042"
+    ],
+    "761": [
+      "aws-rb2-20261107-pack-xa026",
+      "aws-rb2-20261107-pack-xb014",
+      "aws-rb2-20261107-pack-cmp-m02",
+      "aws-rb2-20261107-pack-xa003",
+      "aws-rb2-20261107-pack-aws-rb2-domain1-normal-batch06-20261105-roles-anywhere-workload-identity",
+      "aws-rb2-20261107-pack-nc06",
+      "aws-rb2-20261107-pack-xa039",
+      "aws-rb2-20261107-pack-xa038",
+      "aws-rb2-20261107-pack-cc20",
+      "aws-rb2-20261107-pack-aws-rb2-20261105-boundary-aurora-iam-token-login"
+    ],
+    "74": [
+      "aws-rb2-20261107-pack-xb018",
+      "aws-rb2-20261107-pack-cmp-m10",
+      "aws-rb2-20261107-pack-cmp-m25",
+      "aws-rb2-20261107-pack-cb04",
+      "aws-rb2-20261107-pack-vc-008",
+      "aws-rb2-20261107-pack-cmp-m02",
+      "aws-rb2-20261107-pack-xa033",
+      "aws-rb2-20261107-pack-cb15"
+    ],
+    "165": [
+      "aws-rb2-20261107-pack-ca16",
+      "aws-rb2-20261107-pack-nb03",
+      "aws-rb2-20261107-pack-ca13",
+      "aws-rb2-20261107-pack-cb10",
+      "aws-rb2-20261107-pack-cb13",
+      "aws-rb2-20261107-pack-cb04",
+      "aws-rb2-20261107-pack-xa013",
+      "aws-rb2-20261107-pack-xb021",
+      "aws-rb2-20261107-pack-cc16"
+    ],
+    "657": [
+      "aws-rb2-20261107-pack-xa030",
+      "aws-rb2-20261107-pack-vc-008",
+      "aws-rb2-20261107-pack-xb043",
+      "aws-rb2-20261107-pack-nc05",
+      "aws-rb2-20261107-pack-cmp-m10",
+      "aws-rb2-20261107-pack-xb025",
+      "aws-rb2-20261107-pack-new03",
+      "aws-rb2-20261107-pack-xa012",
+      "aws-rb2-20261107-pack-xa008"
+    ],
+    "36": [
+      "aws-rb2-20261107-pack-vc-011",
+      "aws-rb2-20261107-pack-xa004",
+      "aws-rb2-20261107-pack-cmp-m09",
+      "aws-rb2-20261107-pack-xb042",
+      "aws-rb2-20261107-pack-cc03",
+      "aws-rb2-20261107-pack-cmp-m20",
+      "aws-rb2-20261107-pack-cc18",
+      "aws-rb2-20261107-pack-vc-013",
+      "aws-rb2-20261107-pack-aws-rb2-domain1-normal-batch07-20261105-s3-bucket-key-request-cost"
+    ],
+    "92": [
+      "aws-rb2-20261107-pack-cc16",
+      "aws-rb2-20261107-pack-cmp-m06",
+      "aws-rb2-20261107-pack-xb042",
+      "aws-rb2-20261107-pack-xr102",
+      "aws-rb2-20261107-pack-cc20",
+      "aws-rb2-20261107-pack-vc-013",
+      "aws-rb2-20261107-pack-aws-rb2-domain1-normal-batch08-20261105-s3-account-public-access-guardrail",
+      "aws-rb2-20261107-pack-cmp-m02",
+      "aws-rb2-20261107-pack-xb020",
+      "aws-rb2-20261107-pack-xb021",
+      "aws-rb2-20261107-pack-cmp-m09",
+      "aws-rb2-20261107-pack-aws-rb2-20261105-boundary-aurora-iam-token-login",
+      "aws-rb2-20261107-pack-cb05",
+      "aws-rb2-20261107-pack-cb06"
+    ],
+    "106": [
+      "aws-rb2-20261107-pack-vc-011",
+      "aws-rb2-20261107-pack-cc08",
+      "aws-rb2-20261107-pack-cc09",
+      "aws-rb2-20261107-pack-ca19",
+      "aws-rb2-20261107-pack-vc-013",
+      "aws-rb2-20261107-pack-cmp-m11",
+      "aws-rb2-20261107-pack-cc03",
+      "aws-rb2-20261107-pack-cmp-m20",
+      "aws-rb2-20261107-pack-xa004",
+      "aws-rb2-20261107-pack-aws-rb2-domain1-normal-batch07-20261105-s3-bucket-key-request-cost"
+    ],
+    "189": [
+      "aws-rb2-20261107-pack-cc13",
+      "aws-rb2-20261107-pack-cc06",
+      "aws-rb2-20261107-pack-xa056",
+      "aws-rb2-20261107-pack-cc08",
+      "aws-rb2-20261107-pack-xa041",
+      "aws-rb2-20261107-pack-vc-011",
+      "aws-rb2-20261107-pack-xa040",
+      "aws-rb2-20261107-pack-cmp-m16",
+      "aws-rb2-20261107-pack-vc-013",
+      "aws-rb2-20261107-pack-cc05"
+    ]
+  }
+}

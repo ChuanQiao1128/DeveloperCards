@@ -1,0 +1,161 @@
+{
+  "schemaVersion": 1,
+  "status": "COMPLETE_LIMITED_READBACK_WITH_OPEN_CONTENT_FINDINGS",
+  "reviewedAtUtc": "2026-11-07T19:29:22.584585+00:00",
+  "scope": {
+    "phase": "盲审v1冻结后的最终限定回读；不是新一轮盲审。",
+    "questionCount": 10,
+    "domain1PrimaryQuestionCount": 310,
+    "notAuditedHere": 300,
+    "restrictedCards": 159,
+    "globalCards": 365,
+    "cardsModified": false,
+    "questionSourcesModified": false,
+    "humanLearningOutcomesMeasured": false,
+    "priorProofComparisonAllowedOnlyAfterV1Freeze": true
+  },
+  "reviewedArtifactsSha256": {
+    "teaching-standard.md": "d36ddfeaa867a61d2a686f84383f6c07a56716c93e8f4438e40d3a9de6108af1",
+    "trace.md": "f17a81909986fd2612fec18b10c379df8683ebf71ddb91968f01285b181d08c4",
+    "findings.json": "cf1189f421de478d211b3ac6d5750965406e32244f03110eb0b41bf99395462f",
+    "readback.json": "41f620066c67c6eb48b18d4a56fb5d0e07640592d1e07837a59abfe2f340ab93",
+    "state.json": "1f7d178bab680f4a0fb4f89dc5a58cc7cec7183d094641ef7dd6ede11ae9e997",
+    "prior-proof-excerpts.after-blind-review.json": "31e0c19528c29e0f4679f313ee252b40d819221f32725529442a2ef2382cfd1a",
+    "independent/results.json": "d7944c4cd5bd7466ef6356c233350018e62ec46a8d53ad0056bfb3d16e030a8e",
+    "independent/global-fallback.json": "5c2019c3596e6a20b5891f899f9bd38447a1f3e46e572d912976d2bf6f29979d",
+    "independent/results.restricted-v1.json": "0b1daef1ebe00e6561c75ee443c731708b6859ff73a98c459cea508886b5c018",
+    "independent/global-fallback.v1.json": "eff91c799b0936dc2c824a23f528deaf5b3a84a8371a40e3827e323f56eaa2a6",
+    "independent/version-lineage.json": "3e0db7b26670ed72ad6d2119c97ab35e0e86e47b71248267dca403825ec1b2cb",
+    "cards.domain1.visible.json": "29bac697aa708060b1b5fcc748b8835367d8cfd69a8e06f34adb9a1cd8078ae8",
+    "cards.global.visible.json": "c639a587a229ca44b52abc0ab37c154ee50eceafd229c862c3528290b7c2ee64",
+    "questions.json": "b9cdbed271c5aba66789a6531ddfca23364404aee5b049852d8a0f8a76601d6b"
+  },
+  "teachingStandard": {
+    "source": "teaching-standard.md",
+    "section4FullTextRead": true,
+    "citations": [
+      {
+        "section": "4.1",
+        "quote": "学习者应能根据条件作答、解释原因，并理解关键竞争方案为什么不适用。"
+      },
+      {
+        "section": "4.6",
+        "quote": "不得把一组技术事实、配置事项或原题全部干扰项压进同一张。"
+      },
+      {
+        "section": "4.7",
+        "quote": "核查“去掉此项后，能否仍据已教知识可靠解释唯一可行方案”；真正必要的才进入卡或先修，额外背景/干扰项功能不强行加入卡面。"
+      },
+      {
+        "section": "4.7",
+        "quote": "不能只靠服务关键词、答案字母或模型记忆排除选项，也不要求为排除弱干扰项学完该服务全部配置。"
+      },
+      {
+        "section": "4.9",
+        "quote": "不能仅把缺口写进题解就声称卡片已经覆盖，也不能隐瞒缺口或自行无限扩卡。"
+      }
+    ],
+    "conclusion": "Q761的人员SSO身份源边界与Q189的C/E年度自动轮换能力都是同类强竞争方案的决定性比较，不是要求学完全部干扰项功能或部署清单。"
+  },
+  "necessaryJudgmentChecks": [
+    {
+      "qid": 761,
+      "missingJudgmentIds": [
+        "Q761-J2"
+      ],
+      "closestCompetitorOptionOrdinals": [
+        1
+      ],
+      "isNecessary": "YES",
+      "counterfactualRemoval": "去掉Identity Center对任意非SAML LDAP的接入/桥接边界后，只能由XA026给出broker＋STS正向路径，仍不能凭卡说明同样针对人员SSO的A为什么不适用。",
+      "minimalRequiredScope": "只核原题非SAML LDAP是否需要额外桥接以及A/D的决定差异；不要求完整Identity Center身份源目录、trust部署或控制台URL拼接步骤。",
+      "weakDistractorEncyclopediaRequired": false,
+      "deploymentChecklistRequired": false
+    },
+    {
+      "qid": 189,
+      "missingJudgmentIds": [
+        "Q189-J4",
+        "Q189-J5"
+      ],
+      "closestCompetitorOptionOrdinals": [
+        3,
+        5
+      ],
+      "isNecessary": "YES",
+      "counterfactualRemoval": "保留模式B有卡面依据；加密D也有正向AWS生成KMS自动年度实现。但原题不强制客户KMS，去掉C的SSE-S3年度轮换/配置能力或E的导入材料年度automatic边界，就不能用卡解释C/D/E取舍。",
+      "minimalRequiredScope": "仅比较自动年度轮换与实际配置/材料来源的决定性条件，不要求导入API、密钥部署或完整审计清单。",
+      "weakDistractorEncyclopediaRequired": false,
+      "deploymentChecklistRequired": false
+    }
+  ],
+  "reconciliation": {
+    "questionStatuses": {
+      "SUPPORTED": 8,
+      "PARTIAL": 2
+    },
+    "questionsWithContentFindings": 2,
+    "missingJudgmentComparisons": 3,
+    "navigationGapQuestions": 0,
+    "contentBoundaryNotFoundQuestions": 2,
+    "mainCitedJudgments": 22,
+    "mainMissingJudgments": 3,
+    "mainCitationCountFromRootReadback": 41,
+    "independentExactQuoteChecks": 81,
+    "renderedTraceExactQuoteChecks": 40,
+    "rootIntegrityNegativeControlsFromReadback": 3,
+    "rootScriptIsSemanticCertificate": false,
+    "only10Of310Audited": true,
+    "remaining300NotAcceptedByThisPilot": true,
+    "globalFallbackDoesNotUpgradeRestrictedStatuses": true,
+    "noAwsActualSupportVerdict": true,
+    "noHumanOutcomeClaim": true
+  },
+  "historicalComparison": {
+    "source": "prior-proof-excerpts.after-blind-review.json",
+    "firstReadByThisIndependentReviewerAfterConfirmingV1FrozenSha256": true,
+    "oldRowsReportedSupported": [
+      761,
+      189
+    ],
+    "newVerdictsDerivedFromOldRows": false,
+    "differences": [
+      {
+        "qid": 761,
+        "observation": "旧reasoning包含普通LDAP仅启用Identity Center不会自动兼容的能力边界，但其所引XA026只给broker路径；新版把此项记为卡面未教，不把旧结论当AWS前提。"
+      },
+      {
+        "qid": 189,
+        "observation": "旧reasoning把不能默认导入材料支持用作排除，并含SSE-S3配置路径断言；新版只保留D的正向路径，C/E均作为未闭合比较。"
+      }
+    ],
+    "sourceFilesOutsideAllowedExcerptRead": false
+  },
+  "resolvedReportIssues": [
+    {
+      "id": "FR-Q189-C",
+      "originalLocation": "trace.md Q189-J3",
+      "problem": "原文对C的SSE-S3轮换配置能力作确定排除，且可能借用原题没有的客户KMS条件。",
+      "resolution": "现文明确原题未要求客户KMS；J3只正向支持D，M1/M2分别记录E/C边界；独立及全池结果以v2补记，原题级8+2不变。"
+    },
+    {
+      "id": "FR-READBACK-SHA",
+      "problem": "readback曾仍引用元数据修订前b43dc3版本。",
+      "resolution": "当前readback已与d7944c最终restricted-v2 SHA一致；未以旧快照签发最终回读。"
+    }
+  ],
+  "blockingReportIssues": [],
+  "versionPreservation": {
+    "blindRestrictedV1Path": "independent/results.restricted-v1.json",
+    "blindRestrictedV1OriginalBytesPreserved": true,
+    "globalFallbackV1Path": "independent/global-fallback.v1.json",
+    "globalFallbackV1OriginalBytesPreserved": true,
+    "currentRestrictedRevision": 2,
+    "currentGlobalFallbackRevision": 2,
+    "latestFilesChangedSinceV1": true,
+    "noClaimThatOriginalFrozenFileWasUnchanged": true,
+    "lineage": "independent/version-lineage.json",
+    "initialWorkingDraftReconstructedNotOriginalSnapshot": true
+  },
+  "limits": "这是当前10题报告、卡句引用、必要判断与版本谱系的限定回读。两道题三项比较仍未闭合；既不验证AWS实际产品能力，也不测真人记忆/作答，更不外推其余300道领域1题或1018题全库。"
+}

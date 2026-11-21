@@ -1,0 +1,66 @@
+{
+  "scope": "Read only after independent restricted159 result frozen; never used to select or answer pilot",
+  "independentRestrictedResultSha256": "0b1daef1ebe00e6561c75ee443c731708b6859ff73a98c459cea508886b5c018",
+  "rows": [
+    {
+      "qid": 3,
+      "priorOriginalReportedStatus": "SUPPORTED",
+      "priorOriginalProofPath": "/Users/qc/.local/share/codex-workflows/recallsmith/aws-basics-bilingual-rag-release-20261028/runtime/full-card-rebuild-v2-20261102/global-card-proof-20261106/validation/legacy-current-exact-proof-reuse.json",
+      "variants": []
+    },
+    {
+      "qid": 200,
+      "priorOriginalReportedStatus": "SUPPORTED",
+      "priorOriginalProofPath": "/Users/qc/.local/share/codex-workflows/recallsmith/aws-basics-bilingual-rag-release-20261028/runtime/full-card-rebuild-v2-20261102/global-card-proof-20261106/review/current-impact01/a/results.json",
+      "variants": []
+    },
+    {
+      "qid": 761,
+      "priorOriginalReportedStatus": "SUPPORTED",
+      "priorOriginalProofPath": "/Users/qc/.local/share/codex-workflows/recallsmith/aws-basics-bilingual-rag-release-20261028/runtime/full-card-rebuild-v2-20261102/global-card-proof-20261106/validation/legacy-current-exact-proof-reuse.json",
+      "variants": []
+    },
+    {
+      "qid": 74,
+      "priorOriginalReportedStatus": "SUPPORTED",
+      "priorOriginalProofPath": "/Users/qc/.local/share/codex-workflows/recallsmith/aws-basics-bilingual-rag-release-20261028/runtime/full-card-rebuild-v2-20261102/global-card-proof-20261106/validation/legacy-current-exact-proof-reuse.json",
+      "variants": []
+    },
+    {
+      "qid": 165,
+      "priorOriginalReportedStatus": "SUPPORTED",
+      "priorOriginalProofPath": "/Users/qc/.local/share/codex-workflows/recallsmith/aws-basics-bilingual-rag-release-20261028/runtime/full-card-rebuild-v2-20261102/global-card-proof-20261106/validation/legacy-current-exact-proof-reuse.json",
+      "variants": []
+    },
+    {
+      "qid": 657,
+      "priorOriginalReportedStatus": "SUPPORTED",
+      "priorOriginalProofPath": "/Users/qc/.local/share/codex-workflows/recallsmith/aws-basics-bilingual-rag-release-20261028/runtime/full-card-rebuild-v2-20261102/global-card-proof-20261106/validation/legacy-current-exact-proof-reuse.json",
+      "variants": []
+    },
+    {
+      "qid": 36,
+      "priorOriginalReportedStatus": "SUPPORTED",
+      "priorOriginalProofPath": "/Users/qc/.local/share/codex-workflows/recallsmith/aws-basics-bilingual-rag-release-20261028/runtime/full-card-rebuild-v2-20261102/global-card-proof-20261106/validation/legacy-current-exact-proof-reuse.json",
+      "variants": []
+    },
+    {
+      "qid": 92,
+      "priorOriginalReportedStatus": "SUPPORTED",
+      "priorOriginalProofPath": "/Users/qc/.local/share/codex-workflows/recallsmith/aws-basics-bilingual-rag-release-20261028/runtime/full-card-rebuild-v2-20261102/global-card-proof-20261106/review/current-impact01/a/results.json",
+      "variants": []
+    },
+    {
+      "qid": 106,
+      "priorOriginalReportedStatus": "SUPPORTED",
+      "priorOriginalProofPath": "/Users/qc/.local/share/codex-workflows/recallsmith/aws-basics-bilingual-rag-release-20261028/runtime/full-card-rebuild-v2-20261102/global-card-proof-20261106/validation/legacy-current-exact-proof-reuse.json",
+      "variants": []
+    },
+    {
+      "qid": 189,
+      "priorOriginalReportedStatus": "SUPPORTED",
+      "priorOriginalProofPath": "/Users/qc/.local/share/codex-workflows/recallsmith/aws-basics-bilingual-rag-release-20261028/runtime/full-card-rebuild-v2-20261102/global-card-proof-20261106/validation/legacy-current-exact-proof-reuse.json",
+      "variants": []
+    }
+  ]
+}

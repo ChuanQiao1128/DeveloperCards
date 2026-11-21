@@ -1,0 +1,37 @@
+{
+  "status": "AUDIT_IN_PROGRESS",
+  "pilotQids": [
+    3,
+    200,
+    761,
+    74,
+    165,
+    657,
+    36,
+    92,
+    106,
+    189
+  ],
+  "selectionMethod": "purposeful different-family sample, 3/3/4 over tasks 1.1/1.2/1.3; not a statistical estimate",
+  "domain1PrimaryQuestionCount": 310,
+  "domain1VisibleCardCount": 159,
+  "globalVisibleCardCount": 365,
+  "domain1PrimaryCardCount": 116,
+  "originalQuestionSource": "/Users/qc/.local/share/codex-workflows/recallsmith/aws-basics-bilingual-rag-release-20261028/runtime/full-card-rebuild-v2-20261102/domain1-final-card-catalog-20261105/questions.all.json",
+  "inputHashes": {
+    "/Users/qc/.local/share/codex-workflows/recallsmith/aws-basics-bilingual-rag-release-20261028/runtime/full-card-rebuild-v2-20261102/global-card-proof-20261106/domain1-card-backtrace-20261108/pilot10/questions.json": "b9cdbed271c5aba66789a6531ddfca23364404aee5b049852d8a0f8a76601d6b",
+    "/Users/qc/.local/share/codex-workflows/recallsmith/aws-basics-bilingual-rag-release-20261028/runtime/full-card-rebuild-v2-20261102/global-card-proof-20261106/domain1-card-backtrace-20261108/pilot10/cards.domain1.visible.json": "29bac697aa708060b1b5fcc748b8835367d8cfd69a8e06f34adb9a1cd8078ae8",
+    "/Users/qc/.local/share/codex-workflows/recallsmith/aws-basics-bilingual-rag-release-20261028/runtime/full-card-rebuild-v2-20261102/global-card-proof-20261106/domain1-card-backtrace-20261108/pilot10/cards.global.visible.json": "c639a587a229ca44b52abc0ab37c154ee50eceafd229c862c3528290b7c2ee64"
+  },
+  "excludedInputs": [
+    "printed answers",
+    "prior PASS and proof",
+    "private learningGoal/mustAnswer",
+    "prior card-question mappings"
+  ],
+  "newModelCliApiCalls": 0,
+  "nativeUsage": "unknown",
+  "historyReset": false,
+  "firstRecordedUtc": "2026-11-07T18:52:54Z",
+  "preparedUtc": "2026-11-07T18:56:00.281876+00:00"
+}

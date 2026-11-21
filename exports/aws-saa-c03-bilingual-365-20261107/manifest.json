@@ -1,0 +1,25 @@
+{
+  "status": "COMPLETE_LOCAL_BILINGUAL_PACKAGE",
+  "cards": 365,
+  "planned": 365,
+  "remaining": 0,
+  "formalBilingualPackageComplete": true,
+  "archiveSha256": "f9660d1db1209aae7923fee983777a0f32d35aff33f80024c913c14bcd0923c2",
+  "archivedExternalReferenceFiles": 665,
+  "evidenceIndexPath": "evidence-index.json",
+  "files": {
+    "cards.private.json": "39215e3be8dc17ffe8d4ecd932d471c7f04f66e1210fca8b8d5c7ec4424ca768",
+    "validation365.json": "96e249357bb08cd83e27020a42086420de97525bc398bc09029252ea25ac514d",
+    "cards.public.json": "5b322f3a5e7614d0ac2e9107de578ff1a6e86c34da7c15477da5f36a3137271f",
+    "cards.json": "5b322f3a5e7614d0ac2e9107de578ff1a6e86c34da7c15477da5f36a3137271f",
+    "WORKFLOW.md": "721e62103009d46a81e5f23335b296818b7af15f83daa37ad59e383ba3e814fb",
+    "domain-index.json": "9585dda3a35650cedab865cd8c6d9406a6e4e967ee3199d517c0704f7b395fe6",
+    "cards.import.json": "5b322f3a5e7614d0ac2e9107de578ff1a6e86c34da7c15477da5f36a3137271f",
+    "progress.json": "7c46730686b78a6d199d379599cbd9fcf0d6448b8b0123b76ae39b3acc87fe72",
+    "current-review-index.json": "c5269a431d96370ee05c0bbdd6c91a56fe66b7ae22320b2b38c920127e3a50c6",
+    "cards.deck.md": "f60e57e89c83a04060d84304fde7c9123f77a6cb4e1b6ddf8d9ec71ce04a6c34",
+    "workflow-evidence.tar.gz": "f9660d1db1209aae7923fee983777a0f32d35aff33f80024c913c14bcd0923c2",
+    "completion.json": "3dc454c1d693d7cf74e58879537d994257d7d81d7b40b1da912db2b914d6a9c0"
+  },
+  "createdUtc": "2026-11-07T09:47:04.691961+00:00"
+}

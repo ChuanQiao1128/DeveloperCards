@@ -1,0 +1,31 @@
+{
+  "findings": [
+    {
+      "id": "D1-P10-Q761",
+      "qid": 761,
+      "status": "OPEN_CONTENT_BOUNDARY",
+      "restricted159Status": "PARTIAL",
+      "global365Classification": "CONTENT_BOUNDARY_NOT_FOUND",
+      "suggestedExistingCard": "aws-rb2-20261107-pack-xa026",
+      "missingJudgment": "Identity Center可接入身份源与非SAML任意LDAP的桥接条件，当前卡未明确区分最强竞争项。",
+      "notAnAwsCapabilityVerdict": true,
+      "priorReportedStatus": "SUPPORTED",
+      "requiresTargetedRecheck": true
+    },
+    {
+      "id": "D1-P10-Q189",
+      "qid": 189,
+      "status": "OPEN_CONTENT_BOUNDARY",
+      "restricted159Status": "PARTIAL",
+      "global365Classification": "CONTENT_BOUNDARY_NOT_FOUND",
+      "suggestedExistingCard": "aws-rb2-20261107-pack-cc06",
+      "missingJudgment": "导入KMS材料的年度自动轮换能力/条件，当前卡只说不能默认，尚不足以确定D与E的取舍。",
+      "notAnAwsCapabilityVerdict": true,
+      "priorReportedStatus": "SUPPORTED",
+      "requiresTargetedRecheck": true
+    }
+  ],
+  "cardBodiesChanged": false,
+  "newCards": 0,
+  "actualStudentOutcomesMeasured": false
+}

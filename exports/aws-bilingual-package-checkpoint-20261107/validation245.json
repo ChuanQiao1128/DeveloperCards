@@ -1,0 +1,26 @@
+{
+  "status": "PASS_PARTIAL_245_ONLY",
+  "atUtc": "2026-11-07T09:22:02.846921+00:00",
+  "authored": 245,
+  "independentSemanticPassed": 245,
+  "planned": 365,
+  "remaining": 120,
+  "old347UidIntersection": 0,
+  "untranslatedPrerequisites": [
+    {
+      "card": "VC-009",
+      "prerequisite": "gsc-080"
+    }
+  ],
+  "allAssemblyFailsClosedWithoutOverwrite": true,
+  "outputHashes": {
+    "cards.deck.md": "4bce6d46f78988be5716a7be078418074de943250a88758be861e6e18d1cb51e",
+    "cards.json": "df32124fcfbce50cccdbf2ba886025e45ce70857ef5c861e1e31b17c99265036",
+    "cards.public.json": "df32124fcfbce50cccdbf2ba886025e45ce70857ef5c861e1e31b17c99265036",
+    "cards.import.json": "df32124fcfbce50cccdbf2ba886025e45ce70857ef5c861e1e31b17c99265036",
+    "cards.private.json": "da310da7d0f0ebeec00bb89624fa165c38254c7fa82181843c999e56f443ab61"
+  },
+  "formalBilingualPackageComplete": false,
+  "published": false,
+  "learnerOutcomeMeasured": false
+}

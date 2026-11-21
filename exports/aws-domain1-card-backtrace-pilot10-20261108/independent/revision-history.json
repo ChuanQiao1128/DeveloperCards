@@ -1,0 +1,44 @@
+{
+  "recordedAtUtc": "2026-11-07T19:10:11.072715+00:00",
+  "initialRecord": {
+    "path": "results.initial.json",
+    "sha256": "ee2a0e3c2decf7cf7fc53205ef06b03ca604e1a99453ce05aaf9064d71efab0a",
+    "statusCounts": {
+      "SUPPORTED": 10,
+      "PARTIAL": 0,
+      "UNKNOWN": 0,
+      "SOURCE_SUSPECT": 0
+    },
+    "preservationMethod": "初稿在保存历史副本前已就地修订。本文件从本轮已执行构建脚本逐字段重建；不是声称变更前已保存的字节快照。"
+  },
+  "revisions": [
+    {
+      "qid": 761,
+      "change": "SUPPORTED to PARTIAL",
+      "reason": "broker正向支撑不等于已教Identity Center任意非SAML LDAP支持边界。"
+    },
+    {
+      "qid": 189,
+      "change": "SUPPORTED to PARTIAL",
+      "reason": "不能默认导入材料支持的提醒，不等于明确的年度自动轮换支持/不支持边界。"
+    },
+    {
+      "qid": 92,
+      "judgment": "J2",
+      "change": "DIRECT to DERIVED",
+      "reason": "端点来源限制不等于应用身份限制；补S3 Principal检查请求者和应用独立受限角色的可见原句。"
+    },
+    {
+      "qid": 92,
+      "judgment": "J3",
+      "change": "Remove transferred hard constraints",
+      "reason": "原题未禁止NAT/长期用户key；保留最佳方案对比，不宣称其他所有配置都不安全。"
+    },
+    {
+      "qid": 3,
+      "change": "Add front quotation",
+      "reason": "补足“for the first”所指组织内请求者的卡面上下文。"
+    }
+  ],
+  "scope": "仅修改本独立审查；原题、159卡、作者结果、旧证据、库存及学习记录未改。"
+}

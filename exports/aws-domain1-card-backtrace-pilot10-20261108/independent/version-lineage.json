@@ -1,0 +1,44 @@
+{
+  "recordedAtUtc": "2026-11-07T19:26:17.169032+00:00",
+  "revision": 2,
+  "reason": "最终限定回读发现Q189原题未强制客户KMS，新增SSE-S3选项C的年度轮换/配置控制能力比较，原题级8+2保持。",
+  "versions": {
+    "restricted159V1": {
+      "path": "results.restricted-v1.json",
+      "sha256": "0b1daef1ebe00e6561c75ee443c731708b6859ff73a98c459cea508886b5c018",
+      "preservation": "修订前原字节复制，保留初次冻结结论。"
+    },
+    "restricted159V2": {
+      "path": "results.json",
+      "sha256": "d7944c4cd5bd7466ef6356c233350018e62ec46a8d53ad0056bfb3d16e030a8e",
+      "questionStatuses": {
+        "SUPPORTED": 8,
+        "PARTIAL": 2
+      },
+      "missingJudgmentCount": 3,
+      "exactQuoteChecks": 81
+    },
+    "globalFallbackV1": {
+      "path": "global-fallback.v1.json",
+      "sha256": "eff91c799b0936dc2c824a23f528deaf5b3a84a8371a40e3827e323f56eaa2a6"
+    },
+    "globalFallbackV2": {
+      "path": "global-fallback.json",
+      "sha256": "5c2019c3596e6a20b5891f899f9bd38447a1f3e46e572d912976d2bf6f29979d",
+      "questionClassifications": {
+        "NAVIGATION_GAP": 0,
+        "CONTENT_BOUNDARY_NOT_FOUND": 2
+      },
+      "missingJudgmentComparisons": 3
+    }
+  },
+  "changedArtifactsOnly": [
+    "independent/results.json",
+    "independent/global-fallback.json"
+  ],
+  "cardsOrQuestionsModified": false,
+  "priorProofReadOnlyAfterBlindV1Freeze": true,
+  "historicalProofUsedAsNewAwsPremise": false,
+  "originalDraftReconstructionHistory": "revision-history.json",
+  "postFreezeReportReadbackNotBlindInput": true
+}

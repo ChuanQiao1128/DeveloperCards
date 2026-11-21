@@ -1,0 +1,297 @@
+[
+  {
+    "qid": 3,
+    "primaryTask": "1.1",
+    "family": "组织范围授权",
+    "stem": "A company uses AWS Organizations to manage multiple AWS accounts for different departments. The management account has an Amazon\nS3 bucket that contains project reports. The company wants to limit access to this S3 bucket to only users of accounts within the organization\nin AWS Organizations.\nWhich solution meets these requirements with the LEAST amount of operational overhead?",
+    "options": [
+      {
+        "ordinal": 1,
+        "originalLabel": "A",
+        "text": "A. Add the aws PrincipalOrgID global condition key with a reference to the organization ID to the S3 bucket policy."
+      },
+      {
+        "ordinal": 2,
+        "originalLabel": "B",
+        "text": "B. Create an organizational unit (OU) for each department. Add the aws:PrincipalOrgPaths global condition key to the S3 bucket policy."
+      },
+      {
+        "ordinal": 3,
+        "originalLabel": "C",
+        "text": "C. Use AWS CloudTrail to monitor the CreateAccount, InviteAccountToOrganization, LeaveOrganization, and\nRemoveAccountFromOrganization events. Update the S3 bucket policy accordingly."
+      },
+      {
+        "ordinal": 4,
+        "originalLabel": "D",
+        "text": "D. Tag each user that needs access to the S3 bucket. Add the aws:PrincipalTag global condition key to the S3 bucket policy."
+      }
+    ]
+  },
+  {
+    "qid": 200,
+    "primaryTask": "1.1",
+    "family": "REST身份认证",
+    "stem": "A company hosts its application on AWS. The company uses Amazon Cognito to manage users. When users log in to the application, the\napplication fetches required data from Amazon DynamoDB by using a REST API that is hosted in Amazon API Gateway. The company wants an\nAWS managed solution that will control access to the REST API to reduce development efforts.\nWhich solution will meet these requirements with the LEAST operational overhead?",
+    "options": [
+      {
+        "ordinal": 1,
+        "originalLabel": "A",
+        "text": "A. Configure an AWS Lambda function to be an authorizer in API Gateway to validate which user made the request."
+      },
+      {
+        "ordinal": 2,
+        "originalLabel": "B",
+        "text": "B. For each user, create and assign an API key that must be sent with each request. Validate the key by using an AWS Lambda function."
+      },
+      {
+        "ordinal": 3,
+        "originalLabel": "C",
+        "text": "C. Send the user’s email address in the header with every request. Invoke an AWS Lambda function to validate that the user with that\nemail address has proper access."
+      },
+      {
+        "ordinal": 4,
+        "originalLabel": "D",
+        "text": "D. Configure an Amazon Cognito user pool authorizer in API Gateway to allow Amazon Cognito to validate each request."
+      }
+    ]
+  },
+  {
+    "qid": 761,
+    "primaryTask": "1.1",
+    "family": "非SAML目录联合",
+    "stem": "A company needs to use its on-premises LDAP directory service to authenticate its users to the AWS Management Console. The directory\nservice is not compatible with Security Assertion Markup Language (SAML).\nWhich solution meets these requirements?",
+    "options": [
+      {
+        "ordinal": 1,
+        "originalLabel": "A",
+        "text": "A. Enable AWS IAM Identity Center (AWS Single Sign-On) between AWS and the on-premises LDAP."
+      },
+      {
+        "ordinal": 2,
+        "originalLabel": "B",
+        "text": "B. Create an IAM policy that uses AWS credentials, and integrate the policy into LDAP."
+      },
+      {
+        "ordinal": 3,
+        "originalLabel": "C",
+        "text": "C. Set up a process that rotates the IAM credentials whenever LDAP credentials are updated."
+      },
+      {
+        "ordinal": 4,
+        "originalLabel": "D",
+        "text": "D. Develop an on-premises custom identity broker application or process that uses AWS Security Token Service (AWS STS) to get short-\nlived credentials."
+      }
+    ]
+  },
+  {
+    "qid": 74,
+    "primaryTask": "1.2",
+    "family": "分层安全组",
+    "stem": "A solutions architect is designing a two-tier web application. The application consists of a public-facing web tier hosted on Amazon EC2 in\npublic subnets. The database tier consists of Microsoft SQL Server running on Amazon EC2 in a private subnet. Security is a high priority for\nthe company.\nHow should security groups be configured in this situation? (Choose two.)",
+    "options": [
+      {
+        "ordinal": 1,
+        "originalLabel": "A",
+        "text": "A. Configure the security group for the web tier to allow inbound traffic on port 443 from 0.0.0.0/0."
+      },
+      {
+        "ordinal": 2,
+        "originalLabel": "B",
+        "text": "B. Configure the security group for the web tier to allow outbound traffic on port 443 from 0.0.0.0/0."
+      },
+      {
+        "ordinal": 3,
+        "originalLabel": "C",
+        "text": "C. Configure the security group for the database tier to allow inbound traffic on port 1433 from the security group for the web tier."
+      },
+      {
+        "ordinal": 4,
+        "originalLabel": "D",
+        "text": "D. Configure the security group for the database tier to allow outbound traffic on ports 443 and 1433 to the security group for the web tier."
+      },
+      {
+        "ordinal": 5,
+        "originalLabel": "E",
+        "text": "E. Configure the security group for the database tier to allow inbound traffic on ports 443 and 1433 from the security group for the web\ntier."
+      }
+    ]
+  },
+  {
+    "qid": 165,
+    "primaryTask": "1.2",
+    "family": "WAF入口与绕行",
+    "stem": "A solutions architect must design a solution that uses Amazon CloudFront with an Amazon S3 origin to store a static website. The company’s\nsecurity policy requires that all website traffic be inspected by AWS WAF.\nHow should the solutions architect comply with these requirements?",
+    "options": [
+      {
+        "ordinal": 1,
+        "originalLabel": "A",
+        "text": "A. Configure an S3 bucket policy to accept requests coming from the AWS WAF Amazon Resource Name (ARN) only."
+      },
+      {
+        "ordinal": 2,
+        "originalLabel": "B",
+        "text": "B. Configure Amazon CloudFront to forward all incoming requests to AWS WAF before requesting content from the S3 origin."
+      },
+      {
+        "ordinal": 3,
+        "originalLabel": "C",
+        "text": "C. Configure a security group that allows Amazon CloudFront IP addresses to access Amazon S3 only. Associate AWS WAF to CloudFront."
+      },
+      {
+        "ordinal": 4,
+        "originalLabel": "D",
+        "text": "D. Configure Amazon CloudFront and Amazon S3 to use an origin access identity (OAI) to restrict access to the S3 bucket. Enable AWS\nWAF on the distribution."
+      }
+    ]
+  },
+  {
+    "qid": 657,
+    "primaryTask": "1.2",
+    "family": "跨账户CIDR维护",
+    "stem": "A company has multiple AWS accounts in an organization in AWS Organizations that different business units use. The company has multiple\noffices around the world. The company needs to update security group rules to allow new office CIDR ranges or to remove old CIDR ranges\nacross the organization. The company wants to centralize the management of security group rules to minimize the administrative overhead\nthat updating CIDR ranges requires.\nWhich solution will meet these requirements MOST cost-effectively?",
+    "options": [
+      {
+        "ordinal": 1,
+        "originalLabel": "A",
+        "text": "A. Create VPC security groups in the organization's management account. Update the security groups when a CIDR range update is\nnecessary."
+      },
+      {
+        "ordinal": 2,
+        "originalLabel": "B",
+        "text": "B. Create a VPC customer managed prefix list that contains the list of CIDRs. Use AWS Resource Access Manager (AWS RAM) to share the\nprefix list across the organization. Use the prefix list in the security groups across the organization."
+      },
+      {
+        "ordinal": 3,
+        "originalLabel": "C",
+        "text": "C. Create an AWS managed prefix list. Use an AWS Security Hub policy to enforce the security group update across the organization. Use\nan AWS Lambda function to update the prefix list automatically when the CIDR ranges change."
+      },
+      {
+        "ordinal": 4,
+        "originalLabel": "D",
+        "text": "D. Create security groups in a central administrative AWS account. Create an AWS Firewall Manager common security group policy for the\nwhole organization. Select the previously created security groups as primary groups in the policy."
+      }
+    ]
+  },
+  {
+    "qid": 36,
+    "primaryTask": "1.3",
+    "family": "跨Region用钥",
+    "stem": "A company is building an application in the AWS Cloud. The application will store data in Amazon S3 buckets in two AWS Regions. The\ncompany must use an AWS Key Management Service (AWS KMS) customer managed key to encrypt all data that is stored in the S3 buckets.\nThe data in both S3 buckets must be encrypted and decrypted with the same KMS key. The data and the key must be stored in each of the two\nRegions.\nWhich solution will meet these requirements with the LEAST operational overhead?",
+    "options": [
+      {
+        "ordinal": 1,
+        "originalLabel": "A",
+        "text": "A. Create an S3 bucket in each Region. Configure the S3 buckets to use server-side encryption with Amazon S3 managed encryption keys\n(SSE-S3). Configure replication between the S3 buckets."
+      },
+      {
+        "ordinal": 2,
+        "originalLabel": "B",
+        "text": "B. Create a customer managed multi-Region KMS key. Create an S3 bucket in each Region. Configure replication between the S3 buckets.\nConfigure the application to use the KMS key with client-side encryption."
+      },
+      {
+        "ordinal": 3,
+        "originalLabel": "C",
+        "text": "C. Create a customer managed KMS key and an S3 bucket in each Region. Configure the S3 buckets to use server-side encryption with\nAmazon S3 managed encryption keys (SSE-S3). Configure replication between the S3 buckets."
+      },
+      {
+        "ordinal": 4,
+        "originalLabel": "D",
+        "text": "D. Create a customer managed KMS key and an S3 bucket in each Region. Configure the S3 buckets to use server-side encryption with AWS\nKMS keys (SSE-KMS). Configure replication between the S3 buckets."
+      }
+    ]
+  },
+  {
+    "qid": 92,
+    "primaryTask": "1.3",
+    "family": "S3私网路径与授权",
+    "stem": "A company is storing sensitive user information in an Amazon S3 bucket. The company wants to provide secure access to this bucket from the\napplication tier running on Amazon EC2 instances inside a VPC.\nWhich combination of steps should a solutions architect take to accomplish this? (Choose two.)",
+    "options": [
+      {
+        "ordinal": 1,
+        "originalLabel": "A",
+        "text": "A. Configure a VPC gateway endpoint for Amazon S3 within the VPC."
+      },
+      {
+        "ordinal": 2,
+        "originalLabel": "B",
+        "text": "B. Create a bucket policy to make the objects in the S3 bucket public."
+      },
+      {
+        "ordinal": 3,
+        "originalLabel": "C",
+        "text": "C. Create a bucket policy that limits access to only the application tier running in the VPC."
+      },
+      {
+        "ordinal": 4,
+        "originalLabel": "D",
+        "text": "D. Create an IAM user with an S3 access policy and copy the IAM credentials to the EC2 instance."
+      },
+      {
+        "ordinal": 5,
+        "originalLabel": "E",
+        "text": "E. Create a NAT instance and have the EC2 instances use the NAT instance to access the S3 bucket."
+      }
+    ]
+  },
+  {
+    "qid": 106,
+    "primaryTask": "1.3",
+    "family": "KMS审计与轮换",
+    "stem": "A company is preparing to store confidential data in Amazon S3. For compliance reasons, the data must be encrypted at rest. Encryption key\nusage must be logged for auditing purposes. Keys must be rotated every year.\nWhich solution meets these requirements and is the MOST operationally efficient?",
+    "options": [
+      {
+        "ordinal": 1,
+        "originalLabel": "A",
+        "text": "A. Server-side encryption with customer-provided keys (SSE-C)"
+      },
+      {
+        "ordinal": 2,
+        "originalLabel": "B",
+        "text": "B. Server-side encryption with Amazon S3 managed keys (SSE-S3)"
+      },
+      {
+        "ordinal": 3,
+        "originalLabel": "C",
+        "text": "C. Server-side encryption with AWS KMS keys (SSE-KMS) with manual rotation"
+      },
+      {
+        "ordinal": 4,
+        "originalLabel": "D",
+        "text": "D. Server-side encryption with AWS KMS keys (SSE-KMS) with automatic rotation"
+      }
+    ]
+  },
+  {
+    "qid": 189,
+    "primaryTask": "1.3",
+    "family": "保留锁与加密组合",
+    "stem": "A company needs to store contract documents. A contract lasts for 5 years. During the 5-year period, the company must ensure that the\ndocuments cannot be overwritten or deleted. The company needs to encrypt the documents at rest and rotate the encryption keys\nautomatically every year.\nWhich combination of steps should a solutions architect take to meet these requirements with the LEAST operational overhead? (Choose\ntwo.)",
+    "options": [
+      {
+        "ordinal": 1,
+        "originalLabel": "A",
+        "text": "A. Store the documents in Amazon S3. Use S3 Object Lock in governance mode."
+      },
+      {
+        "ordinal": 2,
+        "originalLabel": "B",
+        "text": "B. Store the documents in Amazon S3. Use S3 Object Lock in compliance mode."
+      },
+      {
+        "ordinal": 3,
+        "originalLabel": "C",
+        "text": "C. Use server-side encryption with Amazon S3 managed encryption keys (SSE-S3). Configure key rotation."
+      },
+      {
+        "ordinal": 4,
+        "originalLabel": "D",
+        "text": "D. Use server-side encryption with AWS Key Management Service (AWS KMS) customer managed keys. Configure key rotation."
+      },
+      {
+        "ordinal": 5,
+        "originalLabel": "E",
+        "text": "E. Use server-side encryption with AWS Key Management Service (AWS KMS) customer provided (imported) keys. Configure key rotation."
+      }
+    ]
+  }
+]

@@ -1,0 +1,702 @@
+{
+  "scope": "Original domain1 questions against frozen159 public visible cards; no hidden targets or old proof read",
+  "status": "AUTHOR_REVISED_CARD_PREMISES_ONLY",
+  "results": [
+    {
+      "qid": 3,
+      "goal": "组织内身份访问管理账户的S3报告桶，减少成员变动维护",
+      "decisiveConditions": [
+        "请求者须属于本组织",
+        "最低维护负担"
+      ],
+      "status": "SUPPORTED",
+      "selectedOptionOrdinals": [
+        1
+      ],
+      "judgments": [
+        {
+          "id": "Q3-J1",
+          "requiredJudgment": "在桶策略按请求者组织ID限定访问",
+          "supportMode": "DIRECT",
+          "citations": [
+            {
+              "stableUid": "aws-rb2-20261107-pack-cmp-m09",
+              "field": "frontZh",
+              "quote": "S3策略要分别限制“只有本组织的身份能来访问”和“应用只能访问本账户的桶”。该检查请求者还是桶，用什么条件？"
+            },
+            {
+              "stableUid": "aws-rb2-20261107-pack-cmp-m09",
+              "field": "backZh",
+              "quote": "前者在桶策略检查aws:PrincipalOrgID"
+            }
+          ],
+          "reasoning": "原题限制的是来访身份的组织归属，正好对应PrincipalOrgID分支。"
+        },
+        {
+          "id": "Q3-J2",
+          "requiredJudgment": "用组织关系匹配持续覆盖新增成员，不逐用户/账户维护名单",
+          "supportMode": "DIRECT",
+          "citations": [
+            {
+              "stableUid": "aws-rb2-20261107-pack-cmp-m09",
+              "field": "backZh",
+              "quote": "检查组织或所有者关系，新增成员或新桶仍能按规则匹配，不必逐个维护清单。"
+            }
+          ],
+          "reasoning": "组织ID直接实现题目范围，新增OU、账号事件自动改策略或逐用户贴标签增加维护。"
+        }
+      ],
+      "closestCompetitor": {
+        "optionOrdinals": [
+          2
+        ],
+        "reason": "按部门OU和路径表达访问边界比整个组织ID更细；题目只要求整个组织，无须为每部门新增OU/维护路径。依据是卡已教组织关系匹配无须逐项清单。"
+      },
+      "missingJudgments": [],
+      "boundaries": [
+        "选项A的aws PrincipalOrgID缺少冒号，原文保留；语义按其明确所指组织ID条件键理解，不擅改题干。"
+      ],
+      "fullStemAndAllOptionsRead": true,
+      "originalQuestionSha256": "86783be94e2883b939e99e0f12611d8f838197932b497d3ea82e32a64c045ae4"
+    },
+    {
+      "qid": 200,
+      "goal": "已有Cognito登录的REST API使用托管入口验证",
+      "decisiveConditions": [
+        "现有Cognito用户身份",
+        "REST API",
+        "最少开发和维护"
+      ],
+      "status": "SUPPORTED",
+      "selectedOptionOrdinals": [
+        4
+      ],
+      "judgments": [
+        {
+          "id": "Q200-J1",
+          "requiredJudgment": "已有Cognito登录令牌应接Cognito authorizer",
+          "supportMode": "DIRECT",
+          "citations": [
+            {
+              "stableUid": "aws-rb2-20261107-pack-ca19",
+              "field": "backZh",
+              "quote": "Cognito令牌用适用的Cognito authorizer；自定义验证用Lambda authorizer；IAM凭据用AWS_IAM并签名请求。"
+            }
+          ],
+          "reasoning": "已具备的身份材料是Cognito，匹配其authorizer无需改成自定义验证路径。"
+        },
+        {
+          "id": "Q200-J2",
+          "requiredJudgment": "API key或普通邮件字段不能替代已认证身份材料",
+          "supportMode": "DERIVED",
+          "citations": [
+            {
+              "stableUid": "aws-rb2-20261107-pack-ca19",
+              "field": "backZh",
+              "quote": "入口须验证调用方实际持有的身份材料"
+            },
+            {
+              "stableUid": "aws-rb2-20261107-pack-ca19",
+              "field": "backZh",
+              "quote": "API key配合usage plan用于识别客户、计量和限流，不能代替上述身份认证与授权。"
+            }
+          ],
+          "reasoning": "B把计量键当登录认证；C只发邮件属性仍须另写验证。D直接用已有身份验证路径。"
+        }
+      ],
+      "closestCompetitor": {
+        "optionOrdinals": [
+          1
+        ],
+        "reason": "Lambda authorizer可承载自定义验证，但卡把它列为自定义验证分支；原题已有Cognito且要少开发，选择D。"
+      },
+      "missingJudgments": [],
+      "boundaries": [
+        "不要求学习者另背DynamoDB后端部署与权限清单；本题所问是REST入口身份验证。"
+      ],
+      "fullStemAndAllOptionsRead": true,
+      "originalQuestionSha256": "f39c8c2f92a5ef5fcce3ba6636439ddd8f66fc4243cb224788d593fad47e1ed2"
+    },
+    {
+      "qid": 761,
+      "goal": "将不支持SAML的本地LDAP身份桥接为AWS临时身份",
+      "decisiveConditions": [
+        "保留LDAP认证",
+        "目录不支持SAML",
+        "AWS管理控制台访问"
+      ],
+      "status": "PARTIAL",
+      "judgments": [
+        {
+          "id": "Q761-J1",
+          "requiredJudgment": "非SAML LDAP可由自建broker验证后向STS取得短期凭证",
+          "supportMode": "DIRECT",
+          "citations": [
+            {
+              "stableUid": "aws-rb2-20261107-pack-xa026",
+              "field": "backZh",
+              "quote": "后者可由自建identity broker先验证LDAP身份，再向STS取得临时凭证。"
+            }
+          ],
+          "reasoning": "卡的非SAML LDAP分支与原题条件一致。"
+        },
+        {
+          "id": "Q761-J2",
+          "requiredJudgment": "企业密码与AWS授权凭证职责分开，不把IAM策略或轮换用户密钥当目录联合",
+          "supportMode": "DERIVED",
+          "citations": [
+            {
+              "stableUid": "aws-rb2-20261107-pack-xa026",
+              "field": "backZh",
+              "quote": "企业目录仍验证员工；AWS端用受限角色或临时凭证授予访问，而不是把企业密码变成长期AWS access key。"
+            }
+          ],
+          "reasoning": "卡面能说明B/C未实现所教联合身份桥接，但不能由此认定Identity Center直接连接任意非SAML LDAP是否可行。"
+        },
+        {
+          "id": "Q761-M1",
+          "requiredJudgment": "非SAML任意LDAP与IAM Identity Center可直接接入的身份源/桥接条件差异；不能只因卡教broker就认定另一SSO方案不可行。",
+          "supportMode": "MISSING",
+          "citations": [],
+          "reasoning": "正向方案成立与最强竞争项被区分是两项证明；现有引用仅完成前者。"
+        }
+      ],
+      "closestCompetitor": {
+        "optionOrdinals": [
+          1
+        ],
+        "reason": "A是同类人员SSO竞争项。卡教broker+STS路径，但未明确Identity Center接任意LDAP的源兼容与桥接边界，不能据现有卡面排除。"
+      },
+      "missingJudgments": [
+        "非SAML任意LDAP与IAM Identity Center可直接接入的身份源/桥接条件差异；不能只因卡教broker就认定另一SSO方案不可行。"
+      ],
+      "boundaries": [
+        "选择架构方案，不把题目未问的控制台登录URL拼装细节变成必答部署步骤。"
+      ],
+      "fullStemAndAllOptionsRead": true,
+      "originalQuestionSha256": "f527e2c7d43fab3107c951f50ad52778b287079f2367bcbb3f10ca236e7020e7",
+      "candidateOptionOrdinals": [
+        4
+      ]
+    },
+    {
+      "qid": 74,
+      "goal": "公网Web接受客户端连接，SQL Server仅接受Web层数据库连接",
+      "decisiveConditions": [
+        "公网Web与私网数据库两层",
+        "SQL Server",
+        "Choose two",
+        "安全优先"
+      ],
+      "status": "SUPPORTED",
+      "selectedOptionOrdinals": [
+        1,
+        3
+      ],
+      "judgments": [
+        {
+          "id": "Q74-J1",
+          "requiredJudgment": "公网Web放行客户端到Web服务的入站443",
+          "supportMode": "DERIVED",
+          "citations": [
+            {
+              "stableUid": "aws-rb2-20261107-pack-cmp-m10",
+              "field": "backZh",
+              "quote": "在接收端只放行实际上一跳和目标服务端口"
+            },
+            {
+              "stableUid": "aws-rb2-20261107-pack-cb15",
+              "field": "backZh",
+              "quote": "响应从服务器443端口发出"
+            }
+          ],
+          "reasoning": "接收端是Web，公网访问者是上一跳；安全HTTP服务对应443。A放行入站，B只改出站不能满足客户端新连接。"
+        },
+        {
+          "id": "Q74-J2",
+          "requiredJudgment": "数据库仅允许Web安全组到SQL Server监听1433",
+          "supportMode": "DIRECT",
+          "citations": [
+            {
+              "stableUid": "aws-rb2-20261107-pack-cmp-m10",
+              "field": "backZh",
+              "quote": "支持引用时用上一跳的安全组。"
+            },
+            {
+              "stableUid": "aws-rb2-20261107-pack-cmp-m10",
+              "field": "backZh",
+              "quote": "端口是接收端实际监听端口，如默认SQL Server 1433"
+            }
+          ],
+          "reasoning": "数据库这段由Web发起，C按Web组和1433限制来源/端口；D方向错误，E还放行非本数据库服务的443。"
+        }
+      ],
+      "closestCompetitor": {
+        "optionOrdinals": [
+          5
+        ],
+        "reason": "E虽包含1433但额外放行443；卡要求只放实际目标服务端口，因此C更符合安全优先。"
+      },
+      "missingJudgments": [],
+      "boundaries": [
+        "0.0.0.0/0按题内CIDR表达的所有IPv4来源读取；不要求另学完整CIDR算术或NACL部署。"
+      ],
+      "fullStemAndAllOptionsRead": true,
+      "originalQuestionSha256": "a6a3f930406ec53c132b151412ead22aa4767352a70dc710f7baf37bea8d5ba1"
+    },
+    {
+      "qid": 165,
+      "goal": "确保CloudFront+S3静态网站的访问经过WAF",
+      "decisiveConditions": [
+        "WAF检查全部网站流量",
+        "CloudFront入口",
+        "S3源站不能成为绕行路径"
+      ],
+      "status": "SUPPORTED",
+      "selectedOptionOrdinals": [
+        4
+      ],
+      "judgments": [
+        {
+          "id": "Q165-J1",
+          "requiredJudgment": "将WAF关联实际承载请求的CloudFront入口",
+          "supportMode": "DIRECT",
+          "citations": [
+            {
+              "stableUid": "aws-rb2-20261107-pack-cb10",
+              "field": "backZh",
+              "quote": "在实际承载请求的受支持HTTP入口关联WAF web ACL"
+            }
+          ],
+          "reasoning": "原题的HTTP入口是CloudFront，关联分发的web ACL才是检测位置。"
+        },
+        {
+          "id": "Q165-J2",
+          "requiredJudgment": "限制私有S3源站为分发身份访问，配合入口WAF形成完整路径",
+          "supportMode": "DERIVED",
+          "citations": [
+            {
+              "stableUid": "aws-rb2-20261107-pack-nb03",
+              "field": "backZh",
+              "quote": "为分发配置源站访问机制，在桶策略授权它执行所需S3动作。"
+            },
+            {
+              "stableUid": "aws-rb2-20261107-pack-nb03",
+              "field": "backZh",
+              "quote": "旧OAI在其支持的S3读取场景中提供专用源站身份。"
+            },
+            {
+              "stableUid": "aws-rb2-20261107-pack-nb03",
+              "field": "backZh",
+              "quote": "客户到CloudFront与CloudFront到S3是两段授权"
+            }
+          ],
+          "reasoning": "网站为静态S3读取，OAI是卡明确支持的专用源站身份。D同时给出OAI限制源站和WAF分发检查，覆盖两段；只写入口检查不能证明S3不会绕行。"
+        }
+      ],
+      "closestCompetitor": {
+        "optionOrdinals": [
+          2
+        ],
+        "reason": "B只描述入口检查，没有D中的源站限制；原题要求全部网站流量。卡把两段授权分开，不能从CloudFront入口检查推导S3本身已受限制。"
+      },
+      "missingJudgments": [],
+      "boundaries": [
+        "不声称WAF是取S3对象的调用身份；也不为原题追加新的上传场景。"
+      ],
+      "fullStemAndAllOptionsRead": true,
+      "originalQuestionSha256": "68f3beb5f2c5fa2fca07d37c34666a6b3a669983ebcfbeeedc0521510f9a1a5f"
+    },
+    {
+      "qid": 657,
+      "goal": "跨账户更新办公室CIDR，集中且成本低",
+      "decisiveConditions": [
+        "只需统一CIDR清单",
+        "多账户安全组引用",
+        "MOST cost-effective"
+      ],
+      "status": "SUPPORTED",
+      "selectedOptionOrdinals": [
+        2
+      ],
+      "judgments": [
+        {
+          "id": "Q657-J1",
+          "requiredJudgment": "用customer-managed prefix list集中CIDR，经RAM共享供安全组引用",
+          "supportMode": "DIRECT",
+          "citations": [
+            {
+              "stableUid": "aws-rb2-20261107-pack-xa030",
+              "field": "backZh",
+              "quote": "建立customer-managed prefix list，经AWS RAM共享给相关账户；各安全组引用这份列表。"
+            }
+          ],
+          "reasoning": "原题的变动对象就是办公室CIDR，不需要把全部安全组迁入管理账户。"
+        },
+        {
+          "id": "Q657-J2",
+          "requiredJudgment": "只同步CIDR时不必增加Firewall Manager全面治理费用",
+          "supportMode": "DIRECT",
+          "citations": [
+            {
+              "stableUid": "aws-rb2-20261107-pack-xa030",
+              "field": "backZh",
+              "quote": "AWS RAM跨账户共享没有额外共享费用。"
+            },
+            {
+              "stableUid": "aws-rb2-20261107-pack-xa030",
+              "field": "backZh",
+              "quote": "Firewall Manager能做更完整的安全组治理，但其安全组策略有按Region的策略费和相关Config费用；只需同步CIDR时不必引入这套治理。"
+            }
+          ],
+          "reasoning": "B满足清单同步，D增加卡已指出的政策与Config费用，不符合本题最低成本目标。"
+        }
+      ],
+      "closestCompetitor": {
+        "optionOrdinals": [
+          4
+        ],
+        "reason": "D可以提供更全面治理，但题目只需CIDR同步；卡直接说明这时prefix list+RAM减少额外费用。"
+      },
+      "missingJudgments": [],
+      "boundaries": [],
+      "fullStemAndAllOptionsRead": true,
+      "originalQuestionSha256": "3beca83345decfe28f2a3e34ccd139681b8fb9801f304c25b74dedc12e882432"
+    },
+    {
+      "qid": 36,
+      "goal": "两Region保存数据及相同用钥身份，以较低维护实现加解密",
+      "decisiveConditions": [
+        "客户管理KMS key",
+        "两Region都有数据及key",
+        "同一密钥关系加解密",
+        "最少运维"
+      ],
+      "status": "SUPPORTED",
+      "selectedOptionOrdinals": [
+        2
+      ],
+      "judgments": [
+        {
+          "id": "Q36-J1",
+          "requiredJudgment": "同一组相关multi-Region keys在两地保留相同材料及key ID",
+          "supportMode": "DIRECT",
+          "citations": [
+            {
+              "stableUid": "aws-rb2-20261107-pack-xa004",
+              "field": "backZh",
+              "quote": "在两个Region部署同一组相关的KMS multi-Region keys。"
+            },
+            {
+              "stableUid": "aws-rb2-20261107-pack-xa004",
+              "field": "backZh",
+              "quote": "相关主密钥与副本共享密钥材料和key ID，所以一地加密的密文可在另一地用相关key解密。"
+            }
+          ],
+          "reasoning": "B明确给出multi-Region KMS，满足两地本地用同组密钥的决定条件。"
+        },
+        {
+          "id": "Q36-J2",
+          "requiredJudgment": "在应用侧加密，把密文交给两地存储以保留跨Region客户端密文语义",
+          "supportMode": "DERIVED",
+          "citations": [
+            {
+              "stableUid": "aws-rb2-20261107-pack-xa004",
+              "field": "frontZh",
+              "quote": "应用在两个Region做客户端加密，密文要在另一Region直接解密，不想回调原Region或换钥重加密。怎样选KMS key？"
+            },
+            {
+              "stableUid": "aws-rb2-20261107-pack-cmp-m20",
+              "field": "backZh",
+              "quote": "客户端加密才把密文交给存储。"
+            }
+          ],
+          "reasoning": "XA004本身教的是跨Region客户端加解密；结合先加密再交存储，匹配B明确的客户端加密路径。"
+        },
+        {
+          "id": "Q36-J3",
+          "requiredJudgment": "SSE-S3不满足客户KMS要求；普通区域SSE-KMS复制不保证上述共享密文路径",
+          "supportMode": "DERIVED",
+          "citations": [
+            {
+              "stableUid": "aws-rb2-20261107-pack-vc-011",
+              "field": "backZh",
+              "quote": "要求客户KMS key时应选对应客户key的SSE-KMS。"
+            },
+            {
+              "stableUid": "aws-rb2-20261107-pack-xa004",
+              "field": "backZh",
+              "quote": "S3服务端跨Region复制仍会按目标Region的key重加密，不能据材料相同推断其跳过该步骤。"
+            }
+          ],
+          "reasoning": "A/C明确SSE-S3，缺客户KMS；D没明确相关multi-Region键且采用区域服务端复制，不能默认补成B的客户端同组键方案。"
+        }
+      ],
+      "closestCompetitor": {
+        "optionOrdinals": [
+          4
+        ],
+        "reason": "D也有KMS，但没有B明确的multi-Region相关键+客户端路径；不能替其补写未给配置。"
+      },
+      "missingJudgments": [],
+      "boundaries": [
+        "“同一key”按原题明确提供的multi-Region相关键逻辑理解，不声称两地ARN是同一个区域资源。各选项都给了复制，不另加完整复制部署清单。"
+      ],
+      "fullStemAndAllOptionsRead": true,
+      "originalQuestionSha256": "951a12c4e444bd50b3294169893bf73fed838b13d959704f5ee6cc6daf3cad1e"
+    },
+    {
+      "qid": 92,
+      "goal": "从VPC应用层安全访问S3，并限制桶访问范围",
+      "decisiveConditions": [
+        "EC2应用层位于VPC",
+        "敏感用户信息",
+        "Choose two"
+      ],
+      "status": "SUPPORTED",
+      "selectedOptionOrdinals": [
+        1,
+        3
+      ],
+      "judgments": [
+        {
+          "id": "Q92-J1",
+          "requiredJudgment": "应用到S3采用VPC内服务gateway endpoint路径",
+          "supportMode": "DIRECT",
+          "citations": [
+            {
+              "stableUid": "aws-rb2-20261107-pack-cmp-m02",
+              "field": "backZh",
+              "quote": "本VPC可用对应服务的gateway endpoint，关联实际调用子网的路由表"
+            }
+          ],
+          "reasoning": "A是卡已教的VPC-S3专用服务路由方案。"
+        },
+        {
+          "id": "Q92-J2",
+          "requiredJudgment": "网络端点与资源授权分开，桶侧限制实际访问身份/来源范围",
+          "supportMode": "DERIVED",
+          "citations": [
+            {
+              "stableUid": "aws-rb2-20261107-pack-cc16",
+              "field": "backZh",
+              "quote": "端点提供到S3的私网路径；桶策略才在授权时检查请求是否来自允许入口。"
+            },
+            {
+              "stableUid": "aws-rb2-20261107-pack-ca08",
+              "field": "backZh",
+              "quote": "资源策略把访问权授给现有调用身份。"
+            },
+            {
+              "stableUid": "aws-rb2-20261107-pack-xb042",
+              "field": "backZh",
+              "quote": "在各自访问点策略中限制应用身份及允许的前缀。"
+            }
+          ],
+          "reasoning": "A只解决路径；C用桶策略限制应用层。卡教了端点不代替授权、资源策略按调用身份限制以及S3应用身份边界，故应选A+C。"
+        }
+      ],
+      "closestCompetitor": {
+        "optionOrdinals": [
+          4,
+          5
+        ],
+        "reason": "D额外把长期IAM用户凭据复制到实例，CMP-M06已教实例角色的临时凭据替代；E是通用出站NAT实例而非A的S3私网服务路径，且本身不能代替桶侧授权。A+C是卡组直接支持的安全架构组合。",
+        "citations": [
+          {
+            "stableUid": "aws-rb2-20261107-pack-cmp-m06",
+            "field": "backZh",
+            "quote": "代码取得可自动更新的临时凭据，不必分发长期用户密钥"
+          }
+        ]
+      },
+      "missingJudgments": [],
+      "boundaries": [
+        "不把“来自一个端点”自动等同“只来自应用层身份”；身份范围须由资源授权限定。不宣称NAT配其他控制在技术上永远不安全，也不把题目改写成明确禁止公网。",
+        "CMP-M02教学场景的绕过NAT前提不作为本原题的新增硬条件；不以“另有NAT就必不安全”作排除理由。"
+      ],
+      "fullStemAndAllOptionsRead": true,
+      "originalQuestionSha256": "a0a75372040faa246a7fb3758c35e69da2de1a2f2232ecccaff3ca68fb514412"
+    },
+    {
+      "qid": 106,
+      "goal": "S3静态加密、用钥审计和年度轮换，减少手工操作",
+      "decisiveConditions": [
+        "静态加密",
+        "记录key使用供审计",
+        "每年轮换",
+        "MOST operationally efficient"
+      ],
+      "status": "SUPPORTED",
+      "selectedOptionOrdinals": [
+        4
+      ],
+      "judgments": [
+        {
+          "id": "Q106-J1",
+          "requiredJudgment": "用支持用钥审计控制的KMS加密路径",
+          "supportMode": "DIRECT",
+          "citations": [
+            {
+              "stableUid": "aws-rb2-20261107-pack-vc-011",
+              "field": "backZh",
+              "quote": "两者都保护落盘数据，区别在密钥控制。"
+            },
+            {
+              "stableUid": "aws-rb2-20261107-pack-vc-011",
+              "field": "backZh",
+              "quote": "KMS方式提供相应的key policy和用钥审计控制。"
+            }
+          ],
+          "reasoning": "普通SSE-S3只解决落盘加密，不提供本卡所教的KMS用钥审计控制；D选择SSE-KMS路径。"
+        },
+        {
+          "id": "Q106-J2",
+          "requiredJudgment": "对支持自动轮换的KMS key启用年度自动轮换而非手工维护",
+          "supportMode": "DERIVED",
+          "citations": [
+            {
+              "stableUid": "aws-rb2-20261107-pack-cc06",
+              "field": "backZh",
+              "quote": "选择AWS生成密钥材料、支持自动轮换的对称KMS key，并开启所需轮换"
+            },
+            {
+              "stableUid": "aws-rb2-20261107-pack-cc05",
+              "field": "frontZh",
+              "quote": "只要年度轮换和使用审计，与需要自行创建、轮换、禁用密钥，选择有何不同？"
+            },
+            {
+              "stableUid": "aws-rb2-20261107-pack-cc05",
+              "field": "backZh",
+              "quote": "AWS代管密钥以固定行为减少管理"
+            }
+          ],
+          "reasoning": "卡明确将年度轮换与审计作为KMS适用任务，并教支持的自动轮换路径；D比C手动轮换更贴合最少运维。"
+        }
+      ],
+      "closestCompetitor": {
+        "optionOrdinals": [
+          3
+        ],
+        "reason": "C仍需手工轮换；题目给了自动轮换可选且要求年度轮换与最低运维，选择D。"
+      },
+      "missingJudgments": [],
+      "boundaries": [],
+      "fullStemAndAllOptionsRead": true,
+      "originalQuestionSha256": "703a336ba2e1487f789a2801968c9be2f70dcd766a70119e388fb8073a59fc85"
+    },
+    {
+      "qid": 189,
+      "goal": "合同受保护版本保留5年，静态加密并每年自动换key",
+      "decisiveConditions": [
+        "5年不可覆写/删除的合同保留",
+        "静态加密",
+        "年度自动轮换",
+        "Choose two",
+        "最少运维"
+      ],
+      "status": "PARTIAL",
+      "judgments": [
+        {
+          "id": "Q189-J1",
+          "requiredJudgment": "固定保留期采用不能由有权者绕过的compliance模式",
+          "supportMode": "DIRECT",
+          "citations": [
+            {
+              "stableUid": "aws-rb2-20261107-pack-cmp-m16",
+              "field": "backZh",
+              "quote": "固定期用对应Object Lock或Backup Vault Lock的compliance模式"
+            },
+            {
+              "stableUid": "aws-rb2-20261107-pack-cmp-m16",
+              "field": "backZh",
+              "quote": "已生效的compliance保留约束提前删除；governance可被有权者绕过。"
+            }
+          ],
+          "reasoning": "5年是固定保留期，B的compliance而不是A的governance满足防提前删除。"
+        },
+        {
+          "id": "Q189-J2",
+          "requiredJudgment": "版本机制保留原有版本，保护对象版本不被新上传覆盖后再删",
+          "supportMode": "DERIVED",
+          "citations": [
+            {
+              "stableUid": "aws-rb2-20261107-pack-cc13",
+              "field": "backZh",
+              "quote": "同名上传保留独立版本"
+            },
+            {
+              "stableUid": "aws-rb2-20261107-pack-cmp-m16",
+              "field": "backZh",
+              "quote": "S3清理须考虑受保护的具体版本"
+            }
+          ],
+          "reasoning": "同名上传形成新版本而不改写原版本；再由compliance保留保护该合同版本。"
+        },
+        {
+          "id": "Q189-J3",
+          "requiredJudgment": "用客户管理KMS静态加密并启用支持的年度自动轮换",
+          "supportMode": "DERIVED",
+          "citations": [
+            {
+              "stableUid": "aws-rb2-20261107-pack-vc-011",
+              "field": "backZh",
+              "quote": "要求客户KMS key时应选对应客户key的SSE-KMS。"
+            },
+            {
+              "stableUid": "aws-rb2-20261107-pack-cc06",
+              "field": "backZh",
+              "quote": "选择AWS生成密钥材料、支持自动轮换的对称KMS key，并开启所需轮换；不能把导入材料默认视为同样支持。"
+            }
+          ],
+          "reasoning": "D采用客户管理KMS及轮换，C的S3管理key不提供题目所给的自行配置key轮换路径，E的导入材料不能默认同等支持。"
+        },
+        {
+          "id": "Q189-M1",
+          "requiredJudgment": "年度自动轮换对导入密钥材料的明确能力/条件边界，或足以比较D与E最低运维的已教依据；“不能默认同样支持”本身不证明E不成立。",
+          "supportMode": "MISSING",
+          "citations": [],
+          "reasoning": "CC06正向教AWS生成材料可自动轮换，导入分支只作保留性提醒，缺少用于排除最强竞争项的确定规则。"
+        }
+      ],
+      "closestCompetitor": {
+        "optionOrdinals": [
+          1,
+          5
+        ],
+        "reason": "A治理模式可按卡面排除；E导入材料分支当前卡只说不能默认，未教足以判断其是否符合年度自动轮换及最低运维的明确边界。"
+      },
+      "missingJudgments": [
+        "年度自动轮换对导入密钥材料的明确能力/条件边界，或足以比较D与E最低运维的已教依据；“不能默认同样支持”本身不证明E不成立。"
+      ],
+      "boundaries": [
+        "合同不可覆写按WORM保留受保护版本理解；不声称Object Lock阻止对同一对象键上传另一个版本或保证最新版指针不变。"
+      ],
+      "fullStemAndAllOptionsRead": true,
+      "originalQuestionSha256": "af254e3ac18a53d9d4b66dea9e7357610ae37d022920e2e3bb79e1c3159e9cde",
+      "candidateOptionOrdinals": [
+        2,
+        4
+      ],
+      "supportedSubchoiceOrdinals": [
+        2
+      ]
+    }
+  ],
+  "counts": {
+    "SUPPORTED": 8,
+    "PARTIAL": 2
+  },
+  "inputHashes": {
+    "questions.json": "b9cdbed271c5aba66789a6531ddfca23364404aee5b049852d8a0f8a76601d6b",
+    "cards.domain1.visible.json": "29bac697aa708060b1b5fcc748b8835367d8cfd69a8e06f34adb9a1cd8078ae8",
+    "rules.md": "bd0018729b13ce0cbce8280cf74b24c6c3a063fb17b79b839e107ca47cb8e067"
+  },
+  "global365FallbackUsed": false,
+  "humanOutcomeMeasured": false,
+  "revision": {
+    "priorPath": "/Users/qc/.local/share/codex-workflows/recallsmith/aws-basics-bilingual-rag-release-20261028/runtime/full-card-rebuild-v2-20261102/global-card-proof-20261106/domain1-card-backtrace-20261108/pilot10/history/author.results.initial.json",
+    "priorSha256": "b7fc8a0a8e85b8d0a98a10b199cdd746323376bd9af5d2bd64835f15291f2557",
+    "reason": "Two positive recipes do not by themselves establish the closest-competitor boundary; Q92 removes transplanted card-front restriction."
+  }
+}
