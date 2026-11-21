@@ -64,6 +64,11 @@ STRINGS = {'type': 'array', 'items': S}
 CARD = obj({**{k: S for k in ('uid',) + draft.TEXT + draft.OPTIONAL + ('scopeChange',)},
             'mustAnswer': STRINGS, 'evidenceIds': STRINGS})
 AUTHOR_SCHEMA = obj({'cards': {'type': 'array', 'items': CARD}})
+GLOSSARY_ENTRIES = {'type': 'array', 'items': obj({'term': S, 'definition': S})}
+GLOSSARY_CARD_SCHEMA = obj({
+    **CARD['properties'],
+    'glossary': obj({side: GLOSSARY_ENTRIES for side in ('frontEn', 'frontZh', 'backEn', 'backZh')}),
+})
 REVIEW_SCHEMA = obj({
     'cards': {'type': 'array', 'items': obj({'uid': S, 'pass': {'type': 'boolean'},
         'checkedRules': {'type': 'array', 'items': {'type': 'string', 'enum': REVIEW_RULES}}, 'reason': S})},
@@ -102,6 +107,13 @@ def validate_schema(data, schema):
             raise ValueError('Structured output string is outside enum')
     else:
         raise ValueError('Unsupported local schema type')
+
+
+def validate_manual_patch(candidate):
+    if not isinstance(candidate, dict) or set(candidate) != {'cards'} or not isinstance(candidate['cards'], list):
+        raise ValueError('Manual patch requires its cards array')
+    for card in candidate['cards']:
+        validate_schema(card, GLOSSARY_CARD_SCHEMA if isinstance(card, dict) and 'glossary' in card else CARD)
 
 
 def total_usage(path, before=None):
@@ -346,6 +358,10 @@ def manual_target_context(original, current, old_review):
     expected = [previous[c['uid']] for c in current['cards']]
     if current.get('scope') != original['scope'] or current.get('previousScope') != expected:
         raise ValueError('Targeted manual original scope changed')
+    kept = original.get('carriedGlossary', {})
+    carried = {c['uid']: kept[c['uid']] for c in current['cards'] if 'glossary' not in c and c['uid'] in kept}
+    if current.get('carriedGlossary', {}) != carried:
+        raise ValueError('Targeted manual glossary context changed')
     required = {c['uid']: c for c in original.get('contextCards', [])}
     passing = {r['uid'] for r in old_review['cards'] if r['pass'] is True}
     allowed = {**{c['uid']: c for c in original['cards'] if c['uid'] in passing}, **required}
@@ -359,8 +375,13 @@ def manual_target_context(original, current, old_review):
 
 def review_input(packet, candidate):
     used = {eid for c in candidate['cards'] for eid in c['evidenceIds']}
+    existing = {c['uid']: c['existingGlossary'] for c in packet['cards'] if c.get('existingGlossary')}
+    carried = {c['uid']: existing[c['uid']] for c in candidate['cards'] if 'glossary' not in c and c['uid'] in existing}
     return {**packet, 'cards': candidate['cards'],
-            'scope': 'Independent knowledge-card review; compare original scope and cited official evidence. Original question support needs recheck.',
+            'scope': 'Independent knowledge-card review; compare original scope and cited official evidence. Original question support needs recheck.'
+                + (' Review the exact bilingual glossary entries as part of the candidate. Check necessity, anchors, and that front help does not give away the recall task.'
+                   if carried or any('glossary' in card for card in candidate['cards']) else ''),
+            **({'carriedGlossary': carried} if carried else {}),
             'evidence': [e for e in packet['evidence'] if e['id'] in used],
             'previousScope': [{k: c[k] for k in ['uid', 'frontEn', 'frontZh', 'answerEn', 'answerZh',
                 'keyPointEn', 'keyPointZh', 'watchOutEn', 'watchOutZh', 'goalEn', 'goalZh', 'mustAnswer']}
@@ -508,7 +529,7 @@ def run(packet_path, baseline, output, primary_session=None, resume_review=False
         manual_patch = Path(manual_patch).resolve()
         manual_bytes = manual_patch.read_bytes()
         candidate = json.loads(manual_bytes)
-        validate_schema(candidate, AUTHOR_SCHEMA)
+        validate_manual_patch(candidate)
         if [c['uid'] for c in candidate['cards']] != uids:
             raise ValueError('Manual patch changed frozen identities or order')
         if any(not c['evidenceIds'] or not set(c['evidenceIds']) <= evidence_ids for c in candidate['cards']):

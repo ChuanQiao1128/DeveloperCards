@@ -37,6 +37,7 @@ export interface CardTags {
 }
 
 export interface CardTeachingZh {
+  backHelp?: FrontHelpEntry[];
   /** Optional for older published decks; aligned with the English answer checklist. */
   mustAnswer?: string[];
   answer: string;
@@ -46,6 +47,7 @@ export interface CardTeachingZh {
 }
 
 export interface CardTeaching {
+  backHelp?: FrontHelpEntry[];
   schema: string;
   answer: string;
   keyPoint: string;

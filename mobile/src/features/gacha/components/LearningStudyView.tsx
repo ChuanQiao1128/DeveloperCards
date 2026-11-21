@@ -1,4 +1,5 @@
 import { CardFrontHelp } from './CardFrontHelp';
+import { unlinkedTermHelp } from '../../../content/frontHelp';
 import React, { useEffect, useState } from 'react';
 import * as RN from 'react-native';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
@@ -109,9 +110,10 @@ export const LearningStudyView = React.memo(function LearningStudyView(props: Le
         testID="learning-study-question"
         accessibilityLabel={question.code ? stripInlineCode(questionA11yLabel(question)) : undefined}
         text={question.text}
+        termHelp={card.FrontHelp}
       />
       {question.code ? <QuestionCodeBlock code={question.code} /> : null}
-      {!helpOpen ? <CardFrontHelp key={`${card.StableUid}:${lang ?? 'en'}`} help={card.FrontHelp} /> : null}
+      {!helpOpen ? <CardFrontHelp key={`${card.StableUid}:${lang ?? 'en'}`} help={unlinkedTermHelp(question.text, card.FrontHelp)} /> : null}
       {/* Question first: the answer and its source stay off screen until "Show answer". The source
           is still read on mount, so it is ready by the time the answer opens. */}
       {revealed ? (
@@ -126,7 +128,8 @@ export const LearningStudyView = React.memo(function LearningStudyView(props: Le
             {props.onPressPrerequisite && card.Teaching?.prerequisites?.length ? (
               <Text style={styles.helpText}>The Foundation links above open the background cards.</Text>
             ) : null}
-            <CardFrontHelp key={`${card.StableUid}:${lang ?? 'en'}:open`} help={card.FrontHelp} initiallyExpanded />
+            <CardFrontHelp key={`${card.StableUid}:${lang ?? 'en'}:open`}
+              help={unlinkedTermHelp(question.text, card.FrontHelp)} initiallyExpanded />
             <Text style={styles.helpText}>You can continue while it is still unclear. Reading an answer is a first step; reviewing later checks what you remember.</Text>
           </View> : null}
         </View>

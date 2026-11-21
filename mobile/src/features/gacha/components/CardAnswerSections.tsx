@@ -9,6 +9,8 @@ import { stripInlineCode } from '../../../content/inlineCode';
 import { normalizeCodeLanguage, renderSimpleMarkdown } from '../session/reviewContentHelpers';
 import { InlineCodeText } from './InlineCodeText';
 import { cardSectionLabels, cardTextA11yProps, useCardTextLang, type CardTextLang } from './CardTextLang';
+import { CardFrontHelp } from './CardFrontHelp';
+import { unlinkedTermHelp } from '../../../content/frontHelp';
 import { colors } from '../../../theme/colors';
 import { spacing } from '../../../theme/spacing';
 import { typography } from '../../../theme/typography';
@@ -115,6 +117,10 @@ export function CardAnswerSections(props: { card: CardExport; testID?: string; o
     const answer = isZh && t['zh-CN']?.answer ? t['zh-CN'].answer : t.answer;
     const keyPoint = isZh && t['zh-CN']?.keyPoint ? t['zh-CN'].keyPoint : t.keyPoint;
     const watchOut = isZh && t['zh-CN']?.watchOut ? t['zh-CN'].watchOut : t.watchOut;
+    const backHelp = isZh && t['zh-CN'] ? t['zh-CN'].backHelp : t.backHelp;
+    const unlinkedKeyPoint = unlinkedTermHelp(keyPoint, backHelp);
+    const unlinked = unlinkedTermHelp(answer, backHelp).filter(entry =>
+      unlinkedKeyPoint.some(hint => hint.term === entry.term));
 
     // 1. Conclusion & Key Point
     sections.push({
@@ -127,14 +133,16 @@ export function CardAnswerSections(props: { card: CardExport; testID?: string; o
               style={styles.keyLineText}
               accessibilityLabel={keyLineA11yLabel(answer, lang)}
               text={(isZh ? '答：' : 'Answer: ') + answer}
+              termHelp={backHelp}
             />
           </View>
           {keyPoint ? (
             <View style={styles.keyPointBlock}>
               <Text style={styles.keyPointLabel}>{isZh ? '考点：' : 'Key point: '}</Text>
-              <InlineCodeText style={styles.sectionBody} text={keyPoint} />
+              <InlineCodeText style={styles.sectionBody} text={keyPoint} termHelp={backHelp} />
             </View>
           ) : null}
+          {unlinked.length ? <CardFrontHelp help={unlinked} /> : null}
         </View>
       ),
     });

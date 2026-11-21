@@ -28,7 +28,51 @@ def view(card):
             'frontZh': card['translations']['zh-CN']['question'],
             **{f'{k}{lang}': data.get(k, '') for lang, data in [('En', t), ('Zh', z)]
                for k in ['answer', 'keyPoint', 'watchOut', 'goal']},
-            'mustAnswer': t['mustAnswer']}
+            'mustAnswer': t['mustAnswer'],
+            **({'existingGlossary': glossary_of(card)} if t.get('backHelp') or card.get('frontHelp') else {})}
+
+
+def glossary_of(card):
+    return {
+        'frontEn': card.get('frontHelp') or [],
+        'frontZh': card['translations']['zh-CN'].get('frontHelp') or [],
+        'backEn': card['teaching'].get('backHelp') or [],
+        'backZh': card['teaching']['zh-CN'].get('backHelp') or [],
+    }
+
+
+def apply_glossary(card, raw):
+    if not isinstance(raw, dict) or set(raw) != {'frontEn', 'frontZh', 'backEn', 'backZh'}:
+        raise ValueError('Expected English and Chinese front/back glossary arrays')
+    translation = card['translations']['zh-CN']
+    teaching = card['teaching']
+    faces = {
+        'frontEn': (card, 'frontHelp', card['question']),
+        'frontZh': (translation, 'frontHelp', translation['question']),
+        'backEn': (teaching, 'backHelp', teaching['answer'] + '\n' + teaching['keyPoint']),
+        'backZh': (teaching['zh-CN'], 'backHelp', teaching['zh-CN']['answer'] + '\n' + teaching['zh-CN']['keyPoint']),
+    }
+    for side, (target, field, text) in faces.items():
+        entries = raw[side]
+        if not isinstance(entries, list) or len(entries) > 2:
+            raise ValueError('A face permits at most two glossary anchors per language')
+        seen = set()
+        for entry in entries:
+            if not isinstance(entry, dict) or set(entry) != {'term', 'definition'}:
+                raise ValueError('A glossary entry requires a term and definition')
+            term, definition = entry['term'], entry['definition']
+            if (not isinstance(term, str) or not 1 <= len(term) <= 80 or term != term.strip()
+                    or term not in text or term.lower() in seen
+                    or not isinstance(definition, str) or not 1 <= len(definition) <= 240
+                    or definition != definition.strip()):
+                raise ValueError('Invalid or unanchored glossary entry: ' + side)
+            seen.add(term.lower())
+        if entries:
+            target[field] = entries
+        else:
+            target.pop(field, None)
+    if any(len(raw[side + 'En']) != len(raw[side + 'Zh']) for side in ('front', 'back')):
+        raise ValueError('Glossary arrays must match across languages')
 
 
 def render(baseline_path, patch_path, output, source_overrides=None):
@@ -43,7 +87,7 @@ def render(baseline_path, patch_path, output, source_overrides=None):
     seen, cards, notes = set(), [], []
     source_overrides = source_overrides or {}
     for patch in patches:
-        if not REQUIRED <= set(patch) or set(patch) - REQUIRED - set(OPTIONAL):
+        if not REQUIRED <= set(patch) or set(patch) - REQUIRED - set(OPTIONAL) - {'glossary'}:
             raise ValueError('Unexpected or missing semantic fields')
         uid = patch['uid']
         if uid not in by_uid or uid in seen:
@@ -90,6 +134,10 @@ def render(baseline_path, patch_path, output, source_overrides=None):
         if by_uid[uid]['teaching'].get('prerequisites'):
             teaching['prerequisites'] = copy.deepcopy(by_uid[uid]['teaching']['prerequisites'])
         c['teaching'] = teaching
+        if 'glossary' in patch:
+            apply_glossary(c, patch['glossary'])
+        elif c['teaching'].get('backHelp'):
+            apply_glossary(c, glossary_of(c))
         cards.append(c)
         note = {k: patch[k] for k in ['uid', 'evidenceIds', 'scopeChange']}
         if uid in source_overrides:

@@ -1,4 +1,5 @@
 import { CardFrontHelp } from './CardFrontHelp';
+import { unlinkedTermHelp } from '../../../content/frontHelp';
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -103,6 +104,7 @@ export const ReviewBody = React.memo(function ReviewBody(props: ReviewBodyProps)
             testID="review-question"
             accessibilityLabel={questionLabel}
             text={question.text}
+            termHelp={card.FrontHelp}
           />
           {question.code ? <QuestionCodeBlock code={question.code} /> : null}
         </>
@@ -116,12 +118,13 @@ export const ReviewBody = React.memo(function ReviewBody(props: ReviewBodyProps)
             testID="review-question"
             accessibilityLabel={questionLabel}
             text={question.text}
+            termHelp={card.FrontHelp}
           />
           {question.code ? <QuestionCodeBlock code={question.code} /> : null}
         </View>
       )}
 
-      <CardFrontHelp key={`${card.StableUid}:${lang ?? 'en'}`} help={card.FrontHelp} />
+      <CardFrontHelp key={`${card.StableUid}:${lang ?? 'en'}`} help={unlinkedTermHelp(question.text, card.FrontHelp)} />
 
       {!faceUp ? (
         <Pressable

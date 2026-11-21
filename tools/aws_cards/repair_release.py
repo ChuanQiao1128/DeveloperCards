@@ -26,7 +26,8 @@ PUBLISHER_CODE_FILES = (
     'tools/aws_cards/validate_release_json.mjs', 'frontend/src/lib/contentRelease.ts',
     'frontend/src/lib/contentReleaseDelivery.ts', 'frontend/src/lib/contentReleaseStatus.ts', 'frontend/src/lib/releaseArtifacts.ts',
     'frontend/src/lib/releaseJournalStore.ts', 'frontend/src/pages/ContentReleasePage.tsx',
-    'frontend/src/types/contentRelease.ts', 'frontend/package-lock.json', '.github/workflows/ci.yml')
+    'frontend/src/types/contentRelease.ts', 'src_C/Vpc/Authoring/TeachingValidation.cs',
+    'frontend/package-lock.json', '.github/workflows/ci.yml')
 REQUIRED_CODE_CHECKS = {'CodeQL', 'frontend (vitest + build)', 'frontend (playwright smoke)',
     'backend (dotnet test)', 'python (uv lock + pytest)', 'mobile (typecheck + vitest + expo export)',
     'tools/mcp-server (build + vitest)', 'tools/author-runner (build + vitest)',
@@ -145,7 +146,7 @@ def verified_patch(packet_path, trial, reviewed, repair=None, manual=False):
         bind_proof(proofs, Path(source['sourcePath']), source['sourceSha256'])
         bind_proof(proofs, trial / 'manual-patch.json', source['sourceSha256'])
         candidate = cards.read(trial / 'manual-patch.json')
-        batch.validate_schema(candidate, batch.AUTHOR_SCHEMA)
+        batch.validate_manual_patch(candidate)
     else:
         author_input, candidate = inference(trial / 'author', 'author', proofs)
         require(author_input == packet, 'Author packet changed')
