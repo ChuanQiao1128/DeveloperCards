@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useLocation, useParams } from 'react-router-dom';
 
 import { fetchPublishJob, fetchPublishJobs, type PublishJob } from '../api/authoring';
 import { ConsolePage, Fields } from '../components/console/OperationsViews';
@@ -109,6 +109,7 @@ export function NeedsAttentionPage() {
 
 export function PublishJobDetailPage() {
   const { jobId } = useParams();
+  const fromOperations = useLocation().state?.from === 'operations';
   const identity = useConsoleIdentity();
   const query = useQuery({
     queryKey: ['publish-job', identity.sub, identity.generation, jobId],
@@ -130,7 +131,9 @@ export function PublishJobDetailPage() {
   return (
     <ConsolePage title="Publish job">
       <nav className="flex flex-wrap gap-4 text-sm" aria-label="Publish job navigation">
-        <Link to="/needs-attention" className={LINK}>Back to publishing issues</Link>
+        <Link to={fromOperations ? '/operations' : '/needs-attention'} className={LINK}>
+          {fromOperations ? 'Back to Operations' : 'Back to publishing issues'}
+        </Link>
         <Link to={PUBLISH_JOBS_HREF} className={LINK}>All publish jobs</Link>
       </nav>
       <section className={PANEL} aria-label="Publish job status">

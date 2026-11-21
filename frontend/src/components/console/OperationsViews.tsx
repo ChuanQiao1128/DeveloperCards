@@ -38,7 +38,7 @@ export function SafeExternalLink({ href, children }: { href: string | null; chil
   return <a className={LINK} href={href} target="_blank" rel="noopener noreferrer">{children} (opens new tab)</a>;
 }
 export function OperationsSummary({ data, historical = false }: { data: Operations; historical?: boolean }) {
-  return <section className={PANEL} aria-label="Operational sources">
+  return <section className={PANEL} id="operational-sources" aria-label="Operational sources" tabIndex={-1}>
     <h2 className={HEADING}>Operational sources</h2>
     <p className="text-sm text-slate-600">Read at {time(data.fetchedAt)}. Source samples may be older than this read.</p>
     <div className="divide-y divide-slate-200">{([['Synthetic checks', data.synthetic], ['CloudWatch alarms', data.alarms], ['Database', data.database], ['Publishing', data.publishing]] as [string, SourceState][]).map(([title, source]) => <div key={title} className="py-3 space-y-1"><h3 className="font-semibold text-slate-900">{title}</h3><Source value={historical && source.state !== 'unknown' ? { ...source, state: 'stale', status: 'unknown' } : source} /></div>)}</div>

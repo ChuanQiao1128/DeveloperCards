@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '../src/auth/AuthContext';
@@ -130,6 +130,64 @@ it('labels stale samples, insufficient data and failed refresh without promoting
   expect(screen.getByRole('alert').textContent).toContain('historical; current status is unknown');
   expect(screen.getByRole('alert').textContent).not.toContain('sensitive-query');
 });
+it('prioritizes fresh signals and suppresses their current status after a refresh failure', async () => {
+  const safeAlarm = { name: 'quiet-alarm', state: 'OK', stateUpdatedAt: operations.fetchedAt };
+  const firingAlarm = { ...safeAlarm, name: 'sync-errors', state: 'ALARM' };
+  const missingAlarm = { ...safeAlarm, name: 'no-traffic', state: 'INSUFFICIENT_DATA' };
+  const check = { name: 'api-health', status: 'failed', advisory: false, httpStatus: 503, latencyMs: 70, code: null };
+  get.mockResolvedValue(envelope({
+    ...operations,
+    synthetic: { ...operations.synthetic, state: 'fresh', checks: [check, { ...check, name: 'remote-config', advisory: true }] },
+    alarms: { ...operations.alarms, state: 'fresh', items: [safeAlarm, missingAlarm, firingAlarm] },
+  }));
+  mount('/operations');
+
+  expect((await screen.findByRole('link', { name: '1 firing alarm' })).getAttribute('href')).toBe('#cloudwatch-alarms');
+  expect(screen.getByRole('link', { name: '1 core check with a problem' })).toBeTruthy();
+  expect(screen.getByRole('link', { name: '1 advisory check with a problem' })).toBeTruthy();
+  expect(screen.getByText(/with insufficient or unknown data/)).toBeTruthy();
+  const alarmPanel = screen.getByRole('region', { name: 'CloudWatch alarms' });
+  expect(within(alarmPanel).getAllByRole('listitem').map(row => row.textContent)).toEqual([
+    expect.stringContaining('sync-errors'), expect.stringContaining('no-traffic'), expect.stringContaining('quiet-alarm'),
+  ]);
+
+  get.mockRejectedValue(new Error('refresh unavailable'));
+  fireEvent.click(screen.getByRole('button', { name: 'Refresh sources' }));
+  await screen.findByRole('alert');
+  expect(screen.queryByRole('link', { name: '1 firing alarm' })).toBeNull();
+  expect(screen.queryByRole('link', { name: '1 core check with a problem' })).toBeNull();
+  expect(within(alarmPanel).getByText('Historical sample · current status unknown')).toBeTruthy();
+  expect(within(alarmPanel).getByText('sync-errors')).toBeTruthy();
+});
+
+it('moves a cached firing alarm to historical evidence when its sample expires', async () => {
+  vi.useFakeTimers();
+  try {
+    get.mockResolvedValue(envelope({
+      ...operations,
+      alarms: { ...operations.alarms, state: 'fresh', status: 'failed',
+        expiresAt: new Date(Date.parse(operations.alarms.fetchedAt) + 1000).toISOString(),
+        items: [{ name: 'expiring-alarm', state: 'ALARM', stateUpdatedAt: operations.fetchedAt }],
+      },
+    }));
+    await act(async () => {
+      mount('/operations');
+      await vi.advanceTimersByTimeAsync(5);
+    });
+    await act(async () => vi.advanceTimersByTimeAsync(5));
+    expect(screen.getByRole('link', { name: '1 firing alarm' })).toBeTruthy();
+
+    await act(async () => vi.advanceTimersByTimeAsync(1000));
+    expect(screen.queryByRole('link', { name: '1 firing alarm' })).toBeNull();
+    const alarmPanel = screen.getByRole('region', { name: 'CloudWatch alarms' });
+    expect(within(alarmPanel).getByText('Historical sample · current status unknown')).toBeTruthy();
+    expect(within(alarmPanel).getByText('expiring-alarm')).toBeTruthy();
+    expect(get).toHaveBeenCalledTimes(1);
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
 it('redirects the old overview bookmark to operations with one polling owner', async () => {
   get.mockResolvedValue(envelope(operations)); mount('/overview');
   await screen.findByRole('heading', { name: 'Operational sources' });
