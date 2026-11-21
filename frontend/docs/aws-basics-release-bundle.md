@@ -97,7 +97,13 @@ After this actual CDN verification succeeds, retain its result, complete backup 
 The production content CDN must be configured in `VITE_CONTENT_MANIFEST_URL`, listed in the Console CSP, and permit anonymous GET/HEAD reads. The content distribution uses its existing Free plan. S3 supplies CORS for the Console origin and GET/HEAD only; CloudFront always sends that fixed Origin to S3, making CORS metadata independent of viewer headers and the shared cache key. No origin-request or cache-policy change is needed. The scoped recovery workflow invalidates only `/content/*` to remove older responses without CORS metadata. Console CSP still names only the configured content CDN. Custom response-header policies are unsupported on this pricing plan; the managed SimpleCORS path was observed to omit ACAO when real browser requests include Priority. The Terraform allow-list for these narrow headers is `docs/delivery/content-release-recovery-20261118/CDN-VERIFY.plan-allow.json`. Ordinary card-only releases require no mobile code change or OTA.
 
 
-## Durable completion and one closeout
+## Production card package storage
+
+Use the versioned S3 build objects for publication, previous-version backups and restore. Find the original build and checksum in Published versions and the server verification receipt. Routine releases leave the local save directory unset and skip archive downloads. Run any temporary preparation in the hosted execution environment and clean up its working files.
+
+The browser journal recovers interrupted Console actions. An S3 build contains the published cards. The editing snapshot and raw review artifacts have separate recovery requirements.
+
+## Legacy file archive and recovery
 
 The journal's optional `delivery` records the verified job/build/hash/count/time. Local archive bytes are separately persisted in owner + releaseId + canonical bundle scoped IndexedDB. Reload resets action confirmations. The runner queries the original actions and checks the current successful job, delivered index and live pointer. Certified builds reuse the server receipt and existing local bytes when available. The local archive can fetch missing bytes by the same immutable build path.
 
