@@ -18,20 +18,31 @@ function observe(root, env = process.env, run = execFileSync) {
   const dest = path.join(build, resources, 'main.jsbundle');
   const intermediate = path.join(build, 'main.jsbundle');
   if (fs.existsSync(dest) || fs.existsSync(intermediate) || fs.existsSync(path.join(c.runDir, 'bundle-stage.json'))) throw new Error('pre-existing/stale bundle or repeated observation');
-  // Require the exact reviewed npm-locked RN implementation. Overrides supplied
-  // by .xcode.env or shell phases cannot replace Metro/Hermes inputs silently.
+  // Enter outside Sentry's Node/Hermes injection; the locked wrapper must own
+  // that protocol while overrides from .xcode.env remain forbidden here.
   const script = path.join(root, 'node_modules/react-native/scripts/react-native-xcode.sh');
-  const locked = JSON.parse(regular(path.join(root, 'node_modules/react-native/package.json')));
-  if (locked.version !== '0.81.5') throw new Error('unsupported RN bundling tool');
-  if (env.NODE_OPTIONS || env.NODE_ARGS || env.EXTRA_PACKAGER_ARGS || env.BUNDLE_CONFIG || env.CONFIG_CMD || env.CONFIG_JSON || env.HERMES_CLI_PATH) throw new Error('uncontrolled bundle override');
+  const sentry = path.join(root, 'node_modules/@sentry/react-native/scripts/sentry-xcode.sh');
+  for (const [pkg, version] of [['react-native', '0.81.5'], ['@sentry/react-native', '7.2.0'], ['@sentry/cli', '2.55.0']]) {
+    if (JSON.parse(regular(path.join(root, 'node_modules', pkg, 'package.json'))).version !== version) throw new Error('unsupported RN/Sentry bundling tool');
+  }
+  const overrides = ['NODE_OPTIONS', 'NODE_ARGS', 'EXTRA_PACKAGER_ARGS', 'BUNDLE_CONFIG', 'CONFIG_CMD', 'CONFIG_JSON', 'HERMES_CLI_PATH',
+    'COMPOSE_SOURCEMAP_PATH', 'SOURCEMAP_FILE', 'SOURCE_MAP_PATH', 'MODULES_PATHS', 'SENTRY_CLI_EXECUTABLE', 'SENTRY_CLI_PACKAGE_PATH',
+    'SENTRY_BINARY_PATH', 'SENTRY_PROPERTIES', 'SENTRY_DOTENV_PATH',
+    'SENTRY_CLI_EXTRA_ARGS', 'SENTRY_CLI_RN_XCODE_EXTRA_ARGS', 'SENTRY_COLLECT_MODULES', 'SENTRY_RN_PACKAGE_PATH',
+    'SENTRY_DISABLE_AUTO_UPLOAD', '__SENTRY_RN_WRAP_XCODE_CALL', 'SENTRY_RN_REAL_NODE_BINARY', 'SENTRY_RN_REAL_HERMES_CLI_PATH', 'SENTRY_RN_SOURCEMAP_REPORT'];
+  // Rust's env::var branches treat empty values as active wrapper controls.
+  const sentryControls = ['SENTRY_RN_BUNDLE_COMMAND', 'SENTRY_RN_NO_DEBUG_ID', 'NO_AUTO_RELEASE', 'AUTO_RELEASE', 'SENTRY_RELEASE', 'SENTRY_DIST'];
+  const override = overrides.find(key => env[key]) || sentryControls.find(key => Object.hasOwn(env, key));
+  if (override) throw new Error(`uncontrolled bundle override: ${override}`);
   const cli = require.resolve('@expo/cli', { paths: [path.join(root, 'node_modules/expo/package.json')] });
   const hermes = path.join(env.PODS_ROOT, 'hermes-engine/destroot/bin/hermesc');
   const controlled = { ...env, PROJECT_ROOT: root, NODE_BINARY: process.execPath, NODE_ARGS: '',
     ENTRY_FILE: path.join(root, 'index.ts'), CLI_PATH: cli, BUNDLE_COMMAND: 'export:embed',
+    COMPOSE_SOURCEMAP_PATH: path.join(root, 'node_modules/react-native/scripts/compose-source-maps.js'),
     HERMES_CLI_PATH: hermes, USE_HERMES: 'true', SKIP_BUNDLING: '', BUNDLE_NAME: 'main' };
   try {
-    run('/bin/bash', [script], { cwd: root, env: controlled, stdio: 'pipe', timeout: 20 * 60 * 1000, maxBuffer: 8 * 1024 * 1024 });
-  } catch { throw new Error('Metro/Hermes build failed; tool output withheld to protect authorization'); }
+    run('/bin/sh', [sentry, script], { cwd: path.join(root, 'ios'), env: controlled, stdio: 'pipe', timeout: 20 * 60 * 1000, maxBuffer: 8 * 1024 * 1024 });
+  } catch { throw new Error('Sentry/Metro/Hermes build failed; tool output withheld to protect authorization'); }
   const bytes = regular(dest, 64 * 1024 * 1024);
   // Hermes HBC magic (little endian 0x1F1903C103BC1FC6).
   if (!bytes.subarray(0, 8).equals(Buffer.from('c61fbc03c103191f', 'hex'))) throw new Error('final Xcode bundle is not Hermes bytecode');

@@ -22,6 +22,11 @@ const temp = () => { const p = fs.mkdtempSync(path.join(os.tmpdir(), 'native-pro
 afterEach(() => { vi.unstubAllEnvs(); dirs.splice(0).forEach(dir => fs.rmSync(dir, { force: true, recursive: true })); });
 const write = (file: string, data: string | Buffer) => { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, data); };
 const hbc = Buffer.concat([Buffer.from('c61fbc03c103191f', 'hex'), Buffer.from(' STUB devcards:sync:pendingOwners:v1 PROGRESS_QUEUE_FULL')]);
+function sentryFixture(root: string) {
+  write(path.join(root, 'node_modules/@sentry/react-native/package.json'), '{"version":"7.2.0"}');
+  write(path.join(root, 'node_modules/@sentry/react-native/scripts/sentry-xcode.sh'), '# STUB Sentry wrapper');
+  write(path.join(root, 'node_modules/@sentry/cli/package.json'), '{"version":"2.55.0"}');
+}
 function fixture() {
   const dir = temp(); const root = path.join(dir, 'repo/mobile');
   for (const f of [...producer.PRODUCER_FILES, 'app.json', 'package.json', 'package-lock.json', 'eas.json', 'src/sync/progressSync.ts']) {
@@ -61,13 +66,14 @@ function fakeBuild(app: any, change?: (c: any) => void) {
     write(path.join(rn, 'scripts/react-native-xcode.sh'), '# STUB tested wrapper execution');
     write(path.join(root, 'node_modules/@expo/cli/package.json'), '{"main":"cli.js"}');
     write(path.join(root, 'node_modules/@expo/cli/cli.js'), '// STUB Metro');
+    sentryFixture(root);
     const build = path.join(c.runDir, 'derived-data/Build/Products/Release-iphoneos');
     fs.mkdirSync(path.join(build, 'STUB.app'), { recursive: true });
     const pods = path.join(root, 'ios/Pods');
     write(path.join(pods, 'hermes-engine/destroot/bin/hermesc'), 'STUB Hermes compiler');
     write(path.join(root, colorTarget), originalColor);
     const revenueCatCompatibility = producer.applyRevenueCatCompatibility(root);
-    // Run the real observer, injecting only its Metro/Hermes external process.
+    // Run the real observer, injecting only its Sentry/Metro/Hermes process.
     observer.observe(root, { CONFIGURATION: 'Release', PLATFORM_NAME: 'iphoneos', CONFIGURATION_BUILD_DIR: build,
       UNLOCALIZED_RESOURCES_FOLDER_PATH: 'STUB.app', PODS_ROOT: pods }, (_command: string, _args: string[], opts: any) => {
       expect(opts.env.SKIP_BUNDLING).toBe(''); expect(opts.env.BUNDLE_COMMAND).toBe('export:embed');
@@ -212,6 +218,7 @@ describe('producer-owned local provenance orchestration (fake build/signature to
           expect(args).toEqual(['ci', '--offline', '--ignore-scripts', '--no-audit', '--no-fund', '--include=dev']);
           write(path.join(root, 'node_modules/react-native/package.json'), '{"version":"0.81.5"}');
           write(path.join(root, 'node_modules/react-native/scripts/react-native-xcode.sh'), '# STUB RN script');
+          sentryFixture(root);
           write(path.join(root, 'node_modules/@expo/cli/package.json'), '{"main":"cli.js"}');
           write(path.join(root, 'node_modules/@expo/cli/cli.js'), '// STUB Metro');
         } else if (args.includes('prebuild')) {
@@ -393,6 +400,7 @@ describe('Xcode final-bundle observer and config preservation', () => {
     const build = path.join(dir, 'derived-data/Release'); fs.mkdirSync(build, { recursive: true });
     const env: any = { CONFIGURATION: 'Release', PLATFORM_NAME: 'iphoneos', CONFIGURATION_BUILD_DIR: build, UNLOCALIZED_RESOURCES_FOLDER_PATH: 'STUB.app', PODS_ROOT: path.join(root, 'ios/Pods') };
     write(path.join(root, 'node_modules/react-native/package.json'), '{"version":"0.81.5"}');
+    sentryFixture(root);
     write(path.join(root, 'node_modules/@expo/cli/package.json'), '{"main":"cli.js"}');
     write(path.join(root, 'node_modules/@expo/cli/cli.js'), '// STUB Metro');
     write(path.join(root, 'node_modules/react-native/scripts/react-native-xcode.sh'), '# STUB RN');
@@ -429,10 +437,13 @@ describe('Xcode final-bundle observer and config preservation', () => {
     config.updates.requestHeaders['expo-channel-name'] = 'preview';
     expect(() => resolve({ config })).toThrow('production update channel conflicts');
   });
-  it('patches the known RN invocation within Sentry and rejects unknown/repeated hooks', () => {
+  it('patches only the known outer Sentry/RN invocation and rejects unknown/repeated hooks', () => {
     const { patchPhase } = require(path.join(mobile, 'plugins/withBuildProvenance.js'));
     const call = '`"$NODE_BINARY" --print "require(\'path\').dirname(require.resolve(\'react-native/package.json\')) + \'/scripts/react-native-xcode.sh\'"`';
-    expect(patchPhase(`SENTRY_WRAPPER ${call}`)).toContain('$PROJECT_DIR/../scripts/release/observeNativeBundle.cjs');
+    const sentry = '`"$NODE_BINARY" --print "require(\'path\').dirname(require.resolve(\'@sentry/react-native/package.json\')) + \'/scripts/sentry-xcode.sh\'"`';
+    expect(patchPhase(`/bin/sh ${sentry} ${call}`)).toBe('"$PROJECT_DIR/../scripts/release/observeNativeBundle.cjs"');
+    expect(() => patchPhase(`SENTRY_WRAPPER ${call}`)).toThrow('unsupported');
+    expect(() => patchPhase(call)).toThrow('unsupported');
     expect(() => patchPhase('unsupported bundler')).toThrow('unsupported');
     expect(() => patchPhase(`${call} ${call}`)).toThrow('unsupported');
   });
@@ -440,7 +451,9 @@ describe('Xcode final-bundle observer and config preservation', () => {
     const { patchPhase } = require(path.join(mobile, 'plugins/withBuildProvenance.js'));
     const project = execFileSync('tar', ['-xOf', path.join(mobile, 'node_modules/expo/template.tgz'), 'package/ios/HelloWorld.xcodeproj/project.pbxproj'], { encoding: 'utf8' });
     const phase = project.match(/name = "Bundle React Native code and images";[\s\S]*?shellScript = ("[^\n]*");/)!;
-    expect(phase).toBeTruthy(); expect(patchPhase(JSON.parse(phase[1]))).toContain('observeNativeBundle.cjs');
+    const sentryPath = path.join(path.dirname(require.resolve('@sentry/react-native/package.json')), 'plugin/build/withSentryIOS.js');
+    expect(phase).toBeTruthy();
+    expect(patchPhase(require(sentryPath).addSentryWithBundledScriptsToBundleShellScript(JSON.parse(phase[1])))).toContain('observeNativeBundle.cjs');
   });
   it('does not allow build-affecting caller env hooks or record authorization secrets', () => {
     const inherited = Object.fromEntries(['EXPO_PUBLIC_API_BASE', 'EXPO_PUBLIC_AWS_REGION', 'EXPO_PUBLIC_COGNITO_USER_POOL_ID',
