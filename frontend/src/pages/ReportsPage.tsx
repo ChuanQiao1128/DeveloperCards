@@ -2,9 +2,8 @@
 //
 // Learner card reports (R20 contract §4 console routes): what learners flagged
 // as wrong, outdated, unclear or mistyped, listed newest first and filtered by
-// status and deck (both in the URL, so a filtered view is a link). Each row
-// links the card editor; resolving happens in an inline form under the row and
-// updates the row at once, rolling it back when the server says no.
+// status, deck and reason (in the URL). The editor returns to the same queue.
+// A report only leaves the open queue after the server confirms its resolution.
 //
 // A report note is learner-written text: it is rendered as a text node and
 // nothing else. The server never sends who reported a card, and this page
@@ -20,6 +19,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { fetchDecks } from '../api/authoring';
 import {
   CARD_REPORT_NOTE_MAX,
+  CARD_REPORT_REASONS,
   CARD_REPORT_RESOLUTIONS,
   cardReportEditorHref,
   cardReportLocaleBadge,
@@ -48,9 +48,11 @@ import { formatAge } from '../lib/automationRules';
 
 type LoadError = { code: string; message: string };
 
+type ReportView = { filter: string; refresh: number };
 type ListState = {
-  /** The filter key the rows belong to; a different key means the list is loading. */
-  forKey: string | null;
+  /** Distinguishes separate visits to the same filter while requests overlap. */
+  forView: ReportView | null;
+  requestId: symbol | null;
   error: LoadError | null;
   items: CardReport[];
   nextCursor: string | null;
@@ -89,11 +91,8 @@ function statusFrom(value: string | null): CardReportStatusFilter {
 
 function deckIdFrom(value: string | null): number | null {
   if (value === null || !/^[1-9]\d*$/.test(value)) return null;
-  return Number(value);
-}
-
-function listKey(status: CardReportStatusFilter, deckId: number | null): string {
-  return `${status}|${deckId ?? ''}`;
+  const id = Number(value);
+  return Number.isSafeInteger(id) ? id : null;
 }
 
 function toLoadError(error: { code: string; message: string } | null, fallback: string): LoadError {
@@ -104,29 +103,44 @@ export function ReportsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const status = statusFrom(searchParams.get('status'));
   const deckId = deckIdFrom(searchParams.get('deckId'));
-  const key = listKey(status, deckId);
+  const reason = CARD_REPORT_REASONS.find(value => value === searchParams.get('reason'));
 
-  const [list, setList] = useState<ListState>({ forKey: null, error: null, items: [], nextCursor: null, loadedAt: 0 });
+  const [list, setList] = useState<ListState>({ forView: null, requestId: null, error: null, items: [], nextCursor: null, loadedAt: 0 });
   const [refreshNonce, setRefreshNonce] = useState(0);
-  const [loadingMore, setLoadingMore] = useState(false);
+  const [pagingRequest, setPagingRequest] = useState<symbol | null>(null);
   const [decks, setDecks] = useState<DeckOption[]>([]);
   const [resolving, setResolving] = useState<number | null>(null);
   const [resolution, setResolution] = useState<CardReportResolution>('fixed');
   const [resolutionNote, setResolutionNote] = useState('');
   const [actionError, setActionError] = useState<string | null>(null);
-  // The page's one persistent live region (a region mounted with its text is not announced).
+  // Keep the live region mounted so assistive technology announces changes to it.
   const [announcement, setAnnouncement] = useState('');
-  const inFlight = useRef(new Set<number>());
+  const [savingReport, setSavingReport] = useState<number | null>(null);
+  const saving = useRef(false);
+  const activeRead = useRef<symbol | null>(null);
+  const heading = useRef<HTMLHeadingElement>(null);
+  const filter = `${status}|${deckId ?? ''}|${reason ?? ''}`;
+  const [view, setView] = useState<ReportView>({ filter, refresh: refreshNonce });
+  if (view.filter !== filter || view.refresh !== refreshNonce) {
+    setView({ filter, refresh: refreshNonce });
+    if (view.filter !== filter) {
+      setResolving(null);
+      setActionError(null);
+      setAnnouncement('');
+    }
+  }
+  const loadingMore = pagingRequest !== null && pagingRequest === list.requestId;
 
   useEffect(() => {
-    let cancelled = false;
+    const requestId = Symbol();
+    activeRead.current = requestId;
     async function run() {
-      const res = await listCardReports({ status, deckId, cursor: null });
-      if (cancelled) return;
-      const forKey = listKey(status, deckId);
+      const res = await listCardReports({ status, deckId, cursor: null, ...(reason ? { reason } : {}) });
+      if (activeRead.current !== requestId) return;
       if (!res.success || !res.data) {
         setList({
-          forKey,
+          forView: view,
+          requestId,
           error: toLoadError(res.error, 'Failed to load card reports.'),
           items: [],
           nextCursor: null,
@@ -134,13 +148,11 @@ export function ReportsPage() {
         });
         return;
       }
-      setList({ forKey, error: null, items: res.data.items, nextCursor: res.data.nextCursor, loadedAt: Date.now() });
+      setList({ forView: view, requestId, error: null, items: res.data.items, nextCursor: res.data.nextCursor, loadedAt: Date.now() });
     }
     void run();
-    return () => {
-      cancelled = true;
-    };
-  }, [status, deckId, refreshNonce]);
+    return () => { activeRead.current = null; };
+  }, [status, deckId, reason, view]);
 
   useEffect(() => {
     let cancelled = false;
@@ -155,8 +167,9 @@ export function ReportsPage() {
     };
   }, []);
 
-  const loading = list.forKey !== key;
+  const loading = list.forView !== view;
   const notReady = !loading && list.error?.code === 'NOT_READY';
+  const visibleReports = list.items.filter(report => status === 'all' || report.status === status);
 
   // Decks the deck list did not return (no access, or it failed) still filter by
   // the slug their reports carry.
@@ -170,28 +183,28 @@ export function ReportsPage() {
     deckOptions.push({ id: deckId, label: `Deck ${deckId}` });
   }
 
-  function setFilter(name: 'status' | 'deckId', value: string) {
+  function setFilter(name: 'status' | 'deckId' | 'reason', value: string) {
     const next = new URLSearchParams(searchParams);
     if (value === '' || (name === 'status' && value === 'open')) next.delete(name);
     else next.set(name, value);
     setSearchParams(next);
-    setResolving(null);
-    setActionError(null);
   }
 
   async function loadMore() {
-    if (!list.nextCursor || loadingMore) return;
-    setLoadingMore(true);
-    const forKey = key;
-    const res = await listCardReports({ status, deckId, cursor: list.nextCursor });
-    setLoadingMore(false);
+    const { requestId, nextCursor } = list;
+    if (!nextCursor || !requestId || loadingMore) return;
+    setPagingRequest(requestId);
+    setActionError(null);
+    const res = await listCardReports({ status, deckId, cursor: nextCursor, ...(reason ? { reason } : {}) });
+    if (activeRead.current !== requestId) return;
+    setPagingRequest(null);
     if (!res.success || !res.data) {
       setActionError(res.error?.message ?? 'Failed to load more card reports.');
       return;
     }
     const page = res.data;
     setList(prev =>
-      prev.forKey === forKey
+      prev.requestId === requestId
         ? {
             ...prev,
             items: [...prev.items, ...page.items.filter(r => !prev.items.some(p => p.reportId === r.reportId))],
@@ -208,55 +221,54 @@ export function ReportsPage() {
     setActionError(null);
   }
 
-  function replaceRow(row: CardReport) {
-    setList(prev => ({ ...prev, items: prev.items.map(r => (r.reportId === row.reportId ? row : r)) }));
-  }
-
-  async function submitResolve(event: FormEvent<HTMLFormElement>, before: CardReport) {
+  async function submitResolve(event: FormEvent<HTMLFormElement>, report: CardReport) {
     event.preventDefault();
-    if (inFlight.current.has(before.reportId)) return;
-    inFlight.current.add(before.reportId);
-    const chosen = resolution;
-    const note = resolutionNote.trim();
-
-    // Optimistic: the row reads resolved before the server answers.
-    replaceRow({
-      ...before,
-      status: 'resolved',
-      resolution: chosen,
-      resolutionNote: note === '' ? null : note,
-      resolvedAt: new Date().toISOString(),
-    });
-    setResolving(null);
+    if (saving.current) return;
+    saving.current = true;
+    setSavingReport(report.reportId);
     setActionError(null);
-    setAnnouncement(`Resolving the report as ${RESOLUTION_LABELS[chosen]}…`);
+    setAnnouncement('Saving report resolution…');
+    const requestId = activeRead.current;
+    const note = resolutionNote.trim();
+    const res = await resolveCardReport(report.reportId, note === '' ? { resolution } : { resolution, note });
+    saving.current = false;
+    if (activeRead.current === null) return;
 
-    const res = await resolveCardReport(before.reportId, note === '' ? { resolution: chosen } : { resolution: chosen, note });
-    inFlight.current.delete(before.reportId);
-    if (res.success) {
-      setAnnouncement(`Report resolved as ${RESOLUTION_LABELS[chosen]}.`);
+    setSavingReport(null);
+    if (activeRead.current !== requestId) {
+      // A different read may have started before the write committed.
+      if (res.success || res.error?.code === 'ALREADY_RESOLVED') setRefreshNonce(n => n + 1);
       return;
     }
-    if (res.error?.code === 'ALREADY_RESOLVED') {
-      // Someone else got there first: show the server's version of the list.
-      setActionError('This report was already resolved. The list has been refreshed.');
-      setAnnouncement('');
+    if (res.success && res.data) {
+      const confirmed = res.data.resolution;
+      setList(prev => ({
+        ...prev,
+        items: prev.items.map(row => row.reportId === report.reportId
+          ? { ...row, status: 'resolved', resolution: confirmed, resolutionNote: note || null }
+          : row),
+      }));
+      setResolving(null);
+      setAnnouncement(`Report resolved as ${RESOLUTION_LABELS[confirmed]}.`);
+      heading.current?.focus();
+    } else if (res.error?.code === 'ALREADY_RESOLVED') {
+      setResolving(null);
+      setAnnouncement('This report was already resolved. Refreshing the queue.');
       setRefreshNonce(n => n + 1);
-      return;
+      heading.current?.focus();
+    } else {
+      setActionError(`Could not confirm the resolution: ${res.error?.message ?? 'unknown error'}. Refresh to check the report, or retry.`);
+      setAnnouncement('');
     }
-    replaceRow(before);
-    setActionError(`Could not resolve the report: ${res.error?.message ?? 'unknown error'}. It is open again.`);
-    setAnnouncement('');
   }
 
   const noteHelpId = 'reports-resolve-note-help';
 
   return (
     <ConsoleShell title={CONSOLE_NAME} subtitle="Card feedback" {...consoleNav()}>
-      <h1 className={H1_CLASS}>Card feedback</h1>
+      <h1 ref={heading} tabIndex={-1} className={H1_CLASS}>Card feedback</h1>
       <p className="text-sm text-slate-600">
-        Problems learners reported on published cards, signed in or not. Fix the card in the editor, then resolve the
-        report.
+        Review feedback on published cards. Open the card in the editor to make a correction, then record the resolution.
       </p>
 
       <div role="status" aria-live="polite" className="sr-only" data-testid="reports-live">
@@ -273,6 +285,7 @@ export function ReportsPage() {
               id="reports-status"
               className={INPUT_CLASS}
               value={status}
+              disabled={savingReport !== null}
               onChange={e => setFilter('status', e.target.value)}
             >
               {STATUS_OPTIONS.map(o => (
@@ -290,6 +303,7 @@ export function ReportsPage() {
               id="reports-deck"
               className={INPUT_CLASS}
               value={deckId === null ? '' : String(deckId)}
+              disabled={savingReport !== null}
               onChange={e => setFilter('deckId', e.target.value)}
             >
               <option value="">All decks</option>
@@ -300,8 +314,25 @@ export function ReportsPage() {
               ))}
             </select>
           </div>
-          <Button variant="outline" size="xs" loading={loading} onClick={() => setRefreshNonce(n => n + 1)}>
-            Refresh
+          <div>
+            <label htmlFor="reports-reason" className={LABEL_CLASS}>Reason</label>
+            <select
+              id="reports-reason"
+              className={INPUT_CLASS}
+              value={reason ?? ''}
+              disabled={savingReport !== null}
+              onChange={e => setFilter('reason', e.target.value)}
+            >
+              <option value="">All reasons</option>
+              {CARD_REPORT_REASONS.map(value => <option key={value} value={value}>{REASON_LABELS[value].label}</option>)}
+            </select>
+          </div>
+          <Button variant="outline" loading={loading} disabled={savingReport !== null} onClick={() => {
+            setActionError(null);
+            setAnnouncement('');
+            setRefreshNonce(n => n + 1);
+          }}>
+            Refresh reports
           </Button>
         </div>
       </section>
@@ -320,7 +351,7 @@ export function ReportsPage() {
         <Callout tone="danger" role="alert" title="Could not load card reports">
           {list.error.message}
         </Callout>
-      ) : list.items.length === 0 ? (
+      ) : visibleReports.length === 0 && !list.nextCursor ? (
         <p className="text-sm text-slate-500">No card reports match these filters.</p>
       ) : (
         <section className={CARD_CLASS} aria-label="Report list">
@@ -333,12 +364,12 @@ export function ReportsPage() {
                   <th scope="col" className={TH_CLASS}>Reason</th>
                   <th scope="col" className={TH_CLASS}>Note</th>
                   <th scope="col" className={TH_CLASS}>Age</th>
-                  <th scope="col" className={TH_CLASS}>Status</th>
+                  <th scope="col" className={`${TH_CLASS} whitespace-nowrap`}>Status</th>
                   <th scope="col" className={TH_CLASS}>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {list.items.map(r => {
+                {visibleReports.map(r => {
                   const reason = REASON_LABELS[r.reason];
                   const editorHref = cardReportEditorHref(r);
                   const cardName = r.question || r.stableUid;
@@ -352,7 +383,7 @@ export function ReportsPage() {
                           <div className="text-xs text-slate-500">{r.stableUid}</div>
                         </td>
                         <td className={TD_CLASS}>
-                          <Badge tone={reason.tone}>{reason.label}</Badge>
+                          <span className="whitespace-nowrap"><Badge tone={reason.tone}>{reason.label}</Badge></span>
                           {r.anonymous ? (
                             <div className="text-xs text-slate-500 mt-1" data-testid="report-anonymous">
                               Not signed in
@@ -381,7 +412,7 @@ export function ReportsPage() {
                               ) : null}
                             </>
                           ) : (
-                            <Badge tone="warning">Open</Badge>
+                            <span className="whitespace-nowrap"><Badge tone="warning">Open</Badge></span>
                           )}
                         </td>
                         <td className={TD_CLASS}>
@@ -389,6 +420,7 @@ export function ReportsPage() {
                             {editorHref ? (
                               <Link
                                 to={editorHref}
+                                state={{ reportSearch: searchParams.toString() }}
                                 className="text-indigo-700 underline"
                                 aria-label={`Open in editor: ${cardName}`}
                               >
@@ -403,6 +435,7 @@ export function ReportsPage() {
                                 size="xs"
                                 aria-label={`Resolve report: ${cardName}`}
                                 aria-expanded={resolving === r.reportId}
+                                disabled={savingReport !== null}
                                 onClick={() => openResolve(r.reportId)}
                               >
                                 Resolve
@@ -415,6 +448,7 @@ export function ReportsPage() {
                         <tr className="border-b border-slate-100 bg-slate-50">
                           <td className={TD_CLASS} colSpan={7}>
                             <form
+                              aria-busy={savingReport === r.reportId}
                               aria-label={`Resolve report: ${cardName}`}
                               className="flex flex-wrap items-start gap-4"
                               onSubmit={e => void submitResolve(e, r)}
@@ -427,6 +461,7 @@ export function ReportsPage() {
                                   id={`reports-resolution-${r.reportId}`}
                                   className={INPUT_CLASS}
                                   value={resolution}
+                                  disabled={savingReport === r.reportId}
                                   onChange={e => setResolution(e.target.value as CardReportResolution)}
                                 >
                                   {CARD_REPORT_RESOLUTIONS.map(value => (
@@ -447,6 +482,7 @@ export function ReportsPage() {
                                   maxLength={CARD_REPORT_NOTE_MAX}
                                   aria-describedby={noteHelpId}
                                   value={resolutionNote}
+                                  disabled={savingReport === r.reportId}
                                   onChange={e => setResolutionNote(e.target.value)}
                                 />
                                 <div id={noteHelpId} className="text-xs text-slate-500 mt-1">
@@ -454,10 +490,10 @@ export function ReportsPage() {
                                 </div>
                               </div>
                               <div className="flex items-center gap-2 pt-5">
-                                <Button type="submit" size="xs">
+                                <Button type="submit" size="xs" loading={savingReport === r.reportId}>
                                   Save resolution
                                 </Button>
-                                <Button variant="ghost" size="xs" onClick={() => setResolving(null)}>
+                                <Button variant="ghost" size="xs" disabled={savingReport === r.reportId} onClick={() => setResolving(null)}>
                                   Cancel
                                 </Button>
                               </div>
@@ -473,7 +509,7 @@ export function ReportsPage() {
           </div>
           {list.nextCursor ? (
             <div className="mt-3">
-              <Button variant="outline" size="xs" loading={loadingMore} onClick={() => void loadMore()}>
+              <Button variant="outline" size="xs" loading={loadingMore} disabled={savingReport !== null} onClick={() => void loadMore()}>
                 Load more
               </Button>
             </div>

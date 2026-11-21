@@ -60,9 +60,9 @@ describe('src/api/cardReports', () => {
     expect(res.data).toEqual({ items: [WIRE], nextCursor: 'c2' });
 
     httpMock.get.mockResolvedValueOnce({ data: ok({ items: [] }) });
-    const next = await api.listCardReports({ status: 'all', deckId: 7, cursor: 'c2', limit: 20 });
+    const next = await api.listCardReports({ status: 'all', deckId: 7, reason: 'outdated', cursor: 'c2', limit: 20 });
     expect(httpMock.get).toHaveBeenLastCalledWith('/api/v1/admin/card-reports', {
-      params: { status: 'all', deckId: 7, cursor: 'c2', limit: 20 },
+      params: { status: 'all', deckId: 7, reason: 'outdated', cursor: 'c2', limit: 20 },
     });
     expect(next.data).toEqual({ items: [], nextCursor: null });
   });
@@ -142,6 +142,9 @@ describe('src/api/cardReports', () => {
   });
 
   it('maps a malformed resolve answer to BAD_RESPONSE and a 409 to its server code', async () => {
+    httpMock.post.mockResolvedValueOnce({ data: ok({ reportId: 42, status: 'resolved', resolution: 'fixed' }) });
+    expect((await api.resolveCardReport(41, { resolution: 'fixed' })).error?.code).toBe('BAD_RESPONSE');
+
     httpMock.post.mockResolvedValueOnce({ data: ok({ ok: true }) });
     expect((await api.resolveCardReport(41, { resolution: 'fixed' })).error?.code).toBe('BAD_RESPONSE');
 

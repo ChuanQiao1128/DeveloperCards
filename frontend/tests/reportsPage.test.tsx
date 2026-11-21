@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 //
 // The /reports console page (R20 contract §4 console routes, §8): learner card
-// reports listed, filtered, resolved with an optimistic update, paged with
+// reports listed, filtered, resolved after server confirmation, paged with
 // nextCursor, and a neutral callout on a server without the migration.
 // src/api/cardReports and the deck list are mocked, so nothing here can leave
 // the process; the session is a real token through tests/support/consoleSession.
@@ -172,7 +172,7 @@ describe('ReportsPage', () => {
     expect(within(row).getByText('Card deleted')).toBeTruthy();
   });
 
-  it('filters by status and deck, and reads both from the URL', async () => {
+  it('filters by status, deck and reason, and restores them from the URL', async () => {
     const user = userEvent.setup();
     await mountLoaded();
 
@@ -193,20 +193,28 @@ describe('ReportsPage', () => {
       expect(api.listCardReports).toHaveBeenLastCalledWith({ status: 'all', deckId: 9, cursor: null }),
     );
 
+    await user.selectOptions(screen.getByLabelText('Reason'), 'outdated');
+    await waitFor(() =>
+      expect(api.listCardReports).toHaveBeenLastCalledWith({ status: 'all', deckId: 9, reason: 'outdated', cursor: null }),
+    );
+    expect(screen.getByTestId('loc').textContent).toContain('reason=outdated');
+
     cleanup();
     api.listCardReports.mockClear();
-    await mountLoaded('/reports?status=resolved&deckId=7');
-    expect(api.listCardReports).toHaveBeenCalledWith({ status: 'resolved', deckId: 7, cursor: null });
+    api.listCardReports.mockResolvedValueOnce(page([report({ status: 'resolved', resolution: 'fixed' })]));
+    await mountLoaded('/reports?status=resolved&deckId=7&reason=outdated');
+    expect(api.listCardReports).toHaveBeenCalledWith({ status: 'resolved', deckId: 7, reason: 'outdated', cursor: null });
+    expect((screen.getByLabelText('Reason') as HTMLSelectElement).value).toBe('outdated');
     expect((screen.getByLabelText('Status') as HTMLSelectElement).value).toBe('resolved');
     expect((screen.getByLabelText('Deck') as HTMLSelectElement).value).toBe('7');
   });
 
   it('ignores an unknown status or a malformed deck id in the URL', async () => {
-    await mountLoaded('/reports?status=bogus&deckId=abc');
+    await mountLoaded('/reports?status=bogus&deckId=abc&reason=bogus');
     expect(api.listCardReports).toHaveBeenCalledWith({ status: 'open', deckId: null, cursor: null });
   });
 
-  it('resolves a report through a labelled inline form, optimistically', async () => {
+  it('keeps the report open while saving and removes it after confirmation', async () => {
     const user = userEvent.setup();
     const pending = deferred<ApiResult<CardReportResolveResult>>();
     api.resolveCardReport.mockReturnValue(pending.promise);
@@ -226,32 +234,38 @@ describe('ReportsPage', () => {
     await user.type(note, 'Same as card 0041.');
     await user.click(within(form).getByRole('button', { name: 'Save resolution' }));
 
-    // Before the server answers, the row already reads resolved and the form is gone.
     expect(api.resolveCardReport).toHaveBeenCalledWith(41, { resolution: 'duplicate', note: 'Same as card 0041.' });
-    expect(screen.queryByRole('form', { name: /^Resolve report/ })).toBeNull();
-    const optimistic = rowFor('Which S3 storage class suits infrequent access?');
-    expect(within(optimistic).getByText('Resolved · Duplicate')).toBeTruthy();
-    expect(within(optimistic).queryByRole('button', { name: /^Resolve/ })).toBeNull();
+    expect(form.getAttribute('aria-busy')).toBe('true');
+    expect((screen.getByRole('button', { name: 'Refresh reports' }) as HTMLButtonElement).disabled).toBe(true);
+    for (const name of ['Status', 'Deck', 'Reason']) {
+      expect((screen.getByRole('combobox', { name }) as HTMLSelectElement).disabled).toBe(true);
+    }
+    expect(within(row).getByText('Open')).toBeTruthy();
+    expect((within(form).getByRole('button', { name: 'Save resolution' }) as HTMLButtonElement).disabled).toBe(true);
+    expect(within(row).queryByText('Resolved · Duplicate')).toBeNull();
 
     await act(async () => pending.resolve(ok({ reportId: 41, status: 'resolved', resolution: 'duplicate' })));
-    expect(within(rowFor('Which S3 storage class suits infrequent access?')).getByText('Resolved · Duplicate')).toBeTruthy();
+    expect(screen.queryByText('Which S3 storage class suits infrequent access?')).toBeNull();
+    expect(screen.getByRole('heading', { name: 'Card feedback' })).toBe(document.activeElement);
     expect(screen.getByTestId('reports-live').textContent).toBe('Report resolved as Duplicate.');
     expect(screen.queryByRole('alert')).toBeNull();
   });
 
-  it('rolls the row back and says why when the resolve fails', async () => {
+  it('keeps the report and entered note available when saving fails', async () => {
     const user = userEvent.setup();
     api.resolveCardReport.mockResolvedValue(refused('FORBIDDEN', 'You cannot write this deck.'));
     await mountLoaded();
 
     await user.click(within(rowFor('Which S3 storage class suits infrequent access?')).getByRole('button', { name: /^Resolve/ }));
+    await user.type(screen.getByLabelText('Note (optional)'), 'Keep this note.');
     await user.click(screen.getByRole('button', { name: 'Save resolution' }));
 
     await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('You cannot write this deck.'));
+    expect((screen.getByLabelText('Note (optional)') as HTMLTextAreaElement).value).toBe('Keep this note.');
     const row = rowFor('Which S3 storage class suits infrequent access?');
     expect(within(row).getByText('Open')).toBeTruthy();
     expect(within(row).getByRole('button', { name: /^Resolve/ })).toBeTruthy();
-    expect(api.resolveCardReport).toHaveBeenCalledWith(41, { resolution: 'fixed' });
+    expect(api.resolveCardReport).toHaveBeenCalledWith(41, { resolution: 'fixed', note: 'Keep this note.' });
   });
 
   it('tells the editor the resolution note is shown to the learner who reported the card', async () => {
@@ -264,27 +278,22 @@ describe('ReportsPage', () => {
     expect(screen.queryByText(/Not shown to the learner/)).toBeNull();
   });
 
-  it('refreshes the list instead of rolling back when the report was already resolved', async () => {
+  it('refreshes the open queue after another editor resolves the report', async () => {
     const user = userEvent.setup();
     api.resolveCardReport.mockResolvedValue(refused('ALREADY_RESOLVED', 'Report already resolved.'));
     api.listCardReports
       .mockResolvedValueOnce(page([report()]))
-      .mockResolvedValueOnce(page([report({ status: 'resolved', resolution: 'wont_fix', resolvedAt: '2026-10-01T11:00:00Z' })]));
+      .mockResolvedValueOnce(page([]));
     await mountLoaded();
 
     await user.click(within(rowFor('Which S3 storage class suits infrequent access?')).getByRole('button', { name: /^Resolve/ }));
     await user.click(screen.getByRole('button', { name: 'Save resolution' }));
 
-    await waitFor(() =>
-      expect(screen.getByRole('alert').textContent).toContain('This report was already resolved. The list has been refreshed.'),
-    );
-    expect(screen.getByRole('alert').textContent).not.toContain('It is open again');
-    await waitFor(() => expect(api.listCardReports).toHaveBeenCalledTimes(2));
+    await screen.findByText('No card reports match these filters.');
+    expect(screen.getByTestId('reports-live').textContent).toContain('This report was already resolved.');
+    expect(api.listCardReports).toHaveBeenCalledTimes(2);
     expect(api.listCardReports).toHaveBeenLastCalledWith({ status: 'open', deckId: null, cursor: null });
-    await waitFor(() =>
-      expect(within(rowFor('Which S3 storage class suits infrequent access?')).getByText("Resolved · Won't fix")).toBeTruthy(),
-    );
-    expect(within(rowFor('Which S3 storage class suits infrequent access?')).queryByRole('button', { name: /^Resolve/ })).toBeNull();
+    expect(screen.queryByRole('alert')).toBeNull();
   });
 
   it('closes the form on Cancel without calling the server', async () => {
@@ -308,6 +317,46 @@ describe('ReportsPage', () => {
     expect(api.listCardReports).toHaveBeenLastCalledWith({ status: 'open', deckId: null, cursor: 'c2' });
     expect(screen.getByText('Which S3 storage class suits infrequent access?')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Load more' })).toBeNull();
+  });
+
+  it('ignores a delayed page after changing a reason filter and returning to it', async () => {
+    const user = userEvent.setup();
+    const oldPage = deferred<ApiResult<CardReportsPage>>();
+    api.listCardReports
+      .mockResolvedValueOnce(page([report()], 'old-page'))
+      .mockReturnValueOnce(oldPage.promise)
+      .mockResolvedValueOnce(page([report({ reportId: 42, reason: 'wrong_answer', question: 'Wrong answer report' })]))
+      .mockResolvedValueOnce(page([report({ reportId: 43, question: 'Current outdated report' })], 'new-page'));
+    await mountLoaded('/reports?reason=outdated');
+    await user.click(screen.getByRole('button', { name: 'Load more' }));
+    expect(api.listCardReports).toHaveBeenLastCalledWith({ status: 'open', deckId: null, reason: 'outdated', cursor: 'old-page' });
+    await user.selectOptions(screen.getByLabelText('Reason'), 'wrong_answer');
+    await screen.findByText('Wrong answer report');
+    await user.selectOptions(screen.getByLabelText('Reason'), 'outdated');
+    await screen.findByText('Current outdated report');
+    await act(async () => oldPage.resolve(page([report({ reportId: 44, question: 'Old page report' })])));
+    expect(screen.queryByText('Old page report')).toBeNull();
+    expect((screen.getByRole('button', { name: 'Load more' }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it('hides a previous visit while a fresh list for the same filter is pending', async () => {
+    const user = userEvent.setup();
+    const other = deferred<ApiResult<CardReportsPage>>();
+    const latest = deferred<ApiResult<CardReportsPage>>();
+    api.listCardReports
+      .mockResolvedValueOnce(page([report()]))
+      .mockReturnValueOnce(other.promise)
+      .mockReturnValueOnce(latest.promise);
+    await mountLoaded('/reports?reason=outdated');
+    await user.selectOptions(screen.getByLabelText('Reason'), 'wrong_answer');
+    await user.selectOptions(screen.getByLabelText('Reason'), 'outdated');
+
+    expect(screen.getByText('Loading card reports…')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /^Resolve report/ })).toBeNull();
+    await act(async () => latest.resolve(page([report({ reportId: 42, question: 'Current outage report' })])));
+    expect(screen.getByText('Current outage report')).toBeTruthy();
+    await act(async () => other.resolve(page([report({ question: 'Delayed unrelated report' })])));
+    expect(screen.queryByText('Delayed unrelated report')).toBeNull();
   });
 
   it('appends a Load more page without repeating a report already listed', async () => {
