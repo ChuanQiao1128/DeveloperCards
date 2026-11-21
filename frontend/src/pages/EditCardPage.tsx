@@ -45,7 +45,7 @@ const CONFLICT_UNRECOVERABLE =
   'current version of the card.';
 
 /** The header-plus-red-box shell every failure on this page renders through. */
-function EditCardErrorScreen({ message }: { message: string }) {
+function EditCardErrorScreen({ message, feedbackHref }: { message: string; feedbackHref: string | null }) {
   return (
     <ConsoleShell
       title={CONSOLE_NAME}
@@ -54,8 +54,8 @@ function EditCardErrorScreen({ message }: { message: string }) {
     >
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-slate-800">Edit Card</h1>
-        <Link to="/" className="text-sm text-indigo-600 hover:text-indigo-800">
-          ← Back to Decks
+        <Link to={feedbackHref ?? '/'} className={`${LINK} text-sm`}>
+          {feedbackHref ? 'Back to Card feedback' : '← Back to Decks'}
         </Link>
       </div>
 
@@ -72,6 +72,8 @@ export function EditCardPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { state: origin } = useLocation();
+  const reportSearch = typeof origin?.reportSearch === 'string' ? new URLSearchParams(origin.reportSearch).toString() : null;
+  const feedbackHref = reportSearch === null ? null : reportSearch ? `/reports?${reportSearch}` : '/reports';
 
   const cardIdRaw = searchParams.get('cardId') ?? '';
 
@@ -125,7 +127,7 @@ export function EditCardPage() {
   const guard = useUnsavedChangesGuard(dirty);
 
   if (invalidId) {
-    return <EditCardErrorScreen message="Missing or invalid deckId/cardId." />;
+    return <EditCardErrorScreen feedbackHref={feedbackHref} message="Missing or invalid deckId/cardId." />;
   }
 
   // Ahead of the pending check, for the reason CardListPage spells out: a
@@ -141,12 +143,12 @@ export function EditCardPage() {
 
   if (deckQuery.isError || !deckQuery.data) {
     const message = deckQuery.error instanceof Error ? deckQuery.error.message : 'Deck not found.';
-    return <EditCardErrorScreen message={message} />;
+    return <EditCardErrorScreen feedbackHref={feedbackHref} message={message} />;
   }
 
   if (cardQuery.isError || !cardQuery.data) {
     const message = cardQuery.error instanceof Error ? cardQuery.error.message : 'Card not found.';
-    return <EditCardErrorScreen message={message} />;
+    return <EditCardErrorScreen feedbackHref={feedbackHref} message={message} />;
   }
 
   // Bound after the guards so their non-null types survive into the closures
@@ -159,7 +161,7 @@ export function EditCardPage() {
   // arrive as a string, so compare as numbers.
   if (Number(card.deckId) !== numericDeckId) {
     return (
-      <EditCardErrorScreen message={`Card with id ${numericCardId} not found in this deck.`} />
+      <EditCardErrorScreen feedbackHref={feedbackHref} message={`Card with id ${numericCardId} not found in this deck.`} />
     );
   }
 
@@ -211,7 +213,7 @@ export function EditCardPage() {
   const returningToQa = origin?.qaDeckId === deck.id && typeof origin?.qaRunId === 'string' && origin.qaRunId !== '';
   const returnHref = returningToQa
     ? `/decks/qa?deckId=${deck.id}&runId=${encodeURIComponent(origin.qaRunId)}`
-    : cardListHref(deck.id, origin);
+    : feedbackHref ?? cardListHref(deck.id, origin);
   const returnState = returningToQa ? { cardListSearch: origin?.cardListSearch } : undefined;
 
   async function handleSubmit(
@@ -307,7 +309,7 @@ export function EditCardPage() {
       <DeckWorkspaceHeader deck={deck} view="cards" cardListSearch={origin?.cardListSearch} />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-semibold text-slate-900">Edit Card</h2>
-        <Link to={returnHref} state={returnState} className={`${LINK} text-sm`}>{returningToQa ? 'Back to AI QA' : 'Back to Cards'}</Link>
+        <Link to={returnHref} state={returnState} className={`${LINK} text-sm`}>{returningToQa ? 'Back to AI QA' : feedbackHref ? 'Back to Card feedback' : 'Back to Cards'}</Link>
       </div>
       <div className="max-w-3xl">
         {conflictCard && conflictDraft ? (

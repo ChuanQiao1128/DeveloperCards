@@ -297,6 +297,10 @@ public static class CardReports
         if (!StatusFilters.Contains(s)) throw new ValidationError("status must be open, resolved or all", "status");
         status = s;
       }
+      req.Query.TryGetValue("reason", out var reason);
+      if (!string.IsNullOrEmpty(reason) && !Reasons.Contains(reason))
+        throw new ValidationError("Invalid report reason", "reason");
+
       long? deckId = null;
       if (req.Query.TryGetValue("deckId", out var d) && !string.IsNullOrEmpty(d))
       {
@@ -323,6 +327,11 @@ public static class CardReports
       {
         parameters.Add(status);
         where.Add($"r.status = ${parameters.Count}");
+      }
+      if (!string.IsNullOrEmpty(reason))
+      {
+        parameters.Add(reason);
+        where.Add($"r.reason = ${parameters.Count}");
       }
       if (deckId is not null)
       {

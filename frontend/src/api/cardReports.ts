@@ -51,6 +51,7 @@ export type CardReportsPage = { items: CardReport[]; nextCursor: string | null }
 
 export type CardReportsParams = {
   status: CardReportStatusFilter;
+  reason?: CardReportReason;
   deckId?: number | null;
   cursor?: string | null;
   limit?: number;
@@ -133,10 +134,11 @@ export function cardReportLocaleBadge(report: Pick<CardReport, 'displayLocale'>)
   return locale === 'zh-CN' ? 'Seen in Chinese (zh-CN)' : `Seen in ${locale}`;
 }
 
-/** GET /api/v1/admin/card-reports?status=&deckId=&limit=&cursor=, newest first. */
+/** GET /api/v1/admin/card-reports?status=&deckId=&reason=&limit=&cursor=, newest first. */
 export async function listCardReports(params: CardReportsParams): Promise<ApiResult<CardReportsPage>> {
   const query: Record<string, string | number> = { status: params.status };
   if (params.deckId) query.deckId = params.deckId;
+  if (params.reason) query.reason = params.reason;
   if (params.cursor) query.cursor = params.cursor;
   query.limit = params.limit ?? CARD_REPORTS_PAGE_SIZE;
   try {
@@ -170,7 +172,7 @@ export async function resolveCardReport(
     const res = resp.data;
     if (!res.success) return { ...res, data: null };
     const data = res.data;
-    if (!isRecord(data) || idOf(data.reportId) === null || !isResolution(data.resolution)) return badResponse();
+    if (!isRecord(data) || idOf(data.reportId) !== reportId || data.status !== 'resolved' || !isResolution(data.resolution)) return badResponse();
     return { ...res, data: { reportId: data.reportId as number, status: 'resolved', resolution: data.resolution } };
   } catch (err) {
     return apiResultFromError<CardReportResolveResult>(err);

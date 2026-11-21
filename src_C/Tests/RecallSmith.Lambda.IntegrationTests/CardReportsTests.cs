@@ -471,6 +471,32 @@ public sealed class CardReportsTests
   }
 
   [Fact]
+  public async Task CardReport_AdminList_FiltersReasonBeforePagingAndKeepsDeckScope()
+  {
+    using var scope = new Scope();
+    var (deckId, slug, _, uid) = await CardAsync("filter-reason");
+    var (otherDeck, otherSlug, _, otherUid) = await CardAsync("filter-reason-other");
+    var first = await CreateAsync(Learner(Sub("first")), slug, uid, "wrong_answer");
+    var latest = await CreateAsync(Learner(Sub("latest")), slug, uid, "wrong_answer");
+    await CreateAsync(Learner(Sub("different-reason")), slug, uid, "typo");
+    await CreateAsync(Learner(Sub("other-deck")), otherSlug, otherUid, "wrong_answer");
+    var editor = Sub("reason-editor");
+    await _db.QueryAsync("insert into admin_deck_permissions (admin_sub, deck_id, can_read, can_write) values ($1, $2, 1, 0)", editor, deckId);
+
+    var filters = new Dictionary<string, string> { ["reason"] = "wrong_answer", ["status"] = "open", ["limit"] = "1" };
+    var page1 = AutomationTestKit.Data(await ListAsync(Editor(editor), filters));
+    Assert.Equal(latest, page1.GetProperty("items")[0].GetProperty("reportId").GetInt64());
+    filters["cursor"] = page1.GetProperty("nextCursor").GetString()!;
+    var page2 = AutomationTestKit.Data(await ListAsync(Editor(editor), filters));
+    Assert.Equal(first, page2.GetProperty("items")[0].GetProperty("reportId").GetInt64());
+    Assert.Equal(JsonValueKind.Null, page2.GetProperty("nextCursor").ValueKind);
+
+    filters["deckId"] = otherDeck.ToString(CultureInfo.InvariantCulture);
+    AutomationTestKit.AssertError(await ListAsync(Editor(editor), filters), 403, "FORBIDDEN");
+    AutomationTestKit.AssertError(await ListAsync(Editor(editor), new Dictionary<string, string> { ["reason"] = "unknown" }), 400, "VALIDATION_ERROR");
+  }
+
+  [Fact]
   public async Task CardReport_AdminList_IsDeckScoped()
   {
     using var scope = new Scope();
