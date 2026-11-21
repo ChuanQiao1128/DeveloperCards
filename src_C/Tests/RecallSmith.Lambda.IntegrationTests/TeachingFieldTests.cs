@@ -42,9 +42,14 @@ public class TeachingFieldTests(PostgresFixture db)
   public async Task ApiImportPublishAndWorker_CarryTeachingAndTags_AndAgreeOnSnapshot()
   {
     var deckId = await NewDeck();
-    var first = Data(await Import(deckId, Card(deckId)));
+    var card = Card(deckId);
+    var withHelp = System.Text.Json.Nodes.JsonNode.Parse(Teaching.GetRawText())!;
+    withHelp["backHelp"] = System.Text.Json.Nodes.JsonNode.Parse("""[{"term":"role","definition":"An AWS identity with permissions."}]""");
+    withHelp["zh-CN"]!["backHelp"] = System.Text.Json.Nodes.JsonNode.Parse("""[{"term":"角色","definition":"带权限的 AWS 身份。"}]""");
+    card["teaching"] = withHelp;
+    var first = Data(await Import(deckId, card));
     Assert.Equal(1, first.GetProperty("created").GetInt32());
-    var second = Data(await Import(deckId, Card(deckId)));
+    var second = Data(await Import(deckId, card));
     Assert.Equal(1, second.GetProperty("unchanged").GetInt32());
     var get = Data(await Call("GET", null, new Dictionary<string, string> { ["deckId"] = deckId.ToString() }))[0];
     var id = get.GetProperty("id").GetInt64();
@@ -60,6 +65,8 @@ public class TeachingFieldTests(PostgresFixture db)
     await using var conn = await db.OpenAsync();
     var cards = await PublishJobProcessor.LoadCardsAsync(conn, (int)deckId);
     Assert.Equal("Attach a role.", cards[0].Teaching!.Value.GetProperty("answer").GetString());
+    Assert.Equal("role", cards[0].Teaching!.Value.GetProperty("backHelp")[0].GetProperty("term").GetString());
+    Assert.Equal("角色", cards[0].Teaching!.Value.GetProperty("zh-CN").GetProperty("backHelp")[0].GetProperty("term").GetString());
     Assert.Equal("1.1", cards[0].Tags!.Value.GetProperty("examTask").GetString());
     var rows = await DbUtil.QueryAsync(conn, null, Publish.CardsSql, [deckId]);
     Assert.Equal(PublishSnapshot.Digest(rows.Select(PublishSnapshot.FromRow)), PublishJobProcessor.SnapshotDigest(cards));

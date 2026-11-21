@@ -41,6 +41,9 @@ public static class TeachingValidation
 
     var answer = RequiredText(raw, "answer");
     var keyPoint = RequiredText(raw, "keyPoint");
+    var backHelp = ReadBackHelp(raw, answer, keyPoint);
+    if (backHelp is not null && (!raw.TryGetProperty("zh-CN", out var helpTranslation) || helpTranslation.ValueKind != JsonValueKind.Object))
+      throw Bad("teaching.backHelp requires matching Chinese teaching");
     string? watchOut = null;
     if (raw.TryGetProperty("watchOut", out var watchEl) && watchEl.ValueKind != JsonValueKind.Null)
       watchOut = Text(watchEl, "watchOut");
@@ -58,6 +61,11 @@ public static class TeachingValidation
       writer.WriteString("schema", Schema);
       writer.WriteString("answer", answer);
       writer.WriteString("keyPoint", keyPoint);
+      if (backHelp is { } entries)
+      {
+        writer.WritePropertyName("backHelp");
+        entries.WriteTo(writer);
+      }
       if (watchOut is not null) writer.WriteString("watchOut", watchOut);
       writer.WritePropertyName("mustAnswer");
       WriteStrings(writer, mustAnswer);
@@ -70,8 +78,16 @@ public static class TeachingValidation
         writer.WriteStartObject();
         var zhAnswer = ZhText(zhEl, "answer");
         var zhKeyPoint = ZhText(zhEl, "keyPoint");
+        var zhHelp = ReadBackHelp(zhEl, zhAnswer, zhKeyPoint);
+        if ((backHelp?.GetArrayLength() ?? 0) != (zhHelp?.GetArrayLength() ?? 0))
+          throw Bad("teaching.backHelp must have matching English and Chinese entries");
         writer.WriteString("answer", zhAnswer);
         writer.WriteString("keyPoint", zhKeyPoint);
+        if (zhHelp is { } zhEntries)
+        {
+          writer.WritePropertyName("backHelp");
+          zhEntries.WriteTo(writer);
+        }
         if (zhEl.TryGetProperty("watchOut", out var zhWatchEl) && zhWatchEl.ValueKind != JsonValueKind.Null)
           writer.WriteString("watchOut", ZhText(zhEl, "watchOut"));
         if (zhEl.TryGetProperty("goal", out var zhGoalEl) && zhGoalEl.ValueKind != JsonValueKind.Null)
@@ -84,6 +100,21 @@ public static class TeachingValidation
   }
 
   public static string? Normalize(string? json) => string.IsNullOrWhiteSpace(json) ? null : Canonicalize(JsonSerializer.Deserialize<JsonElement>(json));
+
+  private static JsonElement? ReadBackHelp(JsonElement raw, string answer, string keyPoint)
+  {
+    var fields = raw.EnumerateObject().Where(p => p.NameEquals("backHelp")).ToList();
+    if (fields.Count > 1) throw Bad("duplicate teaching.backHelp key");
+    if (fields.Count == 0 || FrontHelpValidation.Canonicalize(fields[0].Value) is not { } canonical) return null;
+    var entries = JsonSerializer.Deserialize<JsonElement>(canonical);
+    foreach (var entry in entries.EnumerateArray())
+    {
+      var term = entry.GetProperty("term").GetString()!;
+      if (!answer.Contains(term, StringComparison.Ordinal) && !keyPoint.Contains(term, StringComparison.Ordinal))
+        throw Bad("teaching.backHelp term must appear in the answer or key point");
+    }
+    return entries;
+  }
 
   /// <summary>In place, for an authoring response row: null/absent teaching and tags keys are removed so the
   /// wire never carries "teaching": null for a card without a payload; present cells become JSON objects.</summary>

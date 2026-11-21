@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseFrontHelp } from '../../src/content/frontHelp';
+import { parseFrontHelp, termHelpMatches, unlinkedTermHelp } from '../../src/content/frontHelp';
 import { parseRawCardTranslation } from '../../src/content/cardTranslation';
 import { localizeForDisplay } from '../../src/content/localizeCard';
 import type { CardExport } from '../../src/types/deckExport';
@@ -10,6 +10,16 @@ const card: CardExport = { StableUid: 'latency-01', Revision: 2, Question: 'What
 const translation = parseRawCardTranslation({ v: 1, question: '延迟衡量什么？', explanation: '时间。', frontHelp: zhHelp })!;
 
 describe('front help parsing and display localization', () => {
+  it('links the longer anchor and finds the separate shorter word', () => {
+    const entries = [
+      { term: 'S3', definition: 'Object storage.' },
+      { term: 'S3 Glacier', definition: 'Storage for archives.' },
+    ];
+    expect(termHelpMatches('S3 Glacier and S3, then S3.', entries).map(({ entry, offset }) =>
+      [entry.term, offset])).toEqual([['S3 Glacier', 0], ['S3', 15]]);
+    expect(unlinkedTermHelp('S3 Glacier only', entries)).toEqual([entries[0]]);
+    expect(unlinkedTermHelp('`S3` or S3Backup', entries)).toEqual(entries);
+  });
   it('keeps the v1 extension strict, including fields inside help entries', () => {
     expect(translation.frontHelp).toEqual(zhHelp);
     for (const extra of [{ correct: true }, { frontHelps: [] }, { frontHelp: [{ ...zhHelp[0], correct: true }] }, { frontHelp: [zhHelp[0], zhHelp[0]] }, { frontHelp: [{ term: 'x', definition: 3 }] }]) {

@@ -56,6 +56,20 @@ export function parseReleaseBundle(raw: string, now = Date.now(), requireFresh =
     requireValue(typeof card.orderInDeck === 'number' && Number.isInteger(card.orderInDeck) && card.orderInDeck >= 1 && card.orderInDeck <= 100_000_000 && !orders.has(card.orderInDeck), 'Invalid or duplicate card order.');
     orders.add(card.orderInDeck);
     requireValue(parseFrontHelp(card.frontHelp) !== undefined, `${card.stableUid}: Invalid frontHelp.`);
+    if (card.teaching && typeof card.teaching === 'object') {
+      const teaching = object(card.teaching);
+      const zh = teaching['zh-CN'] ? object(teaching['zh-CN']) : undefined;
+      const checkBackHelp = (face: Record<string, unknown>) => {
+        const help = parseFrontHelp(face.backHelp);
+        requireValue(help !== undefined && (help ?? []).every(({ term }) =>
+          [face.answer, face.keyPoint].some(text => typeof text === 'string' && text.includes(term))),
+          `${card.stableUid}: Invalid or unanchored backHelp.`);
+        return help?.length ?? 0;
+      };
+      const enCount = checkBackHelp(teaching);
+      requireValue(!enCount || zh !== undefined, `${card.stableUid}: backHelp requires Chinese teaching.`);
+      if (zh) requireValue(checkBackHelp(zh) === enCount, `${card.stableUid}: Bilingual backHelp count differs.`);
+    }
     const source = object(card.source); keys(source, ['url', 'quote']);
     requireValue(typeof source.url === 'string' && isValidSourceUrl(source.url) && (source.quote === null || typeof source.quote === 'string' && source.quote.length <= 1000), `${card.stableUid}: Invalid source.`);
     const typed = card as unknown as ImportCardInput;

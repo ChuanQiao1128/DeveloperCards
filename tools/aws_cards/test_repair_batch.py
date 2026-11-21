@@ -11,7 +11,7 @@ import repair_batch as m
 class RepairBatchTests(unittest.TestCase):
     def test_current_complete_rules_are_loaded_and_invalid_blocks_stop(self):
         rules = m.teaching_rules()
-        self.assertIn('mobile-memory-card-v2-20261118', rules['version'])
+        self.assertEqual('mobile-memory-card-v3-20261120', rules['version'])
         self.assertEqual(len(rules['sha256']), 64)
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

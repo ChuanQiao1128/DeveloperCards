@@ -1,10 +1,13 @@
-import React from 'react';
+import React, { useState } from 'react';
 import * as RN from 'react-native';
-import { Text } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { StyleProp, TextProps, TextStyle } from 'react-native';
 
 import { splitInlineCode, stripInlineCode } from '../../../content/inlineCode';
 import { useCardTextLang } from './CardTextLang';
+import { parseFrontHelp, termHelpMatches, type FrontHelpEntry } from '../../../content/frontHelp';
+import { colors } from '../../../theme/colors';
+import { spacing } from '../../../theme/spacing';
 
 export const INLINE_CODE_TEST_ID = 'inline-code';
 
@@ -91,7 +94,83 @@ export type InlineCodeTextProps = Omit<TextProps, 'children'> & {
   text: string | null | undefined;
   /** Style for the code segments, merged over the monospace defaults. */
   codeStyle?: StyleProp<TextStyle>;
+  termHelp?: unknown;
 };
+
+function TermHelpText({ text, entries, spanStyle, textProps, lang }: {
+  text: string;
+  entries: FrontHelpEntry[];
+  spanStyle: StyleProp<TextStyle>;
+  textProps: TextProps;
+  lang: ReturnType<typeof useCardTextLang>;
+}) {
+  const [selected, setSelected] = useState<FrontHelpEntry | null>(null);
+  const used = new Set<FrontHelpEntry>();
+  const parts = splitInlineCode(text).map((part, index) => {
+    if (part.kind === 'code') return <Text key={index} style={spanStyle} testID={INLINE_CODE_TEST_ID}>{part.value}</Text>;
+    const matches = termHelpMatches(part.value, entries.filter(entry => !used.has(entry)));
+    let cursor = 0;
+    const pieces: React.ReactNode[] = [];
+    for (const { entry, offset } of matches) {
+      pieces.push(part.value.slice(cursor, offset));
+      pieces.push(
+        <Text key={entry.term} style={helpStyles.link} accessibilityRole="button"
+          testID={`term-help-${entry.term}`} onPress={() => setSelected(entry)}>
+          {entry.term}
+        </Text>,
+      );
+      used.add(entry);
+      cursor = offset + entry.term.length;
+    }
+    pieces.push(part.value.slice(cursor));
+    return <React.Fragment key={index}>{pieces}</React.Fragment>;
+  });
+  const close = () => setSelected(null);
+  const chinese = lang === 'zh-CN';
+  const buttons = [...used];
+  const actions = buttons.map((entry, i) => ({
+    name: `termHelp${i}`, label: chinese ? `解释 ${entry.term}` : `Explain ${entry.term}`,
+  }));
+  return (
+    <>
+      <Text {...textProps} accessibilityLabel={textProps.accessibilityLabel ?? stripInlineCode(text)}
+        accessibilityActions={[...(textProps.accessibilityActions ?? []), ...actions]}
+        onAccessibilityAction={event => {
+          const index = actions.findIndex(action => action.name === event.nativeEvent.actionName);
+          if (index >= 0) setSelected(buttons[index]);
+          else textProps.onAccessibilityAction?.(event);
+        }}>
+        {parts}
+      </Text>
+      {selected ? (
+        <Modal transparent animationType="fade" onRequestClose={close}>
+          <View style={helpStyles.overlay}>
+            <Pressable style={StyleSheet.absoluteFill} onPress={close} accessible={false} />
+            <View style={helpStyles.panel} accessibilityViewIsModal onAccessibilityEscape={close}>
+              <Text style={helpStyles.title} accessibilityRole="header" accessibilityLanguage={lang}>{selected.term}</Text>
+              <ScrollView style={helpStyles.definitionScroll}>
+                <Text style={helpStyles.definition} accessibilityLanguage={lang}>{selected.definition}</Text>
+              </ScrollView>
+              <Pressable style={helpStyles.close} accessibilityRole="button" onPress={close} testID="term-help-close">
+                <Text style={helpStyles.definition}>{chinese ? '关闭' : 'Close'}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </Modal>
+      ) : null}
+    </>
+  );
+}
+
+const helpStyles = StyleSheet.create({
+  link: { color: colors.ink, textDecorationLine: 'underline' },
+  overlay: { flex: 1, backgroundColor: 'rgba(42,34,24,0.34)', justifyContent: 'flex-end', alignItems: 'center', padding: spacing.md },
+  panel: { width: '100%', maxWidth: 480, maxHeight: '70%', backgroundColor: colors.softCream, borderRadius: spacing.cardRadius, padding: spacing.md, marginBottom: spacing.md, gap: spacing.sm },
+  definitionScroll: { flexGrow: 0 },
+  title: { color: colors.ink, fontSize: 19, fontWeight: '700' },
+  definition: { color: colors.ink, fontSize: 16, lineHeight: 23 },
+  close: { minHeight: 44, alignSelf: 'flex-end', justifyContent: 'center', paddingHorizontal: spacing.md, borderRadius: spacing.buttonRadius, backgroundColor: colors.pokeBlueFaint },
+});
 
 // Card text with markdown inline code spans (`List<int>`) rendered as nested
 // <Text>: prose in the parent style, each span in monospace on a subtle
@@ -101,11 +180,16 @@ export type InlineCodeTextProps = Omit<TextProps, 'children'> & {
 // text is spoken as zh-CN unless the caller sets accessibilityLanguage; elsewhere no such prop is
 // added at all.
 export function InlineCodeText(props: InlineCodeTextProps) {
-  const { text, codeStyle, ...rest } = props;
+  const { text, codeStyle, termHelp, ...rest } = props;
   const lang = useCardTextLang();
   const spanStyle = useInlineCodeStyle(rest.style, codeStyle);
   const nodes = inlineCodeNodes(text, spanStyle);
   const textProps = lang && rest.accessibilityLanguage === undefined ? { ...rest, accessibilityLanguage: lang } : rest;
+  const entries = parseFrontHelp(termHelp);
+  if (text && entries?.length) return (
+    <TermHelpText key={text + JSON.stringify(entries)} text={text} entries={entries}
+      spanStyle={spanStyle} textProps={textProps} lang={lang} />
+  );
 
   if (nodes === text) return <Text {...textProps}>{text}</Text>;
   return (
