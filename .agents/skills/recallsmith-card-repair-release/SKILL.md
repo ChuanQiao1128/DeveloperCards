@@ -52,12 +52,14 @@ Reviewer可在同轮给出精确的删除补丁，仅删除重复话语或题面
 
 ## 仅在授权范围发布
 
+后续正式卡包统一使用 S3 版本对象备份和发布。用控制台服务端回执和已验证的 build ID、SHA-256 接续。常规发布跳过本地自动保存目录及文件导出。已有文件归档或恢复工具以[卡包备份与接续](../../../docs/delivery/card-content-release-workflow.md#卡包备份与接续)为准。
+
 日常五卡顺序与流程缩减以 [`docs/delivery/card-content-release-workflow.md`](../../../docs/delivery/card-content-release-workflow.md) 为入口：第一步为五张人工定稿（冻结前一次必要独立核对）与冻结；第二步为用户授权后一次自动预检/构包（冻结包一致性含范围和已有记录绑定＋发布数据格式），随后沿用Console自动发布/CDN核验及回执。聊天已定稿不另派作者；规则、证据、自评或正文变化只核对失效卡与受影响依赖。七项标准合并在同次审查，不拆成七轮。用户可见稿发生变化须给用户看受影响稿；已有相同冻结批次发布授权不重复询问。
 
 第二步只执行一次`repair_release.py prepare-manual REQUEST.json OUTPUT`，复用第一步已通过且与实际正文/证据/规则匹配的核对记录，不调用模型、不另加人工确认或联网预检；实时库存由Console导入前核对。`run --manual-patch`属于第一步，不在第二步重跑。成功按真实`preflight.json`简报变化/未变数量；失败定位问题，正文或事实问题回第一步，只处理受影响卡和依赖，不自动补PASS。
 
 canonical JSON 是发布真源，阅读 Markdown 不作为发布中转；使用真实 Console JSON 解析校验。人工稿使用 `repair_batch.py run ... --manual-patch FINAL.patch.json` 和 `repair_release.py prepare-manual`，保留真实来源、实际审查和原范围，不伪造作者。`mainSHA` 绑定实际已验证的发布代码 main 提交，完整正文及实际证明另按哈希归档，Git 内容归档独立完成。代码/规则/契约变化先按正常门禁合入验证，未变版本复用验证记录；不可把未归档正文声称为已在 main。首次选目录后自动保存；不支持时一次导出完整文件。
 
-发布时才读`frontend/docs/aws-basics-release-bundle.md`的自动发布／恢复契约。绑定真实独立审查和服务器版本，不伪造PASS或人工审查声明；使用Console `/decks/release?deckId=15` 的 **Run reviewed release**。v2包自动核对原库存基线；`publisherCodeVerification`必须绑定真实main/成功CI和未变的12个文件。首次选保存目录后自动留存，或导出单文件；完成用`repair_release.py finalize`收尾并生成下一批baseline。`verify-baseline`仅诊断，不例行重复执行。纯内容不另发OTA、不额外启动App全套CI，必要内容检查及仓库强制门禁保留。
+发布时才读`frontend/docs/aws-basics-release-bundle.md`的自动发布／恢复契约。绑定真实独立审查和服务器版本，不伪造PASS或人工审查声明；使用Console `/decks/release?deckId=15` 的 **Run reviewed release**。v2包自动核对原库存基线；`publisherCodeVerification`必须绑定真实main/成功CI和未变的12个文件。正式包以 S3 版本对象和服务端核验回执为准。已有文件归档可用 `repair_release.py finalize` 校验和恢复。`verify-baseline`仅诊断，不例行重复执行。纯内容不另发OTA、不额外启动App全套CI，必要内容检查及仓库强制门禁保留。
 
 恢复先查询，继续同一releaseId／actionId／正文／job／build；遵守lease、退避和上限，不换key绕错误。job、live指针、索引、公开manifest、实际下载SHA和全部双语身份／顺序／revision／正文一致才报告完成。Console已有实际CDN核验通过时，保存其真实结果和回执，不例行再做第二次全包下载；结果缺失或冲突才排查。普通内容不强制手机逐张验收，也不声称手机已安装新版。只给改稿、验证状态、耗时／用量和产物路径；不让一批内容修订扩展成无关基础设施改造。
