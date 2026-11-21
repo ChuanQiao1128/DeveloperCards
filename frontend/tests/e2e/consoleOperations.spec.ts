@@ -180,6 +180,46 @@ test('console shell keeps five desktop areas and traps mobile navigation focus',
   expect(fixture.unexpected).toEqual([]);
 });
 
+test('Operations prioritizes observed problems and drills into a publish job at 320 px', async ({ page }, testInfo) => {
+  await setup(page);
+  const alarm = { name: 'recallsmith-prod-observer-unavailable', state: 'INSUFFICIENT_DATA', stateUpdatedAt: operations.fetchedAt };
+  const job = { jobId: 'monitored-job', deckSlug: 'aws-saa-fundamentals', status: 'FAILED', updatedAt: operations.fetchedAt,
+    releaseId: 'monitored-release', buildId: 'monitored-build', deliveryVerification: 'unknown', href: null };
+  await page.route('**/api/v1/admin/operations/overview', route => route.fulfill({ json: envelope({
+    ...operations,
+    synthetic: { ...operations.synthetic, state: 'stale', checks: [
+      { name: 'api-health', status: 'failed', advisory: false, httpStatus: 503, latencyMs: 180, code: null },
+    ] },
+    alarms: { ...operations.alarms, state: 'fresh', items: [alarm,
+      { ...alarm, name: 'recallsmith-prod-sync-http-5xx', state: 'ALARM' }] },
+    publishing: { ...operations.publishing, state: 'fresh', items: [job] },
+  }).data }));
+  await page.route('**/api/v1/authoring/publish/status?*', route => {
+    expect(new URL(route.request().url()).searchParams.get('jobId')).toBe(job.jobId);
+    return route.fulfill({ json: envelope({ ...job, deckId: 15, deckTitle: 'AWS Basics', errorMessage: 'Could not write build' }).data });
+  });
+
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/operations');
+  await expect(page.getByRole('link', { name: '1 firing alarm' })).toBeVisible();
+  await expect(page.getByRole('link', { name: /core check with a problem/ })).toHaveCount(0);
+  await expect(page.getByText('Historical sample · current status unknown')).toBeVisible();
+  await expect(page.getByText(/with insufficient or unknown data/)).toBeVisible();
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  await page.screenshot({ path: testInfo.outputPath('monitoring-triage-desktop.png') });
+
+  await page.setViewportSize({ width: 320, height: 820 });
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBe(320);
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  await page.screenshot({ path: testInfo.outputPath('monitoring-triage-narrow.png'), fullPage: true });
+  await page.getByRole('link', { name: 'Inspect publishing job monitored-job' }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL('/decks/publish-jobs/monitored-job');
+  await expect(page.getByText('Could not write build')).toBeVisible();
+  await page.getByRole('link', { name: 'Back to Operations' }).click();
+  await expect(page.getByRole('heading', { name: 'Latest observations' })).toBeVisible();
+});
+
 test('publishing issues show verified stages and return to the affected deck at 320 px', async ({ page }, testInfo) => {
   await setup(page);
   const deck = { id: 15, slug: 'aws-saa-fundamentals', title: 'AWS Basics', author: 'Fixture', locale: 'en-US', deckType: 1, version: 1 };
