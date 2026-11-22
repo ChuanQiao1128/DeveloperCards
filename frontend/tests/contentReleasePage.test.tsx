@@ -11,8 +11,8 @@ import { releaseFixture } from './support/contentReleaseFixtures';
 import { captureReleaseBackupInventory, prepareReleaseAction } from '../src/lib/contentRelease';
 import type { ReleaseSession } from '../src/types/contentRelease';
 
-const api = vi.hoisted(() => ({ fetchReleaseSnapshot: vi.fn(), fetchReleaseAction: vi.fn(), sendReleaseAction: vi.fn(), fetchReleaseCards: vi.fn(), verifyReleaseDelivery: vi.fn(), waitForReleasePoll: vi.fn() }));
-vi.mock('../src/api/contentRelease', () => ({ fetchReleaseSnapshot: api.fetchReleaseSnapshot, fetchReleaseAction: api.fetchReleaseAction, sendReleaseAction: api.sendReleaseAction, fetchReleaseCards: api.fetchReleaseCards }));
+const api = vi.hoisted(() => ({ fetchS3ReleaseBundle: vi.fn(), fetchReleaseSnapshot: vi.fn(), fetchReleaseAction: vi.fn(), sendReleaseAction: vi.fn(), fetchReleaseCards: vi.fn(), verifyReleaseDelivery: vi.fn(), waitForReleasePoll: vi.fn() }));
+vi.mock('../src/api/contentRelease', () => ({ fetchS3ReleaseBundle: api.fetchS3ReleaseBundle, fetchReleaseSnapshot: api.fetchReleaseSnapshot, fetchReleaseAction: api.fetchReleaseAction, sendReleaseAction: api.sendReleaseAction, fetchReleaseCards: api.fetchReleaseCards }));
 vi.mock('../src/lib/contentReleaseDelivery', async original => ({
   ...await original<typeof import('../src/lib/contentReleaseDelivery')>(),
   verifyReleaseDelivery: api.verifyReleaseDelivery,
@@ -48,6 +48,24 @@ beforeEach(() => { vi.stubGlobal('indexedDB', new IDBFactory()); signOut(); vi.r
 afterEach(() => { cleanup(); signOut(); });
 
 describe('AWS Basics release operator flow', () => {
+  it('loads an S3 bundle and freezes the same editing baseline without file export', async () => {
+    const { bundle, snapshot } = releaseFixture(5);
+    const hash = 'e'.repeat(64);
+    api.fetchS3ReleaseBundle.mockResolvedValue(ok(JSON.stringify(bundle)));
+    api.fetchReleaseSnapshot.mockResolvedValue(ok(snapshot));
+    await mount();
+    await userEvent.type(screen.getByLabelText('S3 bundle SHA-256'), hash);
+    await userEvent.click(screen.getByRole('button', { name: 'Load from S3' }));
+    await screen.findByText(`S3 bundle ${hash}`);
+    expect(api.fetchS3ReleaseBundle).toHaveBeenCalledWith(hash, TEST_EDITOR_SUB);
+    expect(api.fetchReleaseSnapshot).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole('button', { name: 'Capture editing backup and freeze release' }));
+    await screen.findByRole('heading', { name: '1. Frozen release and initial backup' });
+    expect((await readSaved()).s3BundleSha256).toBe(hash);
+    expect(screen.queryByRole('button', { name: 'Download recovery journal' })).toBeNull();
+    expect(api.sendReleaseAction).not.toHaveBeenCalled();
+  });
+
   it('restores the server receipt without downloading or rechecking cards in the browser', async () => {
     const { session, snapshot } = reviewedSession(5);
     const result = ok({ jobId: 'server-job', buildId: 'server-build', outcome: 'committed',

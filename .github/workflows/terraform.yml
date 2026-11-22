@@ -198,6 +198,8 @@ jobs:
       CONSOLE_MFA_ONLY: ${{ github.event_name == 'workflow_dispatch' && inputs.console_mfa_only }}
       CONTENT_HEADERS_ONLY: ${{ github.event_name == 'workflow_dispatch' && inputs.content_headers_only }}
       CONTENT_PUBLISH_NOTIFY_ONLY: ${{ github.event_name == 'workflow_dispatch' && inputs.content_publish_notify_only }}
+      # This one-policy release runs independently of existing break-glass operator drift.
+      REVIEWED_RELEASE_INPUT_ONLY: ${{ needs.select.outputs.allow == 'docs/delivery/s3-reviewed-card-release.plan-allow.json' }}
       # The one root variable without a default (infra/envs/prod/variables.tf, sensitive). Environment secret.
       TF_VAR_alert_email: ${{ secrets.TF_VAR_ALERT_EMAIL }}
     steps:
@@ -282,6 +284,8 @@ jobs:
             )
           elif [ "${CONTENT_PUBLISH_NOTIFY_ONLY:-false}" = true ]; then
             targets=('-target=module.identity.aws_iam_role_policy.worker_notify_send')
+          elif [ "${REVIEWED_RELEASE_INPUT_ONLY:-false}" = true ]; then
+            targets=('-target=module.identity.aws_iam_role_policy.core_vpc')
           fi
           terraform -chdir=infra/envs/prod plan -input=false -no-color -lock-timeout=10m \
             ${targets[@]+"${targets[@]}"} -out="$RUNNER_TEMP/tf/apply.tfplan" > "$RUNNER_TEMP/tf/plan.log" 2>&1
@@ -336,6 +340,8 @@ jobs:
             )
           elif [ "${CONTENT_PUBLISH_NOTIFY_ONLY:-false}" = true ]; then
             targets=('-target=module.identity.aws_iam_role_policy.worker_notify_send')
+          elif [ "${REVIEWED_RELEASE_INPUT_ONLY:-false}" = true ]; then
+            targets=('-target=module.identity.aws_iam_role_policy.core_vpc')
           fi
           terraform -chdir=infra/envs/prod plan -input=false -no-color -lock-timeout=10m \
             ${targets[@]+"${targets[@]}"} -out="$RUNNER_TEMP/tf/second.tfplan" > "$RUNNER_TEMP/tf/second.log" 2>&1 || exit 1
@@ -461,6 +467,10 @@ jobs:
             fi
             if [ "${CONTENT_PUBLISH_NOTIFY_ONLY:-false}" = true ]; then
               echo 'Worker notify send policy targeted scope only; full production drift is not checked.'
+              echo
+            fi
+            if [ "${REVIEWED_RELEASE_INPUT_ONLY:-false}" = true ]; then
+              echo 'Private release input policy targeted scope only; full production drift is not checked.'
               echo
             fi
             echo "- allow file: $allow_line"

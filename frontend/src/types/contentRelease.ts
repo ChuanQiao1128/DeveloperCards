@@ -91,6 +91,7 @@ export interface ReleaseBackupInventory {
 }
 
 export interface ReleaseSession {
+  s3BundleSha256?: string;
   schema: 'aws-basics-console-session-v1';
   ownerSubject: string;
   baseline: ReleaseSnapshot;

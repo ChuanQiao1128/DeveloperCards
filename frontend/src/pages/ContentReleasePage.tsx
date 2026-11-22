@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { fetchReleaseCards, fetchReleaseAction, fetchReleaseSnapshot, sendReleaseAction } from '../api/contentRelease';
+import { createS3ReleaseUpload, fetchS3ReleaseBundle, fetchReleaseCards, fetchReleaseAction, fetchReleaseSnapshot, sendReleaseAction } from '../api/contentRelease';
 import { readSessionUser } from '../auth/sessionUser';
 import { ConsoleShell } from '../components/console/ConsoleShell';
 import { DeckWorkspaceHeader } from '../components/console/DeckWorkspaceHeader';
@@ -66,7 +66,13 @@ export function ContentReleasePage({ deck, children }: {
   const journalRevision = useRef(0);
   const [loading, setLoading] = useState(allowed);
   const [bundle, setBundle] = useState<ReleaseBundle | null>(null);
+  const [s3Hash, setS3Hash] = useState('');
+  const [s3BundleSha256, setS3BundleSha256] = useState<string>();
+  const [uploadBytes, setUploadBytes] = useState('');
+  const [uploadUrl, setUploadUrl] = useState('');
   const activeBundle = session?.bundle ?? bundle;
+  const activeS3Hash = session ? session.s3BundleSha256 : s3BundleSha256;
+  const validS3Hash = /^[0-9a-f]{64}$/.test(s3Hash);
   const [restoreBlocked, setRestoreBlocked] = useState(false);
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
@@ -141,7 +147,8 @@ export function ContentReleasePage({ deck, children }: {
     journalRevision.current = stored.revision;
     currentSession.current = next;
     setSession(next);
-    if (artifactDirectory.current) await writeReleaseArtifacts(artifactDirectory.current, next, () => assertOwner(next), artifact);
+    if (artifactDirectory.current && !next.s3BundleSha256)
+      await writeReleaseArtifacts(artifactDirectory.current, next, () => assertOwner(next), artifact);
     });
   }
   async function run(work: () => Promise<unknown>, recovery = false) {
@@ -151,13 +158,21 @@ export function ContentReleasePage({ deck, children }: {
     catch (failure) { if (mounted.current) setError(failure instanceof Error ? failure.message : String(failure)); }
     finally { busyRef.current = false; if (mounted.current) setBusy(false); }
   }
+  async function loadS3Bundle() {
+    setBundle(null);
+    setS3BundleSha256(undefined);
+    const raw = dataOrThrow(await owned(() => fetchS3ReleaseBundle(s3Hash, user!.sub!)));
+    setBundle(parseReleaseBundle(raw));
+    setS3BundleSha256(s3Hash);
+    setUploadUrl('');
+  }
   async function capture() {
     if (!bundle || currentSession.current) return;
     if (bundle.schema !== 'aws-basics-release-bundle-v2') throw new Error('Regenerate this legacy bundle with its expected baseline before starting a new release. Existing frozen journals can still recover.');
     const baseline = dataOrThrow(await owned(() => fetchReleaseSnapshot(user!.sub!)));
     assertReleaseSnapshot(baseline);
     assertExpectedReleaseBaseline(bundle, baseline);
-    await save({ schema: 'aws-basics-console-session-v1', ownerSubject: user!.sub!, baseline, baselineInventory: captureReleaseBackupInventory(baseline), bundle, actions: {} });
+    await save({ schema: 'aws-basics-console-session-v1', ownerSubject: user!.sub!, baseline, baselineInventory: captureReleaseBackupInventory(baseline), bundle, s3BundleSha256, actions: {} });
     setMessage('Complete editing backup captured. The initial live build and bundle are now frozen for this release.');
   }
   async function verify(current: ReleaseSession): Promise<ReleaseSession> {
@@ -261,7 +276,7 @@ export function ContentReleasePage({ deck, children }: {
     const artifact = await loadDeliveryArtifact(current, () => assertOwner(current));
     await save(completed, false, artifact); assertOwner(current); setDelivery(proof);
     setMessage(`Published and verified ${proof.cards} bilingual cards on the public CDN.`);
-    if (background && artifactDirectory.current && !artifact) {
+    if (background && artifactDirectory.current && !current.s3BundleSha256 && !artifact) {
       const saved = await loadArchiveBytes(completed, signal);
       await save(completed, false, saved);
     }
@@ -347,6 +362,7 @@ export function ContentReleasePage({ deck, children }: {
     const stored = await withReleaseJournalLock(user!.sub!, () => saveReleaseJournal(user!.sub!, '', journalRevision.current, () => assertOwner(currentSession.current)));
     journalRevision.current = stored.revision; currentSession.current = null;
     setSession(null); setBundle(null); setDelivery(null); setQueryView(null);
+    setS3BundleSha256(undefined); setS3Hash(''); setUploadBytes(''); setUploadUrl('');
     setMessage('Completed release archived. Load the next reviewed bundle to begin.');
   }
 
@@ -357,12 +373,30 @@ export function ContentReleasePage({ deck, children }: {
     <section className={`${CARD_CLASS} space-y-3`} aria-labelledby="batch-heading">
       <h2 id="batch-heading" className={H2_CLASS}>Publish a batch</h2>
       {!session && <div className="space-y-2">
+        <label className="block text-sm font-medium" htmlFor="s3-bundle-hash">S3 bundle SHA-256</label>
+        <input id="s3-bundle-hash" className={INPUT_CLASS} type="text" autoComplete="off" spellCheck={false}
+          value={s3Hash} disabled={busy || restoreBlocked} onChange={event => { setS3Hash(event.target.value.trim()); setUploadUrl(''); }} />
+        <Button variant="outline" disabled={!validS3Hash || busy || restoreBlocked} onClick={() => void run(loadS3Bundle)}>Load from S3</Button>
+        <details className="space-y-2">
+          <summary className="cursor-pointer font-medium">Upload a bundle directly to S3</summary>
+          <label className="block text-sm font-medium" htmlFor="s3-bundle-size">Bundle size in bytes</label>
+          <input id="s3-bundle-size" className={INPUT_CLASS} type="number" min={1} max={3_000_000} step={1}
+            value={uploadBytes} disabled={busy || restoreBlocked} onChange={event => { setUploadBytes(event.target.value); setUploadUrl(''); }} />
+          <Button variant="outline" disabled={!validS3Hash || !/^[1-9][0-9]*$/.test(uploadBytes) || Number(uploadBytes) > 3_000_000 || busy || restoreBlocked}
+            onClick={() => void run(async () => { setUploadUrl(dataOrThrow(await owned(() => createS3ReleaseUpload(s3Hash, uploadBytes, user!.sub!)))); })}>
+            Create upload link
+          </Button>
+          {uploadUrl && <Button variant="outline" disabled={busy || restoreBlocked} onClick={() => void run(async () => {
+            await owned(() => navigator.clipboard.writeText(uploadUrl)); setMessage('S3 upload link copied. The link expires in 10 minutes.');
+          })}>Copy upload link</Button>}
+        </details>
         <label className="block text-sm font-medium" htmlFor="release-bundle">Release bundle (JSON)</label>
-        <input id="release-bundle" className={INPUT_CLASS} type="file" accept="application/json,.json" disabled={busy || restoreBlocked} onChange={event => { const file = event.target.files?.[0]; if (!file) return; setBundle(null); void run(async () => { if (file.size > 3_000_000) throw new Error('Release bundle is too large.'); setBundle(parseReleaseBundle(await owned(() => file.text()))); }); }} />
+        <input id="release-bundle" className={INPUT_CLASS} type="file" accept="application/json,.json" disabled={busy || restoreBlocked} onChange={event => { const file = event.target.files?.[0]; if (!file) return; setBundle(null); setS3BundleSha256(undefined); void run(async () => { if (file.size > 3_000_000) throw new Error('Release bundle is too large.'); setBundle(parseReleaseBundle(await owned(() => file.text()))); }); }} />
       </div>}
       {activeBundle && <div className="text-sm" role="status">
         <p className="break-all font-medium">Batch {activeBundle.releaseId}</p>
         <p className="text-slate-600">{activeBundle.cards.length} cards in the bundle</p>
+        {activeS3Hash && <p className="break-all text-slate-600">S3 bundle {activeS3Hash}</p>}
       </div>}
       {!session?.actions.publish && <>
         <p className="max-w-prose text-sm text-slate-600">Publishing backs up the editing deck, registers the bundle’s existing model review, and verifies the card pack on the public CDN.</p>
@@ -371,11 +405,11 @@ export function ContentReleasePage({ deck, children }: {
       </>}
       {delivery && <div className="flex flex-wrap gap-3">
         <Button variant="outline" disabled={busy} onClick={() => void run(startAnotherRelease)}>Start another release</Button>
-        <Button variant="outline" disabled={busy} onClick={() => void run(async () => {
+        {!activeS3Hash && <Button variant="outline" disabled={busy} onClick={() => void run(async () => {
           const current = currentSession.current!;
           const artifact = await loadArchiveBytes(current);
           download(`${current.bundle.releaseId}-verified-artifacts.json`, releaseArtifactDownload(current, artifact));
-        })}>Download verified release artifacts</Button>
+        })}>Download verified release artifacts</Button>}
       </div>}
     </section>
     {publication && <PublicationStatusPanel status={publication} busy={busy} blocked={restoreBlocked}
@@ -390,11 +424,13 @@ export function ContentReleasePage({ deck, children }: {
         <p>Console validates the file and compares the saved editing cards with the bundle.</p>
       </div>}
       <p className="max-w-prose text-sm text-slate-600">
-        Console stores the editing backup and recovery journal in this browser. {supportsArtifactDirectory()
+        Console stores the editing backup and recovery journal in this browser. {activeS3Hash
+          ? 'The release bundle and published version are stored in S3.'
+          : supportsArtifactDirectory()
           ? automaticSave ? 'It also saves copies to your selected folder.' : 'Choose a folder to keep copies outside this browser.'
           : 'You can download a copy after the backup is captured.'}
       </p>
-      {supportsArtifactDirectory() && <Button variant="outline" disabled={busy || restoreBlocked} onClick={() => void run(async () => {
+      {!activeS3Hash && supportsArtifactDirectory() && <Button variant="outline" disabled={busy || restoreBlocked} onClick={() => void run(async () => {
         const directory = await chooseArtifactDirectory(user!.sub!, () => assertOwner(currentSession.current));
         artifactDirectory.current = directory; setAutomaticSave(true);
         const current = currentSession.current;
@@ -416,8 +452,8 @@ export function ContentReleasePage({ deck, children }: {
         <section className={`${CARD_CLASS} space-y-3`} aria-labelledby="backup-heading">
           <h2 id="backup-heading" className={H2_CLASS}>1. Frozen release and initial backup</h2>
           <p className="text-sm break-all">Release: {session.bundle.releaseId} · Main: {session.bundle.review.mainSHA}<br />Initial live build: {session.baseline.deck.live_build_id ?? 'none'}<br />Initial editing snapshot: {session.baseline.editingSnapshot}</p>
-          <div className="flex flex-wrap gap-3"><Button variant="outline" onClick={() => void run(async () => download(`${session.bundle.releaseId}-editing-backup.json`, session.baseline))}>Download complete editing backup</Button><Button variant="outline" onClick={() => void run(async () => download(`${session.bundle.releaseId}-console-journal.json`, session))}>Download recovery journal</Button></div>
-          <p className="text-sm text-slate-600">The exact bundle, backup and requests are saved in browser storage. Download the journal before closing it. Existing actions cannot be replaced with new keys here.</p>
+          {!activeS3Hash && <div className="flex flex-wrap gap-3"><Button variant="outline" onClick={() => void run(async () => download(`${session.bundle.releaseId}-editing-backup.json`, session.baseline))}>Download complete editing backup</Button><Button variant="outline" onClick={() => void run(async () => download(`${session.bundle.releaseId}-console-journal.json`, session))}>Download recovery journal</Button></div>}
+          <p className="text-sm text-slate-600">The exact bundle, backup and requests are saved in browser storage. Existing actions cannot be replaced with new keys here.</p>
         </section>
         {(['import', 'review', 'publish'] as const).map((kind, index) => {
           const action = session.actions[kind];

@@ -296,6 +296,8 @@ export function parseReleaseSession(raw: string, ownerSubject?: string): Release
   requireValue(raw.length <= 10_000_000, 'Recovery journal is too large.');
   const session = object(JSON.parse(raw)) as unknown as ReleaseSession;
   requireValue(session.schema === 'aws-basics-console-session-v1', 'Unsupported recovery journal.');
+  requireValue(session.s3BundleSha256 === undefined ||
+    typeof session.s3BundleSha256 === 'string' && SHA256.test(session.s3BundleSha256), 'Invalid S3 bundle hash in the recovery journal.');
   text(session.ownerSubject, 256);
   if (ownerSubject !== undefined) requireValue(session.ownerSubject === ownerSubject, 'Recovery journal belongs to another signed-in subject.');
   assertReleaseSnapshot(session.baseline);
