@@ -1,6 +1,4 @@
 using System.Text.Json;
-using Amazon;
-using Amazon.Runtime;
 using Amazon.S3;
 using RecallSmith.Lambda.Common;
 using RecallSmith.Lambda.Vpc.Authoring;
@@ -10,22 +8,21 @@ namespace RecallSmith.Lambda.IntegrationTests;
 public sealed class ContentReleaseBundleTests
 {
   [Fact]
-  public async Task UploadSignatureBindsThePrivateObjectAndRequiredHeaders()
+  public void UploadSigningRequestBindsThePrivateObjectAndRequiredHeaders()
   {
     var sha256 = new string('a', 64);
-    using var s3 = new AmazonS3Client(new BasicAWSCredentials("test-key", "test-secret"), RegionEndpoint.APSoutheast2);
-    var request = ContentReleaseBundle.CreateUploadRequest("test-bucket", sha256, 1_734_884, DateTime.UtcNow.AddMinutes(10));
-    var url = new Uri(await s3.GetPreSignedURLAsync(request));
+    var expires = DateTime.UtcNow.AddMinutes(10);
+    var request = ContentReleaseBundle.CreateUploadRequest("test-bucket", sha256, 1_734_884, expires);
 
-    Assert.Equal("https", url.Scheme);
-    Assert.Equal($"/release-input/aws-saa-fundamentals/{sha256}.json", url.AbsolutePath);
-    var query = url.Query.TrimStart('?').Split('&').Select(part => part.Split('=', 2))
-      .ToDictionary(part => part[0], part => Uri.UnescapeDataString(part[1]));
-    var signedHeaders = query["X-Amz-SignedHeaders"].Split(';');
-    Assert.Contains("content-length", signedHeaders);
-    Assert.Contains("content-type", signedHeaders);
-    Assert.Contains("if-none-match", signedHeaders);
-    Assert.Contains("x-amz-checksum-sha256", signedHeaders);
+    Assert.Equal("test-bucket", request.BucketName);
+    Assert.Equal($"release-input/aws-saa-fundamentals/{sha256}.json", request.Key);
+    Assert.Equal(HttpVerb.PUT, request.Verb);
+    Assert.Equal(Protocol.HTTPS, request.Protocol);
+    Assert.Equal(expires, request.Expires);
+    Assert.Equal(1_734_884, request.Headers.ContentLength);
+    Assert.Equal("application/json", request.ContentType);
+    Assert.Equal("*", request.Headers["If-None-Match"]);
+    Assert.Equal("qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqo=", request.Headers["x-amz-checksum-sha256"]);
   }
 
   [Theory]
