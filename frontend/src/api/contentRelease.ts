@@ -32,6 +32,44 @@ function subjectGuard(ownerSubject: string) {
 }
 
 const bundleRoute = '/api/v1/authoring/release/bundle';
+const journalRoute = '/api/v1/authoring/release/journal';
+
+export interface CloudJournalPointer { revision: string | null; parts: string[] }
+
+export async function fetchCloudJournalPointer(ownerSubject: string): Promise<CloudJournalPointer> {
+  try {
+    return (await http.get<CloudJournalPointer>(journalRoute, { transformRequest: [subjectGuard(ownerSubject)] })).data;
+  } catch (error) { throw journalRequestError(error); }
+}
+
+export async function putCloudJournalPointer(pointer: CloudJournalPointer, ownerSubject: string): Promise<CloudJournalPointer> {
+  try {
+    return (await http.put<CloudJournalPointer>(journalRoute, JSON.stringify(pointer), {
+      headers: { 'Content-Type': 'application/json' }, transformRequest: [subjectGuard(ownerSubject)],
+    })).data;
+  } catch (error) { throw journalRequestError(error); }
+}
+
+export async function fetchCloudJournalPart(part: string, ownerSubject: string): Promise<string> {
+  try {
+    return (await http.get<{ data: string }>(journalRoute, {
+      params: { part }, transformRequest: [subjectGuard(ownerSubject)],
+    })).data.data;
+  } catch (error) { throw journalRequestError(error); }
+}
+
+export async function putCloudJournalPart(part: string, data: string, ownerSubject: string): Promise<void> {
+  try {
+    await http.put(journalRoute, data, {
+      params: { part }, headers: { 'Content-Type': 'text/plain' }, transformRequest: [subjectGuard(ownerSubject)],
+    });
+  } catch (error) { throw journalRequestError(error); }
+}
+
+function journalRequestError(error: unknown) {
+  const result = apiResultFromError(error);
+  return new Error(result.error?.message ?? 'Could not access the cloud release journal.');
+}
 
 export async function fetchS3ReleaseBundle(sha256: string, ownerSubject: string): Promise<ApiResult<string>> {
   try {

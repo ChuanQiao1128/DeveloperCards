@@ -900,6 +900,13 @@ test('AWS editors can load a batch directly in Publishing and authorize it expli
   await stubApi(page);
   const aws = { ...DECK, id: 15, slug: 'aws-saa-fundamentals', title: 'AWS Basics' };
   await page.route('**/api/v1/authoring/decks?*', route => route.fulfill({ contentType: 'application/json', body: ok([aws]) }));
+  const { bundle } = releaseFixture(5);
+  const hash = 'a'.repeat(64);
+  await page.route('**/api/v1/authoring/release/journal', route => route.fulfill({ json: { revision: null, parts: [] } }));
+  await page.route('**/api/v1/authoring/release/bundle?*', route => {
+    expect(new URL(route.request().url()).searchParams.get('sha256')).toBe(hash);
+    return route.fulfill({ contentType: 'application/json', body: JSON.stringify(bundle) });
+  });
   let jobsRequests = 0;
   await page.route('**/api/v1/authoring/publish/**', route => {
     jobsRequests++;
@@ -910,10 +917,9 @@ test('AWS editors can load a batch directly in Publishing and authorize it expli
   await expect(page.getByRole('heading', { name: 'Publish a batch' })).toBeVisible();
   const publish = page.getByRole('button', { name: 'Publish batch' });
   await expect(publish).toBeDisabled();
-  const { bundle } = releaseFixture(5);
-  await page.getByLabel('Release bundle (JSON)').setInputFiles({
-    name: 'release-bundle.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(bundle)),
-  });
+  await expect(page.getByLabel('Release bundle (JSON)')).toHaveCount(0);
+  await page.getByLabel('S3 bundle SHA-256').fill(hash);
+  await page.getByRole('button', { name: 'Load from S3' }).click();
   await expect(page.getByText('5 cards in the bundle')).toBeVisible();
   await expect(publish).toBeEnabled();
   await expect(page.getByText(/Review on file/)).toBeHidden();

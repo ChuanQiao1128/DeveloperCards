@@ -9,10 +9,13 @@ import { ok, refused } from './support/apiResult';
 import { signInAsEditor, signInAsSuperAdmin, signOut, TEST_EDITOR_SUB, TEST_ADMIN_SUB } from './support/consoleSession';
 import { releaseFixture } from './support/contentReleaseFixtures';
 import { captureReleaseBackupInventory, prepareReleaseAction } from '../src/lib/contentRelease';
-import type { ReleaseSession } from '../src/types/contentRelease';
+import type { CloudJournalPointer } from '../src/api/contentRelease';
+import type { ReleaseBundle, ReleaseSession } from '../src/types/contentRelease';
 
 const api = vi.hoisted(() => ({ fetchS3ReleaseBundle: vi.fn(), fetchReleaseSnapshot: vi.fn(), fetchReleaseAction: vi.fn(), sendReleaseAction: vi.fn(), fetchReleaseCards: vi.fn(), verifyReleaseDelivery: vi.fn(), waitForReleasePoll: vi.fn() }));
+const cloud = vi.hoisted(() => ({ loadCloudReleaseJournal: vi.fn(), saveCloudReleaseJournal: vi.fn() }));
 vi.mock('../src/api/contentRelease', () => ({ fetchS3ReleaseBundle: api.fetchS3ReleaseBundle, fetchReleaseSnapshot: api.fetchReleaseSnapshot, fetchReleaseAction: api.fetchReleaseAction, sendReleaseAction: api.sendReleaseAction, fetchReleaseCards: api.fetchReleaseCards }));
+vi.mock('../src/lib/cloudReleaseJournal', () => cloud);
 vi.mock('../src/lib/contentReleaseDelivery', async original => ({
   ...await original<typeof import('../src/lib/contentReleaseDelivery')>(),
   verifyReleaseDelivery: api.verifyReleaseDelivery,
@@ -20,7 +23,21 @@ vi.mock('../src/lib/contentReleaseDelivery', async original => ({
 }));
 const { ContentReleasePage } = await import('../src/pages/ContentReleasePage');
 const key = `aws-basics-release-v1:${TEST_EDITOR_SUB}`;
+const s3Hash = 'e'.repeat(64);
+let cloudState: { pointer: CloudJournalPointer; raw: string };
+let cloudRevision: number;
 function store(session: ReleaseSession) { sessionStorage.setItem(key, JSON.stringify(session)); }
+function storeCloud(raw: string) {
+  cloudState = { raw, pointer: { revision: `"${String(++cloudRevision).padStart(32, '0')}"`, parts: raw ? ['a'.repeat(64)] : [] } };
+  return cloudState.pointer;
+}
+function readCloudSaved(): ReleaseSession { return JSON.parse(cloudState.raw); }
+async function loadBundle(bundle: ReleaseBundle, user = userEvent.setup()) {
+  api.fetchS3ReleaseBundle.mockResolvedValue(ok(JSON.stringify(bundle)));
+  await user.type(screen.getByLabelText('S3 bundle SHA-256'), s3Hash);
+  await user.click(screen.getByRole('button', { name: 'Load from S3' }));
+  await screen.findByText(`S3 bundle ${s3Hash}`);
+}
 function importedSession(count = 337) {
   const fixture = releaseFixture(count);
   fixture.session.actions.import = { ...prepareReleaseAction(fixture.session, 'import', 'import'), outcome: 'confirmed', reconciled: true, result: ok({ editingSnapshot: fixture.snapshot.editingSnapshot }) };
@@ -44,24 +61,33 @@ async function reconcile(user: ReturnType<typeof userEvent.setup>, session: Rele
   api.fetchReleaseAction.mockImplementation(async (_release, kind: 'import' | 'review') => ok({ action: { StatusCode: 200, Body: JSON.stringify(session.actions[kind]!.result) }, receipts: [], jobs: [], liveBuildId: 'original-live', manifestVerified: false }));
   for (const kind of kinds) { await user.click(screen.getByRole('button', { name: `Query ${kind} action` })); await screen.findByText(new RegExp(`Committed ${kind} action found`)); }
 }
-beforeEach(() => { vi.stubGlobal('indexedDB', new IDBFactory()); signOut(); vi.resetAllMocks(); api.waitForReleasePoll.mockResolvedValue(undefined); signInAsEditor(); });
+beforeEach(() => {
+  vi.stubGlobal('indexedDB', new IDBFactory());
+  signOut(); vi.resetAllMocks(); signInAsEditor();
+  api.waitForReleasePoll.mockResolvedValue(undefined);
+  cloudRevision = 0;
+  cloudState = { raw: '', pointer: { revision: null, parts: [] } };
+  cloud.loadCloudReleaseJournal.mockImplementation(async () => cloudState);
+  cloud.saveCloudReleaseJournal.mockImplementation(async (owner: string, raw: string, pointer: CloudJournalPointer) => {
+    expect(owner).toBe(TEST_EDITOR_SUB);
+    if (pointer.revision !== cloudState.pointer.revision) throw new Error('Cloud journal changed in another browser.');
+    return storeCloud(raw);
+  });
+});
 afterEach(() => { cleanup(); signOut(); });
 
 describe('AWS Basics release operator flow', () => {
   it('loads an S3 bundle and freezes the same editing baseline without file export', async () => {
     const { bundle, snapshot } = releaseFixture(5);
-    const hash = 'e'.repeat(64);
-    api.fetchS3ReleaseBundle.mockResolvedValue(ok(JSON.stringify(bundle)));
+    vi.stubGlobal('indexedDB', undefined);
     api.fetchReleaseSnapshot.mockResolvedValue(ok(snapshot));
     await mount();
-    await userEvent.type(screen.getByLabelText('S3 bundle SHA-256'), hash);
-    await userEvent.click(screen.getByRole('button', { name: 'Load from S3' }));
-    await screen.findByText(`S3 bundle ${hash}`);
-    expect(api.fetchS3ReleaseBundle).toHaveBeenCalledWith(hash, TEST_EDITOR_SUB);
+    await loadBundle(bundle);
+    expect(api.fetchS3ReleaseBundle).toHaveBeenCalledWith(s3Hash, TEST_EDITOR_SUB);
     expect(api.fetchReleaseSnapshot).not.toHaveBeenCalled();
     await userEvent.click(screen.getByRole('button', { name: 'Capture editing backup and freeze release' }));
     await screen.findByRole('heading', { name: '1. Frozen release and initial backup' });
-    expect((await readSaved()).s3BundleSha256).toBe(hash);
+    expect(readCloudSaved().s3BundleSha256).toBe(s3Hash);
     expect(screen.queryByRole('button', { name: 'Download recovery journal' })).toBeNull();
     expect(api.sendReleaseAction).not.toHaveBeenCalled();
   });
@@ -71,7 +97,9 @@ describe('AWS Basics release operator flow', () => {
     const result = ok({ jobId: 'server-job', buildId: 'server-build', outcome: 'committed',
       snapshotSha256: snapshot.publishSnapshot, manifestVerified: false });
     session.actions.publish = { ...prepareReleaseAction(session, 'publish', 'publish'), outcome: 'confirmed', reconciled: true, result };
-    store(session);
+    session.s3BundleSha256 = s3Hash;
+    storeCloud(JSON.stringify(session));
+    vi.stubGlobal('indexedDB', undefined);
     const sha256 = 'a'.repeat(64); const verifiedAt = '2026-04-20T00:00:00Z';
     api.fetchReleaseAction.mockResolvedValue(ok({ action: { StatusCode: 200, Body: JSON.stringify(result) }, receipts: [],
       jobs: [{ job_id: 'server-job', build_id: 'server-build', status: 'SUCCESS', content_sha256: sha256, error_message: null,
@@ -80,7 +108,7 @@ describe('AWS Basics release operator flow', () => {
     await mount();
     await userEvent.click(screen.getByRole('button', { name: 'Check publication status' }));
     await screen.findByText('Published and verified');
-    expect((await readSaved()).delivery).toMatchObject({ jobId: 'server-job', buildId: 'server-build', sha256, verifiedAt, cards: 5 });
+    expect(readCloudSaved().delivery).toMatchObject({ jobId: 'server-job', buildId: 'server-build', sha256, verifiedAt, cards: 5 });
     expect(api.verifyReleaseDelivery).not.toHaveBeenCalled();
     expect(api.fetchReleaseCards).not.toHaveBeenCalled();
     expect(api.sendReleaseAction).not.toHaveBeenCalled();
@@ -90,12 +118,11 @@ describe('AWS Basics release operator flow', () => {
     const { bundle, snapshot } = releaseFixture(5); const user = userEvent.setup();
     snapshot.cards[0].cardContentHash = '0'.repeat(64);
     api.fetchReleaseSnapshot.mockResolvedValue(ok(snapshot)); await mount();
-    const file = new File([JSON.stringify(bundle)], 'reviewed.json', { type: 'application/json' });
-    Object.defineProperty(file, 'text', { value: async () => JSON.stringify(bundle) });
-    await user.upload(screen.getByLabelText('Release bundle (JSON)'), file);
+    await loadBundle(bundle, user);
     await user.click(screen.getByRole('button', { name: 'Publish batch' }));
     await screen.findByText(/Prepared editing baseline changed/);
     expect(api.sendReleaseAction).not.toHaveBeenCalled();
+    expect(cloud.saveCloudReleaseJournal).not.toHaveBeenCalled();
     expect(await journalStore.loadReleaseJournal(TEST_EDITOR_SUB)).toBeNull();
   });
   it('denies unsigned sessions and other decks without issuing any request', async () => {
@@ -104,27 +131,26 @@ describe('AWS Basics release operator flow', () => {
     expect(api.fetchReleaseSnapshot).not.toHaveBeenCalled();
     cleanup(); signInAsEditor();
     renderAt(<ContentReleasePage />, ['/decks/release?deckId=16']);
-    expect(screen.queryByLabelText('Release bundle (JSON)')).toBeNull();
+    expect(screen.queryByLabelText('S3 bundle SHA-256')).toBeNull();
+    expect(cloud.loadCloudReleaseJournal).not.toHaveBeenCalled();
   });
   it('captures and persists the entire editing backup before the first import request', async () => {
     const user = userEvent.setup(); const { bundle, snapshot } = releaseFixture();
     snapshot.backup.push({ ...structuredClone(snapshot.backup[0]), id: 9999, stable_uid: 'deleted-card', order_in_deck: 9999, version: 9, revision: 3, is_deleted: 1, private_column: 'preserved' });
     api.fetchReleaseSnapshot.mockResolvedValue(ok(snapshot));
     api.sendReleaseAction.mockImplementation(async action => {
-      const saved = (await readSaved());
+      const saved = readCloudSaved();
       expect(saved.baselineInventory.editingSnapshot).toBe(snapshot.editingSnapshot);
       expect(saved.baselineInventory.rows.at(-1)).toMatchObject({ id: 9999, stableUid: 'deleted-card', orderInDeck: 9999, version: 9, revision: 3, isDeleted: 1 });
       expect(saved.baseline.backup.at(-1)).toMatchObject({ stable_uid: 'deleted-card', private_column: 'preserved' });
-      expect(saved.actions.import.payload).toBe(action.payload);
-      expect(saved.actions.import.outcome).toBe('unknown');
+      expect(saved.actions.import?.payload).toBe(action.payload);
+      expect(saved.actions.import?.outcome).toBe('unknown');
       return ok({ editingSnapshot: snapshot.editingSnapshot });
     });
     await mount();
-    const file = new File([JSON.stringify(bundle)], 'synthetic.json', { type: 'application/json' });
-    Object.defineProperty(file, 'text', { value: async () => JSON.stringify(bundle) });
-    await user.upload(screen.getByLabelText('Release bundle (JSON)'), file);
+    await loadBundle(bundle, user);
     await user.click(screen.getByRole('button', { name: 'Capture editing backup and freeze release' }));
-    await screen.findByRole('button', { name: 'Download complete editing backup' });
+    await screen.findByRole('heading', { name: '1. Frozen release and initial backup' });
     expect(api.sendReleaseAction).not.toHaveBeenCalled();
     await user.click(screen.getByRole('button', { name: 'Import 337 cards' }));
     await waitFor(() => expect(api.sendReleaseAction).toHaveBeenCalledTimes(1));
@@ -146,9 +172,7 @@ describe('AWS Basics release operator flow', () => {
       .mockResolvedValueOnce(ok({ receiptId: 'receipt-379', editingSnapshot: snapshot.editingSnapshot, publishSnapshot: snapshot.publishSnapshot }))
       .mockResolvedValueOnce(ok({ jobId: 'job-379', buildId: 'build-379', outcome: 'committed', manifestVerified: false, snapshotSha256: snapshot.publishSnapshot }));
     await mount();
-    const file = new File([JSON.stringify(bundle)], 'synthetic-379.json', { type: 'application/json' });
-    Object.defineProperty(file, 'text', { value: async () => JSON.stringify(bundle) });
-    await user.upload(screen.getByLabelText('Release bundle (JSON)'), file);
+    await loadBundle(bundle, user);
     await screen.findByText('379 cards in the bundle');
     await user.click(screen.getByRole('button', { name: 'Capture editing backup and freeze release' }));
     await screen.findByRole('button', { name: 'Import 379 cards' });
@@ -158,7 +182,7 @@ describe('AWS Basics release operator flow', () => {
     const imported = JSON.parse(api.sendReleaseAction.mock.calls[0][0].payload);
     expect(imported).toMatchObject({ expectedEditingSnapshot: baseline.editingSnapshot, expectedLive: 'original-live', idempotencyKey: 'import' });
     expect(imported.cards).toHaveLength(379);
-    expect((await readSaved()).baseline.backup).toHaveLength(347);
+    expect(readCloudSaved().baseline.backup).toHaveLength(347);
     await user.click(screen.getByRole('button', { name: 'Verify current editing readback' }));
     await screen.findByText(/Exact 379-card readback/);
     await user.click(screen.getByRole('button', { name: 'Verify and register model review' }));
@@ -170,8 +194,12 @@ describe('AWS Basics release operator flow', () => {
     await screen.findByText(/publish: server returned committed/);
     expect(JSON.parse(api.sendReleaseAction.mock.calls[2][0].payload)).toMatchObject({ expectedLive: 'original-live', expectedEditingSnapshot: snapshot.editingSnapshot, receiptId: 'receipt-379' });
   });
-  it('requires query before replaying an unknown import and preserves exact bytes across reload', async () => {
-    const user = userEvent.setup(); const { session, snapshot } = releaseFixture(); store(session);
+  it.each(['legacy', 'cloud'] as const)('requires query before replaying an unknown import and preserves exact bytes in %s recovery', async source => {
+    const user = userEvent.setup(); const { session, snapshot } = releaseFixture();
+    if (source === 'cloud') {
+      session.s3BundleSha256 = s3Hash;
+      storeCloud(JSON.stringify(session));
+    } else store(session);
     api.fetchReleaseSnapshot.mockResolvedValue(ok(snapshot));
     api.sendReleaseAction.mockResolvedValue(refused('TIMEOUT', 'Timed out; commit unknown.'));
     api.fetchReleaseAction.mockResolvedValue(refused('ACTION_NOT_FOUND', 'Action has not committed'));
@@ -180,7 +208,10 @@ describe('AWS Basics release operator flow', () => {
     await screen.findByText(/TIMEOUT: Timed out/);
     const first = api.sendReleaseAction.mock.calls[0][0];
     expect(screen.getByRole('button', { name: 'Retry identical import request' }).hasAttribute('disabled')).toBe(true);
-    mounted.unmount(); await mount();
+    mounted.unmount();
+    if (source === 'cloud') vi.stubGlobal('indexedDB', undefined);
+    await mount();
+    expect(screen.getByRole('button', { name: 'Retry identical import request' }).hasAttribute('disabled')).toBe(true);
     await user.click(screen.getByRole('button', { name: 'Query import action' }));
     await waitFor(() => expect(screen.getByRole('button', { name: 'Retry identical import request' }).hasAttribute('disabled')).toBe(false));
     await user.click(screen.getByRole('button', { name: 'Retry identical import request' }));
@@ -188,6 +219,30 @@ describe('AWS Basics release operator flow', () => {
     expect(api.fetchReleaseAction).toHaveBeenCalledWith(session.bundle.releaseId, 'import', TEST_EDITOR_SUB);
     expect(api.sendReleaseAction.mock.calls[1][0].payload).toBe(first.payload);
     expect(api.sendReleaseAction.mock.calls[1][0].actionId).toBe(first.actionId);
+  });
+  it('migrates an old S3 browser journal to the cloud before continuing', async () => {
+    const { session } = importedSession(5);
+    session.s3BundleSha256 = s3Hash;
+    const raw = JSON.stringify(session);
+    await journalStore.saveReleaseJournal(TEST_EDITOR_SUB, raw, 0, () => {});
+    await mount();
+    expect(cloud.saveCloudReleaseJournal).toHaveBeenCalledWith(TEST_EDITOR_SUB, raw, { revision: null, parts: [] });
+    expect(readCloudSaved().actions.import?.payload).toBe(session.actions.import?.payload);
+    expect((await readSaved()).actions.import.payload).toBe(session.actions.import?.payload);
+    expect(screen.getByRole('button', { name: 'Verify current editing readback' }).hasAttribute('disabled')).toBe(true);
+    expect(api.sendReleaseAction).not.toHaveBeenCalled();
+  });
+  it('blocks dispatch when another browser advances the cloud journal', async () => {
+    const { session, snapshot } = releaseFixture(5);
+    session.s3BundleSha256 = s3Hash;
+    storeCloud(JSON.stringify(session));
+    api.fetchReleaseSnapshot.mockResolvedValue(ok(snapshot));
+    await mount();
+    const current = storeCloud(JSON.stringify(session));
+    await userEvent.click(screen.getByRole('button', { name: 'Import 5 cards' }));
+    await screen.findByText('Cloud journal changed in another browser.');
+    expect(cloudState.pointer).toEqual(current);
+    expect(api.sendReleaseAction).not.toHaveBeenCalled();
   });
   it('refuses receipt registration after a bilingual readback mismatch', async () => {
     const user = userEvent.setup(); const { session, snapshot, cards } = importedSession(); store(session);
@@ -242,7 +297,7 @@ describe('recovery reconciliation and ownership regressions', () => {
   it.each([false, true])('recovers a malformed saved journal while retaining stale-tab protection (%s)', async concurrentWrite => {
     await journalStore.saveReleaseJournal(TEST_EDITOR_SUB, 'invalid journal JSON', 0, () => {});
     const { session } = releaseFixture(5); const user = userEvent.setup(); await mount();
-    await screen.findByText(/Saved release session could not be read/);
+    await screen.findByText(/The saved release could not be loaded/);
     if (concurrentWrite) await journalStore.saveReleaseJournal(TEST_EDITOR_SUB, 'another tab recovered first', 1, () => {});
     const file = new File([JSON.stringify(session)], 'recovery.json', { type: 'application/json' });
     Object.defineProperty(file, 'text', { value: async () => JSON.stringify(session) });
@@ -374,15 +429,13 @@ describe('automatic reviewed release completion', () => {
   }
   it('runs capture/import/review/publish/CDN verification from one reviewed bundle', async () => {
     const fixture = releaseFixture(5); const user = userEvent.setup(); publishingApi(fixture); await mount();
-    const file = new File([JSON.stringify(fixture.bundle)], 'reviewed.json', { type: 'application/json' });
-    Object.defineProperty(file, 'text', { value: async () => JSON.stringify(fixture.bundle) });
-    await user.upload(screen.getByLabelText('Release bundle (JSON)'), file);
+    await loadBundle(fixture.bundle, user);
     await user.click(screen.getByRole('button', { name: 'Publish batch' }));
     await screen.findByText(/Published and verified 5 bilingual cards/);
     expect(api.sendReleaseAction.mock.calls.map(call => call[0].kind)).toEqual(['import', 'review', 'publish']);
     expect(api.fetchReleaseCards).toHaveBeenCalledTimes(1);
     expect(api.fetchReleaseSnapshot).toHaveBeenCalledTimes(3);
-    expect((await readSaved()).delivery).toMatchObject({ jobId: 'same-job', buildId: 'same-build', cards: 5 });
+    expect(readCloudSaved().delivery).toMatchObject({ jobId: 'same-job', buildId: 'same-build', cards: 5 });
     expect(screen.getByText(/manifestVerified=true/)).toBeTruthy();
   });
   it('queries a lost import response and continues without importing again', async () => {
@@ -417,7 +470,7 @@ describe('automatic reviewed release completion', () => {
     expect(persisted.raw.length).toBeGreaterThan(5_000_000);
     expect(JSON.parse(persisted.raw).baseline.backup).toHaveLength(770);
     await user.click(screen.getByRole('button', { name: 'Start another release' }));
-    await screen.findByLabelText('Release bundle (JSON)');
+    await screen.findByLabelText('S3 bundle SHA-256');
     expect((await journalStore.loadReleaseJournal(TEST_EDITOR_SUB))!.raw).toBe('');
   }, 15_000);
   it('recovers a pending index with identical publish bytes and waits for CDN verification', async () => {
