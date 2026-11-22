@@ -12,9 +12,9 @@ import { CONSOLE_NAME } from '../lib/brand';
 import { formatDeckTime } from '../lib/deckTime';
 import { hasReviewedDeckRelease } from '../lib/deckWorkspace';
 import { assertPublicationQuery, publicationStatus, type PublicationStatus } from '../lib/contentReleaseStatus';
-import { loadReleaseJournal, saveReleaseJournal, withReleaseJournalLock } from '../lib/releaseJournalStore';
+import { loadReleaseJournal, withReleaseJournalLock } from '../lib/releaseJournalStore';
 import { loadCloudReleaseJournal, saveCloudReleaseJournal } from '../lib/cloudReleaseJournal';
-import { backgroundDeliveryProof, downloadVerifiedDeck, verifyReleaseDelivery, verifyStoredReleaseDelivery, waitForReleasePoll, type ReleaseDeliveryProof } from '../lib/contentReleaseDelivery';
+import { backgroundDeliveryProof, downloadVerifiedDeck, verifyReleaseDelivery, waitForReleasePoll, type ReleaseDeliveryProof } from '../lib/contentReleaseDelivery';
 import { loadDeliveryArtifact, releaseArtifactDownload, saveDeliveryArtifact } from '../lib/releaseArtifacts';
 import { assertExpectedReleaseBaseline, captureReleaseBackupInventory, assertActionDependencies, assertActionResult, assertFrozenAction, isConfirmedAction, assertOriginalLive, assertReleaseSnapshot, assertReplayAllowed, decodeCommittedAction, parseReleaseBundle, parseReleaseSession, prepareReleaseAction, verifyReleaseReadback } from '../lib/contentRelease';
 import type { ApiResult } from '../types/api';
@@ -60,10 +60,10 @@ export function ContentReleasePage({ deck, children }: {
   const [session, setSession] = useState<ReleaseSession | null>(null);
   const currentSession = useRef<ReleaseSession | null>(null);
   const cloudPointer = useRef<CloudJournalPointer>({ revision: null, parts: [] });
+  const [cloudLoaded, setCloudLoaded] = useState(false);
   const mounted = useRef(false);
   const running = useRef<AbortController | null>(null);
   const [delivery, setDelivery] = useState<ReleaseDeliveryProof | null>(null);
-  const journalRevision = useRef(0);
   const [loading, setLoading] = useState(allowed);
   const [bundle, setBundle] = useState<ReleaseBundle | null>(null);
   const [s3Hash, setS3Hash] = useState('');
@@ -82,6 +82,8 @@ export function ContentReleasePage({ deck, children }: {
   const [publicationLookupFailed, setPublicationLookupFailed] = useState(false);
   const freshPublishQuery = useRef(false);
   const publication = publicationStatus(session, Boolean(delivery), publicationLookupFailed);
+  const unusedRelease = Boolean(session && Object.keys(session.actions).length === 0);
+  const stoppedRelease = publication?.kind === 'failed' || publication?.kind === 'superseded';
 
   const assertOwner = useCallback((current?: ReleaseSession | null) => {
     if (!mounted.current || running.current?.signal.aborted) throw new Error('Publication monitoring stopped.');
@@ -105,31 +107,24 @@ export function ContentReleasePage({ deck, children }: {
         if (cancelled) return;
         assertOwner();
         cloudPointer.current = cloud.pointer;
+        setCloudLoaded(true);
         if (cloud.pointer.revision) {
           const restored = cloud.raw ? parseReleaseSession(cloud.raw, user!.sub!) : null;
-          if (restored && !restored.s3BundleSha256) throw new Error('The cloud journal is missing its S3 bundle binding.');
           currentSession.current = restored;
           setSession(restored);
           return;
         }
-        let stored = await loadReleaseJournal(user!.sub!).catch(() => null);
+        const stored = await loadReleaseJournal(user!.sub!).catch(() => null);
         if (cancelled) return;
         assertOwner();
-        journalRevision.current = stored?.revision ?? 0;
         const legacy = stored ? null : sessionStorage.getItem(storageKey);
-        const restored = stored?.raw ?? legacy;
-        const recovered = restored ? parseReleaseSession(restored, user!.sub!) : null;
-        if (legacy) {
-          stored = await withReleaseJournalLock(user!.sub!, () => saveReleaseJournal(user!.sub!, legacy, 0, () => assertOwner(recovered)));
+        const raw = stored?.raw ?? legacy;
+        const recovered = raw ? parseReleaseSession(raw, user!.sub!) : null;
+        if (recovered && raw) {
+          cloudPointer.current = await saveCloudReleaseJournal(user!.sub!, raw, cloudPointer.current);
           if (cancelled) return;
           assertOwner(recovered);
-          sessionStorage.removeItem(storageKey);
-        }
-        journalRevision.current = stored?.revision ?? 0;
-        if (recovered?.s3BundleSha256) {
-          cloudPointer.current = await saveCloudReleaseJournal(user!.sub!, restored!, cloudPointer.current);
-          if (cancelled) return;
-          assertOwner(recovered);
+          if (legacy) sessionStorage.removeItem(storageKey);
         }
         currentSession.current = recovered;
         setSession(recovered);
@@ -151,18 +146,10 @@ export function ContentReleasePage({ deck, children }: {
   function download(name: string, value: unknown) { assertOwner(); downloadJson(name, value); assertOwner(); }
 
   // A journal storage failure blocks dispatch. It must be recoverable after a lost HTTP response.
-  async function save(next: ReleaseSession, archivePrevious = false) {
+  async function save(next: ReleaseSession) {
     return withReleaseJournalLock(next.ownerSubject, async () => {
       assertOwner(next);
-      const raw = JSON.stringify(next);
-      if (next.s3BundleSha256) {
-        if (archivePrevious && cloudPointer.current.parts.length) throw new Error('Finish the active cloud release before restoring a different journal.');
-        cloudPointer.current = await saveCloudReleaseJournal(next.ownerSubject, raw, cloudPointer.current);
-      } else {
-        if (cloudPointer.current.parts.length) throw new Error('Finish the active cloud release before restoring a different journal.');
-        const stored = await saveReleaseJournal(next.ownerSubject, raw, journalRevision.current, () => assertOwner(next), archivePrevious);
-        journalRevision.current = stored.revision;
-      }
+      cloudPointer.current = await saveCloudReleaseJournal(next.ownerSubject, JSON.stringify(next), cloudPointer.current);
       assertOwner(next);
       currentSession.current = next;
       setSession(next);
@@ -199,7 +186,7 @@ export function ContentReleasePage({ deck, children }: {
     const snapshot = dataOrThrow(await owned(() => fetchReleaseSnapshot(user!.sub!)));
     if (current.actions.import?.result?.data?.editingSnapshot !== snapshot.editingSnapshot) throw new Error('Editing content changed since the confirmed import. The frozen release cannot adopt another editing snapshot.');
     verifyReleaseReadback(current, snapshot, cards);
-    return { ...current, verifiedSnapshot: snapshot };
+    return { ...current, verifiedSnapshot: { ...snapshot, backup: undefined } };
   }
   async function dispatch(kind: ReleaseKind, replay = false) {
     const session = currentSession.current;
@@ -284,15 +271,7 @@ export function ContentReleasePage({ deck, children }: {
     const job = query.jobs.find(item => item.job_id === action.result?.data?.jobId && item.build_id === action.result?.data?.buildId);
     const background = job?.cdnVerificationState ? backgroundDeliveryProof(current, query) : undefined;
     if (job?.cdnVerificationState && !background) return false;
-    let proof = background;
-    if (!proof) {
-      const guard = () => assertOwner(current);
-      const cached = current.s3BundleSha256 ? undefined : await loadDeliveryArtifact(current, guard);
-      const cache = current.s3BundleSha256 ? undefined
-        : (verified: ReleaseDeliveryProof, bytes: Uint8Array) => saveDeliveryArtifact(current, verified, bytes, guard);
-      proof = (cached ? await owned(() => verifyStoredReleaseDelivery(current, query, cached), current)
-        : await owned(() => verifyReleaseDelivery(current, query, signal, cache), current)) ?? undefined;
-    }
+    const proof = background ?? await owned(() => verifyReleaseDelivery(current, query, signal), current);
     if (!proof) return false;
     await save({ ...current, delivery: proof }); assertOwner(current); setDelivery(proof);
     setMessage(`Published and verified ${proof.cards} bilingual cards on the public CDN.`);
@@ -374,29 +353,32 @@ export function ContentReleasePage({ deck, children }: {
   }
 
   async function startAnotherRelease() {
-    if (!delivery) throw new Error('Verify the current publication before starting another release.');
+    const current = currentSession.current;
+    if (!current) return;
+    if (!delivery && Object.keys(current.actions).length !== 0) {
+      const latest = await query('publish');
+      const status = latest && publicationStatus(latest, false);
+      if (status?.kind !== 'failed' && status?.kind !== 'superseded')
+        throw new Error('Resolve the original publication before starting another release.');
+    }
     await withReleaseJournalLock(user!.sub!, async () => {
       assertOwner(currentSession.current);
-      if (currentSession.current?.s3BundleSha256)
-        cloudPointer.current = await saveCloudReleaseJournal(user!.sub!, '', cloudPointer.current);
-      else
-        journalRevision.current = (await saveReleaseJournal(user!.sub!, '', journalRevision.current, () => assertOwner(currentSession.current))).revision;
+      cloudPointer.current = await saveCloudReleaseJournal(user!.sub!, '', cloudPointer.current);
       assertOwner(currentSession.current);
     });
     currentSession.current = null;
     setSession(null); setBundle(null); setDelivery(null); setQueryView(null);
+    setPublicationLookupFailed(false); freshPublishQuery.current = false;
     setS3BundleSha256(undefined); setS3Hash(''); setUploadBytes(''); setUploadUrl('');
-    setMessage('Completed release archived. Load the next reviewed bundle to begin.');
+    setMessage('Release journal archived. Load the next reviewed bundle to begin.');
   }
 
   async function restoreLegacyJournal(file: File) {
+    if (!cloudLoaded || cloudPointer.current.parts.length)
+      throw new Error('Load the active cloud release before restoring a legacy journal.');
     if (file.size > 10_000_000) throw new Error('Recovery journal is too large.');
     const restored = parseReleaseSession(await owned(() => file.text()), user!.sub!);
-    if (!restored.s3BundleSha256 && cloudPointer.current.revision && !currentSession.current) {
-      const previous = await owned(() => loadReleaseJournal(user!.sub!));
-      journalRevision.current = previous?.revision ?? 0;
-    }
-    await save(restored, true);
+    await save(restored);
     setRestoreBlocked(false); setDelivery(null); setQueryView(null); setPublicationLookupFailed(false);
     freshPublishQuery.current = false; setBundle(null);
     setMessage('Original backup, frozen requests and action keys restored. Query each existing action before continuing.');
@@ -445,6 +427,10 @@ export function ContentReleasePage({ deck, children }: {
           download(`${current.bundle.releaseId}-verified-artifacts.json`, releaseArtifactDownload(current, artifact));
         })}>Download verified release artifacts</Button>}
       </div>}
+      {!delivery && (unusedRelease || stoppedRelease) && <Button variant="outline" disabled={busy || restoreBlocked}
+        onClick={() => void run(startAnotherRelease)}>
+        {unusedRelease ? 'Archive unused release' : 'Archive stopped release'}
+      </Button>}
     </section>
     {publication && <PublicationStatusPanel status={publication} busy={busy} blocked={restoreBlocked}
       onCheck={() => void run(() => verifyExistingPublication(true))} onContinue={() => void run(continuePublication)} onVerify={() => void run(() => verifyExistingPublication())} />}
@@ -458,12 +444,10 @@ export function ContentReleasePage({ deck, children }: {
         <p>Console validates the bundle and compares it with the saved editing cards.</p>
       </div>}
       <p className="max-w-prose text-sm text-slate-600">
-        {session && !activeS3Hash
-          ? 'This release uses a legacy browser journal.'
-          : 'Console saves the editing backup and release progress to private S3 before sending changes. Sign in with the same account to resume on another device.'}
+        Console saves the editing backup and release progress to private S3 before sending changes. Sign in with the same account to resume on another device.
       </p>
       {!session && bundle && <Button variant="outline" disabled={busy || restoreBlocked} onClick={() => void run(capture)}>Capture editing backup and freeze release</Button>}
-      {!activeS3Hash && <section className={`${CARD_CLASS} space-y-3`}>
+      {cloudLoaded && !activeBundle && !cloudPointer.current.parts.length && <section className={`${CARD_CLASS} space-y-3`}>
         <label className="block text-sm" htmlFor="release-recovery">Or restore a downloaded Console recovery journal</label>
         <input id="release-recovery" className={INPUT_CLASS} type="file" accept="application/json,.json" disabled={busy} onChange={event => {
           const file = event.target.files?.[0];
@@ -475,7 +459,7 @@ export function ContentReleasePage({ deck, children }: {
           <h2 id="backup-heading" className={H2_CLASS}>1. Frozen release and initial backup</h2>
           <p className="text-sm break-all">Release: {session.bundle.releaseId} · Main: {session.bundle.review.mainSHA}<br />Initial live build: {session.baseline.deck.live_build_id ?? 'none'}<br />Initial editing snapshot: {session.baseline.editingSnapshot}</p>
           {!activeS3Hash && <div className="flex flex-wrap gap-3"><Button variant="outline" onClick={() => void run(async () => download(`${session.bundle.releaseId}-editing-backup.json`, session.baseline))}>Download complete editing backup</Button><Button variant="outline" onClick={() => void run(async () => download(`${session.bundle.releaseId}-console-journal.json`, session))}>Download recovery journal</Button></div>}
-          <p className="text-sm text-slate-600">The exact bundle, backup and requests are saved {activeS3Hash ? 'in private S3' : 'in browser storage'}. Restored actions must be checked before retrying.</p>
+          <p className="text-sm text-slate-600">The exact bundle, backup and requests are saved in private S3. Check restored actions before retrying.</p>
         </section>
         {(['import', 'review', 'publish'] as const).map((kind, index) => {
           const action = session.actions[kind];

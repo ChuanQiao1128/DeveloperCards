@@ -135,7 +135,7 @@ public sealed class ContentReleaseJournalTests
     if (part is not null) query.Add("part", part);
     if (queryOwner is not null) query.Add("owner", queryOwner);
     return new LambdaRequest(JsonSerializer.SerializeToElement(new {
-      rawPath = ContentReleaseJournal.Route, requestContext = new { http = new { method } },
+      rawPath = "/api/v1/authoring/release/journal", requestContext = new { http = new { method } },
       queryStringParameters = query, body, isBase64Encoded = false
     }));
   }

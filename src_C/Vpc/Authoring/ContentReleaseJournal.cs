@@ -11,7 +11,6 @@ namespace RecallSmith.Lambda.Vpc.Authoring;
 
 public static class ContentReleaseJournal
 {
-  public const string Route = "/api/v1/authoring/release/journal";
   public const int PartBytes = 720_000, MaxParts = 45;
   private static readonly Dictionary<string, string> PrivateHeaders = new() { ["cache-control"] = "private, no-store" };
   private sealed record Pointer(string Nonce, string[] Parts);

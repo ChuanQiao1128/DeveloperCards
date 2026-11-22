@@ -122,6 +122,7 @@ public static class RouteMetrics
     "/api/v1/admin/db/premium-state",
     "/api/v1/admin/db/rc-events",
     "/api/v1/authoring/decks",
+    "/api/v1/authoring/release/journal",
     "/api/v1/authoring/cards/import",
     "/api/v1/authoring/cards/import/receipt",
     "/api/v1/authoring/cards/page",
