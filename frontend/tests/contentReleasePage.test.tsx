@@ -372,6 +372,30 @@ describe('recovery reconciliation and ownership regressions', () => {
     }
     expect(api.sendReleaseAction).not.toHaveBeenCalled();
   });
+  it.each([409, 503])('allows archiving a checked publish with no job only after a definite rejection (%d)', async httpStatus => {
+    const { session } = reviewedSession(5);
+    const outcome = refused<Record<string, unknown>>('LIVE_BUILD_CONFLICT', 'The saved live version changed.');
+    const action = prepareReleaseAction(session, 'publish', 'publish');
+    session.actions.publish = { ...action, result: { ...outcome, error: { ...outcome.error!, httpStatus } } };
+    storeCloud(JSON.stringify(session));
+    api.fetchReleaseAction.mockImplementation(async (_release, kind: 'import' | 'review' | 'publish') => kind === 'publish'
+      ? refused('ACTION_NOT_FOUND', 'No committed action.')
+      : ok({ action: { StatusCode: 200, Body: JSON.stringify(session.actions[kind]!.result) },
+          receipts: [], jobs: [], liveBuildId: 'original-live', manifestVerified: false }));
+    await mount();
+    await userEvent.click(screen.getByRole('button', { name: 'Check publication status' }));
+    await screen.findByText(/The action has not committed/);
+    if (httpStatus === 409) {
+      await userEvent.click(screen.getByRole('button', { name: 'Archive unpublished release' }));
+      await screen.findByText(/Release journal archived/);
+      expect(api.fetchReleaseAction.mock.calls.map(call => call[1])).toEqual(['publish', 'import', 'review', 'publish']);
+      expect(cloudState.pointer.parts).toEqual([]);
+    } else {
+      expect(screen.queryByRole('button', { name: 'Archive unpublished release' })).toBeNull();
+      expect(readCloudSaved().actions.publish?.payload).toBe(action.payload);
+    }
+    expect(api.sendReleaseAction).not.toHaveBeenCalled();
+  });
   it('cannot restore an old journal after another browser claims the empty revision', async () => {
     storeCloud('');
     const { session } = releaseFixture(5);

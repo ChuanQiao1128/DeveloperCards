@@ -53,11 +53,16 @@ function definitiveRejection(action: ReleaseAction) {
   return action.result?.success === false && REJECTED_WRITE_STATUSES.includes(action.result.error?.httpStatus ?? 0);
 }
 
+function settledAction(action: ReleaseAction) {
+  return action.queried && action.reconciled && (isConfirmedAction(action) || definitiveRejection(action));
+}
+
 function canArchiveUnpublished(session: ReleaseSession | null) {
-  if (!session || session.actions.publish) return false;
+  if (!session) return false;
+  const publish = session.actions.publish;
+  if (publish) return publish.outcome === 'unknown' && !publish.query && settledAction(publish);
   const actions = Object.values(session.actions);
-  return actions.length > 0 && actions.every(action => action.queried && action.reconciled &&
-    (isConfirmedAction(action) || definitiveRejection(action)));
+  return actions.length > 0 && actions.every(settledAction);
 }
 
 export function ContentReleasePage({ deck, children }: {
@@ -363,14 +368,15 @@ export function ContentReleasePage({ deck, children }: {
     const current = currentSession.current;
     if (!current) return;
     if (!delivery && Object.keys(current.actions).length !== 0) {
-      if (current.actions.publish) {
+      if (current.actions.publish && !canArchiveUnpublished(current)) {
         const latest = await query('publish');
         const status = latest && publicationStatus(latest, false);
         if (status?.kind !== 'failed' && status?.kind !== 'superseded')
           throw new Error('Resolve the original publication before starting another release.');
       } else {
-        for (const kind of ['import', 'review'] as const) if (current.actions[kind]) await query(kind);
-        if (!canArchiveUnpublished(currentSession.current))
+        for (const kind of ['import', 'review', 'publish'] as const) if (current.actions[kind]) await query(kind);
+        const checked = currentSession.current;
+        if (!checked || !canArchiveUnpublished(checked) || !Object.values(checked.actions).every(settledAction))
           throw new Error('Confirm the outcome of the saved editing requests before starting another release.');
       }
     }
