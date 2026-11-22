@@ -31,6 +31,30 @@ function subjectGuard(ownerSubject: string) {
   };
 }
 
+const bundleRoute = '/api/v1/authoring/release/bundle';
+
+export async function fetchS3ReleaseBundle(sha256: string, ownerSubject: string): Promise<ApiResult<string>> {
+  try {
+    const response = await http.get<string>(bundleRoute, {
+      params: { sha256 }, transformRequest: [subjectGuard(ownerSubject)], responseType: 'text',
+      transformResponse: [(data, _headers, status) => {
+        if (status === 200 || typeof data !== 'string') return data;
+        try { return JSON.parse(data); } catch { return data; }
+      }],
+    });
+    return { success: true, data: response.data, error: null, traceId: '' };
+  } catch (error) { return apiResultFromError(error); }
+}
+
+export async function createS3ReleaseUpload(sha256: string, bytes: string, ownerSubject: string): Promise<ApiResult<string>> {
+  try {
+    const { data } = await http.post<{ url: string }>(bundleRoute, null, {
+      params: { sha256, bytes }, transformRequest: [subjectGuard(ownerSubject)],
+    });
+    return { success: true, data: data.url, error: null, traceId: '' };
+  } catch (error) { return apiResultFromError(error); }
+}
+
 export async function fetchReleaseSnapshot(ownerSubject: string): Promise<ApiResult<ReleaseSnapshot>> {
   try {
     return (await http.get<ApiResult<ReleaseSnapshot>>('/api/v1/authoring/release/snapshot', { params: { deckId: 15 }, transformRequest: [subjectGuard(ownerSubject)] })).data;

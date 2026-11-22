@@ -101,6 +101,18 @@ The production content CDN must be configured in `VITE_CONTENT_MANIFEST_URL`, li
 
 Use the versioned S3 build objects for publication, previous-version backups and restore. Find the original build and checksum in Published versions and the server verification receipt. Routine releases leave the local save directory unset and skip archive downloads. Run any temporary preparation in the hosted execution environment and clean up its working files.
 
+For S3 input, calculate the SHA-256 and byte count of the frozen v2 JSON. In **Publish a batch**, enter the SHA-256 and create a link under **Upload a bundle directly to S3**. The link expires after ten minutes and signs the exact length, SHA-256 checksum and conditional create. In the hosted preparation environment, use the copied URL without printing it or sharing it in logs.
+
+```sh
+bundle_sha=$(shasum -a 256 "$RELEASE_BUNDLE" | cut -d ' ' -f 1)
+bundle_checksum=$(printf '%s' "$bundle_sha" | xxd -r -p | openssl base64 -A)
+curl --fail --silent --show-error --upload-file "$RELEASE_BUNDLE" \
+  -H 'Content-Type: application/json' -H 'If-None-Match: *' \
+  -H "x-amz-checksum-sha256: $bundle_checksum" "$S3_UPLOAD_URL"
+```
+
+If the bundle is already present, S3 refuses the duplicate PUT. **Load from S3** checks the stored object's hash before the Console parses it. **Publish batch** retains the existing baseline, review, publish and verification steps. The input object lives under the private `release-input/aws-saa-fundamentals/` prefix. Published card packs use the existing CDN prefix and the browser recovery journal remains available.
+
 The browser journal recovers interrupted Console actions. An S3 build contains the published cards. The editing snapshot and raw review artifacts have separate recovery requirements.
 
 ## Legacy file archive and recovery

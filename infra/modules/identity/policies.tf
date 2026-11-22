@@ -46,6 +46,12 @@ resource "aws_iam_role_policy" "core_vpc" {
         Resource = ["${local.content_bucket_arn}/content/*"]
       },
       {
+        Sid      = "S3ReviewedReleaseInput"
+        Effect   = "Allow"
+        Action   = ["s3:GetObject", "s3:PutObject"]
+        Resource = ["${local.content_bucket_arn}/release-input/aws-saa-fundamentals/*.json"]
+      },
+      {
         Sid      = "S3Premium"
         Effect   = "Allow"
         Action   = ["s3:GetObject"]
