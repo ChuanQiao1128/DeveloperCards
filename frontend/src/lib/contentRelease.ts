@@ -10,6 +10,8 @@ import { isValidSourceUrl, normalizeSourceForCompare } from './sourceRules';
 import { normalizeTranslationsForCompare, validateTranslation } from './translationRules';
 
 const SHA256 = /^[0-9a-f]{64}$/;
+// VpcFunction.DispatchAsync applies this limit to the decoded string, in UTF-16 units.
+const CONTROLLED_IMPORT_BODY_MAX = 1_048_576;
 const TEXT_FIELDS = ['question', 'explanation', 'codeSnippet', 'codeLanguage', 'realWorldUsage', 'topic'] as const;
 const EVIDENCE_KEYS = ['runId', 'batchAuthorizationRef', 'authorizationScope', 'model', 'mainSHA', 'evidenceRef', 'evidenceHash', 'evidenceVersion', 'reportRef', 'reportHash', 'reportVersion', 'promptHash', 'promptVersion', 'corpusHash', 'corpusVersion', 'expiresAt', 'cards'];
 function requireValue(condition: unknown, message: string): asserts condition { if (!condition) throw new Error(message); }
@@ -247,7 +249,7 @@ function structurallyEqual(left: unknown, right: unknown): boolean {
 }
 export function assertFrozenAction(session: ReleaseSession, action: ReleaseAction) {
   requireValue(action.actionId === action.kind, 'Recovery action must use its fixed logical action ID.');
-  requireValue(action.payload.length <= (action.kind === 'import' ? 900_000 : 768_000), 'Frozen request exceeds the server payload limit.');
+  requireValue(action.payload.length <= (action.kind === 'import' ? CONTROLLED_IMPORT_BODY_MAX : 768_000), 'Frozen request exceeds the server payload limit.');
   requireValue(structurallyEqual(object(JSON.parse(action.payload)), expectedActionBody(session, action.kind)), 'Recovery action differs from its frozen bundle, original live baseline, verified snapshot or review receipt.');
 }
 export function prepareReleaseAction(session: ReleaseSession, kind: ReleaseKind, actionId: string): ReleaseAction {

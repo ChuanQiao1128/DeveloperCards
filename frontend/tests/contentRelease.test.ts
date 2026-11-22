@@ -102,6 +102,28 @@ describe('exact readback, snapshot and provenance gates', () => {
 });
 
 describe('uncertain outcomes preserve the original logical action', () => {
+  it.each([1_038_325, 1_048_576, 1_048_577])('applies the server string limit to a %i-unit bilingual import', size => {
+    const { session } = releaseFixture(379);
+    const emptySize = prepareReleaseAction(session, 'import', 'import').payload.length;
+    let remaining = size - emptySize;
+    for (const card of session.bundle.cards) {
+      const added = Math.min(remaining, Math.ceil((size - emptySize) / 379));
+      card.translations['zh-CN']!.explanation += '例'.repeat(added);
+      remaining -= added;
+    }
+    expect(remaining).toBe(0);
+    const prepare = () => prepareReleaseAction(session, 'import', 'import');
+    if (size > 1_048_576) {
+      expect(prepare).toThrow(/server payload limit/);
+    } else {
+      const action = prepare();
+      expect(action.payload).toHaveLength(size);
+      expect(new TextEncoder().encode(action.payload).length).toBeGreaterThan(size);
+      session.actions.import = action;
+      expect(parseReleaseSession(JSON.stringify(session)).actions.import?.payload).toBe(action.payload);
+    }
+  });
+
   it('requires query before identical-key replay, rejects second logical action and restores exact bytes', () => {
     const { session } = releaseFixture();
     const action = prepareReleaseAction(session, 'import', 'import');
