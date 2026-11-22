@@ -1,6 +1,6 @@
 export interface StoredReleaseJournal { raw: string; revision: number }
 
-/** One owner slot spans the journal CAS and any external recovery-file commit. */
+/** Serialize journal work within a browser. Each store also checks its revision. */
 export async function withReleaseJournalLock<T>(owner: string, work: () => Promise<T>): Promise<T> {
   const locks = globalThis.navigator?.locks;
   return locks ? locks.request(`recallsmith-release:${owner}`, work) : work();

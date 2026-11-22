@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { createS3ReleaseUpload, fetchS3ReleaseBundle, fetchReleaseCards, fetchReleaseAction, fetchReleaseSnapshot, sendReleaseAction } from '../api/contentRelease';
+import { createS3ReleaseUpload, fetchS3ReleaseBundle, fetchReleaseCards, fetchReleaseAction, fetchReleaseSnapshot, sendReleaseAction, type CloudJournalPointer } from '../api/contentRelease';
 import { readSessionUser } from '../auth/sessionUser';
 import { ConsoleShell } from '../components/console/ConsoleShell';
 import { DeckWorkspaceHeader } from '../components/console/DeckWorkspaceHeader';
@@ -12,12 +12,13 @@ import { CONSOLE_NAME } from '../lib/brand';
 import { formatDeckTime } from '../lib/deckTime';
 import { hasReviewedDeckRelease } from '../lib/deckWorkspace';
 import { assertPublicationQuery, publicationStatus, type PublicationStatus } from '../lib/contentReleaseStatus';
-import { loadReleaseJournal, saveReleaseJournal, withReleaseJournalLock } from '../lib/releaseJournalStore';
-import { backgroundDeliveryProof, downloadVerifiedDeck, verifyReleaseDelivery, verifyStoredReleaseDelivery, waitForReleasePoll, type ReleaseDeliveryProof } from '../lib/contentReleaseDelivery';
-import { chooseArtifactDirectory, loadArtifactDirectory, loadDeliveryArtifact, releaseArtifactDownload, saveDeliveryArtifact, supportsArtifactDirectory, writeReleaseArtifacts, type ArtifactDirectory, type DeliveryArtifact } from '../lib/releaseArtifacts';
+import { loadReleaseJournal, withReleaseJournalLock } from '../lib/releaseJournalStore';
+import { loadCloudReleaseJournal, saveCloudReleaseJournal } from '../lib/cloudReleaseJournal';
+import { backgroundDeliveryProof, downloadVerifiedDeck, verifyReleaseDelivery, waitForReleasePoll, type ReleaseDeliveryProof } from '../lib/contentReleaseDelivery';
+import { makeDeliveryArtifact, releaseArtifactDownload } from '../lib/releaseArtifacts';
 import { assertExpectedReleaseBaseline, captureReleaseBackupInventory, assertActionDependencies, assertActionResult, assertFrozenAction, isConfirmedAction, assertOriginalLive, assertReleaseSnapshot, assertReplayAllowed, decodeCommittedAction, parseReleaseBundle, parseReleaseSession, prepareReleaseAction, verifyReleaseReadback } from '../lib/contentRelease';
 import type { ApiResult } from '../types/api';
-import type { ReleaseBundle, ReleaseKind, ReleaseSession } from '../types/contentRelease';
+import type { ReleaseAction, ReleaseBundle, ReleaseKind, ReleaseSession } from '../types/contentRelease';
 
 function dataOrThrow<T>(result: ApiResult<T>): T {
   if (!result.success || result.data === null) throw new Error(`${result.error?.code ?? 'INVALID_RESPONSE'}: ${result.error?.message ?? 'Response has no data.'}`);
@@ -46,6 +47,23 @@ export function PublicationStatusPanel({ status, busy, blocked, onCheck, onConti
 }
 
 const AWS_BASICS = { id: 15, slug: 'aws-saa-fundamentals', title: 'AWS Basics' };
+const REJECTED_WRITE_STATUSES = [400, 403, 409, 413, 422];
+
+function definitiveRejection(action: ReleaseAction) {
+  return action.result?.success === false && REJECTED_WRITE_STATUSES.includes(action.result.error?.httpStatus ?? 0);
+}
+
+function settledAction(action: ReleaseAction) {
+  return action.queried && action.reconciled && (isConfirmedAction(action) || definitiveRejection(action));
+}
+
+function canArchiveUnpublished(session: ReleaseSession | null) {
+  if (!session) return false;
+  const publish = session.actions.publish;
+  if (publish) return publish.outcome === 'unknown' && !publish.query && settledAction(publish);
+  const actions = Object.values(session.actions);
+  return actions.length > 0 && actions.every(settledAction);
+}
 
 export function ContentReleasePage({ deck, children }: {
   deck?: typeof AWS_BASICS;
@@ -58,12 +76,11 @@ export function ContentReleasePage({ deck, children }: {
   const storageKey = `aws-basics-release-v1:${user?.sub ?? 'no-session'}`;
   const [session, setSession] = useState<ReleaseSession | null>(null);
   const currentSession = useRef<ReleaseSession | null>(null);
-  const artifactDirectory = useRef<ArtifactDirectory | undefined>(undefined);
-  const [automaticSave, setAutomaticSave] = useState(false);
+  const cloudPointer = useRef<CloudJournalPointer>({ revision: null, parts: [] });
+  const [cloudLoaded, setCloudLoaded] = useState(false);
   const mounted = useRef(false);
   const running = useRef<AbortController | null>(null);
   const [delivery, setDelivery] = useState<ReleaseDeliveryProof | null>(null);
-  const journalRevision = useRef(0);
   const [loading, setLoading] = useState(allowed);
   const [bundle, setBundle] = useState<ReleaseBundle | null>(null);
   const [s3Hash, setS3Hash] = useState('');
@@ -82,6 +99,9 @@ export function ContentReleasePage({ deck, children }: {
   const [publicationLookupFailed, setPublicationLookupFailed] = useState(false);
   const freshPublishQuery = useRef(false);
   const publication = publicationStatus(session, Boolean(delivery), publicationLookupFailed);
+  const unusedRelease = Boolean(session && Object.keys(session.actions).length === 0);
+  const unpublishedRelease = canArchiveUnpublished(session);
+  const stoppedRelease = publication?.kind === 'failed' || publication?.kind === 'superseded';
 
   const assertOwner = useCallback((current?: ReleaseSession | null) => {
     if (!mounted.current || running.current?.signal.aborted) throw new Error('Publication monitoring stopped.');
@@ -101,29 +121,35 @@ export function ContentReleasePage({ deck, children }: {
     void (async () => {
       try {
         assertOwner();
-        let stored = await loadReleaseJournal(user!.sub!);
+        const cloud = await loadCloudReleaseJournal(user!.sub!);
         if (cancelled) return;
         assertOwner();
-        journalRevision.current = stored?.revision ?? 0;
+        cloudPointer.current = cloud.pointer;
+        setCloudLoaded(true);
+        if (cloud.pointer.revision) {
+          const restored = cloud.raw ? parseReleaseSession(cloud.raw, user!.sub!) : null;
+          currentSession.current = restored;
+          setSession(restored);
+          return;
+        }
+        const stored = await loadReleaseJournal(user!.sub!).catch(() => null);
+        if (cancelled) return;
+        assertOwner();
         const legacy = stored ? null : sessionStorage.getItem(storageKey);
-        const restored = stored?.raw ?? legacy;
-        const recovered = restored ? parseReleaseSession(restored, user!.sub!) : null;
-        if (legacy) {
-          stored = await withReleaseJournalLock(user!.sub!, () => saveReleaseJournal(user!.sub!, legacy, 0, () => assertOwner(recovered)));
+        const raw = stored?.raw ?? legacy;
+        const recovered = raw ? parseReleaseSession(raw, user!.sub!) : null;
+        if (recovered && raw) {
+          cloudPointer.current = await saveCloudReleaseJournal(user!.sub!, raw, cloudPointer.current);
           if (cancelled) return;
           assertOwner(recovered);
-          sessionStorage.removeItem(storageKey);
+          if (legacy) sessionStorage.removeItem(storageKey);
         }
-        journalRevision.current = stored?.revision ?? 0;
         currentSession.current = recovered;
         setSession(recovered);
-        const directory = await loadArtifactDirectory(user!.sub!, () => assertOwner(recovered));
-        if (cancelled) return;
-        assertOwner(recovered); artifactDirectory.current = directory; setAutomaticSave(Boolean(directory));
       } catch (failure) {
         if (!cancelled) {
           setRestoreBlocked(true);
-          setError(`Saved release session could not be read. Keep its downloaded journal and reconcile before any new action. ${String(failure)}`);
+          setError(`The saved release could not be loaded. Reload and reconcile it before starting a new release. ${String(failure)}`);
         }
       } finally { if (!cancelled) setLoading(false); }
     })();
@@ -138,17 +164,13 @@ export function ContentReleasePage({ deck, children }: {
   function download(name: string, value: unknown) { assertOwner(); downloadJson(name, value); assertOwner(); }
 
   // A journal storage failure blocks dispatch. It must be recoverable after a lost HTTP response.
-  async function save(next: ReleaseSession, archivePrevious = false, artifact?: DeliveryArtifact) {
+  async function save(next: ReleaseSession) {
     return withReleaseJournalLock(next.ownerSubject, async () => {
-    assertOwner(next);
-    const raw = JSON.stringify(next);
-    const stored = await saveReleaseJournal(user!.sub!, raw, journalRevision.current, () => assertOwner(next), archivePrevious);
-    assertOwner(next);
-    journalRevision.current = stored.revision;
-    currentSession.current = next;
-    setSession(next);
-    if (artifactDirectory.current && !next.s3BundleSha256)
-      await writeReleaseArtifacts(artifactDirectory.current, next, () => assertOwner(next), artifact);
+      assertOwner(next);
+      cloudPointer.current = await saveCloudReleaseJournal(next.ownerSubject, JSON.stringify(next), cloudPointer.current);
+      assertOwner(next);
+      currentSession.current = next;
+      setSession(next);
     });
   }
   async function run(work: () => Promise<unknown>, recovery = false) {
@@ -182,7 +204,7 @@ export function ContentReleasePage({ deck, children }: {
     const snapshot = dataOrThrow(await owned(() => fetchReleaseSnapshot(user!.sub!)));
     if (current.actions.import?.result?.data?.editingSnapshot !== snapshot.editingSnapshot) throw new Error('Editing content changed since the confirmed import. The frozen release cannot adopt another editing snapshot.');
     verifyReleaseReadback(current, snapshot, cards);
-    return { ...current, verifiedSnapshot: snapshot };
+    return { ...current, verifiedSnapshot: { ...snapshot, backup: undefined } };
   }
   async function dispatch(kind: ReleaseKind, replay = false) {
     const session = currentSession.current;
@@ -235,7 +257,8 @@ export function ContentReleasePage({ deck, children }: {
     } catch (failure) { if (kind === 'publish') setPublicationLookupFailed(true); throw failure; }
     if (!result.success || !result.data) {
       if (result.error?.code !== 'ACTION_NOT_FOUND') dataOrThrow(result);
-      await save({ ...session, actions: { ...session.actions, [kind]: { ...action, queried: true, reconciled: true, outcome: 'unknown', result: undefined, query: undefined } } });
+      const rejection = definitiveRejection(action) ? action.result : undefined;
+      await save({ ...session, actions: { ...session.actions, [kind]: { ...action, queried: true, reconciled: true, outcome: 'unknown', result: rejection, query: undefined } } });
       if (kind === 'publish') { setPublicationLookupFailed(false); freshPublishQuery.current = true; }
       setQueryView(result); setMessage('The action has not committed as of this query. Its original request and key are retained for an identical replay.'); return;
     }
@@ -267,34 +290,18 @@ export function ContentReleasePage({ deck, children }: {
     const job = query.jobs.find(item => item.job_id === action.result?.data?.jobId && item.build_id === action.result?.data?.buildId);
     const background = job?.cdnVerificationState ? backgroundDeliveryProof(current, query) : undefined;
     if (job?.cdnVerificationState && !background) return false;
-    const cached = await loadDeliveryArtifact(current, () => assertOwner(current));
-    const proof = background ?? (cached ? await owned(() => verifyStoredReleaseDelivery(current, query, cached), current)
-      : await owned(() => verifyReleaseDelivery(current, query, signal,
-        (proof, bytes) => saveDeliveryArtifact(current, proof, bytes, () => assertOwner(current))), current));
+    const proof = background ?? await owned(() => verifyReleaseDelivery(current, query, signal), current);
     if (!proof) return false;
-    const completed = { ...current, delivery: proof };
-    const artifact = await loadDeliveryArtifact(current, () => assertOwner(current));
-    await save(completed, false, artifact); assertOwner(current); setDelivery(proof);
+    await save({ ...current, delivery: proof }); assertOwner(current); setDelivery(proof);
     setMessage(`Published and verified ${proof.cards} bilingual cards on the public CDN.`);
-    if (background && artifactDirectory.current && !current.s3BundleSha256 && !artifact) {
-      const saved = await loadArchiveBytes(completed, signal);
-      await save(completed, false, saved);
-    }
     return true;
   }
 
   async function loadArchiveBytes(current: ReleaseSession, signal = AbortSignal.timeout(20_000)) {
-    const guard = () => assertOwner(current);
-    const saved = await loadDeliveryArtifact(current, guard);
-    if (saved) return saved;
-    const query = current.actions.publish?.query;
-    const proof = query && backgroundDeliveryProof(current, query);
-    if (!proof || !current.delivery) throw new Error('Check this release’s public verification before downloading its files.');
+    const proof = current.delivery;
+    if (!delivery || !proof) throw new Error('Check this release’s public verification before downloading its files.');
     const bytes = await owned(() => downloadVerifiedDeck(current, proof, signal), current);
-    await saveDeliveryArtifact(current, proof, bytes, guard);
-    const artifact = await loadDeliveryArtifact(current, guard);
-    if (!artifact) throw new Error('Could not save the verified download.');
-    return artifact;
+    return makeDeliveryArtifact(current, proof, bytes);
   }
   async function verifyExistingPublication(checkOnly = false) {
     const controller = new AbortController(); running.current = controller; setDelivery(null);
@@ -358,12 +365,42 @@ export function ContentReleasePage({ deck, children }: {
   }
 
   async function startAnotherRelease() {
-    if (!delivery) throw new Error('Verify the current publication before starting another release.');
-    const stored = await withReleaseJournalLock(user!.sub!, () => saveReleaseJournal(user!.sub!, '', journalRevision.current, () => assertOwner(currentSession.current)));
-    journalRevision.current = stored.revision; currentSession.current = null;
+    const current = currentSession.current;
+    if (!current) return;
+    if (!delivery && Object.keys(current.actions).length !== 0) {
+      if (current.actions.publish && !canArchiveUnpublished(current)) {
+        const latest = await query('publish');
+        const status = latest && publicationStatus(latest, false);
+        if (status?.kind !== 'failed' && status?.kind !== 'superseded')
+          throw new Error('Resolve the original publication before starting another release.');
+      } else {
+        for (const kind of ['import', 'review', 'publish'] as const) if (current.actions[kind]) await query(kind);
+        const checked = currentSession.current;
+        if (!checked || !canArchiveUnpublished(checked) || !Object.values(checked.actions).every(settledAction))
+          throw new Error('Confirm the outcome of the saved editing requests before starting another release.');
+      }
+    }
+    await withReleaseJournalLock(user!.sub!, async () => {
+      assertOwner(currentSession.current);
+      cloudPointer.current = await saveCloudReleaseJournal(user!.sub!, '', cloudPointer.current);
+      assertOwner(currentSession.current);
+    });
+    currentSession.current = null;
     setSession(null); setBundle(null); setDelivery(null); setQueryView(null);
+    setPublicationLookupFailed(false); freshPublishQuery.current = false;
     setS3BundleSha256(undefined); setS3Hash(''); setUploadBytes(''); setUploadUrl('');
-    setMessage('Completed release archived. Load the next reviewed bundle to begin.');
+    setMessage('Release journal archived. Load the next reviewed bundle to begin.');
+  }
+
+  async function restoreLegacyJournal(file: File) {
+    if (!cloudLoaded || cloudPointer.current.parts.length)
+      throw new Error('Load the active cloud release before restoring a legacy journal.');
+    if (file.size > 10_000_000) throw new Error('Recovery journal is too large.');
+    const restored = parseReleaseSession(await owned(() => file.text()), user!.sub!);
+    await save(restored);
+    setRestoreBlocked(false); setDelivery(null); setQueryView(null); setPublicationLookupFailed(false);
+    freshPublishQuery.current = false; setBundle(null);
+    setMessage('Original backup, frozen requests and action keys restored. Query each existing action before continuing.');
   }
 
   if (!allowed) return <ConsoleShell title={CONSOLE_NAME} {...consoleNav()}><Callout tone="danger" role="alert">This release page requires a signed-in Console editor or super_admin and AWS Basics deck 15. Server authorization remains authoritative.</Callout></ConsoleShell>;
@@ -390,8 +427,6 @@ export function ContentReleasePage({ deck, children }: {
             await owned(() => navigator.clipboard.writeText(uploadUrl)); setMessage('S3 upload link copied. The link expires in 10 minutes.');
           })}>Copy upload link</Button>}
         </details>
-        <label className="block text-sm font-medium" htmlFor="release-bundle">Release bundle (JSON)</label>
-        <input id="release-bundle" className={INPUT_CLASS} type="file" accept="application/json,.json" disabled={busy || restoreBlocked} onChange={event => { const file = event.target.files?.[0]; if (!file) return; setBundle(null); setS3BundleSha256(undefined); void run(async () => { if (file.size > 3_000_000) throw new Error('Release bundle is too large.'); setBundle(parseReleaseBundle(await owned(() => file.text()))); }); }} />
       </div>}
       {activeBundle && <div className="text-sm" role="status">
         <p className="break-all font-medium">Batch {activeBundle.releaseId}</p>
@@ -411,6 +446,10 @@ export function ContentReleasePage({ deck, children }: {
           download(`${current.bundle.releaseId}-verified-artifacts.json`, releaseArtifactDownload(current, artifact));
         })}>Download verified release artifacts</Button>}
       </div>}
+      {!delivery && (unusedRelease || unpublishedRelease || stoppedRelease) && <Button variant="outline" disabled={busy || restoreBlocked}
+        onClick={() => void run(startAnotherRelease)}>
+        {unusedRelease ? 'Archive unused release' : stoppedRelease ? 'Archive stopped release' : 'Archive unpublished release'}
+      </Button>}
     </section>
     {publication && <PublicationStatusPanel status={publication} busy={busy} blocked={restoreBlocked}
       onCheck={() => void run(() => verifyExistingPublication(true))} onContinue={() => void run(continuePublication)} onVerify={() => void run(() => verifyExistingPublication())} />}
@@ -421,39 +460,25 @@ export function ContentReleasePage({ deck, children }: {
       {activeBundle && <div className="space-y-1 text-sm text-slate-600">
         <p>Review on file · {activeBundle.review.cards.length} card records</p>
         <p className="break-all">Model: {activeBundle.review.model} · Run: {activeBundle.review.runId}</p>
-        <p>Console validates the file and compares the saved editing cards with the bundle.</p>
+        <p>Console validates the bundle and compares it with the saved editing cards.</p>
       </div>}
       <p className="max-w-prose text-sm text-slate-600">
-        Console stores the editing backup and recovery journal in this browser. {activeS3Hash
-          ? 'The release bundle and published version are stored in S3.'
-          : supportsArtifactDirectory()
-          ? automaticSave ? 'It also saves copies to your selected folder.' : 'Choose a folder to keep copies outside this browser.'
-          : 'You can download a copy after the backup is captured.'}
+        Console saves the editing backup and release progress to private S3 before sending changes. Sign in with the same account to resume on another device.
       </p>
-      {!activeS3Hash && supportsArtifactDirectory() && <Button variant="outline" disabled={busy || restoreBlocked} onClick={() => void run(async () => {
-        const directory = await chooseArtifactDirectory(user!.sub!, () => assertOwner(currentSession.current));
-        artifactDirectory.current = directory; setAutomaticSave(true);
-        const current = currentSession.current;
-        const artifact = current?.delivery ? await loadArchiveBytes(current) : undefined;
-        await withReleaseJournalLock(user!.sub!, async () => {
-          if (!current) return;
-          const stored = await loadReleaseJournal(user!.sub!); assertOwner(current);
-          if (stored?.revision !== journalRevision.current || stored.raw !== JSON.stringify(current)) throw new Error('Release changed in another tab. Reload before exporting it.');
-          await writeReleaseArtifacts(directory, current, () => assertOwner(current), artifact);
-        });
-        setMessage('Save folder selected. Recovery files and verified card packs will save here automatically.');
-      })}>{automaticSave ? 'Change automatic save folder' : 'Choose automatic save folder'}</Button>}
       {!session && bundle && <Button variant="outline" disabled={busy || restoreBlocked} onClick={() => void run(capture)}>Capture editing backup and freeze release</Button>}
-      <section className={`${CARD_CLASS} space-y-3`}>
+      {cloudLoaded && !activeBundle && !cloudPointer.current.parts.length && <section className={`${CARD_CLASS} space-y-3`}>
         <label className="block text-sm" htmlFor="release-recovery">Or restore a downloaded Console recovery journal</label>
-        <input id="release-recovery" className={INPUT_CLASS} type="file" accept="application/json,.json" disabled={busy} onChange={event => { const file = event.target.files?.[0]; if (!file) return; void run(async () => { if (file.size > 10_000_000) throw new Error('Recovery journal is too large.'); await save(parseReleaseSession(await owned(() => file.text()), user!.sub!), true); setRestoreBlocked(false); setDelivery(null); setQueryView(null); setPublicationLookupFailed(false); freshPublishQuery.current = false; setBundle(null); setMessage('Original backup, frozen requests and action keys restored. Query each existing action before continuing.'); }, true); }} />
-      </section>
+        <input id="release-recovery" className={INPUT_CLASS} type="file" accept="application/json,.json" disabled={busy} onChange={event => {
+          const file = event.target.files?.[0];
+          if (file) void run(() => restoreLegacyJournal(file), true);
+        }} />
+      </section>}
       {session && <>
         <section className={`${CARD_CLASS} space-y-3`} aria-labelledby="backup-heading">
           <h2 id="backup-heading" className={H2_CLASS}>1. Frozen release and initial backup</h2>
           <p className="text-sm break-all">Release: {session.bundle.releaseId} · Main: {session.bundle.review.mainSHA}<br />Initial live build: {session.baseline.deck.live_build_id ?? 'none'}<br />Initial editing snapshot: {session.baseline.editingSnapshot}</p>
           {!activeS3Hash && <div className="flex flex-wrap gap-3"><Button variant="outline" onClick={() => void run(async () => download(`${session.bundle.releaseId}-editing-backup.json`, session.baseline))}>Download complete editing backup</Button><Button variant="outline" onClick={() => void run(async () => download(`${session.bundle.releaseId}-console-journal.json`, session))}>Download recovery journal</Button></div>}
-          <p className="text-sm text-slate-600">The exact bundle, backup and requests are saved in browser storage. Existing actions cannot be replaced with new keys here.</p>
+          <p className="text-sm text-slate-600">The exact bundle, backup and requests are saved in private S3. Check restored actions before retrying.</p>
         </section>
         {(['import', 'review', 'publish'] as const).map((kind, index) => {
           const action = session.actions[kind];

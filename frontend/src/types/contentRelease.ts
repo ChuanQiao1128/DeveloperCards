@@ -58,6 +58,9 @@ export interface ReleaseSnapshot {
   cards: Array<Omit<ReleaseCardReview, 'verdict' | 'blockers' | 'unknowns'> & { version: number }>;
 }
 
+/** After readback, only the metadata used by the review/publish requests is needed. */
+export type ReleaseVerificationSnapshot = Omit<ReleaseSnapshot, 'backup'> & Partial<Pick<ReleaseSnapshot, 'backup'>>;
+
 export interface ReleaseActions {
   action: { Body?: string; body?: string; StatusCode?: number; statusCode?: number };
   receipts: Array<{ id: string; revoked: boolean; expires_at: string }>;
@@ -98,6 +101,6 @@ export interface ReleaseSession {
   baselineInventory: ReleaseBackupInventory;
   bundle: ReleaseBundle;
   actions: Partial<Record<ReleaseKind, ReleaseAction>>;
-  verifiedSnapshot?: ReleaseSnapshot;
+  verifiedSnapshot?: ReleaseVerificationSnapshot;
   delivery?: { jobId: string; buildId: string; sha256: string; cards: number; verifiedAt: string };
 }

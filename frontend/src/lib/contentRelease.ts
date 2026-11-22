@@ -2,7 +2,7 @@ import { canonicalizeJson } from './canonicalJson';
 import type { ImportCardInput } from '../api/authoring';
 import type { Card } from '../types/card';
 import type { ApiResult } from '../types/api';
-import type { ReleaseAction, ReleaseBackupInventory, ReleaseBundle, ReleaseKind, ReleaseSession, ReleaseSnapshot } from '../types/contentRelease';
+import type { ReleaseAction, ReleaseBackupInventory, ReleaseBundle, ReleaseKind, ReleaseSession, ReleaseSnapshot, ReleaseVerificationSnapshot } from '../types/contentRelease';
 import { isValidDifficulty, isValidStableUid } from './cardRules';
 import { parseFrontHelp, normalizeFrontHelpForCompare } from './frontHelp';
 import { normalizeMcqForCompare, validateMcq } from './mcqRules';
@@ -132,13 +132,17 @@ function timestamp(value: unknown) { return typeof value === 'string' && Number.
 function hasFields(row: Record<string, unknown>, fields: string[]) {
   requireValue(fields.every(field => Object.hasOwn(row, field)), 'Snapshot backup is missing required recoverable row fields.');
 }
-export function assertReleaseSnapshot(snapshot: ReleaseSnapshot): void {
+function assertSnapshotMetadata(snapshot: ReleaseVerificationSnapshot): void {
   requireValue(snapshot?.deckId === 15 && snapshot.deck?.id === 15 && snapshot.deck.slug === 'aws-saa-fundamentals', 'Snapshot deck does not match AWS Basics.');
   requireValue(snapshot.policy === 'aws-codex-bilingual-v1' && snapshot.reviewSchema === 'codex-release-review-v1', 'Unsupported server release policy or schema.');
   for (const value of [snapshot.editingSnapshot, snapshot.publishSnapshot, snapshot.policyHash, snapshot.schemaHash]) hash(value);
   const deck = object(snapshot.deck);
   hasFields(deck, ['id', 'slug', 'title', 'author', 'description', 'locale', 'deck_type', 'is_deleted', 'version', 'created_at', 'updated_at', 'manifest_order', 'tier', 'availability', 'eta', 'retired_at_ms', 'download_mode', 'total_cards', 'preview_cards', 'live_build_id', 'translation_locales', 'release_generation']);
   requireValue(['title', 'author', 'locale'].every(field => typeof deck[field] === 'string') && ['description', 'eta', 'live_build_id'].every(field => nullableText(deck[field])) && deck.is_deleted === 0 && integer(deck.deck_type) && integer(deck.version) && integer(deck.manifest_order, 0) && integer(deck.total_cards, 0) && integer(deck.release_generation, 0) && (deck.preview_cards === null || integer(deck.preview_cards)) && (deck.retired_at_ms === null || integer(deck.retired_at_ms)) && timestamp(deck.created_at) && timestamp(deck.updated_at) && ['free', 'premium'].includes(String(deck.tier)) && ['live', 'coming', 'retired'].includes(String(deck.availability)) && ['public', 'auth', 'none'].includes(String(deck.download_mode)) && Array.isArray(deck.translation_locales) && deck.translation_locales.every(locale => typeof locale === 'string'), 'Snapshot backup deck fields are invalid.');
+}
+
+export function assertReleaseSnapshot(snapshot: ReleaseSnapshot): void {
+  assertSnapshotMetadata(snapshot);
   requireValue(Array.isArray(snapshot.backup) && Array.isArray(snapshot.cards), 'Snapshot is missing the complete editing backup.');
   const rows = new Map<string, Record<string, unknown>>(); const ids = new Set<number>(); const orders = new Set<number>();
   for (const raw of snapshot.backup) {
@@ -173,6 +177,17 @@ export function captureReleaseBackupInventory(snapshot: ReleaseSnapshot): Releas
 export function assertOriginalLive(session: ReleaseSession, snapshot: ReleaseSnapshot) {
   assertReleaseSnapshot(snapshot);
   requireValue(snapshot.deck.live_build_id === session.baseline.deck.live_build_id, 'Live build changed since the initial backup. This release cannot rebase onto it.');
+}
+
+function assertVerifiedSnapshot(session: ReleaseSession, snapshot: ReleaseVerificationSnapshot) {
+  if (snapshot.backup !== undefined) assertReleaseSnapshot(snapshot as ReleaseSnapshot);
+  else assertSnapshotMetadata(snapshot);
+  requireValue(snapshot.deck.live_build_id === session.baseline.deck.live_build_id, 'Live build changed since the initial backup. This release cannot rebase onto it.');
+  const { bundle } = session;
+  requireValue(Array.isArray(snapshot.cards) && snapshot.cards.length === bundle.cards.length &&
+    snapshot.cards.every(meta => meta && integer(meta.version)) && bundle.review.cards.every(reviewed => snapshot.cards.some(meta =>
+      ['stableUid', 'cardContentHash', 'schema', 'revision', 'orderInDeck'].every(field => reviewed[field as keyof typeof reviewed] === meta[field as keyof typeof meta]))),
+  'Verified snapshot differs from frozen model review bindings.');
 }
 
 export function assertExpectedReleaseBaseline(bundle: ReleaseBundle, snapshot: ReleaseSnapshot): void {
@@ -231,8 +246,7 @@ function expectedActionBody(session: ReleaseSession, kind: ReleaseKind): object 
   }
   const snapshot = session.verifiedSnapshot;
   requireValue(session.actions.import && snapshot, 'Confirm import and verify full readback first.');
-  assertOriginalLive(session, snapshot);
-  requireValue(snapshot.cards.length === bundle.cards.length && bundle.review.cards.every(reviewed => snapshot.cards.some(meta => ['stableUid', 'cardContentHash', 'schema', 'revision', 'orderInDeck'].every(field => reviewed[field as keyof typeof reviewed] === meta[field as keyof typeof meta]))), 'Verified snapshot differs from frozen model review bindings.');
+  assertVerifiedSnapshot(session, snapshot);
   if (kind === 'review') return { ...bundle.review, ...common, actionId: kind, expectedEditingSnapshot: snapshot.editingSnapshot, policy: snapshot.policy, policyHash: snapshot.policyHash, reviewSchema: snapshot.reviewSchema, schemaHash: snapshot.schemaHash, reviewedBy: 'codex', humanPerCardReview: false };
   const review = session.actions.review;
   const receiptId = review?.result?.data?.receiptId;
@@ -305,7 +319,7 @@ export function parseReleaseSession(raw: string, ownerSubject?: string): Release
   session.bundle = parseReleaseBundle(JSON.stringify(session.bundle), Date.now(), false);
   assertExpectedReleaseBaseline(session.bundle, session.baseline);
   object(session.actions);
-  if (session.verifiedSnapshot) assertOriginalLive(session, session.verifiedSnapshot);
+  if (session.verifiedSnapshot) assertVerifiedSnapshot(session, session.verifiedSnapshot);
   for (const [kind, action] of Object.entries(session.actions)) {
     requireValue(['import', 'review', 'publish'].includes(kind) && action?.kind === kind && typeof action.payload === 'string' && ['confirmed', 'unknown'].includes(action.outcome) && typeof action.queried === 'boolean' && typeof action.reconciled === 'boolean', 'Invalid journal action.');
     assertFrozenAction(session, action);
