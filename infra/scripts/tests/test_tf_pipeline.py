@@ -1598,6 +1598,16 @@ class StepBodyTest(unittest.TestCase):
             if "second" in name:
                 self.assertIn("full production drift is not checked", out)
 
+    def test_reviewed_release_targets_only_the_runtime_policy_in_both_plans(self):
+        for name in ("plan to a saved file (never printed)", "the second plan must be empty"):
+            open(self.log, "w").close()
+            rc, out = self.run_step("apply", name, REVIEWED_RELEASE_INPUT_ONLY="true", STUB_PYTHON="empty")
+            self.assertEqual(rc, 0, out)
+            plans = [line for line in self.read(self.log).splitlines() if " plan " in line]
+            self.assertEqual(len(plans), 1)
+            targets = [arg for arg in plans[0].split() if arg.startswith("-target=")]
+            self.assertEqual(targets, ['-target=module.identity.aws_iam_role_policy.core_vpc'])
+
     def test_worker_notify_selection_and_all_mode_conflicts(self):
         rc, out = self.run_step("select", "pick this push's allow files", CONTENT_PUBLISH_NOTIFY_ONLY="true")
         self.assertEqual(rc, 0, out)

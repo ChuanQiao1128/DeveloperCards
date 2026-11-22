@@ -284,7 +284,7 @@ jobs:
             )
           elif [ "${CONTENT_PUBLISH_NOTIFY_ONLY:-false}" = true ]; then
             targets=('-target=module.identity.aws_iam_role_policy.worker_notify_send')
-          elif [ "$REVIEWED_RELEASE_INPUT_ONLY" = true ]; then
+          elif [ "${REVIEWED_RELEASE_INPUT_ONLY:-false}" = true ]; then
             targets=('-target=module.identity.aws_iam_role_policy.core_vpc')
           fi
           terraform -chdir=infra/envs/prod plan -input=false -no-color -lock-timeout=10m \
@@ -340,7 +340,7 @@ jobs:
             )
           elif [ "${CONTENT_PUBLISH_NOTIFY_ONLY:-false}" = true ]; then
             targets=('-target=module.identity.aws_iam_role_policy.worker_notify_send')
-          elif [ "$REVIEWED_RELEASE_INPUT_ONLY" = true ]; then
+          elif [ "${REVIEWED_RELEASE_INPUT_ONLY:-false}" = true ]; then
             targets=('-target=module.identity.aws_iam_role_policy.core_vpc')
           fi
           terraform -chdir=infra/envs/prod plan -input=false -no-color -lock-timeout=10m \
@@ -469,7 +469,7 @@ jobs:
               echo 'Worker notify send policy targeted scope only; full production drift is not checked.'
               echo
             fi
-            if [ "$REVIEWED_RELEASE_INPUT_ONLY" = true ]; then
+            if [ "${REVIEWED_RELEASE_INPUT_ONLY:-false}" = true ]; then
               echo 'Private release input policy targeted scope only; full production drift is not checked.'
               echo
             fi
