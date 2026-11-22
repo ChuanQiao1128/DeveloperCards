@@ -71,7 +71,7 @@ export function ContentReleasePage({ deck, children }: {
   const [uploadBytes, setUploadBytes] = useState('');
   const [uploadUrl, setUploadUrl] = useState('');
   const activeBundle = session?.bundle ?? bundle;
-  const activeS3Hash = session?.s3BundleSha256 ?? s3BundleSha256;
+  const activeS3Hash = session ? session.s3BundleSha256 : s3BundleSha256;
   const validS3Hash = /^[0-9a-f]{64}$/.test(s3Hash);
   const [restoreBlocked, setRestoreBlocked] = useState(false);
   const [busy, setBusy] = useState(false);
