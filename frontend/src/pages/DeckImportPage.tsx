@@ -1,6 +1,6 @@
 // src/pages/DeckImportPage.tsx
 //
-// Markdown batch import for one deck: paste or pick a file, preview the
+// Batch import for one deck: paste or pick a file, preview the
 // reconciliation, then apply it in transactional batches, with a cancel button
 // and a leave guard while a run is in progress.
 //
@@ -19,6 +19,7 @@ import { createImportJournal, readImportJournal, hasPendingImport, withImportJou
 import { QueryKeys, useAppQueryClient } from '../api/queryClient';
 import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard';
 import { DeckWorkspaceHeader } from '../components/console/DeckWorkspaceHeader';
+import { hasReviewedDeckRelease } from '../lib/deckWorkspace';
 import { cardListHref } from '../lib/cardListLocation';
 import { RarityDistribution } from '../components/RarityDistribution';
 import {
@@ -36,6 +37,7 @@ import {
   type ImportAction,
   type ImportRunResult,
 } from '../lib/deckImportRunner';
+import { planReviewedDeckBatch, readReviewedDeckBatch } from '../lib/reviewedDeckBatch';
 import { formatWarning, sortWarnings, type ImportWarning } from '../lib/mcqWarnings';
 import { markEnd, markStart } from '../perf/journey';
 import { CONSOLE_NAME } from '../lib/brand';
@@ -60,6 +62,7 @@ interface DeckState {
 }
 
 interface PreviewState {
+  reviewed: boolean;
   parsed: ParsedDeck;
   plan: ImportPlan;
   /** Set when the document header names a different deck than the target. */
@@ -70,7 +73,7 @@ interface PreviewState {
   clearTranslations: boolean;
 }
 
-const ACCEPTED_EXTENSIONS = ['.md', '.txt'];
+const ACCEPTED_EXTENSIONS = ['.md', '.txt', '.json'];
 
 function truncate(text: string, max = 90): string {
   const oneLine = text.replace(/\s+/g, ' ').trim();
@@ -155,6 +158,7 @@ function DeckImportWorkspace({ deckId }: { deckId: number }) {
   const [text, setText] = useState('');
   const [fileName, setFileName] = useState<string | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
+  const [baselineMessage, setBaselineMessage] = useState('');
 
   const [preview, setPreview] = useState<PreviewState | null>(null);
   const [previewing, setPreviewing] = useState(false);
@@ -183,7 +187,7 @@ function DeckImportWorkspace({ deckId }: { deckId: number }) {
   useEffect(() => subscribeSessionChanges(() => {
     abortRef.current?.abort();
     setSessionGeneration(getSessionGeneration());
-    setRecovery(null); setRunResult(null); setPreview(null); setText(''); setStep('input'); setRunning(false);
+    setRecovery(null); setRunResult(null); setPreview(null); setText(''); setBaselineMessage(''); setStep('input'); setRunning(false);
   }), []);
 
   useEffect(() => {
@@ -232,13 +236,29 @@ function DeckImportWorkspace({ deckId }: { deckId: number }) {
 
   const deck = deckState.deck;
 
+  async function copyCardVersions() {
+    if (!deck) return;
+    const generation = getSessionGeneration();
+    setBaselineMessage('Loading card versions…');
+    try {
+      const result = await fetchCardsByDeck(deck.id);
+      if (generation !== getSessionGeneration()) return;
+      if (!result.success || !result.data) throw new Error('Could not load card versions.');
+      const cards = result.data.map(({ stableUid, version, orderInDeck }) => ({ stableUid, version, orderInDeck }));
+      await navigator.clipboard.writeText(JSON.stringify({ deckId: deck.id, deckSlug: deck.slug, cards }, null, 2));
+      if (generation === getSessionGeneration()) setBaselineMessage('Card versions copied.');
+    } catch (error) {
+      if (generation === getSessionGeneration()) setBaselineMessage(error instanceof Error ? error.message : 'Could not copy card versions.');
+    }
+  }
+
   function handleFile(file: File | null) {
     setFileError(null);
     if (!file) return;
 
     const lower = file.name.toLowerCase();
     if (!ACCEPTED_EXTENSIONS.some((ext) => lower.endsWith(ext))) {
-      setFileError(`Only ${ACCEPTED_EXTENSIONS.join(' and ')} files are accepted.`);
+      setFileError(`Only .md, .txt, or .json files are accepted.`);
       // Clear the picker so choosing the same wrong file again still fires a
       // change event and re-shows the message.
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -262,14 +282,17 @@ function DeckImportWorkspace({ deckId }: { deckId: number }) {
   const buildPreview = useCallback(async () => {
     if (!deck || recovery || recoveryError || recoveryLoading) return;
 
+    const generation = getSessionGeneration();
     setPreviewing(true);
     setPreviewError(null);
     setRunResult(null);
 
     try {
       markStart('import:preview');
-      const parsed = parseDeckMarkdown(text);
+      const reviewed = text.trimStart().startsWith('{') ? await readReviewedDeckBatch(text.trim()) : null;
+      const parsed = reviewed?.parsed ?? parseDeckMarkdown(text);
       const cardsResult = await fetchCardsByDeck(deck.id);
+      if (generation !== getSessionGeneration()) return;
 
       if (!cardsResult.success) {
         setPreviewError(cardsResult.error?.message ?? 'Failed to load the current deck contents.');
@@ -277,11 +300,13 @@ function DeckImportWorkspace({ deckId }: { deckId: number }) {
       }
 
       const existing = cardsResult.data ?? [];
-      const plan = planImport(parsed, existing, { deckLocale: deck.locale });
+      const plan = reviewed
+        ? planReviewedDeckBatch(reviewed, deck, existing)
+        : planImport(parsed, existing, { deckLocale: deck.locale });
       const slugMismatch =
         parsed.deckSlug && deck.slug && parsed.deckSlug !== deck.slug ? parsed.deckSlug : null;
 
-      setPreview({ parsed, plan, slugMismatch, existing, clearTranslations: false });
+      setPreview({ reviewed: reviewed !== null, parsed, plan, slugMismatch, existing, clearTranslations: false });
       setStep('preview');
       markEnd('import:preview');
     } catch (err: unknown) {
@@ -313,7 +338,7 @@ function DeckImportWorkspace({ deckId }: { deckId: number }) {
     : 0;
 
   function setClearTranslations(clearTranslations: boolean) {
-    if (!preview || !deck) return;
+    if (!preview || !deck || preview.reviewed) return;
     setPreview({
       ...preview,
       clearTranslations,
@@ -350,7 +375,7 @@ function DeckImportWorkspace({ deckId }: { deckId: number }) {
     try {
       await withImportJournalLock(owner, deck.id, async () => {
         if (!isCurrent()) return;
-        const journal = saved ? await readImportJournal(owner, deck.id) : await createImportJournal(owner, deck.id, toRun);
+        const journal = saved ? await readImportJournal(owner, deck.id) : await createImportJournal(owner, deck.id, toRun, undefined, preview?.reviewed ? deck.slug : undefined);
         if (!journal || (saved && saved.runId !== journal.runId)) throw new Error('Saved import changed. Reload this page before continuing.');
         if (!isCurrent()) return;
         setRecovery(journal);
@@ -413,7 +438,7 @@ function DeckImportWorkspace({ deckId }: { deckId: number }) {
         {...consoleNav()}
       >
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-xl font-semibold text-slate-800">Import Markdown</h1>
+          <h1 className="text-xl font-semibold text-slate-800">Import cards</h1>
           <Link to="/" className="text-sm text-indigo-600 hover:text-indigo-800">
             ← Back to Decks
           </Link>
@@ -438,7 +463,7 @@ function DeckImportWorkspace({ deckId }: { deckId: number }) {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold text-slate-800">
-            Import Markdown · <span className="font-mono text-base">{deck.slug}</span>
+            Import cards · <span className="font-mono text-base">{deck.slug}</span>
           </h1>
           <p className="text-sm text-slate-600 mt-1">
             Step {step === 'input' ? '1 of 3 · source' : step === 'preview' ? '2 of 3 · preview' : '3 of 3 · execute'}
@@ -471,10 +496,8 @@ function DeckImportWorkspace({ deckId }: { deckId: number }) {
             <div className="px-4 py-3 border-b border-slate-100">
               <h2 className="text-lg font-semibold text-slate-800">1 · Source</h2>
               <p className="text-xs text-slate-500 mt-1">
-                Paste a deck document, or load a{' '}
-                <span className="font-mono">.md</span> / <span className="font-mono">.txt</span> file.
-                Cards are matched by <span className="font-mono">stableUid</span>, so importing the
-                same file twice changes nothing.
+                Paste or load a Deck Markdown file, or load a reviewed JSON batch.
+                The preview matches cards by stable UID and checks reviewed versions before import.
               </p>
             </div>
 
@@ -483,14 +506,22 @@ function DeckImportWorkspace({ deckId }: { deckId: number }) {
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept=".md,.txt,text/markdown,text/plain"
+                  accept=".md,.txt,.json,text/markdown,text/plain,application/json"
                   className="text-sm text-slate-600"
                   onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
                 />
+                {!hasReviewedDeckRelease(deck) && (
+                  <button type="button" className="text-sm text-indigo-600 hover:text-indigo-800"
+                    onClick={() => void copyCardVersions()}>
+                    Copy card versions
+                  </button>
+                )}
                 {fileName ? (
                   <span className="text-xs text-slate-500 font-mono">{fileName}</span>
                 ) : null}
               </div>
+
+              {baselineMessage && <p role="status" className="text-sm text-slate-600">{baselineMessage}</p>}
 
               {fileError ? (
                 <div className="bg-red-50 border border-red-200 text-red-800 px-3 py-2 rounded text-sm">

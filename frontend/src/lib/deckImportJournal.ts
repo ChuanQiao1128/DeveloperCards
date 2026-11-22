@@ -39,6 +39,7 @@ async function validate(journal: ImportJournal, account: string, deckId: number)
         batch.fingerprint !== await fingerprint(batch.body)) throw corrupt();
     const body = JSON.parse(batch.body);
     if (body.deckId !== deckId || typeof body.operationId !== 'string' || !body.operationId || ids.has(body.operationId) ||
+        (body.expectedDeckSlug !== undefined && (typeof body.expectedDeckSlug !== 'string' || !body.expectedDeckSlug)) ||
         !Array.isArray(body.cards) || body.cards.length === 0 || body.cards.length > 500 ||
         JSON.stringify(body.cards) !== JSON.stringify(batch.actions.map(cardInputFor)) ||
         (batch.state === 'committed' && (!batch.result || ![batch.result.created, batch.result.updated, batch.result.unchanged].every(n => Number.isSafeInteger(n) && n >= 0)))) throw corrupt();
@@ -70,14 +71,16 @@ export function saveImportJournal(journal: ImportJournal, storage: JournalStorag
 }
 
 /** One bounded journal per account/deck. Unknown work is never aged out as if rolled back. */
-export async function createImportJournal(account: string, deckId: number, actions: readonly ImportAction[], storage: JournalStorage = localStorage): Promise<ImportJournal> {
+export async function createImportJournal(account: string, deckId: number, actions: readonly ImportAction[], storage: JournalStorage = localStorage, expectedDeckSlug?: string): Promise<ImportJournal> {
   if (!account) throw new Error('Sign in again before importing.');
   if (actions.some(wouldClearTranslations)) throw new Error('Preview again and explicitly approve clearing translations before importing.');
   const previous = await readImportJournal(account, deckId, storage);
   if (previous && hasPendingImport(previous)) throw new Error('Recover the saved import before starting another import.');
   const batches = [];
-  for (const chunk of chunkImportActions(deckId, actions)) {
-    const body = JSON.stringify({ deckId, operationId: crypto.randomUUID(), cards: chunk.map(cardInputFor) });
+  const chunks = chunkImportActions(deckId, actions);
+  if (expectedDeckSlug && chunks.length !== 1) throw new Error('A reviewed batch must be applied in one transaction.');
+  for (const chunk of chunks) {
+    const body = JSON.stringify({ deckId, expectedDeckSlug, operationId: crypto.randomUUID(), cards: chunk.map(cardInputFor) });
     batches.push({ body, fingerprint: await fingerprint(body), actions: chunk, state: 'pending' as const });
   }
   const journal: ImportJournal = { version: 1, account, deckId, runId: crypto.randomUUID(), createdAt: Date.now(), batches };

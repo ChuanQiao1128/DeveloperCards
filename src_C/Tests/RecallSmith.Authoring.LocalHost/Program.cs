@@ -48,13 +48,20 @@ JsonElement Event(string method, string path, string query, string? body, string
 
 // Controls exist only in this non-shipping executable and operate on its disposable DB.
 app.MapGet("/__test/ready", () => Results.Ok(new { ready = true }));
-app.MapPost("/__test/seed", async () => {
+app.MapPost("/__test/seed", async (HttpRequest request) => {
   var rows = await db.QueryAsync("insert into decks(slug,title,author) values($1,$2,$3) returning id", "local-" + Guid.NewGuid().ToString("N"), "Local authoring verification", "Synthetic test");
   var deckId = Convert.ToInt64(rows[0]["id"], CultureInfo.InvariantCulture);
   foreach (var who in new[] { "owner", "reader" })
     await db.QueryAsync("insert into admin_deck_permissions(admin_sub,deck_id,can_read,can_write) values($1,$2,1,$3) returning id", "local-" + who, deckId, who == "owner" ? 1 : 0);
-  var cards = await db.QueryAsync("insert into cards(deck_id,stable_uid,question,explanation,difficulty,order_in_deck) values($1,'local-card','Original question','Original answer',2,5) returning id", deckId);
-  return Results.Ok(new { deckId, cardId = Convert.ToInt64(cards[0]["id"]), tokens = identities.ToDictionary(p => p.Value.Sub[6..], p => p.Key) });
+  long? cardId = null;
+  if (!request.Query.ContainsKey("empty"))
+  {
+    var cards = await db.QueryAsync("insert into cards(deck_id,stable_uid,question,explanation,difficulty,order_in_deck) values($1,'local-card','Original question','Original answer',2,5) returning id", deckId);
+    cardId = Convert.ToInt64(cards[0]["id"]);
+  }
+  if (request.Query.ContainsKey("deleted"))
+    await db.QueryAsync("insert into cards(deck_id,stable_uid,question,explanation,difficulty,order_in_deck,is_deleted) values($1,'deleted-card','Original question','Original answer',2,30,1) returning id", deckId);
+  return Results.Ok(new { deckId, cardId, tokens = identities.ToDictionary(p => p.Value.Sub[6..], p => p.Key) });
 });
 app.MapGet("/__test/state/{deckId:long}", async (long deckId) => Results.Ok(new {
   cards = await db.QueryAsync("select id,stable_uid,question,explanation,version,order_in_deck from cards where deck_id=$1 and is_deleted=0 order by id", deckId),

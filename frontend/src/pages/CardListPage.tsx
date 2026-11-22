@@ -305,7 +305,7 @@ export function CardListPage() {
               to={`/decks/cards/new${deckQueryString}`} state={state}>New card</Link>
           </div>
           <div className="flex flex-wrap gap-3 text-sm">
-            <Link className={LINK} to={`/decks/cards/import${deckQueryString}`} state={state}>Import Markdown</Link>
+            <Link className={LINK} to={`/decks/cards/import${deckQueryString}`} state={state}>Import cards</Link>
             <Link className={LINK} to={`/decks/preview${deckQueryString}`} state={state}>Preview deck</Link>
             <Link className={LINK} to={qaPageHref(deck.id)} state={state}>AI QA</Link>
             <Link className={LINK} to={`/review${deckQueryString}`}>AI draft review</Link>
@@ -361,7 +361,7 @@ export function CardListPage() {
         </div>
 
         {pageCards.length === 0 ? <p className="px-4 py-6 text-sm text-slate-600">
-          {cards.length === 0 ? 'No cards yet. Use New card or Import Markdown to add cards.' : 'No cards match these filters.'}
+          {cards.length === 0 ? 'No cards yet. Use New card or Import cards to add cards.' : 'No cards match these filters.'}
         </p> : (
           <table className="w-full text-left text-sm" aria-label="Cards in deck">
             <thead>

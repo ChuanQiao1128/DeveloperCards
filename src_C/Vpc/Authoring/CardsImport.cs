@@ -132,6 +132,12 @@ public static class CardsImport
     }
   }
 
+  private static void RequireReviewedJson(JsonElement original, string? canonical, string field)
+  {
+    if (PublishSnapshot.CanonicalJson(original.GetRawText()) != PublishSnapshot.CanonicalJson(canonical ?? "null"))
+      throw new ValidationError($"Reviewed {field} must use the exact stored JSON form.", field);
+  }
+
   private static async Task<APIGatewayProxyResponse> HandleCardsImportCoreAsync(LambdaRequest req, Res res, AuthContext auth, ImportOutcome outcome)
   {
     var deny = Auth.RequireAdmin(auth, res);
@@ -143,6 +149,7 @@ public static class CardsImport
     if (conn is null) return Helpers.ConfigError(res, "Missing PG env vars (PGHOST/PGDATABASE/PGUSER/PGPASSWORD)");
 
     long deckId;
+    string? reviewedDeckSlug = null;
     string? deckLocale;
     List<ImportCard> cards;
 
@@ -157,6 +164,8 @@ public static class CardsImport
         return res.BadRequest("VALIDATION_ERROR", "deckId is required");
       }
       deckId = Helpers.RequireInteger(deckIdEl, "deckId");
+      if (body.TryGetProperty("expectedDeckSlug", out _))
+        reviewedDeckSlug = ContentRelease.Required(body, "expectedDeckSlug");
 
       if (!body.TryGetProperty("cards", out var cardsEl) || cardsEl.ValueKind != JsonValueKind.Array)
       {
@@ -239,6 +248,23 @@ public static class CardsImport
           var translationsSent = cardEl.TryGetProperty("translations", out var trEl);
           var teaching = TeachingValidation.Read(cardEl, out var teachingSent);
           var tags = TagsValidation.Read(cardEl, out var tagsSent);
+          if (reviewedDeckSlug is not null)
+          {
+            foreach (var (field, value) in new (string Field, string? Value)[] {
+              ("stableUid", uid), ("question", question), ("explanation", explanation), ("codeSnippet", codeSnippet),
+              ("codeLanguage", codeLanguage), ("realWorldUsage", realWorldUsage), ("topic", topic)
+            })
+            {
+              if (!cardEl.TryGetProperty(field, out var original) || original.ValueKind != JsonValueKind.String ||
+                  original.GetString() != (value ?? ""))
+                throw new ValidationError($"Reviewed {field} must use the exact stored text.", field);
+            }
+            RequireReviewedJson(cardEl.GetProperty("mcq"), mcq, "mcq");
+            RequireReviewedJson(cardEl.GetProperty("source"), source, "source");
+            RequireReviewedJson(cardEl.GetProperty("frontHelp"), frontHelp, "frontHelp");
+            RequireReviewedJson(cardEl.GetProperty("teaching"), teaching, "teaching");
+            RequireReviewedJson(cardEl.GetProperty("tags"), tags, "tags");
+          }
           // Validate translations after locking the row: an older client may omit the stored English help.
           cards.Add(new ImportCard(i, uid, question, explanation, codeSnippet, codeLanguage, realWorldUsage, difficulty, orderInDeck, topic, mcq, source,
             translationsSent ? trEl.GetRawText() : null, null, translationsSent, frontHelp, frontHelpSent,
@@ -253,7 +279,7 @@ public static class CardsImport
         {
           return res.BadRequest(ex.Code, $"cards[{i}] ({uid}): {ex.Message}");
         }
-        catch (ValidationError ex)
+        catch (Exception ex) when (ex is ValidationError or KeyNotFoundException)
         {
           return res.BadRequest("VALIDATION_ERROR", $"cards[{i}] ({uid}): {ex.Message}");
         }
@@ -311,7 +337,7 @@ public static class CardsImport
 
       // Serialize imports without blocking foreign-key checks from concurrent ordinary card creates.
       var deckRows = await DbUtil.QueryAsync(conn, tx,
-        "select id from decks where id = $1 and is_deleted = 0 for no key update", [deckId]);
+        "select slug, locale from decks where id = $1 and is_deleted = 0 for no key update", [deckId]);
       if (deckRows.Count == 0) return Helpers.ErrorEnvelope(res, 404, "DECK_NOT_FOUND", $"Deck {deckId} not found");
 
       // Check permissions again after waiting for the deck lock, and hold them through commit/replay.
@@ -325,6 +351,8 @@ public static class CardsImport
 
       if (await ContentRelease.Applies(conn, deckId, tx))
       {
+        if (reviewedDeckSlug is not null)
+          return res.BadRequest("RELEASE_POLICY_SCOPE", "Use Publish batch for this deck.");
         await ContentRelease.Lock(conn, tx, deckId);
         using var releaseDoc = Validation.ParseJsonBody(req)!;
         var body = releaseDoc.RootElement;
@@ -357,6 +385,12 @@ public static class CardsImport
         payloadHash = ContentRelease.PayloadHash(body);
         var replay = await ContentRelease.Replay(conn, tx, deckId, releaseId, actionId, payloadHash);
         if (replay is not null) { outcome.DeckId = null; return replay; }
+        if (reviewedDeckSlug is not null)
+        {
+          if (!string.Equals(deckRows[0]["slug"] as string, reviewedDeckSlug, StringComparison.Ordinal))
+            return Helpers.ErrorEnvelope(res, 409, "DECK_SLUG_CONFLICT", "The target deck changed since this batch was reviewed.");
+          deckLocale = deckRows[0]["locale"] as string;
+        }
       }
 
       // A soft-deleted card in this deck whose stable_uid is in the payload cannot be revived by an
@@ -374,7 +408,7 @@ public static class CardsImport
       // Lock every existing payload row, so omitted help/translations are validated and preserved atomically.
       var storedRows = await DbUtil.QueryAsync(conn, tx,
         """
-        select stable_uid as "stableUid", version,
+        select stable_uid as "stableUid", version, order_in_deck,
           nullif(to_jsonb(cards) -> 'translations', 'null'::jsonb) as translations,
           nullif(to_jsonb(cards) -> 'front_help', 'null'::jsonb) as "frontHelp"
         from cards where deck_id = $1 and is_deleted = 0 and stable_uid = any($2) order by id for update
@@ -396,6 +430,8 @@ public static class CardsImport
       {
         var c = cards[index];
         storedByUid.TryGetValue(c.StableUid, out var storedRow);
+        if (reviewedDeckSlug is not null && storedRow is not null && Convert.ToInt32(storedRow["order_in_deck"]) != c.OrderInDeck)
+          return Helpers.ErrorEnvelope(res, 409, "ORDER_CONFLICT", "A reviewed update must keep the card's current order.");
         var help = c.FrontHelpSent ? c.FrontHelp
           : storedRow is not null && Helpers.JsonbElement(storedRow, "frontHelp") is { } keptHelp ? FrontHelpValidation.Canonicalize(keptHelp) : null;
         var english = new TranslationValidation.EnglishCard(c.Question, c.Explanation, c.RealWorldUsage, c.Mcq, help);
@@ -405,6 +441,11 @@ public static class CardsImport
             ? TranslationValidation.Canonicalize(JsonSerializer.Deserialize<JsonElement>(c.Translations!), english, deckLocale)
             : storedRow is not null && Helpers.JsonbElement(storedRow, "translations") is { } kept
               ? TranslationValidation.Canonicalize(kept, english, deckLocale) : null;
+          if (reviewedDeckSlug is not null)
+          {
+            if (!c.TranslationsSent) return res.BadRequest("VALIDATION_ERROR", "A reviewed card must include translations or null.");
+            RequireReviewedJson(JsonSerializer.Deserialize<JsonElement>(c.Translations!), translations, "translations");
+          }
           if (!translationsReady && translations is not null) return Helpers.TranslationsNotMigrated(res);
           cards[index] = c with { FrontHelp = help, Translations = translations,
             TranslationBasis = c.TranslationsSent ? TranslationValidation.BasisJson(translations, english) : null };
@@ -419,11 +460,10 @@ public static class CardsImport
         }
       }
 
-      // A live card outside the payload holding an order the payload needs is a real conflict: nothing
-      // is written and the caller resolves it.
+      // A reviewed batch also treats deleted rows as occupied, so it never parks cards outside its scope.
       var holderRows = await DbUtil.QueryAsync(conn, tx,
-        """select stable_uid as "stableUid", order_in_deck as "orderInDeck" from cards where deck_id = $1 and is_deleted = 0 and order_in_deck = any($2) and not (stable_uid = any($3)) order by id for update""",
-        [deckId, orders, uids]);
+        """select stable_uid as "stableUid", order_in_deck as "orderInDeck" from cards where deck_id = $1 and (is_deleted = 0 or $4) and order_in_deck = any($2) and not (stable_uid = any($3)) order by id for update""",
+        [deckId, orders, uids, reviewedDeckSlug is not null]);
       if (holderRows.Count > 0)
       {
         var pairs = string.Join("; ", holderRows.Take(10).Select(r =>
@@ -448,7 +488,8 @@ public static class CardsImport
         from blockers, base
         where c.id = blockers.id
         """;
-      parked = await DbUtil.ExecuteAsync(conn, tx, parkSql, [deckId, orders, uids, maxOrder]);
+      if (reviewedDeckSlug is null)
+        parked = await DbUtil.ExecuteAsync(conn, tx, parkSql, [deckId, orders, uids, maxOrder]);
 
       var versionParameter = extended ? 22 : translationsReady && frontHelpReady ? 18 : translationsReady ? 16 : 13;
       var casWhere = genericImport ? $"cards.is_deleted = 0 and ${versionParameter}::bigint > 0 and cards.version = ${versionParameter}::bigint and " : "";
