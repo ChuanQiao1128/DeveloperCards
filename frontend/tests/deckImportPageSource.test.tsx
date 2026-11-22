@@ -30,7 +30,7 @@
 // But `upload` filters candidates against the input's `accept` attribute by
 // default, and this page's input carries accept=".md,.txt,...". Uploading
 // notes.png therefore fires NO change event at all, the page's own
-// "Only .md and .txt files are accepted." never appears, and a rejection test
+// "Only .md, .txt, or .json files are accepted." never appears, and a rejection test
 // degenerates into asserting that nothing happened — permanently green.
 // Measured: with the default setup the message did not appear; with
 // `userEvent.setup({ applyAccept: false })` it did.
@@ -316,7 +316,7 @@ describe('loading a document from a file', () => {
 
     await user.upload(fileInput(), new File(['not markdown'], 'notes.png', { type: 'image/png' }));
 
-    expect(await screen.findByText('Only .md and .txt files are accepted.')).not.toBeNull();
+    expect(await screen.findByText('Only .md, .txt, or .json files are accepted.')).not.toBeNull();
     expect(sourceBox().value).toBe('');
     // The picker must be cleared, or choosing the SAME wrong file again fires
     // no change event and the page looks like it silently accepted it.
@@ -335,7 +335,7 @@ describe('loading a document from a file', () => {
 
     await lenient.upload(fileInput(), new File(['x'], 'notes.png', { type: 'image/png' }));
 
-    expect(await screen.findByText('Only .md and .txt files are accepted.')).not.toBeNull();
+    expect(await screen.findByText('Only .md, .txt, or .json files are accepted.')).not.toBeNull();
     expect(sourceBox().value).toBe(DOC);
     expect(screen.queryByText('deck.md')).not.toBeNull();
   });
