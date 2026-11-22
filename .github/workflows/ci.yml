@@ -264,6 +264,8 @@ jobs:
           [ "$found" = 1 ] || { echo "no Python package found" >&2; exit 1; }
       - name: Check isolated Console SDK lifecycle
         run: uv run --frozen --project services/synthetic-check python -m unittest discover -s scripts/ops/console_s2 -p 'test_*.py' -v
+      - name: Check local AWS claim evidence workflow
+        run: python -m unittest discover -s tools/content-pipeline -p test_claim_evidence.py -v
       # The same packages, audited for known vulnerabilities in what they ship: the
       # locked runtime dependencies (`--no-dev`; evals' optional `embeddings` extra is
       # a local-only tool and stays out). `--no-emit-local` drops evals' path
