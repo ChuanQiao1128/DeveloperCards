@@ -30,8 +30,12 @@ async function storage<T>(key: IDBValidKey, guard: () => void, value?: T): Promi
 }
 
 export async function saveDeliveryArtifact(session: ReleaseSession, proof: ReleaseDeliveryProof, bytes: Uint8Array, guard: () => void) {
-  const artifact: DeliveryArtifact = { owner: session.ownerSubject, releaseId: session.bundle.releaseId, bundle: canonical(session.bundle), proof, bytes };
+  const artifact = makeDeliveryArtifact(session, proof, bytes);
   await storage([artifact.owner, artifact.releaseId], guard, artifact);
+}
+
+export function makeDeliveryArtifact(session: ReleaseSession, proof: ReleaseDeliveryProof, bytes: Uint8Array): DeliveryArtifact {
+  return { owner: session.ownerSubject, releaseId: session.bundle.releaseId, bundle: canonical(session.bundle), proof, bytes };
 }
 export async function loadDeliveryArtifact(session: ReleaseSession, guard: () => void): Promise<DeliveryArtifact | undefined> {
   const artifact = await storage<DeliveryArtifact>([session.ownerSubject, session.bundle.releaseId], guard);

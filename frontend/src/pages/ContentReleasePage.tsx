@@ -15,10 +15,10 @@ import { assertPublicationQuery, publicationStatus, type PublicationStatus } fro
 import { loadReleaseJournal, withReleaseJournalLock } from '../lib/releaseJournalStore';
 import { loadCloudReleaseJournal, saveCloudReleaseJournal } from '../lib/cloudReleaseJournal';
 import { backgroundDeliveryProof, downloadVerifiedDeck, verifyReleaseDelivery, waitForReleasePoll, type ReleaseDeliveryProof } from '../lib/contentReleaseDelivery';
-import { loadDeliveryArtifact, releaseArtifactDownload, saveDeliveryArtifact } from '../lib/releaseArtifacts';
+import { makeDeliveryArtifact, releaseArtifactDownload } from '../lib/releaseArtifacts';
 import { assertExpectedReleaseBaseline, captureReleaseBackupInventory, assertActionDependencies, assertActionResult, assertFrozenAction, isConfirmedAction, assertOriginalLive, assertReleaseSnapshot, assertReplayAllowed, decodeCommittedAction, parseReleaseBundle, parseReleaseSession, prepareReleaseAction, verifyReleaseReadback } from '../lib/contentRelease';
 import type { ApiResult } from '../types/api';
-import type { ReleaseBundle, ReleaseKind, ReleaseSession } from '../types/contentRelease';
+import type { ReleaseAction, ReleaseBundle, ReleaseKind, ReleaseSession } from '../types/contentRelease';
 
 function dataOrThrow<T>(result: ApiResult<T>): T {
   if (!result.success || result.data === null) throw new Error(`${result.error?.code ?? 'INVALID_RESPONSE'}: ${result.error?.message ?? 'Response has no data.'}`);
@@ -47,6 +47,18 @@ export function PublicationStatusPanel({ status, busy, blocked, onCheck, onConti
 }
 
 const AWS_BASICS = { id: 15, slug: 'aws-saa-fundamentals', title: 'AWS Basics' };
+const REJECTED_WRITE_STATUSES = [400, 403, 409, 413, 422];
+
+function definitiveRejection(action: ReleaseAction) {
+  return action.result?.success === false && REJECTED_WRITE_STATUSES.includes(action.result.error?.httpStatus ?? 0);
+}
+
+function canArchiveUnpublished(session: ReleaseSession | null) {
+  if (!session || session.actions.publish) return false;
+  const actions = Object.values(session.actions);
+  return actions.length > 0 && actions.every(action => action.queried && action.reconciled &&
+    (isConfirmedAction(action) || definitiveRejection(action)));
+}
 
 export function ContentReleasePage({ deck, children }: {
   deck?: typeof AWS_BASICS;
@@ -83,6 +95,7 @@ export function ContentReleasePage({ deck, children }: {
   const freshPublishQuery = useRef(false);
   const publication = publicationStatus(session, Boolean(delivery), publicationLookupFailed);
   const unusedRelease = Boolean(session && Object.keys(session.actions).length === 0);
+  const unpublishedRelease = canArchiveUnpublished(session);
   const stoppedRelease = publication?.kind === 'failed' || publication?.kind === 'superseded';
 
   const assertOwner = useCallback((current?: ReleaseSession | null) => {
@@ -239,7 +252,8 @@ export function ContentReleasePage({ deck, children }: {
     } catch (failure) { if (kind === 'publish') setPublicationLookupFailed(true); throw failure; }
     if (!result.success || !result.data) {
       if (result.error?.code !== 'ACTION_NOT_FOUND') dataOrThrow(result);
-      await save({ ...session, actions: { ...session.actions, [kind]: { ...action, queried: true, reconciled: true, outcome: 'unknown', result: undefined, query: undefined } } });
+      const rejection = definitiveRejection(action) ? action.result : undefined;
+      await save({ ...session, actions: { ...session.actions, [kind]: { ...action, queried: true, reconciled: true, outcome: 'unknown', result: rejection, query: undefined } } });
       if (kind === 'publish') { setPublicationLookupFailed(false); freshPublishQuery.current = true; }
       setQueryView(result); setMessage('The action has not committed as of this query. Its original request and key are retained for an identical replay.'); return;
     }
@@ -279,17 +293,10 @@ export function ContentReleasePage({ deck, children }: {
   }
 
   async function loadArchiveBytes(current: ReleaseSession, signal = AbortSignal.timeout(20_000)) {
-    const guard = () => assertOwner(current);
-    const saved = await loadDeliveryArtifact(current, guard);
-    if (saved) return saved;
-    const query = current.actions.publish?.query;
-    const proof = query && backgroundDeliveryProof(current, query);
-    if (!proof || !current.delivery) throw new Error('Check this release’s public verification before downloading its files.');
+    const proof = current.delivery;
+    if (!delivery || !proof) throw new Error('Check this release’s public verification before downloading its files.');
     const bytes = await owned(() => downloadVerifiedDeck(current, proof, signal), current);
-    await saveDeliveryArtifact(current, proof, bytes, guard);
-    const artifact = await loadDeliveryArtifact(current, guard);
-    if (!artifact) throw new Error('Could not save the verified download.');
-    return artifact;
+    return makeDeliveryArtifact(current, proof, bytes);
   }
   async function verifyExistingPublication(checkOnly = false) {
     const controller = new AbortController(); running.current = controller; setDelivery(null);
@@ -356,10 +363,16 @@ export function ContentReleasePage({ deck, children }: {
     const current = currentSession.current;
     if (!current) return;
     if (!delivery && Object.keys(current.actions).length !== 0) {
-      const latest = await query('publish');
-      const status = latest && publicationStatus(latest, false);
-      if (status?.kind !== 'failed' && status?.kind !== 'superseded')
-        throw new Error('Resolve the original publication before starting another release.');
+      if (current.actions.publish) {
+        const latest = await query('publish');
+        const status = latest && publicationStatus(latest, false);
+        if (status?.kind !== 'failed' && status?.kind !== 'superseded')
+          throw new Error('Resolve the original publication before starting another release.');
+      } else {
+        for (const kind of ['import', 'review'] as const) if (current.actions[kind]) await query(kind);
+        if (!canArchiveUnpublished(currentSession.current))
+          throw new Error('Confirm the outcome of the saved editing requests before starting another release.');
+      }
     }
     await withReleaseJournalLock(user!.sub!, async () => {
       assertOwner(currentSession.current);
@@ -427,9 +440,9 @@ export function ContentReleasePage({ deck, children }: {
           download(`${current.bundle.releaseId}-verified-artifacts.json`, releaseArtifactDownload(current, artifact));
         })}>Download verified release artifacts</Button>}
       </div>}
-      {!delivery && (unusedRelease || stoppedRelease) && <Button variant="outline" disabled={busy || restoreBlocked}
+      {!delivery && (unusedRelease || unpublishedRelease || stoppedRelease) && <Button variant="outline" disabled={busy || restoreBlocked}
         onClick={() => void run(startAnotherRelease)}>
-        {unusedRelease ? 'Archive unused release' : 'Archive stopped release'}
+        {unusedRelease ? 'Archive unused release' : stoppedRelease ? 'Archive stopped release' : 'Archive unpublished release'}
       </Button>}
     </section>
     {publication && <PublicationStatusPanel status={publication} busy={busy} blocked={restoreBlocked}

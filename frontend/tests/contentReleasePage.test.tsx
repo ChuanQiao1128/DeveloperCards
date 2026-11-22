@@ -347,6 +347,31 @@ describe('recovery reconciliation and ownership regressions', () => {
     expect(cloud.saveCloudReleaseJournal).toHaveBeenCalledTimes(1);
     expect(api.sendReleaseAction).not.toHaveBeenCalled();
   });
+  it.each([409, 503])('allows archiving a checked unpublished import only after a definite rejection (%d)', async httpStatus => {
+    const { session } = releaseFixture(5);
+    const outcome = refused<Record<string, unknown>>('EDITING_SNAPSHOT_CONFLICT', 'The saved editing snapshot changed.');
+    const action = prepareReleaseAction(session, 'import', 'import');
+    session.actions.import = {
+      ...action,
+      result: { ...outcome, error: { ...outcome.error!, httpStatus } },
+    };
+    storeCloud(JSON.stringify(session));
+    api.fetchReleaseAction.mockResolvedValue(refused('ACTION_NOT_FOUND', 'No committed action.'));
+    await mount();
+    expect(screen.queryByRole('button', { name: 'Archive unpublished release' })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Query import action' }));
+    await screen.findByText(/The action has not committed/);
+    if (httpStatus === 409) {
+      await userEvent.click(screen.getByRole('button', { name: 'Archive unpublished release' }));
+      await screen.findByText(/Release journal archived/);
+      expect(api.fetchReleaseAction).toHaveBeenCalledTimes(2);
+      expect(cloudState.pointer.parts).toEqual([]);
+    } else {
+      expect(screen.queryByRole('button', { name: 'Archive unpublished release' })).toBeNull();
+      expect(readCloudSaved().actions.import?.payload).toBe(action.payload);
+    }
+    expect(api.sendReleaseAction).not.toHaveBeenCalled();
+  });
   it('cannot restore an old journal after another browser claims the empty revision', async () => {
     storeCloud('');
     const { session } = releaseFixture(5);
