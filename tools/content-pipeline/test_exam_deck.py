@@ -72,9 +72,11 @@ class Model:
                     row.update(verdict='gap', repairKeys=[RULE['key']], note='Make stop behavior explicit.')
                 rows.append(row)
             return {'questions': rows}
-        if stage == 'source-review' and self.wrong_key:
-            return {'verdict': 'wrong_key', 'evidence': [{'source': 'disk', 'quote': DOC['text']}],
-                    'note': 'The printed key reverses the retention rule.'}
+        if stage == 'source-review':
+            if self.wrong_key:
+                return {'verdict': 'wrong_key', 'evidence': [{'source': 'disk', 'quote': DOC['text']}],
+                        'note': 'The printed key reverses the retention rule.'}
+            return {'verdict': 'unconfirmed', 'evidence': [], 'note': 'The question itself stands.'}
         raise AssertionError(stage)
 
 
@@ -301,6 +303,212 @@ class ExamDeckWorkflowTests(unittest.TestCase):
         self.assertEqual(flow.verify_quotes([ref], [DOC]), [{'source':'disk', 'quote':QUOTE}])
         with self.assertRaisesRegex(ValueError, 'absent from the named'):
             flow.verify_quotes([dict(ref, source='https://docs.aws.amazon.com/another')], [DOC])
+
+    def test_keyless_select_two_rejects_one_choice(self):
+        q = question(1)
+        q.update(text='Select TWO answers for keeping and encrypting files.',
+                 choices={'A': 'Keep the files with a persistent disk.',
+                          'B': 'Encrypt the written files.'}, answer=[])
+        cards = {RULE['key']: card()}
+        with self.assertRaisesRegex(ValueError, 'requires 2 choices'):
+            flow.check_question(q, supported('Q1'), [{'key': RULE['key']}], cards)
+
+    def test_selection_count_is_scoped_to_directives_and_interrogatives(self):
+        cases = {
+            'Which TWO of the following controls preserve and protect the files?': {2},
+            '请选择两项能够保护数据的控制措施。': {2},
+            '该公司需要保护文件。下列哪三项措施满足要求？': {3},
+            'Which options work? (Select THREE.)': {3},
+            'The company must choose two options for a later rollout. Which storage solution keeps files?': set(),
+            'Which option keeps the files? Select all that apply.': set(),
+        }
+        for prompt, counts in cases.items():
+            with self.subTest(prompt=prompt):
+                self.assertEqual(flow.selection_counts(prompt), counts)
+
+    def test_rejected_option_cannot_certify_its_own_wording(self):
+        q = question(1)
+        q['choices']['B'] = 'Delete every file on the disk.'
+        row = supported('Q1')
+        row['options'][1].update(cardKey='', quote=q['choices']['B'])
+        with self.assertRaisesRegex(ValueError, 'decisive condition'):
+            flow.check_question(q, row, [{'key': RULE['key']}], {RULE['key']: card()})
+
+    def test_pdf_page_footers_are_not_question_content(self):
+        raw = (b"Question 1. What preserves the files?\nA. Disk\nB. Memory\n"
+               b"                  Page 1 of 2\n\f"
+               b"Question 2. What persists?\nA. Data\nB. Cache\n"
+               b"                  Page 2 of 2\n\f")
+        mocked = flow.subprocess.CompletedProcess([], 0, raw)
+        with patch.object(flow.subprocess, 'run', return_value=mocked):
+            rows = flow.normalize_questions(Path('exam.pdf'), 2)
+        self.assertEqual([row['choices']['B'] for row in rows], ['Memory', 'Cache'])
+
+    def test_cross_batch_exact_rule_collision_is_reused(self):
+        bank = [question(i) for i in range(1, 10)]
+        bank[-1].update(text='Does an attached block device preserve backups on reboot?',
+                        choices={'A':'Yes', 'B':'No'})
+        def model(stage, instructions, data, schema):
+            self.assertEqual(stage, 'plan')
+            return {'rules': [RULE],
+                    'questions': [{'id': q['id'], 'needs': [{'need': 'Preserve backups.',
+                                                          'key': RULE['key']}]} for q in data['questions']]}
+        rules = {}
+        allocations = flow.plan(model, bank, rules, {'hosts': set(), 'questions': {}})
+        self.assertEqual(len(allocations), 9)
+        self.assertEqual(set(rules), {RULE['key']})
+
+    def test_cites_cards_without_exposing_the_planners_proposed_answer(self):
+        def model(stage, instructions, data, schema):
+            self.assertEqual(stage, 'question-review')
+            self.assertEqual(data['packets'][0]['judgments'], [{'number': 1, 'key': RULE['key']}])
+            return {'questions': [supported('Q1')]}
+        result = flow.assess(model, [question(1)], {'Q1': [{'key': RULE['key'], 'need': 'Answer A.'}]},
+                             {RULE['key']: card()}, {}, FrozenSources(), [], {})
+        self.assertEqual(result['Q1']['status'], 'supported')
+
+    def test_confirmed_source_issue_without_cards_returns_a_report(self):
+        def model(stage, instructions, data, schema):
+            if stage == 'author':
+                return {'cards': [{**card(), 'status': 'insufficient'}]}
+            if stage == 'source-review':
+                return {'verdict': 'unsound', 'note': 'The question contradicts the documented premise.',
+                        'evidence': [{'source': 'disk', 'quote': DOC['text']}]}
+            return Model()(stage, instructions, data, schema)
+        with tempfile.TemporaryDirectory() as directory:
+            result, last = self.workflow(directory, [question(1)], model, exporter=lambda *args: self.fail('export'))
+        self.assertEqual(result['status'], 'source_issues_only')
+        self.assertEqual(result['counts'], {'confirmed_source_issue': 1})
+        self.assertEqual(last['questions']['Q1']['sourceReview']['verdict'], 'unsound')
+        self.assertEqual(result['bundles'], [])
+
+    def test_transient_source_failure_retries_before_freezing_snapshot(self):
+        url = DOC['url']
+        page = {'url': url, 'title': DOC['title'], 'sourceId': flow.digest(DOC['text']),
+                'chunks': [{'id': 'p1', 'charStart': 0, 'charEnd': len(DOC['text']), 'text': DOC['text']}]}
+        failure = flow.IngestError('temporary 503')
+        failure.__cause__ = flow.HTTPError(url, 503, 'Unavailable', None, None)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            with patch.object(flow, 'ingest', side_effect=[failure, page]) as request:
+                with patch.object(flow.time, 'sleep'):
+                    evidence = flow.Sources(root, FrozenSources.hosts).packet([url], 'persistent files', 3)
+            self.assertEqual(request.call_count, 2)
+            self.assertEqual(len(evidence), 1)
+            with patch.object(flow, 'ingest', side_effect=AssertionError('must reuse success')):
+                self.assertEqual(flow.Sources(root, FrozenSources.hosts).packet([url], 'persistent files', 3), evidence)
+
+    def test_long_question_reaches_review_with_all_ten_cards(self):
+        q = {'id':'Q1', 'text':'x' * 10000,
+             'choices':{str(i):'y' * 2999 for i in range(10)}}
+        excess = len(flow.canonical(q)) - 40000
+        q['choices']['0'] = q['choices']['0'][:-excess]
+        self.assertEqual(len(flow.canonical(q)), 40000)
+        q['answer'] = []
+        cards = {}
+        for n in range(10):
+            key = f'large-{n}'
+            current = dict(card(), key=key, answerEn='Words needed for decision ' * 18,
+                           reasonEn='The cited material explains a mechanism. ' * 13)
+            # Keep complete visible text near the per-card limit.
+            current['answerEn'] = current['answerEn'].strip()
+            current['reasonEn'] = current['reasonEn'].strip()
+            flow.verify_card(current, [DOC])
+            cards[key] = current
+        needs = {'Q1': [{'key': key, 'need': 'Full private planner note. ' * 10} for key in cards]}
+        def model(stage, instructions, data, schema):
+            self.assertEqual(stage, 'question-review')
+            packet = data['packets'][0]
+            self.assertEqual(packet['question']['text'], q['text'])
+            self.assertEqual(packet['question']['choices'], q['choices'])
+            self.assertEqual(len(packet['cards']), 10)
+            return {'questions': [dict(supported('Q1'), verdict='gap', uses=[], options=[])]}
+        result = flow.assess(model, [q], needs, cards, {}, FrozenSources(), [], {})
+        self.assertEqual(result['Q1']['status'], 'gap')
+
+    def test_conflicting_rule_is_resolved_in_targeted_second_prompt(self):
+        bank = [question(i) for i in range(1, 10)]
+        rules = {}
+        requests = []
+        def model(stage, instructions, data, schema):
+            requests.append(data)
+            new_rule = RULE
+            if data['questions'][0]['id'] == 'Q9':
+                new_rule = dict(RULE, goal='Choose encryption for written files.')
+                if data.get('definitionConflicts'):
+                    self.assertEqual(data['definitionConflicts'], [RULE])
+                    new_rule['key'] = 'disk-encryption'
+            return {'rules': [new_rule],
+                    'questions': [{'id': q['id'], 'needs': [{'need': 'Choose control.',
+                                                          'key': new_rule['key']}]}
+                                  for q in data['questions']]}
+        allocations = flow.plan(model, bank, rules, {'hosts': set(), 'questions': {}})
+        self.assertEqual(len(requests), 3)
+        self.assertEqual(allocations['Q1'][0]['key'], RULE['key'])
+        self.assertEqual(allocations['Q9'][0]['key'], 'disk-encryption')
+        self.assertEqual(rules[RULE['key']], RULE)
+
+    def test_reviewed_card_digest_is_checked_before_any_output(self):
+        current = card()
+        reviews = {RULE['key']: {'cardSha256': flow.digest(flow.canonical(current)),
+                                 'note': 'Passed.', 'evidence': [DOC]}}
+        current['answerEn'] = 'The card changed after review.'
+        findings = {'Q1': {'status': 'supported', 'proof': supported('Q1')}}
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            with self.assertRaisesRegex(ValueError, 'Card changed after independent review'):
+                flow.deliver(root, {'deckSlug':'qa-tamper'}, {RULE['key']: current}, reviews, findings)
+            self.assertEqual(list(root.iterdir()), [])
+
+    def test_second_controller_cannot_take_same_run_directory(self):
+        with tempfile.TemporaryDirectory() as directory:
+            with flow.run_lock(Path(directory)):
+                with self.assertRaisesRegex(ValueError, 'already active'):
+                    with flow.run_lock(Path(directory)):
+                        self.fail('concurrent controller acquired the lock')
+
+    @unittest.skipUnless((flow.REPO / 'frontend/node_modules/esbuild').exists(), 'install frontend dependencies')
+    def test_second_bundle_failure_hides_first_and_can_resume(self):
+        cards, reviews, findings = {}, {}, {}
+        for i in range(1, 502):
+            key = f'card-{i}'
+            current = dict(card(), key=key)
+            cards[key] = current
+            reviews[key] = {'cardSha256': flow.digest(flow.canonical(current)),
+                            'note': 'Independent review passed.', 'evidence': [DOC]}
+            findings[f'Q{i}'] = {'status': 'supported', 'proof': {'uses': [{'key': key}], 'options': []}}
+        original_run = flow.subprocess.run
+        validations = 0
+        def interrupt_second(argv, **kwargs):
+            nonlocal validations
+            if 'check-new' in argv:
+                validations += 1
+                if validations == 2:
+                    raise flow.subprocess.CalledProcessError(1, argv, stderr='simulated interruption')
+            return original_run(argv, **kwargs)
+        config = {'deckSlug': 'qa-atomic'}
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            with patch.object(flow.subprocess, 'run', side_effect=interrupt_second):
+                with self.assertRaises(flow.subprocess.CalledProcessError):
+                    list(flow.deliver(root, config, cards, reviews, findings))
+            self.assertFalse((root / 'delivery').exists())
+            self.assertFalse((root / 'cards.md').exists())
+            rename = Path.rename
+            def interrupt_commit(path, dest):
+                if path.name == '.delivery-staging':
+                    raise OSError('simulated interruption before commit')
+                return rename(path, dest)
+            with patch.object(Path, 'rename', interrupt_commit):
+                with self.assertRaisesRegex(OSError, 'before commit'):
+                    list(flow.deliver(root, config, cards, reviews, findings))
+            self.assertFalse((root / 'delivery').exists())
+            self.assertFalse((root / 'cards.md').exists())
+            delivered = list(flow.deliver(root, config, cards, reviews, findings))
+            self.assertGreater(len(delivered), 1)
+            count = sum(len(json.loads(flow.load(Path(path))['draft'])['cards']) for path in delivered)
+            self.assertEqual(count, 501)
+            self.assertEqual(delivered, list(flow.deliver(root, config, cards, reviews, findings)))
 
     @unittest.skipUnless((flow.REPO / 'frontend/node_modules/esbuild').exists(), 'install frontend dependencies')
     def test_console_preview_and_tampered_bundle(self):
