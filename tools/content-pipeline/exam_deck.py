@@ -67,7 +67,6 @@ def choices(*values):
 
 
 TEXT = {'type': 'string'}
-REFERENCE = obj(source=TEXT, quote=TEXT)
 PLAN = obj(
     rules=arr(obj(key=TEXT, goal=TEXT, query=TEXT, urls=arr(TEXT))),
     questions=arr(obj(id=TEXT, needs=arr(obj(need=TEXT, key=TEXT)))))
@@ -81,7 +80,6 @@ COVERAGE = obj(questions=arr(obj(
     uses=arr(obj(need={'type': 'integer'}, key=TEXT, quote=TEXT)),
     options=arr(obj(choiceId=TEXT, verdict=choices('select', 'reject'), cardKey=TEXT, quote=TEXT, reason=TEXT)),
     repairKeys=arr(TEXT), note=TEXT)))
-SOURCE_ISSUE = obj(verdict=choices('wrong_key', 'unsound', 'unconfirmed'), evidence=arr(REFERENCE), note=TEXT)
 MERGES = obj(pairs=arr(obj(id=TEXT, verdict=choices('equivalent', 'distinct'), note=TEXT)))
 
 
@@ -321,6 +319,42 @@ def verify_quotes(refs, packet):
     return resolved
 
 
+def resolve_evidence_hints(config, questions, sources):
+    hints = config.get('evidenceHints', {})
+    if not isinstance(hints, dict) or not hints.keys() <= {q['id'] for q in questions}:
+        raise ValueError('evidenceHints must map original question IDs to official excerpts')
+    resolved = {}
+    for qid in sorted(hints):
+        refs = hints[qid]
+        if not isinstance(refs, list) or not 1 <= len(refs) <= 5:
+            raise ValueError(f'{qid}: expected 1–5 official evidence hints')
+        rows = []
+        for ref in refs:
+            if not isinstance(ref, dict) or set(ref) != {'url', 'quote'}:
+                raise ValueError(f'{qid}: evidence hint requires url and quote')
+            url = checked_text(ref['url'], 2048, 'evidence URL')
+            quote = checked_text(ref['quote'], 1500, 'evidence quote')
+            packet = sources.fetch(url)
+            citation = verify_quotes([{'source': url, 'quote': quote}], packet)[0]
+            rows.append(next(row for row in packet if row['source'] == citation['source']))
+        resolved[qid] = rows
+    return resolved
+
+
+def evidence_packet(sources, urls, query, limit, hints):
+    pinned = {row['source']: row for row in hints}
+    retrieved = sources.packet(urls, query, limit + len(pinned))
+    if not pinned:
+        return retrieved
+    additional = [row for row in retrieved if row['source'] not in pinned]
+    # The same question can require more than one decision. Preserve an automatic match.
+    slots = limit - bool(additional)
+    preferred = list(pinned.values())
+    if len(preferred) > slots:
+        preferred = ranked(preferred, lambda row: row['text'], query, slots)
+    return (preferred + additional)[:limit]
+
+
 def visible_card(card):
     return {field: card[field] for field in ('key', 'frontEn', 'answerEn', 'reasonEn')}
 
@@ -515,7 +549,7 @@ def rule_urls(rule, hosts):
     return approved
 
 
-def select_cards(model, sources, rules, needed, seed_urls, standard, revisions):
+def select_cards(model, sources, rules, needed, seed_urls, standard, revisions, hints_by_rule):
     accepted, problems, evaluations = {}, {}, {}
     for attempt in range(REPAIR_ROUNDS):
         pending = [r for key, r in rules.items() if key in needed and key not in accepted]
@@ -529,12 +563,15 @@ def select_cards(model, sources, rules, needed, seed_urls, standard, revisions):
                 search = (rule['query'] + ' ' + failure[:250]).strip()
                 # Model URL candidates are hints, while the configured hosts define the trust boundary.
                 urls = rule_urls(rule, sources.hosts)
-                packets[key] = sources.packet(seed_urls + urls, search, 3 + attempt)
+                packets[key] = evidence_packet(sources, seed_urls + urls, search, 3 + attempt,
+                                               hints_by_rule.get(key, []))
             _, output = result_rows(model, 'author', (
                 'Write original bilingual mobile cards for these rule keys using the complete rules below. '
                 'Use one practical decision and explain the causal mechanism. Each front must be a short '
                 'concrete scenario, blank line and one question. checkEn is exactly the minimum answer the '
-                'front asks for. Provide exact verbatim quotes separately for both answer and reason. '
+                'front asks for. Any unasked recovery step or configuration may illustrate the reason, '
+                'but must not become a required answer or a separate recall task. '
+                'Provide exact verbatim quotes separately for both answer and reason. '
                 'Each citation source is the opaque source identifier copied from an evidence row. '
                 'During revision, address the specific coverage finding and preserve the proven scope of '
                 'the prior draft. If facts cannot be established, return insufficient and explain.\n\n'
@@ -554,8 +591,9 @@ def select_cards(model, sources, rules, needed, seed_urls, standard, revisions):
             _, reviews = result_rows(model, 'card-review', (
                 'Independently review each frozen card. Pass only if every answer and reason is supported '
                 'by its cited official source, EN/ZH have the same meaning and conditions, the card teaches '
-                'one useful mobile-size judgment and causal mechanism, the prompt is unambiguous, the '
-                'self-check matches the front, and a changed condition can be reasoned through. '
+                'one useful mobile-size judgment and causal mechanism, the prompt is unambiguous, and '
+                'a changed condition can be reasoned through. Compare each item in the self-check to '
+                'what the front explicitly asks. Revise if any item requires an unasked follow-up action. '
                 'For revise, identify the defect and the smallest sound repair.\n\n' + standard),
                 {'cards': list(valid.values()), 'evidence': {k: packets[k] for k in valid}}, REVIEW, 'cards', 'key', valid)
             for key, review in reviews.items():
@@ -570,29 +608,49 @@ def select_cards(model, sources, rules, needed, seed_urls, standard, revisions):
     return accepted, problems, evaluations
 
 
-def source_issue(model, sources, seed_urls, question, report):
-    evidence = sources.packet(seed_urls, question['text'] + ' ' + report['note'], 6)
+def source_issue(model, sources, seed_urls, question, report, hints):
+    evidence = evidence_packet(sources, seed_urls, question['text'] + ' ' + report['note'], 6, hints)
     if not evidence:
         return
-    verdict = model('source-review', (
+    schema = obj(verdict=choices('wrong_key', 'unsound', 'unconfirmed'),
+                 evidence=arr(obj(source=TEXT, quote=TEXT)), note=TEXT)
+    source_ids = {row['source'] for row in evidence}
+    instructions = (
         'Independently check whether the original question or its provided answer key has a '
         'specific defect, using authoritative excerpts. Confirm only if the excerpts establish '
         'the defect under the original wording (missing information, no valid answer, multiple '
-        'valid answers beyond the requested count, or a contradicted key). Quote exact official '
-        'text. Do not create replacement questions or relax conditions. If evidence cannot prove '
+        'valid answers beyond the requested count, or a contradicted key). Copy only the literal '
+        'evidence.source ID into source and at least 16 consecutive characters from its text into quote. '
+        'Do not create replacement questions or relax conditions. If evidence cannot prove '
         'a defect, return unconfirmed. Use wrong_key only if the exact card-selected choices are '
         'established by the original question conditions and contradict its key. Use unsound only if '
-        'no unique valid choice set can be determined.'), {'question': question, 'possibleIssue': report['note'],
-                                          'selectedFromCards': report.get('proof', {}).get('selected', []),
-                                          'evidence': evidence}, SOURCE_ISSUE)
-    corrected = verdict['verdict'] == 'wrong_key' and report['status'] == 'answer_mismatch'
-    if (corrected or verdict['verdict'] == 'unsound') and verdict['evidence']:
-        citations = verify_quotes(verdict['evidence'], evidence)
+        'no unique valid choice set can be determined.')
+    data = {'question': question, 'possibleIssue': report['note'],
+            'selectedFromCards': report.get('proof', {}).get('selected', []), 'evidence': evidence}
+    for _ in range(2):
+        verdict = model('source-review', instructions, data, schema)
+        corrected = verdict['verdict'] == 'wrong_key' and report['status'] == 'answer_mismatch'
+        if not (corrected or verdict['verdict'] == 'unsound'):
+            return
+        try:
+            if not verdict['evidence']:
+                raise ValueError('Confirmed source issue requires an exact official citation')
+            if any(ref['source'] not in source_ids for ref in verdict['evidence']):
+                raise ValueError('Citation source must be a literal evidence.source ID from the packet')
+            citations = verify_quotes(verdict['evidence'], evidence)
+        except ValueError as exc:
+            error = str(exc)
+            report.setdefault('sourceCitationErrors', []).append(error)
+            data = {**data, 'citationRepair': error}
+            continue
         report.update(status='supported_with_corrected_key' if corrected else 'confirmed_source_issue',
                       sourceReview=dict(verdict, evidence=citations), officialEvidence=evidence)
+        return
 
 
-def assess(model, questions, allocations, cards, evaluations, sources, seed_urls, previous, *, rules=None):
+def assess(model, questions, allocations, cards, evaluations, sources, seed_urls, previous, *,
+           rules=None, evidence_hints=None):
+    evidence_hints = evidence_hints or {}
     findings, pending, context = {}, [], {}
     for q in questions:
         qid = q['id']
@@ -606,7 +664,7 @@ def assess(model, questions, allocations, cards, evaluations, sources, seed_urls
             report = {'binding': binding, 'status': 'gap', 'note': 'No accepted card for this question'}
             related = [url for need in needs if rules and need['key'] in rules
                        for url in rule_urls(rules[need['key']], sources.hosts)]
-            source_issue(model, sources, seed_urls + related, q, report)
+            source_issue(model, sources, seed_urls + related, q, report, evidence_hints.get(qid, []))
             findings[qid] = report
             continue
         # Withhold the answer key, sources and planner wording from the card-only proof.
@@ -622,8 +680,9 @@ def assess(model, questions, allocations, cards, evaluations, sources, seed_urls
         'quote the assigned rule card for each numbered judgment. For each original option, copy its '
         'label (such as A) into choiceId, give its select/reject verdict, cite the exact card key in '
         'cardKey, and explain why the quote proves that disposition. Option wording is never an ID. '
-        'If an option can be eliminated directly from the question, use an empty cardKey and quote '
-        'the decisive condition from the stem. An option is not evidence for rejecting itself. '
+        'If an option can be eliminated directly from the question, use an empty cardKey and copy '
+        'at least 12 consecutive characters covering the decisive condition from the original stem. '
+        'This minimum also applies to Chinese. An option is not evidence for rejecting itself. '
         'Every selected option requires card evidence. Inspect omitted '
         'decisive judgments before passing. For a gap explain what is missing. Only list a visible key '
         'in repairKeys if that card is defective. Use source_issue for a suspected defect in the exam.')
@@ -662,7 +721,7 @@ def assess(model, questions, allocations, cards, evaluations, sources, seed_urls
                 report = {'binding': binding, 'status': status, 'note': note, 'proof': row}
                 if status in {'answer_mismatch', 'source_issue'}:
                     related = [doc['url'] for key in available for doc in evaluations[key]['evidence']]
-                    source_issue(model, sources, seed_urls + related, q, report)
+                    source_issue(model, sources, seed_urls + related, q, report, evidence_hints.get(qid, []))
                 findings[qid] = report
             group = retry
     return findings
@@ -750,6 +809,7 @@ def deliver(root, config, cards, evaluations, findings):
 
 def execute(root, config, questions, standard, model, sources, exporter=deliver):
     seed_urls = config.get('sources', [])
+    evidence_hints = resolve_evidence_hints(config, questions, sources)
     rules, allocations, cards, evaluations, problems, findings = {}, {}, {}, {}, {}, {}
     targets, revisions = questions, {}
     snapshot = {}
@@ -762,11 +822,16 @@ def execute(root, config, questions, standard, model, sources, exporter=deliver)
         if round_number == 1:
             merge_shared_rules(model, rules, allocations)
         needed = {n['key'] for needs in allocations.values() for n in needs}
+        hints_by_rule = {}
+        for qid, hints in evidence_hints.items():
+            for need in allocations[qid]:
+                hints_by_rule.setdefault(need['key'], []).extend(hints)
         new_cards, problems, new_reviews = select_cards(
-            model, sources, rules, needed - cards.keys(), seed_urls, standard, revisions)
+            model, sources, rules, needed - cards.keys(), seed_urls, standard, revisions, hints_by_rule)
         cards.update(new_cards)
         evaluations.update(new_reviews)
-        findings = assess(model, questions, allocations, cards, evaluations, sources, seed_urls, findings, rules=rules)
+        findings = assess(model, questions, allocations, cards, evaluations, sources, seed_urls, findings,
+                          rules=rules, evidence_hints=evidence_hints)
         unresolved = [q for q in questions if findings[q['id']]['status'] not in {'supported', 'supported_with_corrected_key', 'confirmed_source_issue'}]
         snapshot = {'round': round_number, 'rules': rules, 'allocations': allocations, 'cards': cards,
                     'cardReviews': evaluations, 'cardIssues': problems, 'questions': findings,
