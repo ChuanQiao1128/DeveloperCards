@@ -712,6 +712,30 @@ export async function importCardsBatch(params: {
 
 type PublishStarted = { mode: string; jobId?: string };
 
+export interface ReviewedPublishBaseline {
+  editingSnapshot: string;
+  liveBuildId: string | null;
+}
+
+export async function fetchReviewedPublishBaseline(deckId: number): Promise<ApiResult<{ baseline: ReviewedPublishBaseline | null }>> {
+  try {
+    return (await http.post<ApiResult<{ baseline: ReviewedPublishBaseline | null }>>(
+      '/api/v1/authoring/publish?mode=reviewed-batch-preview', { deckId })).data;
+  } catch (err) {
+    return apiResultFromError(err);
+  }
+}
+
+export async function publishReviewedImport(deckId: number, reviewedImportOperationId: string, signal: AbortSignal): Promise<ApiResult<PublishStarted>> {
+  try {
+    return (await http.post<ApiResult<PublishStarted>>('/api/v1/authoring/publish',
+      { deckId, reviewedImportOperationId }, { signal, timeout: IMPORT_REQUEST_TIMEOUT_MS })).data;
+  } catch (err) {
+    return apiResultFromError(err);
+  }
+}
+
+
 export async function publishDeck(
   deckId: number,
   note?: string,
@@ -766,6 +790,8 @@ type PublishJobDetail = Pick<PublishJob, 'jobId' | 'status' | 'manifestState' | 
   dispatchAttempts?: number | null;
   manifestError?: string | null;
   manifestAttempts?: number | null;
+  cdnVerificationState?: 'pending' | 'verified' | 'needs_attention';
+  cdnVerificationError?: string | null;
 };
 
 export async function fetchPublishJob(jobId: string): Promise<ApiResult<PublishJobDetail>> {

@@ -9,8 +9,8 @@ public static class PublishDelivery
 {
   public const int Batch = 5;
   public const int MaxAttempts = 5;
-  public static async Task<bool> Ready(NpgsqlConnection conn) =>
-    await DbUtil.ExecuteScalarAsync(conn, null, "select to_regclass('public.publish_dispatch') is not null and to_regclass('public.publish_manifest_delivery') is not null", []) is true;
+  public static async Task<bool> Ready(NpgsqlConnection conn, NpgsqlTransaction? tx = null) =>
+    await DbUtil.ExecuteScalarAsync(conn, tx, "select to_regclass('public.publish_dispatch') is not null and to_regclass('public.publish_manifest_delivery') is not null", []) is true;
 
   public static async Task Annotate(NpgsqlConnection conn, List<Dictionary<string, object?>> rows)
   {

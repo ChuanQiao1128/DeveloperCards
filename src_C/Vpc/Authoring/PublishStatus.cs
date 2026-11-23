@@ -53,6 +53,7 @@ public static class PublishStatus
     }
 
     await PublishDelivery.Annotate(conn,rows);
+    await PublishCdnVerification.AnnotateAsync(conn, rows);
     return res.Ok(rows[0]);
   }
 }

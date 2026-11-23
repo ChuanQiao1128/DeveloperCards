@@ -7,7 +7,7 @@ using RecallSmith.Lambda.Vpc.Authoring;
 
 namespace RecallSmith.Lambda.Vpc.Automation;
 
-/// <summary>Signed callback from the public-network verifier for one certified AWS Basics build.</summary>
+/// <summary>Signed callback from the public-network verifier for one reviewed public build.</summary>
 internal static class ContentCdnVerification
 {
   internal const string Prepare = "prepare-content-cdn";
@@ -28,18 +28,20 @@ internal static class ContentCdnVerification
       : res.Ok(await RecordAsync(conn, jobId, body));
   }
 
-  private const string Current = """
+  private const string Current = $$"""
     from publish_cdn_verification v join deck_publishes p using(job_id)
     join decks d on d.id=p.deck_id left join publish_manifest_delivery m using(job_id)
-    where p.job_id=$1 and p.deck_slug='aws-saa-fundamentals' and d.slug=p.deck_slug
-      and d.is_deleted=0 and p.release_receipt_id is not null and p.release_generation=d.release_generation
+    where p.job_id=$1 and d.slug=p.deck_slug and d.is_deleted=0
+      and ((p.deck_slug='aws-saa-fundamentals' and p.release_receipt_id is not null and p.release_generation=d.release_generation)
+        or (p.deck_slug<>'aws-saa-fundamentals' and exists(select 1 from publish_dispatch s where s.job_id=p.job_id
+          and starts_with(s.action_id,'{{PublishCdnVerification.ReviewedBatchActionPrefix}}'))))
       and p.content_sha256=v.sha256 and v.verified_at is null and v.failure_code is null
       and (p.status='PROCESSING' or (p.status='SUCCESS' and d.live_build_id=p.build_id))
     """;
 
   internal static async Task<object> PrepareAsync(NpgsqlConnection conn, string jobId)
   {
-    const string sql = "select p.status,p.build_id,v.sha256,v.card_count,m.state " + Current;
+    const string sql = "select p.status,p.deck_slug,p.build_id,p.content_bytes,v.sha256,v.card_count,m.state " + Current;
     var rows = await DbUtil.QueryAsync(conn, null, sql, [jobId]);
     if (rows.Count == 0) return new { skip = true };
     if (rows[0]["status"] as string != "SUCCESS") return new { retry = true };
@@ -52,7 +54,7 @@ internal static class ContentCdnVerification
     var row = rows[0];
     if (row["state"] as string == "needs_attention") return new { skip = true };
     if (row["state"] as string != "delivered") return new { retry = true };
-    return new { buildId = row["build_id"], sha256 = row["sha256"], cards = row["card_count"] };
+    return new { slug = row["deck_slug"], buildId = row["build_id"], sha256 = row["sha256"], cards = row["card_count"], bytes = row["content_bytes"] };
   }
 
   internal static async Task<object> RecordAsync(NpgsqlConnection conn, string jobId, JsonElement body)

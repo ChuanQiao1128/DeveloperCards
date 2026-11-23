@@ -1,4 +1,4 @@
-import type { ImportCardsBatchResult } from '../api/authoring';
+import type { ImportCardsBatchResult, ReviewedPublishBaseline } from '../api/authoring';
 import { cardInputFor, chunkImportActions, wouldClearTranslations, type ImportAction } from './deckImportRunner';
 
 export type JournalStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> & Partial<Pick<Storage, 'key' | 'length'>>;
@@ -8,6 +8,7 @@ export interface ImportJournal {
   deckId: number;
   runId: string;
   createdAt: number;
+  reviewedPublish?: { jobId?: string; refusal?: string; notice?: string; finished?: boolean };
   batches: Array<{
     body: string;
     fingerprint: string;
@@ -21,7 +22,8 @@ const PREFIX = 'recallsmith-import/v1/';
 export const IMPORT_JOURNAL_MAX_CHARS = 2_000_000;
 const key = (account: string, deckId: number) => `${PREFIX}${encodeURIComponent(account)}/${deckId}`;
 const corrupt = () => new Error('Import recovery data is invalid. Submission is blocked; keep this browser data and contact support.');
-export const hasPendingImport = (journal: ImportJournal) => !journal.batches.some(b => b.state === 'rejected') && journal.batches.some(b => b.state === 'pending' || b.state === 'unknown');
+export const hasPendingImport = (journal: ImportJournal) => !journal.batches.some(b => b.state === 'rejected') && (journal.batches.some(b => b.state === 'pending' || b.state === 'unknown') ||
+  Boolean(journal.reviewedPublish && !journal.reviewedPublish.finished && !journal.reviewedPublish.refusal));
 export const IMPORT_JOURNAL_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 
 async function fingerprint(body: string): Promise<string> {
@@ -38,6 +40,19 @@ async function validate(journal: ImportJournal, account: string, deckId: number)
     if (typeof batch.body !== 'string' || !Array.isArray(batch.actions) || !['pending', 'unknown', 'committed', 'rejected'].includes(batch.state) ||
         batch.fingerprint !== await fingerprint(batch.body)) throw corrupt();
     const body = JSON.parse(batch.body);
+    if (journal.reviewedPublish !== undefined) {
+      const publish = journal.reviewedPublish;
+      const baseline = body.reviewedPublishBaseline;
+      if (!publish || journal.batches.length !== 1 || !body.expectedDeckSlug ||
+          !/^[0-9a-f]{64}$/.test(baseline?.editingSnapshot ?? '') ||
+          (baseline.liveBuildId !== null && typeof baseline.liveBuildId !== 'string') ||
+          (publish.jobId !== undefined && (typeof publish.jobId !== 'string' || !publish.jobId)) ||
+          (publish.refusal !== undefined && (typeof publish.refusal !== 'string' || !publish.refusal)) ||
+          ((publish.jobId || publish.refusal) && batch.state !== 'committed') ||
+          (publish.notice !== undefined && typeof publish.notice !== 'string') ||
+          (publish.finished !== undefined && (publish.finished !== true || !publish.jobId)) ||
+          (publish.jobId && publish.refusal)) throw corrupt();
+    } else if (body.reviewedPublishBaseline !== undefined) throw corrupt();
     if (body.deckId !== deckId || typeof body.operationId !== 'string' || !body.operationId || ids.has(body.operationId) ||
         (body.expectedDeckSlug !== undefined && (typeof body.expectedDeckSlug !== 'string' || !body.expectedDeckSlug)) ||
         !Array.isArray(body.cards) || body.cards.length === 0 || body.cards.length > 500 ||
@@ -71,7 +86,7 @@ export function saveImportJournal(journal: ImportJournal, storage: JournalStorag
 }
 
 /** One bounded journal per account/deck. Unknown work is never aged out as if rolled back. */
-export async function createImportJournal(account: string, deckId: number, actions: readonly ImportAction[], storage: JournalStorage = localStorage, expectedDeckSlug?: string): Promise<ImportJournal> {
+export async function createImportJournal(account: string, deckId: number, actions: readonly ImportAction[], storage: JournalStorage = localStorage, expectedDeckSlug?: string, reviewedPublishBaseline?: ReviewedPublishBaseline): Promise<ImportJournal> {
   if (!account) throw new Error('Sign in again before importing.');
   if (actions.some(wouldClearTranslations)) throw new Error('Preview again and explicitly approve clearing translations before importing.');
   const previous = await readImportJournal(account, deckId, storage);
@@ -80,10 +95,11 @@ export async function createImportJournal(account: string, deckId: number, actio
   const chunks = chunkImportActions(deckId, actions);
   if (expectedDeckSlug && chunks.length !== 1) throw new Error('A reviewed batch must be applied in one transaction.');
   for (const chunk of chunks) {
-    const body = JSON.stringify({ deckId, expectedDeckSlug, operationId: crypto.randomUUID(), cards: chunk.map(cardInputFor) });
+    const body = JSON.stringify({ deckId, expectedDeckSlug, reviewedPublishBaseline, operationId: crypto.randomUUID(), cards: chunk.map(cardInputFor) });
     batches.push({ body, fingerprint: await fingerprint(body), actions: chunk, state: 'pending' as const });
   }
-  const journal: ImportJournal = { version: 1, account, deckId, runId: crypto.randomUUID(), createdAt: Date.now(), batches };
+  const journal: ImportJournal = { version: 1, account, deckId, runId: crypto.randomUUID(), createdAt: Date.now(), batches,
+    ...(reviewedPublishBaseline ? { reviewedPublish: {} } : {}) };
   await validate(journal, account, deckId);
   // Replacing a completed/rejected run is safe only after a fresh preview. Keep the old
   // journal until the replacement write succeeds, including quota failure.
@@ -99,7 +115,7 @@ export async function createImportJournal(account: string, deckId: number, actio
       try {
         const old = JSON.parse(saved) as ImportJournal;
         await validate(old, old.account, old.deckId);
-        if (old.version === 1 && Array.isArray(old.batches) && old.batches.every(b => b.state === 'committed') && Date.now() - old.createdAt > IMPORT_JOURNAL_RETENTION_MS) {
+        if (old.version === 1 && Array.isArray(old.batches) && old.batches.every(b => b.state === 'committed') && !hasPendingImport(old) && Date.now() - old.createdAt > IMPORT_JOURNAL_RETENTION_MS) {
           storage.removeItem(savedKey); continue;
         }
       } catch { /* Retain unrecognized data; it cannot prove a safe discard. */ }

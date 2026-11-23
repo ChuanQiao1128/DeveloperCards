@@ -124,6 +124,12 @@ public class JobRepository : IJobRepository
     await using var tx = await conn.BeginTransactionAsync();
     // Lock deck before job so final validation, rollback, revocation and card writes serialize.
     await DbUtil.QueryAsync(conn, tx, "select d.id from decks d join deck_publishes p on p.deck_id=d.id where p.job_id=$1 for update of d", [jobId]);
+    if (await PublishDelivery.Ready(conn, tx) && await DbUtil.ExecuteScalarAsync(conn, tx, """
+      select exists(select 1 from publish_dispatch s join deck_publishes p using(job_id) join decks d on d.id=p.deck_id
+        where p.job_id=$1 and p.status='PROCESSING' and starts_with(s.action_id,$2)
+          and p.release_expected_live is distinct from d.live_build_id)
+      """, [jobId, PublishCdnVerification.ReviewedBatchActionPrefix]) is true)
+      throw new BusinessException("LIVE_BUILD_CHANGED: the prior live build changed while publishing.");
     List<Dictionary<string, object?>> done;
     await tx.SaveAsync("complete");
     try

@@ -11,11 +11,12 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 
-import { fetchCardsByDeck, fetchDeckById, importCardsBatch, lookupImportReceipt } from '../api/authoring';
+import { fetchCardsByDeck, fetchDeckById, fetchPublishJob, fetchReviewedPublishBaseline, importCardsBatch, lookupImportReceipt, publishReviewedImport, type ReviewedPublishBaseline } from '../api/authoring';
 import { getSessionGeneration, subscribeSessionChanges } from '../auth/tokenStore';
 import { readSessionUser } from '../auth/sessionUser';
-import { createImportJournal, readImportJournal, hasPendingImport, withImportJournalLock, type ImportJournal } from '../lib/deckImportJournal';
+import { createImportJournal, readImportJournal, saveImportJournal, hasPendingImport, withImportJournalLock, type ImportJournal } from '../lib/deckImportJournal';
 import { QueryKeys, useAppQueryClient } from '../api/queryClient';
 import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard';
 import { DeckWorkspaceHeader } from '../components/console/DeckWorkspaceHeader';
@@ -63,6 +64,7 @@ interface DeckState {
 
 interface PreviewState {
   reviewed: boolean;
+  publishBaseline: ReviewedPublishBaseline | null;
   parsed: ParsedDeck;
   plan: ImportPlan;
   /** Set when the document header names a different deck than the target. */
@@ -174,6 +176,24 @@ function DeckImportWorkspace({ deckId }: { deckId: number }) {
   const [recoveryError, setRecoveryError] = useState<string | null>(null);
   const [recoveryLoading, setRecoveryLoading] = useState(true);
   const account = readSessionUser()?.sub;
+  const [publishResult, setPublishResult] = useState<ImportJournal['reviewedPublish']>();
+  const jobId = publishResult?.jobId;
+  const publication = useQuery({
+    queryKey: ['reviewed-batch-publication', sessionGeneration, deckId, jobId],
+    enabled: Boolean(jobId),
+    queryFn: async () => {
+      const result = await fetchPublishJob(jobId!);
+      if (!result.success || result.data?.jobId !== jobId || result.data?.deckId !== deckId) throw new Error('Could not load the publish job.');
+      return result.data;
+    },
+    refetchInterval: query => {
+      const job = query.state.data;
+      return query.state.status === 'error' || job?.status === 'FAILED' ||
+        job?.dispatchExhausted || job?.manifestState === 'needs_attention' ||
+        job?.cdnVerificationState === 'needs_attention' || (job?.cdnVerificationState === 'verified' && job.manifestState === 'delivered') ||
+        (job?.status === 'SUCCESS' && job.buildIsLive === false) ? false : 5_000;
+    },
+  }, queryClient);
 
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -187,7 +207,7 @@ function DeckImportWorkspace({ deckId }: { deckId: number }) {
   useEffect(() => subscribeSessionChanges(() => {
     abortRef.current?.abort();
     setSessionGeneration(getSessionGeneration());
-    setRecovery(null); setRunResult(null); setPreview(null); setText(''); setBaselineMessage(''); setStep('input'); setRunning(false);
+    setRecovery(null); setPublishResult(undefined); setRunResult(null); setPreview(null); setText(''); setBaselineMessage(''); setStep('input'); setRunning(false);
   }), []);
 
   useEffect(() => {
@@ -195,7 +215,10 @@ function DeckImportWorkspace({ deckId }: { deckId: number }) {
     setRecoveryLoading(true); setRecovery(null); setRecoveryError(null);
     if (!account || invalidDeckId) { setRecoveryLoading(false); return; }
     void readImportJournal(account, deckId).then(journal => {
-      if (current) setRecovery(journal && hasPendingImport(journal) ? journal : null);
+      if (current) {
+        setRecovery(journal && hasPendingImport(journal) ? journal : null);
+        setPublishResult(journal?.reviewedPublish);
+      }
     }).catch(error => {
       if (current) setRecoveryError(`Recovery storage failed: ${error instanceof Error ? error.message : 'Cannot read saved import.'}`);
     }).finally(() => { if (current) setRecoveryLoading(false); });
@@ -203,6 +226,28 @@ function DeckImportWorkspace({ deckId }: { deckId: number }) {
   }, [account, deckId, invalidDeckId, sessionGeneration]);
 
   useEffect(() => () => abortRef.current?.abort(), []);
+
+  useEffect(() => {
+    const job = publication.data;
+    const finished = job && (job.status === 'FAILED' || job.dispatchExhausted ||
+      job.manifestState === 'needs_attention' || job.cdnVerificationState === 'needs_attention' ||
+      (job.status === 'SUCCESS' && (job.buildIsLive === false ||
+        (job.manifestState === 'delivered' && job.cdnVerificationState === 'verified'))));
+    if (!account || !jobId || !finished || publishResult?.finished) return;
+    let current = true;
+    void withImportJournalLock(account, deckId, async () => {
+      if (!current || sessionGeneration !== getSessionGeneration()) return;
+      const journal = await readImportJournal(account, deckId);
+      if (!journal?.reviewedPublish || journal.reviewedPublish.jobId !== jobId) return;
+      journal.reviewedPublish.finished = true;
+      saveImportJournal(journal);
+      setPublishResult(journal.reviewedPublish);
+      setRecovery(null);
+    }).catch(error => {
+      if (current) setRecoveryError(error instanceof Error ? error.message : 'Could not save publication status.');
+    });
+    return () => { current = false; };
+  }, [account, deckId, jobId, publication.data, publishResult?.finished, sessionGeneration]);
 
   useEffect(() => {
     if (invalidDeckId) return;
@@ -291,6 +336,8 @@ function DeckImportWorkspace({ deckId }: { deckId: number }) {
       markStart('import:preview');
       const reviewed = text.trimStart().startsWith('{') ? await readReviewedDeckBatch(text.trim()) : null;
       const parsed = reviewed?.parsed ?? parseDeckMarkdown(text);
+      const publicationPreview = reviewed && readSessionUser()?.groups.includes('super_admin')
+        ? await fetchReviewedPublishBaseline(deck.id) : null;
       const cardsResult = await fetchCardsByDeck(deck.id);
       if (generation !== getSessionGeneration()) return;
 
@@ -306,7 +353,8 @@ function DeckImportWorkspace({ deckId }: { deckId: number }) {
       const slugMismatch =
         parsed.deckSlug && deck.slug && parsed.deckSlug !== deck.slug ? parsed.deckSlug : null;
 
-      setPreview({ reviewed: reviewed !== null, parsed, plan, slugMismatch, existing, clearTranslations: false });
+      setPreview({ reviewed: reviewed !== null, publishBaseline: publicationPreview?.data?.baseline ?? null,
+        parsed, plan, slugMismatch, existing, clearTranslations: false });
       setStep('preview');
       markEnd('import:preview');
     } catch (err: unknown) {
@@ -357,7 +405,7 @@ function DeckImportWorkspace({ deckId }: { deckId: number }) {
     return false;
   }, [preview, recoveryLoading, recovery, recoveryError]);
 
-  async function execute(toRun: readonly ImportAction[], saved?: ImportJournal) {
+  async function execute(toRun: readonly ImportAction[], saved?: ImportJournal, publishBaseline?: ReviewedPublishBaseline) {
     if (!deck || (!saved && toRun.length === 0) || running || recoveryError || recoveryLoading) return;
     const owner = readSessionUser()?.sub;
     if (!owner) { setRecoveryError("Sign in again before importing."); return; }
@@ -375,7 +423,7 @@ function DeckImportWorkspace({ deckId }: { deckId: number }) {
     try {
       await withImportJournalLock(owner, deck.id, async () => {
         if (!isCurrent()) return;
-        const journal = saved ? await readImportJournal(owner, deck.id) : await createImportJournal(owner, deck.id, toRun, undefined, preview?.reviewed ? deck.slug : undefined);
+        const journal = saved ? await readImportJournal(owner, deck.id) : await createImportJournal(owner, deck.id, toRun, undefined, preview?.reviewed ? deck.slug : undefined, publishBaseline);
         if (!journal || (saved && saved.runId !== journal.runId)) throw new Error('Saved import changed. Reload this page before continuing.');
         if (!isCurrent()) return;
         setRecovery(journal);
@@ -388,10 +436,23 @@ function DeckImportWorkspace({ deckId }: { deckId: number }) {
             onProgress: (p) => setProgress({ done: p.done, total: p.total }),
           },
         );
-        if (isCurrent()) {
-          setRunResult(result);
-          setRecovery(hasPendingImport(journal) ? journal : null);
+        if (!isCurrent()) return;
+        setRunResult(result);
+        const publish = journal.reviewedPublish;
+        if (publish && !publish.jobId && !publish.refusal && journal.batches[0].state === 'committed' && !controller.signal.aborted) {
+          const operationId = result.batches[0].operationId;
+          const published = await publishReviewedImport(deck.id, operationId, controller.signal);
+          if (!isCurrent()) return;
+          if (published.success && published.data?.jobId) publish.jobId = published.data.jobId;
+          else if (published.error && (published.error.httpStatus ?? 0) >= 400 && (published.error.httpStatus ?? 0) < 500 &&
+              published.error.httpStatus !== 429 && !['PUBLISH_IN_PROGRESS', 'AI_QA_REQUIRED', 'AI_QA_BLOCKED'].includes(published.error.code)) {
+            publish.refusal = published.error.message;
+          }
+          publish.notice = publish.jobId || publish.refusal ? undefined : published.error?.message;
+          saveImportJournal(journal);
         }
+        setPublishResult(publish);
+        setRecovery(hasPendingImport(journal) ? journal : null);
       });
     } catch (error) {
       if (isCurrent()) setRecoveryError(`Import stopped: ${error instanceof Error ? error.message : 'Recovery storage is unavailable.'} Reload this page to recover safely.`);
@@ -481,10 +542,27 @@ function DeckImportWorkspace({ deckId }: { deckId: number }) {
       </div>
 
       <div className="max-w-4xl space-y-4">
+        {(jobId || publishResult?.refusal) && (
+          <div role="status" className="rounded border border-slate-200 bg-white px-4 py-3 text-sm">
+            {publishResult?.refusal ?? (
+              publication.isError ? 'Could not check the publish job.' :
+              publication.data?.status === 'FAILED' ? (publication.data.errorMessage ?? 'Publish failed.') :
+              publication.data?.status === 'SUCCESS' && publication.data.cdnVerificationState === 'verified' && publication.data.buildIsLive && publication.data.manifestState === 'delivered' ? 'Published and verified on the CDN.' :
+              publication.data?.cdnVerificationState === 'needs_attention' || publication.data?.manifestState === 'needs_attention' || publication.data?.dispatchExhausted
+                ? 'Publication needs attention. Check the job status.'
+                : publication.data?.status === 'SUCCESS' && publication.data.buildIsLive === false ? 'This build is no longer live.'
+                : 'Publishing and verifying the card pack.'
+            )}
+            {jobId && <span className="ml-2 break-all">Job {jobId}</span>}
+            {publication.isError && <button type="button" className="ml-2 text-indigo-600"
+              disabled={publication.isFetching} onClick={() => void publication.refetch()}>Check status again</button>}
+          </div>
+        )}
         {recoveryError ? <div role="alert" className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded text-sm">{recoveryError}</div> : null}
-        {recovery ? (
+        {recovery && !recovery.reviewedPublish?.jobId ? (
           <section aria-label="Saved import recovery" className="bg-amber-50 border border-amber-200 text-amber-900 px-4 py-3 rounded space-y-3">
-            <p className="text-sm" role="status">A saved import needs recovery. Committed batches will be kept. Unconfirmed batches are checked before any resend.</p>
+            <p className="text-sm" role="status">{recovery.reviewedPublish ? 'A reviewed batch needs recovery. The original import and publish identity will be reused.' : 'A saved import needs recovery. Committed batches will be kept. Unconfirmed batches are checked before any resend.'}</p>
+            {recovery.reviewedPublish?.notice && <p className="text-sm">{recovery.reviewedPublish.notice}</p>}
             <button type="button" disabled={running || recoveryLoading || !!recoveryError}
               className="px-3 py-2 rounded-md text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700 disabled:bg-slate-300 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
               onClick={() => void execute([], recovery)}>{running ? 'Checking saved import...' : 'Recover saved import'}</button>
@@ -721,8 +799,18 @@ function DeckImportWorkspace({ deckId }: { deckId: number }) {
                              focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                   onClick={() => void execute(actions)}
                 >
-                  Import {actions.length} card{actions.length === 1 ? '' : 's'}
+                  {preview.publishBaseline ? 'Import only' : `Import ${actions.length} card${actions.length === 1 ? '' : 's'}`}
                 </button>
+                {preview.publishBaseline && (
+                  <button
+                    type="button"
+                    disabled={blocked || actions.length === 0 || running || previewing}
+                    className="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:bg-slate-300"
+                    onClick={() => void execute(actions, undefined, preview.publishBaseline ?? undefined)}
+                  >
+                    Import and publish {actions.length} card{actions.length === 1 ? '' : 's'}
+                  </button>
+                )}
 
                 <button
                   type="button"
