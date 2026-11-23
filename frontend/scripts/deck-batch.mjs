@@ -4,16 +4,16 @@ import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
 
 const [command, draftPath, reviewPath, outputPath] = process.argv.slice(2);
-const usage = 'Usage: node frontend/scripts/deck-batch.mjs draft DRAFT.json | pack DRAFT.json REVIEW.json BATCH.json';
+const usage = 'Usage: node frontend/scripts/deck-batch.mjs draft DRAFT.json | pack DRAFT.json REVIEW.json BATCH.json | check-new BATCH.json';
 
 try {
-  if (!draftPath || (command === 'draft' ? process.argv.length !== 4 :
+  if (!draftPath || (['draft', 'check-new'].includes(command) ? process.argv.length !== 4 :
     command !== 'pack' || process.argv.length !== 6)) throw new Error(usage);
   const code = await build({
     entryPoints: [fileURLToPath(new URL('../src/lib/reviewedDeckBatch.ts', import.meta.url))],
     bundle: true, write: false, platform: 'node', format: 'esm', logLevel: 'silent',
   });
-  const { deckBatchDraftHash, parseDeckBatchDraft, readReviewedDeckBatch } =
+  const { deckBatchDraftHash, parseDeckBatchDraft, readReviewedDeckBatch, planReviewedDeckBatch } =
     await import('data:text/javascript;base64,' + Buffer.from(code.outputFiles[0].text).toString('base64'));
   const draft = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(await readFile(draftPath));
   if (command === 'draft') {
@@ -24,6 +24,11 @@ try {
       draftSha256: await deckBatchDraftHash(draft),
       cards: cards.map(({ card, expectedVersion }) => ({ stableUid: card.stableUid, expectedVersion })),
     }, null, 2));
+  } else if (command === 'check-new') {
+    const batch = await readReviewedDeckBatch(draft);
+    const { deckId: id, deckSlug: slug } = batch;
+    const plan = planReviewedDeckBatch(batch, { id, slug, locale: 'en-US' }, []);
+    console.log(`Validated ${plan.creates.length} new cards for ${slug}.`);
   } else {
     const review = JSON.parse(await readFile(reviewPath, 'utf8'));
     const contents = JSON.stringify({ schema: 'reviewed-deck-batch-v1', draft, review }) + '\n';
