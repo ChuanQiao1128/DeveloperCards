@@ -72,7 +72,7 @@ public class PublishJobProcessor : IPublishJobProcessor, IReplayOutcome, IPublis
     if (job.DeckSlug == "aws-saa-fundamentals") await ValidateReleaseJob(jobId);
 
     // Step 3: 业务数据准备
-    var deckData = await LoadDeckDataAsync(job.DeckId);
+    var (deckData, verifyPublicBatch) = await LoadJobDeckDataAsync(job.DeckId, jobId);
 
     if (deckData.Cards.Count == 0)
     {
@@ -90,14 +90,6 @@ public class PublishJobProcessor : IPublishJobProcessor, IReplayOutcome, IPublis
     {
       RouteMetrics.EmitGauge(PublishSnapshot.StaleMetric, 1);
       throw new BusinessException($"{PublishSnapshot.StaleErrorCode}: cards changed after the AI QA publish gate passed; publish again");
-    }
-
-    await using (var snapshotConn = await Pg.OpenConnectionOrNullAsync())
-    {
-      if (snapshotConn is null) throw new InvalidOperationException("Failed to open database connection");
-      if (await PublishDelivery.Ready(snapshotConn) && await DbUtil.ExecuteScalarAsync(snapshotConn,null,
-        "select publish_editing_snapshot is not null and publish_editing_snapshot is distinct from content_editing_snapshot(deck_id) from deck_publishes where job_id=$1",[jobId]) is true)
-        throw new BusinessException($"{PublishSnapshot.StaleErrorCode}: content or settings changed after validation; publish again");
     }
 
     // An automation publish checked the deck's settings too (R18C, backend-design-11): a settings edit since then is a
@@ -126,7 +118,7 @@ public class PublishJobProcessor : IPublishJobProcessor, IReplayOutcome, IPublis
 
     Console.WriteLine($"[JobId={jobId}] Uploaded to S3: {job.S3Key} (sha256={uploadResult.Sha256}, bytes={uploadResult.Bytes})");
 
-    if (job.DeckSlug == "aws-saa-fundamentals")
+    if (verifyPublicBatch || job.DeckSlug == "aws-saa-fundamentals")
     {
       await using var uploadConn = await Pg.OpenConnectionOrNullAsync();
       if (uploadConn is null) throw new InvalidOperationException("Failed to record reviewed build integrity");
@@ -135,7 +127,7 @@ public class PublishJobProcessor : IPublishJobProcessor, IReplayOutcome, IPublis
         "update deck_publishes set content_sha256=$2,content_bytes=$3 where job_id=$1 and status='PROCESSING'",
         [jobId, uploadResult.Sha256, uploadResult.Bytes]);
       if (recorded != 1) throw new BusinessException("RELEASE_GENERATION_CANCELLED: upload did not commit a live build");
-      if (uploadResult.ReviewedContentVerified)
+      if (verifyPublicBatch || uploadResult.ReviewedContentVerified)
         await PublishCdnVerification.StageAsync(uploadConn, tx, jobId, uploadResult.Sha256, deckData.Cards.Count);
       await tx.CommitAsync();
     }
@@ -299,11 +291,37 @@ public class PublishJobProcessor : IPublishJobProcessor, IReplayOutcome, IPublis
   /// <summary>
   /// 从数据库加载卡组数据
   /// </summary>
-  private async Task<DeckExportData> LoadDeckDataAsync(int deckId)
+  private static async Task<(DeckExportData Deck, bool VerifyPublicBatch)> LoadJobDeckDataAsync(int deckId, string jobId)
   {
     await using var conn = await Pg.OpenConnectionOrNullAsync();
     if (conn is null) throw new InvalidOperationException("Failed to open database connection");
+    var durable = await PublishDelivery.Ready(conn);
+    await using var tx = durable ? await conn.BeginTransactionAsync(System.Data.IsolationLevel.RepeatableRead) : null;
+    var verifyPublicBatch = false;
+    if (tx is not null)
+    {
+      var rows = await DbUtil.QueryAsync(conn, tx, """
+        select p.publish_editing_snapshot is distinct from content_editing_snapshot(p.deck_id) as stale,
+          p.publish_editing_snapshot is not null as bound,
+          starts_with(s.action_id,$2) as reviewed,
+          p.release_expected_live is distinct from d.live_build_id as live_changed
+        from deck_publishes p join decks d on d.id=p.deck_id left join publish_dispatch s using(job_id)
+        where p.job_id=$1
+        """, [jobId, PublishCdnVerification.ReviewedBatchActionPrefix]);
+      if (rows.Count != 1) throw new BusinessException("Publish job disappeared before export.");
+      var row = rows[0];
+      verifyPublicBatch = row["reviewed"] is true;
+      if ((row["stale"] is true && row["bound"] is true) ||
+          (verifyPublicBatch && (row["stale"] is true || row["live_changed"] is true)))
+        throw new BusinessException($"{PublishSnapshot.StaleErrorCode}: content or settings changed after validation; publish again");
+    }
+    var data = await LoadDeckDataAsync(conn, tx, deckId);
+    if (tx is not null) await tx.CommitAsync();
+    return (data, verifyPublicBatch);
+  }
 
+  private static async Task<DeckExportData> LoadDeckDataAsync(NpgsqlConnection conn, NpgsqlTransaction? tx, int deckId)
+  {
     // 查询 deck 信息
     const string deckSql = """
       SELECT 
@@ -319,7 +337,7 @@ public class PublishJobProcessor : IPublishJobProcessor, IReplayOutcome, IPublis
       LIMIT 1
       """;
 
-    var deckRows = await DbUtil.QueryAsync(conn, null, deckSql, [deckId]);
+    var deckRows = await DbUtil.QueryAsync(conn, tx, deckSql, [deckId]);
     if (deckRows.Count == 0)
     {
       throw new BusinessException($"Deck {deckId} not found");
@@ -328,7 +346,7 @@ public class PublishJobProcessor : IPublishJobProcessor, IReplayOutcome, IPublis
     var deck = deckRows[0];
     var deckType = Convert.ToInt32(deck["deckType"], CultureInfo.InvariantCulture);
 
-    var cards = await LoadCardsAsync(conn, deckId);
+    var cards = await LoadCardsAsync(conn, deckId, tx);
 
     return new DeckExportData
     {
@@ -356,9 +374,9 @@ public class PublishJobProcessor : IPublishJobProcessor, IReplayOutcome, IPublis
     from cards where deck_id = $1 and is_deleted = 0 order by order_in_deck asc, id asc
     """;
 
-  public static async Task<List<CardExportData>> LoadCardsAsync(NpgsqlConnection conn, int deckId)
+  public static async Task<List<CardExportData>> LoadCardsAsync(NpgsqlConnection conn, int deckId, NpgsqlTransaction? tx = null)
   {
-    var cardRows = await DbUtil.QueryAsync(conn, null, CardsSqlTranslations, [deckId]);
+    var cardRows = await DbUtil.QueryAsync(conn, tx, CardsSqlTranslations, [deckId]);
 
     return cardRows.Select(c => new CardExportData
     {

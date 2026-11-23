@@ -289,9 +289,8 @@ public static partial class Publish
 
     if (req.Method != "POST") return res.MethodNotAllowed("Method not allowed");
 
-    var mode = (req.Query.TryGetValue("mode", out var m) ? m : string.Empty).Trim().ToLowerInvariant() == "preview"
-      ? "preview"
-      : "publish";
+    var requestedMode = req.Query.GetValueOrDefault("mode")?.Trim().ToLowerInvariant();
+    var mode = requestedMode is "preview" or "reviewed-batch-preview" ? requestedMode : "publish";
 
     var queueUrl = TestEnqueueSeam?.QueueUrl ?? PublishJobQueueUrl;
 
@@ -316,8 +315,11 @@ public static partial class Publish
       var denyDeck = await Helpers.RequireDeckWrite(conn, adminSub, deckIdInt, isSuperAdmin, res);
       if (denyDeck is not null) return denyDeck;
 
+      if (mode == "reviewed-batch-preview") return await PreviewReviewedBatch(conn, deckIdInt, auth, res);
       if (mode == "publish")
       {
+        if (body.TryGetProperty("reviewedImportOperationId", out _))
+          return await PublishReviewedBatch(conn, deckIdInt, body, auth, res);
         // The publish path is shared with the automation (A00 §6.4); the console binds the snapshot only when the
         // AI QA gate is enforced and resumes a recent active job instead of refusing it.
         if (await ContentRelease.Applies(conn, deckIdInt))
@@ -441,7 +443,7 @@ public static partial class Publish
   /// </summary>
   internal static async Task<PublishStart> StartPublishAsync(NpgsqlConnection conn, long deckId, string actorSub, string? note,
     bool bindSnapshot, string? expectedSnapshot, bool allowResume, DateTime? expectedDeckUpdatedAt = null, CancellationToken ct = default,
-    string? actionId = null, string? requestHash = null, bool actorSuperadmin = false)
+    string? actionId = null, string? requestHash = null, bool actorSuperadmin = false, ReviewedBaseline? reviewedBatch = null)
   {
     ct.ThrowIfCancellationRequested();
     var queueUrl = TestEnqueueSeam?.QueueUrl ?? PublishJobQueueUrl;
@@ -458,6 +460,7 @@ public static partial class Publish
         ? await DispatchPublishAsync(conn, replay, deckId, "", actorSub, note, queueUrl, ct) : replay;
     }
     var editingSnapshot = durable ? (string?)await DbUtil.ExecuteScalarAsync(conn, null, "select content_editing_snapshot($1)", [deckId]) : null;
+    if (reviewedBatch is not null && editingSnapshot != reviewedBatch.EditingSnapshot) return StaleRefusal(deckId);
     var loaded = await LoadDeckAsync(conn, deckId);
     if (loaded.Refusal is not null) return loaded.Refusal;
     bindSnapshot |= durable;
@@ -608,7 +611,7 @@ public static partial class Publish
     await using var tx = durable ? await conn.BeginTransactionAsync(RecallSmith.Lambda.Common.RequestBudget.Combine(ct)) : null;
     if (tx is not null)
     {
-      await DbUtil.QueryAsync(conn, tx, "select id from decks where id=$1 for update", [deckId]);
+      var currentDeck = await DbUtil.QueryAsync(conn, tx, "select live_build_id from decks where id=$1 for update", [deckId]);
       if (actionId is not null)
       {
         var replay = await ReplayOrdinary(conn, tx, deckId, actionId, requestHash);
@@ -618,6 +621,8 @@ public static partial class Publish
           return replay.Outcome == Resumed ? await DispatchPublishAsync(conn, replay, deckId, deckSlug, actorSub, note, queueUrl, ct) : replay;
         }
       }
+      if (reviewedBatch is not null && (currentDeck.Count != 1 || currentDeck[0]["live_build_id"] as string != reviewedBatch.LiveBuildId))
+        return StaleRefusal(deckId);
       if (!Equals(editingSnapshot, await DbUtil.ExecuteScalarAsync(conn, tx, "select content_editing_snapshot($1)", [deckId])))
         return StaleRefusal(deckId);
     }
@@ -636,7 +641,8 @@ public static partial class Publish
 
     if (tx is not null)
     {
-      await DbUtil.ExecuteAsync(conn, tx, "update deck_publishes set publish_editing_snapshot=$2 where job_id=$1", [jobId, editingSnapshot]);
+      await DbUtil.ExecuteAsync(conn, tx, "update deck_publishes set publish_editing_snapshot=$2,release_expected_live=$3::text where job_id=$1",
+        [jobId, editingSnapshot, reviewedBatch?.LiveBuildId]);
       await PublishDelivery.Stage(conn, tx, jobId, actorSuperadmin, actionId, requestHash);
       await tx.CommitAsync(RecallSmith.Lambda.Common.RequestBudget.Combine(ct));
     }
@@ -649,6 +655,8 @@ public static partial class Publish
     if (!body.TryGetProperty("actionId", out var value) || value.ValueKind == JsonValueKind.Null) return null;
     if (value.ValueKind != JsonValueKind.String || value.GetString() is not { Length: > 0 and <= 100 } action)
       throw new ValidationError("actionId must be a string of 1..100 characters", "actionId");
+    if (action.StartsWith(PublishCdnVerification.ReviewedBatchActionPrefix, StringComparison.Ordinal))
+      throw new ValidationError("Reserved action ID.", "actionId");
     return action;
   }
 

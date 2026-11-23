@@ -150,6 +150,7 @@ public static class CardsImport
 
     long deckId;
     string? reviewedDeckSlug = null;
+    Publish.ReviewedBaseline? publishBaseline = null;
     string? deckLocale;
     List<ImportCard> cards;
 
@@ -166,6 +167,15 @@ public static class CardsImport
       deckId = Helpers.RequireInteger(deckIdEl, "deckId");
       if (body.TryGetProperty("expectedDeckSlug", out _))
         reviewedDeckSlug = ContentRelease.Required(body, "expectedDeckSlug");
+
+      if (body.TryGetProperty("reviewedPublishBaseline", out var baseline))
+      {
+        if (!Publish.CanPublishReviewedBatch(auth)) return res.Forbidden();
+        if (reviewedDeckSlug is null || baseline.ValueKind != JsonValueKind.Object ||
+            !baseline.TryGetProperty("liveBuildId", out var live) || live.ValueKind is not (JsonValueKind.String or JsonValueKind.Null))
+          return res.BadRequest("VALIDATION_ERROR", "Reviewed publishing requires a deck slug and a release baseline.");
+        publishBaseline = new(ContentRelease.Required(baseline, "editingSnapshot", 64), live.GetString());
+      }
 
       if (!body.TryGetProperty("cards", out var cardsEl) || cardsEl.ValueKind != JsonValueKind.Array)
       {
@@ -390,6 +400,9 @@ public static class CardsImport
           if (!string.Equals(deckRows[0]["slug"] as string, reviewedDeckSlug, StringComparison.Ordinal))
             return Helpers.ErrorEnvelope(res, 409, "DECK_SLUG_CONFLICT", "The target deck changed since this batch was reviewed.");
           deckLocale = deckRows[0]["locale"] as string;
+          if (publishBaseline is not null && publishBaseline != await Publish.ReviewedBatchBaseline(conn, tx, deckId))
+            return Helpers.ErrorEnvelope(res, 409, "REVIEWED_BASELINE_CHANGED", "The editing deck or live build changed after preview.");
+
         }
       }
 
@@ -604,7 +617,9 @@ public static class CardsImport
       await DbUtil.ExecuteAsync(conn, tx, "set constraints uq_cards_deck_order immediate", []);
       if (genericImport)
       {
-        releaseResult = res.Ok(new { deckId, created, updated, unchanged = unchangedUids.Count,
+        var reviewedPublish = publishBaseline is null ? null : new Publish.ReviewedBaseline(
+          await ContentRelease.EditingSnapshot(conn, tx, deckId), publishBaseline.LiveBuildId);
+        releaseResult = res.Ok(new { deckId, created, updated, unchanged = unchangedUids.Count, reviewedPublish,
           cards = cards.Select(c => new { stableUid = c.StableUid, id = ids[c.StableUid], action = actions[c.StableUid] }).ToArray() });
         await ContentRelease.Save(conn, tx, deckId, releaseId!, actionId!, "cards/import", payloadHash!, releaseResult);
       }

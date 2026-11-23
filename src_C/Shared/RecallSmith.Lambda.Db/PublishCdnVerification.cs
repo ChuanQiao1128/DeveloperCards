@@ -4,6 +4,8 @@ namespace RecallSmith.Lambda.Db;
 
 public static class PublishCdnVerification
 {
+  // The publish API reserves this prefix for jobs linked to reviewed import receipts.
+  public const string ReviewedBatchActionPrefix = "reviewed-batch:";
   public const string EventType = "content_cdn_verification";
   // Initial delay plus the five receives on the existing notify queue normally fit within 15 minutes.
   private const string ReceiptOverdue = "CDN_RECEIPT_OVERDUE";
