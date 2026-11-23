@@ -13,7 +13,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 
-import { fetchCardsByDeck, fetchDeckById, fetchPublishJob, fetchReviewedPublishBaseline, importCardsBatch, lookupImportReceipt, publishReviewedImport, type ReviewedPublishBaseline } from '../api/authoring';
+import { fetchCardsByDeck, fetchDeckById, fetchPublishJob, fetchReviewedPublishBaseline, findReviewedPublish, importCardsBatch, lookupImportReceipt, publishReviewedImport, type ReviewedPublishBaseline, type SavedReviewedPublish } from '../api/authoring';
 import { getSessionGeneration, subscribeSessionChanges } from '../auth/tokenStore';
 import { readSessionUser } from '../auth/sessionUser';
 import { createImportJournal, readImportJournal, saveImportJournal, hasPendingImport, withImportJournalLock, type ImportJournal } from '../lib/deckImportJournal';
@@ -176,6 +176,9 @@ function DeckImportWorkspace({ deckId }: { deckId: number }) {
   const [recoveryError, setRecoveryError] = useState<string | null>(null);
   const [recoveryLoading, setRecoveryLoading] = useState(true);
   const account = readSessionUser()?.sub;
+  const [savedPublish, setSavedPublish] = useState<SavedReviewedPublish | null>(null);
+  const [savedPublishMessage, setSavedPublishMessage] = useState('');
+  const [findingPublish, setFindingPublish] = useState(false);
   const [publishResult, setPublishResult] = useState<ImportJournal['reviewedPublish']>();
   const jobId = publishResult?.jobId;
   const publication = useQuery({
@@ -207,7 +210,7 @@ function DeckImportWorkspace({ deckId }: { deckId: number }) {
   useEffect(() => subscribeSessionChanges(() => {
     abortRef.current?.abort();
     setSessionGeneration(getSessionGeneration());
-    setRecovery(null); setPublishResult(undefined); setRunResult(null); setPreview(null); setText(''); setBaselineMessage(''); setStep('input'); setRunning(false);
+    setRecovery(null); setPublishResult(undefined); setSavedPublish(null); setSavedPublishMessage(''); setFindingPublish(false); setRunResult(null); setPreview(null); setText(''); setBaselineMessage(''); setStep('input'); setRunning(false);
   }), []);
 
   useEffect(() => {
@@ -470,6 +473,46 @@ function DeckImportWorkspace({ deckId }: { deckId: number }) {
     }
   }
 
+  async function recoverRemotePublish(operation?: SavedReviewedPublish) {
+    if (running || findingPublish || (operation && !operation.canResume)) return;
+    const generation = getSessionGeneration();
+    if (!readSessionUser()?.groups.includes('super_admin')) return;
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const current = () => !controller.signal.aborted && generation === getSessionGeneration();
+    setFindingPublish(true);
+    setSavedPublishMessage('');
+    try {
+      if (!operation) {
+        const result = await findReviewedPublish(deckId);
+        if (!current()) return;
+        if (!result.success) throw new Error(result.error?.message ?? 'Could not find a saved publication.');
+        const batch = result.data?.batch ?? null;
+        setSavedPublish(batch);
+        if (batch?.jobId) {
+          setPublishResult({ jobId: batch.jobId });
+          if (batch.canResume) setSavedPublishMessage('The publish job exists. Resume delivery of the same job.');
+        }
+        else setSavedPublishMessage(!batch ? 'No saved reviewed publication for this account and deck.' :
+          batch.canResume ? 'Import confirmed. Resume publishing this reviewed batch.' :
+            'The deck changed after import. Review the current contents before publishing.');
+      } else {
+        const result = await publishReviewedImport(deckId, operation.operationId, controller.signal);
+        if (!current()) return;
+        if (!result.success || !result.data?.jobId) throw new Error(result.error?.message ?? 'Publication was not confirmed. Check the saved publication again.');
+        setPublishResult({ jobId: result.data.jobId });
+        setSavedPublish(null);
+      }
+    } catch (error) {
+      if (current()) setSavedPublishMessage(error instanceof Error ? error.message : 'Publication recovery failed.');
+    } finally {
+      if (current()) {
+        setFindingPublish(false);
+        abortRef.current = null;
+      }
+    }
+  }
+
   function restart() {
     setStep('input');
     setPreview(null);
@@ -594,11 +637,23 @@ function DeckImportWorkspace({ deckId }: { deckId: number }) {
                     Copy card versions
                   </button>
                 )}
+                {readSessionUser()?.groups.includes('super_admin') && !hasReviewedDeckRelease(deck) && (
+                  <button type="button" className="text-sm text-indigo-600 hover:text-indigo-800"
+                    disabled={findingPublish || running || recoveryLoading || Boolean(recovery)}
+                    onClick={() => void recoverRemotePublish()}>Find saved publication</button>
+                )}
                 {fileName ? (
                   <span className="text-xs text-slate-500 font-mono">{fileName}</span>
                 ) : null}
               </div>
 
+              {savedPublishMessage && <p role="status" className="text-sm text-slate-600">{savedPublishMessage}</p>}
+              {savedPublish?.canResume && (
+                <button type="button" className="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white disabled:bg-slate-300"
+                  disabled={findingPublish || running || Boolean(recovery)} onClick={() => void recoverRemotePublish(savedPublish)}>
+                  Resume saved publication
+                </button>
+              )}
               {baselineMessage && <p role="status" className="text-sm text-slate-600">{baselineMessage}</p>}
 
               {fileError ? (

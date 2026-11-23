@@ -290,7 +290,7 @@ public static partial class Publish
     if (req.Method != "POST") return res.MethodNotAllowed("Method not allowed");
 
     var requestedMode = req.Query.GetValueOrDefault("mode")?.Trim().ToLowerInvariant();
-    var mode = requestedMode is "preview" or "reviewed-batch-preview" ? requestedMode : "publish";
+    var mode = requestedMode is "preview" or "reviewed-batch-preview" or "reviewed-batch-recovery" ? requestedMode : "publish";
 
     var queueUrl = TestEnqueueSeam?.QueueUrl ?? PublishJobQueueUrl;
 
@@ -316,6 +316,7 @@ public static partial class Publish
       if (denyDeck is not null) return denyDeck;
 
       if (mode == "reviewed-batch-preview") return await PreviewReviewedBatch(conn, deckIdInt, auth, res);
+      if (mode == "reviewed-batch-recovery") return await FindReviewedBatch(conn, deckIdInt, auth, res);
       if (mode == "publish")
       {
         if (body.TryGetProperty("reviewedImportOperationId", out _))
@@ -705,10 +706,13 @@ public static partial class Publish
     {
       // SQS may have accepted the message; the worker owns status after the committed insert.
       Log.Event("warn", new { tag = "publish", outcome = DispatchUnconfirmed, jobId = start.JobId, deckId, error = ex.Message });
-      return start with { Outcome = DispatchUnconfirmed, HttpStatus = 503, Code = "PUBLISH_DISPATCH_UNCONFIRMED",
-        Message = "Publish job committed; delivery is unconfirmed. Poll this job or retry publish to deliver the same pending job." };
+      return UnconfirmedPublish(start);
     }
   }
+
+  private static PublishStart UnconfirmedPublish(PublishStart start) =>
+    start with { Outcome = DispatchUnconfirmed, HttpStatus = 503, Code = "PUBLISH_DISPATCH_UNCONFIRMED",
+      Message = "Publish job committed; delivery is unconfirmed. Poll this job or retry publish to deliver the same pending job." };
 
   private static PublishStart StaleRefusal(long deckId)
   {

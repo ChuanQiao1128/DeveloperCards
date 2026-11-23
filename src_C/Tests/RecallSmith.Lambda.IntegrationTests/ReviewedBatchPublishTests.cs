@@ -116,9 +116,14 @@ public sealed class ReviewedBatchPublishTests(PostgresFixture db)
 
       var operation = Guid.NewGuid().ToString("D");
       Data(await Import(id, slug, operation, await Baseline(id), Card("first-card", 10, 0, "First question")));
+      var saved = Data(await CallPublish(id, new { deckId = id }, "reviewed-batch-recovery")).GetProperty("batch");
+      Assert.True(saved.GetProperty("canResume").GetBoolean());
+      Assert.Equal(operation, saved.GetProperty("operationId").GetString());
       await db.QueryAsync("update cards set question='Concurrent card edit' where deck_id=$1", id);
       var publish = await CallPublish(id, new { deckId = id, reviewedImportOperationId = operation });
       Assert.Equal(409, publish.StatusCode);
+      var stale = Data(await CallPublish(id, new { deckId = id }, "reviewed-batch-recovery")).GetProperty("batch");
+      Assert.False(stale.GetProperty("canResume").GetBoolean());
       Assert.Empty(await db.QueryAsync("select job_id from deck_publishes where deck_id=$1", id));
       Assert.Equal(JsonValueKind.Null, (await Baseline(id)).ValueKind);
     }

@@ -726,6 +726,21 @@ export async function fetchReviewedPublishBaseline(deckId: number): Promise<ApiR
   }
 }
 
+export interface SavedReviewedPublish {
+  operationId: string;
+  jobId: string | null;
+  canResume: boolean;
+}
+
+export async function findReviewedPublish(deckId: number): Promise<ApiResult<{ batch: SavedReviewedPublish | null }>> {
+  try {
+    return (await http.post<ApiResult<{ batch: SavedReviewedPublish | null }>>(
+      '/api/v1/authoring/publish?mode=reviewed-batch-recovery', { deckId })).data;
+  } catch (err) {
+    return apiResultFromError(err);
+  }
+}
+
 export async function publishReviewedImport(deckId: number, reviewedImportOperationId: string, signal: AbortSignal): Promise<ApiResult<PublishStarted>> {
   try {
     return (await http.post<ApiResult<PublishStarted>>('/api/v1/authoring/publish',

@@ -48,6 +48,37 @@ public static partial class Publish
     return res.Ok(new { baseline });
   }
 
+  private static string ReviewedActionPrefix(string actorHash) =>
+    PublishCdnVerification.ReviewedBatchActionPrefix + actorHash[..24] + ":";
+
+  private static async Task<APIGatewayProxyResponse> FindReviewedBatch(
+    NpgsqlConnection conn, long deckId, AuthContext auth, Res res)
+  {
+    if (!CanPublishReviewedBatch(auth)) return res.Forbidden();
+    if (!await PublishDelivery.Ready(conn)) return res.Ok(new { batch = (object?)null });
+
+    var actorHash = ContentRelease.Hash(auth.UserSub!);
+    var rows = await DbUtil.QueryAsync(conn, null, """
+      with latest as (
+        select action_id, coalesce(result->>'body',result->>'Body')::jsonb #> '{data,reviewedPublish}' as approval
+        from content_release_actions
+        where deck_id=$1 and release_id=$2 and kind='cards/import'
+          and jsonb_typeof(coalesce(result->>'body',result->>'Body')::jsonb #> '{data,reviewedPublish}')='object'
+        order by created_at desc, action_id desc
+        limit 1
+      )
+      select a.action_id,s.job_id,
+        a.approval->>'editingSnapshot'=content_editing_snapshot(d.id)
+          and (a.approval->>'liveBuildId') is not distinct from d.live_build_id
+          and (s.job_id is null or (p.status='PENDING' and s.delivered_at is null and s.attempts<5)) as can_resume
+      from latest a join decks d on d.id=$1 and d.is_deleted=0 and d.slug<>$4
+      left join publish_dispatch s on s.deck_id=d.id and s.action_id=$3 || a.action_id
+      left join deck_publishes p on p.job_id=s.job_id
+      """, [deckId, "console-import-v1:" + actorHash, ReviewedActionPrefix(actorHash), ContentRelease.DeckSlug]);
+    if (rows.Count == 0) return res.Ok(new { batch = (object?)null });
+    return res.Ok(new { batch = new { operationId = rows[0]["action_id"], jobId = rows[0]["job_id"], canResume = rows[0]["can_resume"] is true } });
+  }
+
   private static async Task<APIGatewayProxyResponse> PublishReviewedBatch(
     NpgsqlConnection conn, long deckId, JsonElement body, AuthContext auth, Res res)
   {
@@ -56,20 +87,26 @@ public static partial class Publish
       throw new ValidationError("Invalid reviewed import operation.", "reviewedImportOperationId");
     var actorHash = ContentRelease.Hash(auth.UserSub!);
     var result = await DbUtil.ExecuteScalarAsync(conn, null, """
-      select result from content_release_actions where deck_id=$1 and release_id=$2 and action_id=$3 and kind='cards/import'
+      select coalesce(result->>'body',result->>'Body') from content_release_actions where deck_id=$1 and release_id=$2 and action_id=$3 and kind='cards/import'
       """, [deckId, "console-import-v1:" + actorHash, operation.ToString("D")]) as string;
     if (result is null) return res.BadRequest("REVIEWED_IMPORT_REQUIRED", "Import receipt is missing.");
-    var receipt = JsonSerializer.Deserialize<APIGatewayProxyResponse>(result)!;
-    using var doc = JsonDocument.Parse(receipt.Body);
+    using var doc = JsonDocument.Parse(result);
     var data = doc.RootElement.GetProperty("data");
     if (!data.TryGetProperty("reviewedPublish", out var ready) || ready.ValueKind != JsonValueKind.Object)
       return res.BadRequest("REVIEWED_IMPORT_REQUIRED", "Import was not confirmed for publishing.");
     var baseline = new ReviewedBaseline(ready.GetProperty("editingSnapshot").GetString()!,
       ready.GetProperty("liveBuildId").GetString());
-    var action = PublishCdnVerification.ReviewedBatchActionPrefix + actorHash[..24] + ":" + operation.ToString("D");
+    var action = ReviewedActionPrefix(actorHash) + operation.ToString("D");
     var start = await StartPublishAsync(conn, deckId, auth.UserSub!, null, bindSnapshot: true, expectedSnapshot: null,
       allowResume: false, actionId: action, requestHash: ContentRelease.PayloadHash(body), actorSuperadmin: true,
       reviewedBatch: baseline);
+    // A replay can find a committed job while another dispatcher still holds
+    // its lease. Keep recovery available until delivery is actually confirmed.
+    if (start.Outcome == Resumed && await DbUtil.ExecuteScalarAsync(conn, null, """
+      select exists(select 1 from publish_dispatch s join deck_publishes p using(job_id)
+        where s.job_id=$1 and p.status='PENDING' and s.delivered_at is null)
+      """, [start.JobId]) is true)
+      start = UnconfirmedPublish(start);
     return StartResponse(start, res);
   }
 }

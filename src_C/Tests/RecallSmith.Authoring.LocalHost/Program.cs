@@ -13,6 +13,8 @@ Environment.SetEnvironmentVariable("AUTOMATION_MODE", "off");
 Environment.SetEnvironmentVariable("AI_QA_ENABLED", "0");
 var db = new PostgresFixture();
 await db.InitializeAsync();
+LocalPublishHarness.Configure();
+var publication = new LocalPublishHarness(db);
 var function = new VpcFunction();
 var builder = WebApplication.CreateBuilder(args);
 builder.WebHost.UseUrls("http://127.0.0.1:5187");
@@ -20,12 +22,13 @@ var app = builder.Build();
 var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../../"));
 var dist = new PhysicalFileProvider(Path.Combine(root, "frontend/dist"));
 var identities = new Dictionary<string, (string Sub, string[] Groups)>();
-foreach (var who in new[] { "owner", "reader", "outsider" })
+foreach (var who in new[] { "owner", "reader", "outsider", "publisher", "other-publisher" })
 {
-  var claims = new Dictionary<string, object> { ["sub"] = "local-" + who, ["cognito:groups"] = new[] { "editor" } };
+  string[] groups = who.EndsWith("publisher", StringComparison.Ordinal) ? ["super_admin"] : ["editor"];
+  var claims = new Dictionary<string, object> { ["sub"] = "local-" + who, ["cognito:groups"] = groups };
   string Segment(object o) => Convert.ToBase64String(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(o))).TrimEnd('=').Replace('+', '-').Replace('/', '_');
   var token = Segment(new { alg = "none" }) + "." + Segment(claims) + ".local-test-only";
-  identities.Add(token, ("local-" + who, ["editor"]));
+  identities.Add(token, ("local-" + who, groups));
 }
 var dropNext = 0;
 var editAfterCommit = 0;
@@ -66,7 +69,19 @@ app.MapPost("/__test/seed", async (HttpRequest request) => {
 app.MapGet("/__test/state/{deckId:long}", async (long deckId) => Results.Ok(new {
   cards = await db.QueryAsync("select id,stable_uid,question,explanation,version,order_in_deck from cards where deck_id=$1 and is_deleted=0 order by id", deckId),
   receipts = await db.QueryAsync("select action_id,kind from content_release_actions where deck_id=$1", deckId),
+  jobs = await db.QueryAsync("""
+    select p.job_id,p.status,s.delivered_at is not null as dispatched
+    from deck_publishes p left join publish_dispatch s using(job_id) where p.deck_id=$1
+    """, deckId),
 }));
+app.MapPost("/__test/fail-next-publish-dispatch", () => LocalPublishHarness.FailNextDispatch());
+app.MapPost("/__test/expire-publish-lease/{jobId:guid}", async (Guid jobId) =>
+  await db.QueryAsync("update publish_dispatch set lease_until=now()-interval '1 second' where job_id=$1 returning job_id", jobId.ToString("D")));
+app.MapPost("/__test/build/{jobId:guid}", async (Guid jobId) => Results.Ok(await publication.BuildAsync(jobId.ToString("D"))));
+app.MapPost("/__test/cdn-receipt/{jobId:guid}", async (Guid jobId, JsonElement body) =>
+  Results.Ok(await publication.RecordAsync(jobId.ToString("D"), body)));
+app.MapGet("/__test/cdn/{**path}", (string path) =>
+  publication.Read(path) is { } bytes ? Results.Bytes(bytes, "application/json") : Results.NotFound());
 app.MapPost("/__test/drop-next-import", (HttpRequest request) => {
   Interlocked.Exchange(ref editAfterCommit, request.Query.ContainsKey("edit") ? 1 : 0);
   Interlocked.Exchange(ref dropNext, 1);
