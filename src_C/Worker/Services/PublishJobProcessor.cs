@@ -313,7 +313,10 @@ public class PublishJobProcessor : IPublishJobProcessor, IReplayOutcome, IPublis
       verifyPublicBatch = row["reviewed"] is true;
       if ((row["stale"] is true && row["bound"] is true) ||
           (verifyPublicBatch && (row["stale"] is true || row["live_changed"] is true)))
+      {
+        RouteMetrics.EmitGauge(PublishSnapshot.StaleMetric, 1);
         throw new BusinessException($"{PublishSnapshot.StaleErrorCode}: content or settings changed after validation; publish again");
+      }
     }
     var data = await LoadDeckDataAsync(conn, tx, deckId);
     if (tx is not null) await tx.CommitAsync();
