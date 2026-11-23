@@ -413,7 +413,9 @@ class ExamDeckWorkflowTests(unittest.TestCase):
 
     def test_many_question_hints_leave_room_for_an_automatic_rule_match(self):
         hints = [{**DOC, 'source': f'hint-{index}'} for index in range(5)]
-        packet = flow.evidence_packet(FrozenSources(), [DOC['url']], 'persistent disk', 3, hints)
+        sources = FrozenSources()
+        with patch.object(sources, 'packet', side_effect=lambda urls, query, limit: (hints + [DOC])[:limit]):
+            packet = flow.evidence_packet(sources, [DOC['url']], 'persistent disk', 3, hints)
         self.assertEqual([row['source'] for row in packet], ['hint-0', 'hint-1', 'disk'])
 
     def test_source_citation_retry_is_bounded_and_preserves_exact_quote_gate(self):

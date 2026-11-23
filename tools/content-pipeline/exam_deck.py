@@ -343,7 +343,7 @@ def resolve_evidence_hints(config, questions, sources):
 
 def evidence_packet(sources, urls, query, limit, hints):
     pinned = {row['source']: row for row in hints}
-    retrieved = sources.packet(urls, query, limit)
+    retrieved = sources.packet(urls, query, limit + len(pinned))
     if not pinned:
         return retrieved
     additional = [row for row in retrieved if row['source'] not in pinned]
@@ -569,7 +569,9 @@ def select_cards(model, sources, rules, needed, seed_urls, standard, revisions, 
                 'Write original bilingual mobile cards for these rule keys using the complete rules below. '
                 'Use one practical decision and explain the causal mechanism. Each front must be a short '
                 'concrete scenario, blank line and one question. checkEn is exactly the minimum answer the '
-                'front asks for. Provide exact verbatim quotes separately for both answer and reason. '
+                'front asks for. Any unasked recovery step or configuration may illustrate the reason, '
+                'but must not become a required answer or a separate recall task. '
+                'Provide exact verbatim quotes separately for both answer and reason. '
                 'Each citation source is the opaque source identifier copied from an evidence row. '
                 'During revision, address the specific coverage finding and preserve the proven scope of '
                 'the prior draft. If facts cannot be established, return insufficient and explain.\n\n'
@@ -589,8 +591,9 @@ def select_cards(model, sources, rules, needed, seed_urls, standard, revisions, 
             _, reviews = result_rows(model, 'card-review', (
                 'Independently review each frozen card. Pass only if every answer and reason is supported '
                 'by its cited official source, EN/ZH have the same meaning and conditions, the card teaches '
-                'one useful mobile-size judgment and causal mechanism, the prompt is unambiguous, the '
-                'self-check matches the front, and a changed condition can be reasoned through. '
+                'one useful mobile-size judgment and causal mechanism, the prompt is unambiguous, and '
+                'a changed condition can be reasoned through. Compare each item in the self-check to '
+                'what the front explicitly asks. Revise if any item requires an unasked follow-up action. '
                 'For revise, identify the defect and the smallest sound repair.\n\n' + standard),
                 {'cards': list(valid.values()), 'evidence': {k: packets[k] for k in valid}}, REVIEW, 'cards', 'key', valid)
             for key, review in reviews.items():
