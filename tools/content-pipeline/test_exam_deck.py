@@ -382,6 +382,60 @@ class ExamDeckWorkflowTests(unittest.TestCase):
         self.assertEqual(last['questions']['Q1']['sourceReview']['verdict'], 'unsound')
         self.assertEqual(result['bundles'], [])
 
+    def test_exact_question_hint_reaches_author_without_leaking_into_question_proof(self):
+        url = DOC['url']
+        page = {'url': url, 'title': DOC['title'], 'sourceId': flow.digest(DOC['text']),
+                'chunks': [{'id': 'p1', 'charStart': 0, 'charEnd': len(DOC['text']), 'text': DOC['text']}]}
+        config = {'deckSlug': 'exam-test', 'evidenceHints': {'Q1': [{'url': url, 'quote': QUOTE}]}}
+        base_model = Model()
+
+        def model(stage, instructions, data, schema):
+            response = base_model(stage, instructions, data, schema)
+            if stage == 'author':
+                evidence = data['evidence'][RULE['key']]
+                self.assertEqual([row['text'] for row in evidence], [DOC['text']])
+                for ref in response['cards'][0]['evidence']:
+                    ref['source'] = evidence[0]['source']
+            if stage == 'question-review':
+                self.assertNotIn('evidence', data['packets'][0])
+                self.assertNotIn('answer', data['packets'][0]['question'])
+            return response
+
+        with tempfile.TemporaryDirectory() as directory, patch.object(flow, 'ingest', return_value=page) as fetch:
+            root = Path(directory)
+            result = flow.execute(root, config, [question(1)], 'rules', model, flow.Sources(root, FrozenSources.hosts),
+                                  exporter=lambda *args: ['bundle'])
+            self.assertEqual(result['counts'], {'supported': 1})
+            config['evidenceHints']['Q1'][0]['quote'] = 'A statement absent from the source'
+            with self.assertRaisesRegex(ValueError, 'absent from the named frozen source'):
+                flow.execute(root, config, [question(1)], 'rules', self.fail, flow.Sources(root, FrozenSources.hosts))
+            self.assertEqual(fetch.call_count, 1)
+
+    def test_many_question_hints_leave_room_for_an_automatic_rule_match(self):
+        hints = [{**DOC, 'source': f'hint-{index}'} for index in range(5)]
+        packet = flow.evidence_packet(FrozenSources(), [DOC['url']], 'persistent disk', 3, hints)
+        self.assertEqual([row['source'] for row in packet], ['hint-0', 'hint-1', 'disk'])
+
+    def test_source_citation_retry_is_bounded_and_preserves_exact_quote_gate(self):
+        for recovered in (True, False):
+            with self.subTest(recovered=recovered):
+                requests = []
+                def model(stage, instructions, data, schema):
+                    self.assertEqual(stage, 'source-review')
+                    requests.append(data)
+                    quote = QUOTE if recovered and len(requests) == 2 else 'Absent from the exact original chunk.'
+                    source = DOC['url'] if len(requests) == 1 else 'disk'
+                    return {'verdict': 'unsound', 'evidence': [{'source': source, 'quote': quote}],
+                            'note': 'The answer options contradict the cited source.'}
+
+                report = {'status': 'source_issue', 'note': 'Potential source issue.'}
+                flow.source_issue(model, FrozenSources(), [DOC['url']], question(1), report, [])
+                self.assertEqual(len(requests), 2)
+                self.assertNotIn('citationRepair', requests[0])
+                self.assertIn('literal evidence.source ID', requests[1]['citationRepair'])
+                self.assertEqual(report['status'], 'confirmed_source_issue' if recovered else 'source_issue')
+                self.assertEqual(len(report['sourceCitationErrors']), 1 if recovered else 2)
+
     def test_transient_source_failure_retries_before_freezing_snapshot(self):
         url = DOC['url']
         page = {'url': url, 'title': DOC['title'], 'sourceId': flow.digest(DOC['text']),
